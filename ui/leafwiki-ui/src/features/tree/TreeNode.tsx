@@ -37,6 +37,22 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
   const isLoggedIn = useSessionStore((s) => s.user !== null)
   const isActive = isStoreActive
 
+  const handleLinkClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (
+      node.kind !== NODE_KIND_SECTION ||
+      !isActive ||
+      event.button !== 0 ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return
+    }
+
+    toggleNode(node.id)
+  }
+
   const dndEnabled = useTreeDndStore((s) => s.enabled)
   const isDragActive = useTreeDndStore((s) => s.activeId === node.id)
   const dropZone = useTreeDndStore((s) =>
@@ -73,6 +89,7 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
         data-testid={`tree-node-link-${node.id}`}
         aria-current={isActive ? 'page' : undefined}
         draggable={false}
+        onClick={handleLinkClick}
       >
         <span
           className={clsx('tree-node__title', {
