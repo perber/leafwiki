@@ -10,7 +10,12 @@ import {
   type RevisionComparison,
   type RevisionSnapshot,
 } from '@/lib/api/revisions'
-import { formatRelativeTime } from '@/lib/formatDate'
+import {
+  formatDateOnly,
+  formatDateTime,
+  formatRelativeTime,
+  formatTimeOnly,
+} from '@/lib/formatDate'
 import i18next from '@/lib/i18n'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { buildHistoryUrl, withBasePath } from '@/lib/routePath'
@@ -83,13 +88,7 @@ type RevisionGroup = {
 
 function groupLabel(value?: string) {
   if (!value) return t('common.unknown')
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return t('common.unknown')
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-  }).format(date)
+  return formatDateOnly(value) || t('common.unknown')
 }
 
 function groupRevisions(revisions: Revision[]): RevisionGroup[] {
@@ -113,12 +112,7 @@ function groupRevisions(revisions: Revision[]): RevisionGroup[] {
 function revisionTitle(revision: Revision) {
   if (!revision.createdAt) return t('common.unknownTime')
 
-  const date = new Date(revision.createdAt)
-  if (Number.isNaN(date.getTime())) return revision.createdAt
-
-  return new Intl.DateTimeFormat(undefined, {
-    timeStyle: 'short',
-  }).format(date)
+  return formatTimeOnly(revision.createdAt) || revision.createdAt
 }
 
 function revisionMeta(revision: Revision) {
@@ -181,13 +175,7 @@ function displayAuthor(revision: Revision) {
 function formatTimestamp(value?: string) {
   if (!value) return ''
 
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date)
+  return formatDateTime(value) || value
 }
 
 function buildLineDiff(
