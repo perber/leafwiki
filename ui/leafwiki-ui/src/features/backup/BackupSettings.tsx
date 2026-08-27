@@ -3,23 +3,15 @@ import { CloudUpload, GitMerge, Loader2, TriangleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { useDateTimeFormat } from '@/lib/useDateTimeFormat'
 import { useBackupStore } from '@/stores/backup'
 import { useSetTitle } from '../viewer/setTitle'
 
 const POLL_INTERVAL_MS = 5000
 
-function formatDate(value: string | null, fallback: string): string {
-  if (!value) return fallback
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return fallback
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date)
-}
-
 export default function BackupSettings() {
   const { t } = useTranslation('backup')
+  const { formatDateTime } = useDateTimeFormat()
   const {
     enabled,
     lastBackupAt,
@@ -133,7 +125,7 @@ export default function BackupSettings() {
                     {isPolling ? t('waitingForBackup') : t('loading')}
                   </span>
                 ) : (
-                  formatDate(lastBackupAt, t('never'))
+                  formatDateTime(lastBackupAt ?? undefined) || t('never')
                 )}
               </span>
             </div>

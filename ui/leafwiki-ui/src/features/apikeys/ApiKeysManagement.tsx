@@ -1,6 +1,7 @@
 import { mapApiError } from '@/lib/api/errors'
 import { useApiKeyStore } from '@/stores/apikeys'
 import { useUserStore } from '@/stores/users'
+import { useDateTimeFormat } from '@/lib/useDateTimeFormat'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -8,13 +9,10 @@ import { useSetTitle } from '../viewer/setTitle'
 import { CreateApiKeyButton } from './CreateApiKeyButton'
 import { DeleteApiKeyButton } from './DeleteApiKeyButton'
 
-function formatTimestamp(value?: string): string {
-  if (!value) return '—'
-  return new Date(value).toLocaleString()
-}
-
 export default function ApiKeysManagement() {
   const { t } = useTranslation('apikeys')
+  const { formatDateTime } = useDateTimeFormat()
+  const formatTimestamp = (value?: string) => formatDateTime(value) || '—'
   const { apiKeys, loadApiKeys, reset } = useApiKeyStore()
   const { users, loadUsers } = useUserStore()
   const [loading, setLoading] = useState(true)

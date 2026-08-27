@@ -1,5 +1,7 @@
 import i18next from 'i18next'
 import { initReactI18next } from 'react-i18next'
+// Side-effect: keeps date-fns / Intl locale in sync with the active language.
+import './dateLocale'
 
 // Eagerly globs every namespace file under src/locales/<lang>/<namespace>.json.
 // Adding a new language only requires a new locale folder — no code change here.

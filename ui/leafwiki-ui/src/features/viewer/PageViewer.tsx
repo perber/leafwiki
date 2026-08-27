@@ -188,10 +188,14 @@ export default function PageViewer() {
                   {showUpdated && (
                     <div className="page-viewer__metadata">
                       <span className="page-viewer__metadata-item">
-                        Updated{' '}
                         {editorName
-                          ? `by ${editorName} · ${updatedRelative}`
-                          : updatedRelative}
+                          ? t('section.updatedByLabel', {
+                              editor: editorName,
+                              time: updatedRelative,
+                            })
+                          : t('section.updatedLabel', {
+                              time: updatedRelative,
+                            })}
                       </span>
                     </div>
                   )}
