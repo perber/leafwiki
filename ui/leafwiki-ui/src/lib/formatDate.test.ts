@@ -78,9 +78,10 @@ describe('explicit format presets', () => {
     expect(
       formatTimeOnly(ISO, 'en', { dateFormat: 'locale', timeFormat: '24h' }),
     ).toMatch(/^\d{2}:\d{2}$/)
+    // 12h: unpadded hour + English AM/PM marker, even under a non-English UI.
     expect(
-      formatTimeOnly(ISO, 'en', { dateFormat: 'locale', timeFormat: '12h' }),
-    ).toMatch(/^\d{2}:\d{2}\s?\S+$/)
+      formatTimeOnly(ISO, 'de', { dateFormat: 'locale', timeFormat: '12h' }),
+    ).toMatch(/^\d{1,2}:\d{2} (AM|PM)$/)
   })
 
   it('formatDateTime combines the chosen date and time presets', () => {
