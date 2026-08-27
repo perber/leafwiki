@@ -34,5 +34,10 @@
   },
   "language": {
     "selfName": "Deutsch"
+  },
+  "pagination": {
+    "prev": "← Zurück",
+    "next": "Weiter →",
+    "pageOf": "Seite {{page}} von {{total}}"
   }
 }

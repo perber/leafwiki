@@ -90,7 +90,11 @@
     "removeFieldAriaLabel": "Remove frontmatter field {{field}}",
     "addTagPlaceholder": "Add tag",
     "keyPlaceholder": "Key",
-    "valuePlaceholder": "Value"
+    "valuePlaceholder": "Value",
+    "internalFieldsToggle": "Internal fields",
+    "addPropertyButton": "Add property",
+    "flatHint": "Keep fields flat for now. If you need nested metadata later, use dot keys like <code>seo.title</code>.",
+    "unsupportedNotice": "Existing advanced frontmatter is preserved in the background but not editable in this compact view yet."
   },
   "tagInput": {
     "loading": "Loading…",
@@ -120,5 +124,8 @@
     "keyReserved": "Property key is reserved.",
     "keyUnique": "Property key must be unique.",
     "valueType": "Property value must be a string, number, boolean, or flat list."
+  },
+  "titleBar": {
+    "dirtyIndicator": "(Changes)"
   }
 }

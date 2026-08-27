@@ -9,6 +9,12 @@
     "role": "Role",
     "actions": "Actions"
   },
+  "actions": {
+    "edit": "Edit",
+    "new": "New User",
+    "changePassword": "Change Password",
+    "delete": "Delete"
+  },
   "invite": {
     "pendingPill": "Invitation pending",
     "resendAction": "Resend invite",

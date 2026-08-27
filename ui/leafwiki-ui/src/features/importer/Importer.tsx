@@ -891,7 +891,7 @@ export default function Importer() {
                       setResultFilter(filter)
                     }}
                   >
-                    {filter}
+                    {t(`resultItems.filter.${filter}`)}
                   </button>
                 ))}
               </div>
