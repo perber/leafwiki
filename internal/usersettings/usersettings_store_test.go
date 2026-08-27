@@ -1,6 +1,7 @@
 package usersettings
 
 import (
+	"database/sql"
 	"os"
 	"path/filepath"
 	"sync"
@@ -251,5 +252,67 @@ func TestUserSettingsStore_Replace_ReopensAgainstNewFileAndClosesOld(t *testing.
 	}
 	if got.Language != "de" || got.AutoSave != false {
 		t.Fatalf("expected Replace to reflect the file actually on disk (Language=de, AutoSave=false), got %+v", got)
+	}
+}
+
+// TestUserSettingsStore_MigratesLegacySchema_AddsFormatColumns pins the
+// additive migration: opening a pre-format-preference usersettings.db must
+// add date_format / time_format and default any existing row to "locale",
+// without disturbing the row's other values.
+func TestUserSettingsStore_MigratesLegacySchema_AddsFormatColumns(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "usersettings.db")
+
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	if _, err := db.Exec(`CREATE TABLE user_settings (
+		user_id    TEXT PRIMARY KEY,
+		language   TEXT NOT NULL,
+		autosave   INTEGER NOT NULL,
+		updated_at TIMESTAMP NOT NULL
+	)`); err != nil {
+		t.Fatalf("create legacy table: %v", err)
+	}
+	if _, err := db.Exec(
+		`INSERT INTO user_settings (user_id, language, autosave, updated_at) VALUES (?, ?, ?, ?)`,
+		"user-1", "de", 1, time.Now().UTC(),
+	); err != nil {
+		t.Fatalf("insert legacy row: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close legacy db: %v", err)
+	}
+
+	store, err := NewUserSettingsStore(dir, nil)
+	if err != nil {
+		t.Fatalf("NewUserSettingsStore (migrating): %v", err)
+	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
+
+	got, err := store.Get("user-1")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got.Language != "de" {
+		t.Fatalf("expected legacy language preserved, got %+v", got)
+	}
+	if got.DateFormat != DefaultDateFormat || got.TimeFormat != DefaultTimeFormat {
+		t.Fatalf("expected migrated row to default to locale formats, got %+v", got)
+	}
+
+	if err := store.Upsert(&UserSettings{
+		UserID: "user-2", Language: "en", AutoSave: true,
+		DateFormat: "iso", TimeFormat: "12h", UpdatedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+	got2, err := store.Get("user-2")
+	if err != nil {
+		t.Fatalf("Get user-2: %v", err)
+	}
+	if got2.DateFormat != "iso" || got2.TimeFormat != "12h" {
+		t.Fatalf("expected iso/12h round-trip, got %+v", got2)
 	}
 }

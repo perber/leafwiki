@@ -29,7 +29,23 @@
       "autoSaveDescription": "Änderungen beim Bearbeiten einer Seite automatisch speichern.",
       "autoSaveToggleError": "Einstellung für automatisches Speichern konnte nicht aktualisiert werden",
       "languageLabel": "Sprache",
-      "languageChangeError": "Spracheinstellung konnte nicht aktualisiert werden"
+      "languageChangeError": "Spracheinstellung konnte nicht aktualisiert werden",
+      "dateFormatLabel": "Datumsformat",
+      "dateFormatChangeError": "Datumsformat-Einstellung konnte nicht aktualisiert werden",
+      "timeFormatLabel": "Uhrzeitformat",
+      "timeFormatChangeError": "Uhrzeitformat-Einstellung konnte nicht aktualisiert werden",
+      "dateFormat": {
+        "locale": "Sprache folgen",
+        "iso": "2026-08-27",
+        "dmyDot": "27.08.2026",
+        "mdySlash": "08/27/2026",
+        "dmySlash": "27/08/2026"
+      },
+      "timeFormat": {
+        "locale": "Sprache folgen",
+        "h24": "24-Stunden (14:30)",
+        "h12": "12-Stunden (2:30 PM)"
+      }
     }
   }
 }

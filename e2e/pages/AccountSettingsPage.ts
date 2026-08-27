@@ -33,4 +33,22 @@ export default class AccountSettingsPage {
     await this.languageSelect().click();
     await this.languageOptions().filter({ hasText: name }).first().click();
   }
+
+  dateFormatSelect() {
+    return this.page.locator('button[data-testid="preferences-dateformat-select"]');
+  }
+
+  timeFormatSelect() {
+    return this.page.locator('button[data-testid="preferences-timeformat-select"]');
+  }
+
+  async selectDateFormat(label: string) {
+    await this.dateFormatSelect().click();
+    await this.page.locator('[role="option"]').filter({ hasText: label }).first().click();
+  }
+
+  async selectTimeFormat(label: string) {
+    await this.timeFormatSelect().click();
+    await this.page.locator('[role="option"]').filter({ hasText: label }).first().click();
+  }
 }

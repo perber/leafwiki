@@ -23,9 +23,11 @@ func (uc *GetUserSettingsUseCase) Execute(_ context.Context, userID string) (*co
 // ─── UpdateUserSettingsUseCase ───────────────────────────────────────────────
 
 type UpdateUserSettingsInput struct {
-	UserID   string
-	Language *string
-	AutoSave *bool
+	UserID     string
+	Language   *string
+	AutoSave   *bool
+	DateFormat *string
+	TimeFormat *string
 }
 
 type UpdateUserSettingsUseCase struct {
@@ -38,7 +40,9 @@ func NewUpdateUserSettingsUseCase(s *coreusersettings.UserSettingsService) *Upda
 
 func (uc *UpdateUserSettingsUseCase) Execute(_ context.Context, in UpdateUserSettingsInput) (*coreusersettings.UserSettings, error) {
 	return uc.settings.Update(in.UserID, coreusersettings.UserSettingsPatch{
-		Language: in.Language,
-		AutoSave: in.AutoSave,
+		Language:   in.Language,
+		AutoSave:   in.AutoSave,
+		DateFormat: in.DateFormat,
+		TimeFormat: in.TimeFormat,
 	})
 }

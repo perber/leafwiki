@@ -4,12 +4,16 @@ export type UserSettings = {
   userId: string
   language: string
   autoSave: boolean
+  dateFormat: string
+  timeFormat: string
   updatedAt: string
 }
 
 export type UserSettingsPatch = {
   language?: string
   autoSave?: boolean
+  dateFormat?: string
+  timeFormat?: string
 }
 
 export async function getUserSettings(): Promise<UserSettings> {
