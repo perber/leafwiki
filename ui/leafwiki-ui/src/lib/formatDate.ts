@@ -1,4 +1,5 @@
-import { formatDistanceToNow } from 'date-fns'
+import { format as formatWithPattern, formatDistanceToNow } from 'date-fns'
+import { useUserSettingsStore } from '@/stores/userSettings'
 import { bcp47 } from './dateLocale'
 
 /**
@@ -12,28 +13,95 @@ export function formatRelativeTime(value?: string) {
   return formatDistanceToNow(date, { addSuffix: true })
 }
 
-function formatWith(
-  value: string | undefined,
-  lng: string | undefined,
-  options: Intl.DateTimeFormatOptions,
-): string {
-  if (!value) return ''
+export type DateTimeFormatPrefs = {
+  dateFormat: string
+  timeFormat: string
+}
+
+// date-fns patterns for the explicit presets; anything not listed here
+// (i.e. "locale") falls back to Intl in the active UI language.
+const DATE_PATTERNS: Record<string, string> = {
+  iso: 'yyyy-MM-dd',
+  dmy_dot: 'dd.MM.yyyy',
+  mdy_slash: 'MM/dd/yyyy',
+  dmy_slash: 'dd/MM/yyyy',
+}
+
+const TIME_PATTERNS: Record<string, string> = {
+  '24h': 'HH:mm',
+  '12h': 'hh:mm a',
+}
+
+function currentPrefs(): DateTimeFormatPrefs {
+  const s = useUserSettingsStore.getState()
+  return { dateFormat: s.dateFormat, timeFormat: s.timeFormat }
+}
+
+function toDate(value?: string): Date | null {
+  if (!value) return null
   const date = new Date(value)
-  if (isNaN(date.getTime())) return ''
-  return new Intl.DateTimeFormat(bcp47(lng), options).format(date)
+  return isNaN(date.getTime()) ? null : date
 }
 
-/** Absolute date + time, e.g. "27 Aug 2026, 14:30". Locale-aware. */
-export function formatDateTime(value?: string, lng?: string): string {
-  return formatWith(value, lng, { dateStyle: 'medium', timeStyle: 'short' })
+function datePart(
+  date: Date,
+  lng: string | undefined,
+  dateFormat: string,
+): string {
+  const pattern = DATE_PATTERNS[dateFormat]
+  if (pattern) return formatWithPattern(date, pattern)
+  return new Intl.DateTimeFormat(bcp47(lng), { dateStyle: 'medium' }).format(
+    date,
+  )
 }
 
-/** Absolute date only, e.g. "27 Aug 2026". Locale-aware. */
-export function formatDateOnly(value?: string, lng?: string): string {
-  return formatWith(value, lng, { dateStyle: 'medium' })
+function timePart(
+  date: Date,
+  lng: string | undefined,
+  timeFormat: string,
+): string {
+  const pattern = TIME_PATTERNS[timeFormat]
+  if (pattern) return formatWithPattern(date, pattern)
+  return new Intl.DateTimeFormat(bcp47(lng), { timeStyle: 'short' }).format(
+    date,
+  )
 }
 
-/** Absolute time only, e.g. "14:30". Locale-aware. */
-export function formatTimeOnly(value?: string, lng?: string): string {
-  return formatWith(value, lng, { timeStyle: 'short' })
+/** Absolute date + time. Honours the user's date/time format preference. */
+export function formatDateTime(
+  value?: string,
+  lng?: string,
+  prefs: DateTimeFormatPrefs = currentPrefs(),
+): string {
+  const date = toDate(value)
+  if (!date) return ''
+  if (prefs.dateFormat === 'locale' && prefs.timeFormat === 'locale') {
+    return new Intl.DateTimeFormat(bcp47(lng), {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(date)
+  }
+  return `${datePart(date, lng, prefs.dateFormat)} ${timePart(date, lng, prefs.timeFormat)}`
+}
+
+/** Absolute date only. Honours the user's date format preference. */
+export function formatDateOnly(
+  value?: string,
+  lng?: string,
+  prefs: DateTimeFormatPrefs = currentPrefs(),
+): string {
+  const date = toDate(value)
+  if (!date) return ''
+  return datePart(date, lng, prefs.dateFormat)
+}
+
+/** Absolute time only. Honours the user's time format preference. */
+export function formatTimeOnly(
+  value?: string,
+  lng?: string,
+  prefs: DateTimeFormatPrefs = currentPrefs(),
+): string {
+  const date = toDate(value)
+  if (!date) return ''
+  return timePart(date, lng, prefs.timeFormat)
 }

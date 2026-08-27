@@ -49,6 +49,56 @@ describe('absolute formatters', () => {
   })
 })
 
+describe('explicit format presets', () => {
+  it('formatDateOnly honours each date preset', () => {
+    expect(
+      formatDateOnly(ISO, 'en', { dateFormat: 'iso', timeFormat: 'locale' }),
+    ).toBe('2026-08-27')
+    expect(
+      formatDateOnly(ISO, 'en', {
+        dateFormat: 'dmy_dot',
+        timeFormat: 'locale',
+      }),
+    ).toBe('27.08.2026')
+    expect(
+      formatDateOnly(ISO, 'en', {
+        dateFormat: 'mdy_slash',
+        timeFormat: 'locale',
+      }),
+    ).toBe('08/27/2026')
+    expect(
+      formatDateOnly(ISO, 'en', {
+        dateFormat: 'dmy_slash',
+        timeFormat: 'locale',
+      }),
+    ).toBe('27/08/2026')
+  })
+
+  it('formatTimeOnly honours 24h and 12h presets (shape is timezone-stable)', () => {
+    expect(
+      formatTimeOnly(ISO, 'en', { dateFormat: 'locale', timeFormat: '24h' }),
+    ).toMatch(/^\d{2}:\d{2}$/)
+    expect(
+      formatTimeOnly(ISO, 'en', { dateFormat: 'locale', timeFormat: '12h' }),
+    ).toMatch(/^\d{2}:\d{2}\s?\S+$/)
+  })
+
+  it('formatDateTime combines the chosen date and time presets', () => {
+    expect(
+      formatDateTime(ISO, 'en', { dateFormat: 'iso', timeFormat: '24h' }),
+    ).toMatch(/^2026-08-27 \d{2}:\d{2}$/)
+  })
+
+  it('"locale" for both keeps the single combined Intl format', () => {
+    const out = formatDateTime(ISO, 'de', {
+      dateFormat: 'locale',
+      timeFormat: 'locale',
+    })
+    expect(out).toMatch(/27\./)
+    expect(out).toMatch(/\d{1,2}:\d{2}/)
+  })
+})
+
 describe('formatRelativeTime locale', () => {
   it('follows the active i18next language', async () => {
     const past = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()

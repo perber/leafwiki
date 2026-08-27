@@ -27,6 +27,8 @@ function makeSettings(overrides: Partial<UserSettings> = {}): UserSettings {
     userId: 'user-1',
     language: 'en',
     autoSave: true,
+    dateFormat: 'locale',
+    timeFormat: 'locale',
     updatedAt: '2026-01-01T00:00:00Z',
     ...overrides,
   }
@@ -106,5 +108,50 @@ describe('useUserSettingsStore', () => {
 
     expect(useUserSettingsStore.getState().language).toBe('en')
     expect(useUserSettingsStore.getState().loaded).toBe(false)
+  })
+
+  it('loadUserSettings hydrates the date/time format preference', async () => {
+    ;(userSettingsApi.getUserSettings as Mock).mockResolvedValue(
+      makeSettings({ dateFormat: 'dmy_dot', timeFormat: '24h' }),
+    )
+
+    await useUserSettingsStore.getState().loadUserSettings()
+
+    expect(useUserSettingsStore.getState().dateFormat).toBe('dmy_dot')
+    expect(useUserSettingsStore.getState().timeFormat).toBe('24h')
+  })
+
+  it('setDateFormat optimistically updates and PUTs the patch', async () => {
+    ;(userSettingsApi.updateUserSettings as Mock).mockResolvedValue(
+      makeSettings({ dateFormat: 'iso' }),
+    )
+
+    await useUserSettingsStore.getState().setDateFormat('iso')
+
+    expect(useUserSettingsStore.getState().dateFormat).toBe('iso')
+    expect(userSettingsApi.updateUserSettings).toHaveBeenCalledWith({
+      dateFormat: 'iso',
+    })
+  })
+
+  it('setTimeFormat rolls back and toasts on a failed update', async () => {
+    useUserSettingsStore.setState({ timeFormat: 'locale' })
+    ;(userSettingsApi.updateUserSettings as Mock).mockRejectedValue(
+      new Error('boom'),
+    )
+
+    await useUserSettingsStore.getState().setTimeFormat('12h')
+
+    expect(useUserSettingsStore.getState().timeFormat).toBe('locale')
+    expect(toast.error).toHaveBeenCalled()
+  })
+
+  it('clearUserSettings resets the format preference to locale', () => {
+    useUserSettingsStore.setState({ dateFormat: 'iso', timeFormat: '12h' })
+
+    useUserSettingsStore.getState().clearUserSettings()
+
+    expect(useUserSettingsStore.getState().dateFormat).toBe('locale')
+    expect(useUserSettingsStore.getState().timeFormat).toBe('locale')
   })
 })

@@ -120,3 +120,58 @@ func TestUserSettingsService_Update_InvalidLanguage_ReturnsValidationError(t *te
 		t.Fatalf("expected a validation error on the language field, got: %+v", vErr.Errors)
 	}
 }
+
+func TestUserSettingsService_Update_ValidFormats_Persist(t *testing.T) {
+	svc := newTestService(t)
+
+	dateFormat := "dmy_dot"
+	timeFormat := "24h"
+	updated, err := svc.Update("user-1", UserSettingsPatch{
+		DateFormat: &dateFormat,
+		TimeFormat: &timeFormat,
+	})
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if updated.DateFormat != dateFormat || updated.TimeFormat != timeFormat {
+		t.Fatalf("expected DateFormat=%q TimeFormat=%q, got %+v", dateFormat, timeFormat, updated)
+	}
+
+	got, err := svc.Get("user-1")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got.DateFormat != dateFormat || got.TimeFormat != timeFormat {
+		t.Fatalf("expected persisted formats, got %+v", got)
+	}
+	// A format-only patch must not touch the language default.
+	if got.Language != DefaultLanguage {
+		t.Fatalf("expected language untouched, got %+v", got)
+	}
+}
+
+func TestUserSettingsService_Update_InvalidFormats_ReturnValidationErrors(t *testing.T) {
+	svc := newTestService(t)
+
+	badDate := "dd.MM.yyyy"
+	badTime := "military"
+	_, err := svc.Update("user-1", UserSettingsPatch{
+		DateFormat: &badDate,
+		TimeFormat: &badTime,
+	})
+	if err == nil {
+		t.Fatalf("expected a validation error, got nil")
+	}
+
+	var vErr *sharederrors.ValidationErrors
+	if !errors.As(err, &vErr) {
+		t.Fatalf("expected a *sharederrors.ValidationErrors, got: %v (%T)", err, err)
+	}
+	fields := map[string]bool{}
+	for _, fe := range vErr.Errors {
+		fields[fe.Field] = true
+	}
+	if !fields["dateFormat"] || !fields["timeFormat"] {
+		t.Fatalf("expected validation errors on dateFormat and timeFormat, got: %+v", vErr.Errors)
+	}
+}

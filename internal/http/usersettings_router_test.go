@@ -12,8 +12,10 @@ import (
 )
 
 type apiUserSettings struct {
-	Language string `json:"language"`
-	AutoSave bool   `json:"autoSave"`
+	Language   string `json:"language"`
+	AutoSave   bool   `json:"autoSave"`
+	DateFormat string `json:"dateFormat"`
+	TimeFormat string `json:"timeFormat"`
 }
 
 func TestUserSettings_Get_Unauthenticated_Rejected(t *testing.T) {
@@ -106,6 +108,59 @@ func TestUserSettings_Put_InvalidLanguage_Returns400(t *testing.T) {
 	rec := authenticatedRequest(t, router, http.MethodPut, "/api/user-settings", strings.NewReader(`{"language":"xx-not-real"}`))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for an unsupported language, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestUserSettings_Put_DateAndTimeFormat_UpdatesAndPersists(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	putRec := authenticatedRequest(t, router, http.MethodPut, "/api/user-settings", strings.NewReader(`{"dateFormat":"dmy_dot","timeFormat":"24h"}`))
+	if putRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 on PUT, got %d: %s", putRec.Code, putRec.Body.String())
+	}
+	var updated apiUserSettings
+	if err := json.Unmarshal(putRec.Body.Bytes(), &updated); err != nil {
+		t.Fatalf("unmarshal PUT response: %v", err)
+	}
+	if updated.DateFormat != "dmy_dot" || updated.TimeFormat != "24h" {
+		t.Fatalf("expected dmy_dot/24h in PUT response, got %+v", updated)
+	}
+
+	getRec := authenticatedRequest(t, router, http.MethodGet, "/api/user-settings", nil)
+	var got apiUserSettings
+	if err := json.Unmarshal(getRec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal GET response: %v", err)
+	}
+	if got.DateFormat != "dmy_dot" || got.TimeFormat != "24h" {
+		t.Fatalf("expected persisted dmy_dot/24h, got %+v", got)
+	}
+}
+
+func TestUserSettings_Get_NoPriorSettings_ReturnsLocaleFormats(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	rec := authenticatedRequest(t, router, http.MethodGet, "/api/user-settings", nil)
+	var got apiUserSettings
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal GET response: %v", err)
+	}
+	if got.DateFormat != "locale" || got.TimeFormat != "locale" {
+		t.Fatalf("expected locale/locale defaults, got %+v", got)
+	}
+}
+
+func TestUserSettings_Put_InvalidDateFormat_Returns400(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/user-settings", strings.NewReader(`{"dateFormat":"dd.MM.yyyy"}`))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for an unsupported date format, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
 

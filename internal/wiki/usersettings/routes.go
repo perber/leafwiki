@@ -61,8 +61,10 @@ func (r *Routes) handleGetUserSettings(c *gin.Context) {
 
 func (r *Routes) handleUpdateUserSettings(c *gin.Context) {
 	var req struct {
-		Language *string `json:"language"`
-		AutoSave *bool   `json:"autoSave"`
+		Language   *string `json:"language"`
+		AutoSave   *bool   `json:"autoSave"`
+		DateFormat *string `json:"dateFormat"`
+		TimeFormat *string `json:"timeFormat"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		respondWithUserSettingsStatusError(c, http.StatusBadRequest, ErrCodeUserSettingsInvalidPayload, "Invalid payload", "invalid payload")
@@ -71,9 +73,11 @@ func (r *Routes) handleUpdateUserSettings(c *gin.Context) {
 
 	user := authmw.MustGetUser(c)
 	settings, err := r.updateUserSettings.Execute(c.Request.Context(), UpdateUserSettingsInput{
-		UserID:   user.ID,
-		Language: req.Language,
-		AutoSave: req.AutoSave,
+		UserID:     user.ID,
+		Language:   req.Language,
+		AutoSave:   req.AutoSave,
+		DateFormat: req.DateFormat,
+		TimeFormat: req.TimeFormat,
 	})
 	if err != nil {
 		respondWithUserSettingsError(c, err)

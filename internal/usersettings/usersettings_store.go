@@ -64,15 +64,68 @@ func NewUserSettingsStore(storageDir string, log *slog.Logger) (*UserSettingsSto
 }
 
 func (s *UserSettingsStore) ensureSchema() error {
-	_, err := s.db.Exec(`
+	if _, err := s.db.Exec(`
 		CREATE TABLE IF NOT EXISTS user_settings (
-			user_id    TEXT PRIMARY KEY,
-			language   TEXT NOT NULL,
-			autosave   INTEGER NOT NULL,
-			updated_at TIMESTAMP NOT NULL
+			user_id     TEXT PRIMARY KEY,
+			language    TEXT NOT NULL,
+			autosave    INTEGER NOT NULL,
+			date_format TEXT NOT NULL DEFAULT 'locale',
+			time_format TEXT NOT NULL DEFAULT 'locale',
+			updated_at  TIMESTAMP NOT NULL
 		);
-	`)
-	return err
+	`); err != nil {
+		return err
+	}
+	return s.ensureFormatColumns()
+}
+
+// ensureFormatColumns additively migrates a pre-format-preference
+// user_settings table by adding date_format / time_format if missing.
+// Existing rows get the "locale" default (follow the UI language). Idempotent:
+// columns already present are skipped, so it is safe on every startup.
+func (s *UserSettingsStore) ensureFormatColumns() error {
+	existing, err := s.existingColumns()
+	if err != nil {
+		return err
+	}
+
+	migrations := []struct {
+		column string
+		ddl    string
+	}{
+		{"date_format", "ALTER TABLE user_settings ADD COLUMN date_format TEXT NOT NULL DEFAULT 'locale'"},
+		{"time_format", "ALTER TABLE user_settings ADD COLUMN time_format TEXT NOT NULL DEFAULT 'locale'"},
+	}
+
+	for _, m := range migrations {
+		if existing[m.column] {
+			continue
+		}
+		if _, err := s.db.Exec(m.ddl); err != nil {
+			return fmt.Errorf("failed to add column %s to user_settings table: %w", m.column, err)
+		}
+	}
+	return nil
+}
+
+func (s *UserSettingsStore) existingColumns() (map[string]bool, error) {
+	rows, err := s.db.Query(`PRAGMA table_info(user_settings)`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	cols := map[string]bool{}
+	for rows.Next() {
+		var cid, notNull, pk int
+		var name, ctype string
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notNull, &dflt, &pk); err != nil {
+			return nil, err
+		}
+		cols[name] = true
+	}
+	return cols, rows.Err()
 }
 
 // Get returns userID's saved settings, or DefaultUserSettings(userID) if the
@@ -89,13 +142,13 @@ func (s *UserSettingsStore) Get(userID string) (*UserSettings, error) {
 
 func (s *UserSettingsStore) getLocked(userID string) (*UserSettings, error) {
 	row := s.db.QueryRow(
-		`SELECT language, autosave, updated_at FROM user_settings WHERE user_id = ?`,
+		`SELECT language, autosave, date_format, time_format, updated_at FROM user_settings WHERE user_id = ?`,
 		userID,
 	)
 
 	var us UserSettings
 	us.UserID = userID
-	if err := row.Scan(&us.Language, &us.AutoSave, &us.UpdatedAt); err != nil {
+	if err := row.Scan(&us.Language, &us.AutoSave, &us.DateFormat, &us.TimeFormat, &us.UpdatedAt); err != nil {
 		if err == sql.ErrNoRows {
 			return DefaultUserSettings(userID), nil
 		}
@@ -117,13 +170,15 @@ func (s *UserSettingsStore) Upsert(us *UserSettings) error {
 
 func (s *UserSettingsStore) upsertLocked(us *UserSettings) error {
 	_, err := s.db.Exec(
-		`INSERT INTO user_settings (user_id, language, autosave, updated_at)
-		 VALUES (?, ?, ?, ?)
+		`INSERT INTO user_settings (user_id, language, autosave, date_format, time_format, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(user_id) DO UPDATE SET
 		   language = excluded.language,
 		   autosave = excluded.autosave,
+		   date_format = excluded.date_format,
+		   time_format = excluded.time_format,
 		   updated_at = excluded.updated_at`,
-		us.UserID, us.Language, us.AutoSave, us.UpdatedAt,
+		us.UserID, us.Language, us.AutoSave, us.DateFormat, us.TimeFormat, us.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to save user settings for user %s: %w", us.UserID, err)
