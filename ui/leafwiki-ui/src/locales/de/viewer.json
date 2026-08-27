@@ -76,6 +76,7 @@
     "moreActions": "Weitere Aktionen",
     "expandAll": "Alle ausklappen",
     "collapseAll": "Alle einklappen",
+    "sortPages": "Seiten sortieren",
     "refresh": "Explorer aktualisieren",
     "refreshSuccess": "Explorer aktualisiert",
     "refreshError": "Aktualisierung fehlgeschlagen",
@@ -146,6 +147,9 @@
     "searchAriaLabel": "Seiten durchsuchen",
     "noMatch": "Keine passende Seite gefunden.",
     "matchingPagesAriaLabel": "Passende Seiten"
+  },
+  "metadata": {
+    "propertiesToggle": "Eigenschaften ({{count}})"
   },
   "shortcutsHelp": {
     "menuItem": "Tastaturkürzel",

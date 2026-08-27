@@ -3,6 +3,7 @@ import { useSidebarStore } from '@/stores/sidebar'
 import { Page } from '@/lib/api/pages'
 import { ChevronDown, ChevronRight, Tag } from 'lucide-react'
 import { useId, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router'
 
 type Props = {
@@ -18,6 +19,7 @@ function getEditableProperties(
 }
 
 export function PageMetadata({ page }: Props) {
+  const { t } = useTranslation('viewer')
   const [propsOpen, setPropsOpen] = useState(false)
   const propertiesListId = useId()
   const setSidebarMode = useSidebarStore((s) => s.setSidebarMode)
@@ -86,7 +88,9 @@ export function PageMetadata({ page }: Props) {
             onClick={() => setPropsOpen((o) => !o)}
           >
             {propsOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-            <span>Properties ({editableProps.length})</span>
+            <span>
+              {t('metadata.propertiesToggle', { count: editableProps.length })}
+            </span>
           </button>
 
           {propsOpen && (

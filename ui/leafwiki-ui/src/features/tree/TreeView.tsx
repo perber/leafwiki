@@ -254,7 +254,7 @@ export default function TreeView() {
               data-testid="tree-view-action-button-sort"
             >
               <List size={15} />
-              Sort pages
+              {t('toolbar.sortPages')}
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>

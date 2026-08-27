@@ -90,7 +90,11 @@
     "removeFieldAriaLabel": "Frontmatter-Feld {{field}} entfernen",
     "addTagPlaceholder": "Schlagwort hinzufügen",
     "keyPlaceholder": "Schlüssel",
-    "valuePlaceholder": "Wert"
+    "valuePlaceholder": "Wert",
+    "internalFieldsToggle": "Interne Felder",
+    "addPropertyButton": "Eigenschaft hinzufügen",
+    "flatHint": "Halten Sie die Felder vorerst flach. Wenn Sie später verschachtelte Metadaten benötigen, verwenden Sie Punkt-Schlüssel wie <code>seo.title</code>.",
+    "unsupportedNotice": "Vorhandene erweiterte Frontmatter bleibt im Hintergrund erhalten, ist in dieser kompakten Ansicht aber noch nicht bearbeitbar."
   },
   "tagInput": {
     "loading": "Wird geladen…",
@@ -120,5 +124,8 @@
     "keyReserved": "Der Eigenschaftsschlüssel ist reserviert.",
     "keyUnique": "Der Eigenschaftsschlüssel muss eindeutig sein.",
     "valueType": "Der Eigenschaftswert muss eine Zeichenkette, Zahl, ein Wahrheitswert oder eine flache Liste sein."
+  },
+  "titleBar": {
+    "dirtyIndicator": "(Änderungen)"
   }
 }

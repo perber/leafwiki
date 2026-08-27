@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ChevronDown, ChevronRight, Plus, Tag, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import { EditorFrontmatterField } from './frontmatter'
 
 const METADATA_ALLOWED_HOTKEYS = 'Mod+KeyS Escape'
@@ -278,7 +278,7 @@ export function PageFrontmatterPanel({
                           ) : (
                             <ChevronRight size={14} />
                           )}
-                          Internal fields
+                          {t('frontmatterPanel.internalFieldsToggle')}
                         </button>
 
                         {showInternalFields ? (
@@ -318,13 +318,16 @@ export function PageFrontmatterPanel({
                       data-testid="page-frontmatter-add-field"
                     >
                       <Plus size={14} />
-                      Add property
+                      {t('frontmatterPanel.addPropertyButton')}
                     </Button>
                   </div>
 
                   <p className="page-frontmatter-panel__hint">
-                    Keep fields flat for now. If you need nested metadata later,
-                    use dot keys like <code>seo.title</code>.
+                    <Trans
+                      i18nKey="frontmatterPanel.flatHint"
+                      ns="editor"
+                      components={{ code: <code /> }}
+                    />
                   </p>
 
                   {hasUnsupportedFields ? (
@@ -332,8 +335,7 @@ export function PageFrontmatterPanel({
                       className="page-frontmatter-panel__notice"
                       data-testid="page-frontmatter-unsupported-notice"
                     >
-                      Existing advanced frontmatter is preserved in the
-                      background but not editable in this compact view yet.
+                      {t('frontmatterPanel.unsupportedNotice')}
                     </p>
                   ) : null}
                 </div>

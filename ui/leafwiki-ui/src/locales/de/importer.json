@@ -152,7 +152,13 @@
     "detailUpdated": "Bestehende Seite wurde aktualisiert",
     "detailSkipped": "Ohne Fehler übersprungen",
     "detailNone": "Keine weiteren Details",
-    "noItemsMatch": "Keine Elemente entsprechen dem aktuellen Filter."
+    "noItemsMatch": "Keine Elemente entsprechen dem aktuellen Filter.",
+    "filter": {
+      "all": "Alle",
+      "created": "Erstellt",
+      "skipped": "Übersprungen",
+      "failed": "Fehlgeschlagen"
+    }
   },
   "status": {
     "running": "Läuft",
