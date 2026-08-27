@@ -1,4 +1,5 @@
 import { format as formatWithPattern, formatDistanceToNow } from 'date-fns'
+import { enUS } from 'date-fns/locale'
 import { useUserSettingsStore } from '@/stores/userSettings'
 import { bcp47 } from './dateLocale'
 
@@ -29,7 +30,7 @@ const DATE_PATTERNS: Record<string, string> = {
 
 const TIME_PATTERNS: Record<string, string> = {
   '24h': 'HH:mm',
-  '12h': 'hh:mm a',
+  '12h': 'h:mm a',
 }
 
 function currentPrefs(): DateTimeFormatPrefs {
@@ -61,7 +62,13 @@ function timePart(
   timeFormat: string,
 ): string {
   const pattern = TIME_PATTERNS[timeFormat]
-  if (pattern) return formatWithPattern(date, pattern)
+  if (pattern) {
+    // Pin the 12-hour marker to English AM/PM — date-fns' global default
+    // locale would otherwise localise "a" (e.g. "nachm." under a German UI),
+    // diverging from the picker label. 24h has no locale-sensitive token.
+    const options = timeFormat === '12h' ? { locale: enUS } : undefined
+    return formatWithPattern(date, pattern, options)
+  }
   return new Intl.DateTimeFormat(bcp47(lng), { timeStyle: 'short' }).format(
     date,
   )
