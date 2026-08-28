@@ -146,6 +146,37 @@ describe('useUserSettingsStore', () => {
     expect(toast.error).toHaveBeenCalled()
   })
 
+  it('a slow, failing earlier format write does not clobber a newer choice', async () => {
+    useUserSettingsStore.setState({ dateFormat: 'locale' })
+    let failFirst: (err: Error) => void = () => {}
+    ;(userSettingsApi.updateUserSettings as Mock)
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            failFirst = reject
+          }),
+      )
+      .mockResolvedValueOnce(makeSettings({ dateFormat: 'dmy_dot' }))
+
+    const first = useUserSettingsStore.getState().setDateFormat('iso')
+    const second = useUserSettingsStore.getState().setDateFormat('dmy_dot')
+    expect(useUserSettingsStore.getState().dateFormat).toBe('dmy_dot')
+
+    await vi.waitFor(() =>
+      expect(userSettingsApi.updateUserSettings).toHaveBeenCalledTimes(1),
+    )
+    failFirst(new Error('boom'))
+    await Promise.all([first, second])
+
+    // The newer value wins, the stale failure neither rolls back nor toasts,
+    // and its PUT ran before the newer one so the server ends up on 'dmy_dot'.
+    expect(useUserSettingsStore.getState().dateFormat).toBe('dmy_dot')
+    expect(toast.error).not.toHaveBeenCalled()
+    expect(
+      (userSettingsApi.updateUserSettings as Mock).mock.calls.map((c) => c[0]),
+    ).toEqual([{ dateFormat: 'iso' }, { dateFormat: 'dmy_dot' }])
+  })
+
   it('clearUserSettings resets the format preference to locale', () => {
     useUserSettingsStore.setState({ dateFormat: 'iso', timeFormat: '12h' })
 

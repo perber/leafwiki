@@ -63,6 +63,22 @@ describe('PreferencesPanel', () => {
     ).toBeInTheDocument()
   })
 
+  it('associates each format picker with its visible label', () => {
+    render(<PreferencesPanel />)
+
+    // Accessible name comes from the label via aria-labelledby, not the
+    // selected value — so the two pickers are distinguishable to AT.
+    expect(
+      screen.getByRole('combobox', { name: 'Language' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('combobox', { name: 'Date format' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('combobox', { name: 'Time format' }),
+    ).toBeInTheDocument()
+  })
+
   it('lets the user pick a date format', async () => {
     const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 })
     render(<PreferencesPanel />)

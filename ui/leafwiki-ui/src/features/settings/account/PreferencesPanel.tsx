@@ -54,7 +54,10 @@ export function PreferencesPanel() {
       </div>
 
       <div className="settings__field">
-        <label className="settings__field-label">
+        <label
+          id="preferences-language-label"
+          className="settings__field-label"
+        >
           {t('account.preferences.languageLabel')}
         </label>
         <Select
@@ -63,7 +66,10 @@ export function PreferencesPanel() {
             void setLanguage(value)
           }}
         >
-          <SelectTrigger data-testid="preferences-language-select">
+          <SelectTrigger
+            data-testid="preferences-language-select"
+            aria-labelledby="preferences-language-label"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -77,7 +83,10 @@ export function PreferencesPanel() {
       </div>
 
       <div className="settings__field">
-        <label className="settings__field-label">
+        <label
+          id="preferences-dateformat-label"
+          className="settings__field-label"
+        >
           {t('account.preferences.dateFormatLabel')}
         </label>
         <Select
@@ -86,7 +95,10 @@ export function PreferencesPanel() {
             void setDateFormat(value)
           }}
         >
-          <SelectTrigger data-testid="preferences-dateformat-select">
+          <SelectTrigger
+            data-testid="preferences-dateformat-select"
+            aria-labelledby="preferences-dateformat-label"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -100,7 +112,10 @@ export function PreferencesPanel() {
       </div>
 
       <div className="settings__field">
-        <label className="settings__field-label">
+        <label
+          id="preferences-timeformat-label"
+          className="settings__field-label"
+        >
           {t('account.preferences.timeFormatLabel')}
         </label>
         <Select
@@ -109,7 +124,10 @@ export function PreferencesPanel() {
             void setTimeFormat(value)
           }}
         >
-          <SelectTrigger data-testid="preferences-timeformat-select">
+          <SelectTrigger
+            data-testid="preferences-timeformat-select"
+            aria-labelledby="preferences-timeformat-label"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

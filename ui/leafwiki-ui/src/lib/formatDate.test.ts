@@ -8,7 +8,11 @@ import {
   formatTimeOnly,
 } from './formatDate'
 
-const ISO = '2026-08-27T14:30:00.000Z'
+// A timezone-less (local) timestamp on purpose: the formatters render in the
+// machine's local timezone, so a UTC instant would shift the calendar date
+// (and thus the exact-string assertions below) on machines running ahead of
+// UTC. Local time keeps "2026-08-27 14:30" stable everywhere.
+const LOCAL = '2026-08-27T14:30:00'
 
 afterEach(async () => {
   await i18next.changeLanguage('en')
@@ -33,8 +37,8 @@ describe('absolute formatters', () => {
   })
 
   it('format the same instant differently per locale', () => {
-    const en = formatDateOnly(ISO, 'en')
-    const de = formatDateOnly(ISO, 'de')
+    const en = formatDateOnly(LOCAL, 'en')
+    const de = formatDateOnly(LOCAL, 'de')
     expect(en).not.toBe('')
     expect(de).not.toBe('')
     expect(en).not.toBe(de)
@@ -43,7 +47,7 @@ describe('absolute formatters', () => {
   })
 
   it('formatDateTime includes both a date and a time component', () => {
-    const out = formatDateTime(ISO, 'en')
+    const out = formatDateTime(LOCAL, 'en')
     expect(out).toMatch(/2026/)
     expect(out).toMatch(/\d{1,2}:\d{2}/)
   })
@@ -52,22 +56,22 @@ describe('absolute formatters', () => {
 describe('explicit format presets', () => {
   it('formatDateOnly honours each date preset', () => {
     expect(
-      formatDateOnly(ISO, 'en', { dateFormat: 'iso', timeFormat: 'locale' }),
+      formatDateOnly(LOCAL, 'en', { dateFormat: 'iso', timeFormat: 'locale' }),
     ).toBe('2026-08-27')
     expect(
-      formatDateOnly(ISO, 'en', {
+      formatDateOnly(LOCAL, 'en', {
         dateFormat: 'dmy_dot',
         timeFormat: 'locale',
       }),
     ).toBe('27.08.2026')
     expect(
-      formatDateOnly(ISO, 'en', {
+      formatDateOnly(LOCAL, 'en', {
         dateFormat: 'mdy_slash',
         timeFormat: 'locale',
       }),
     ).toBe('08/27/2026')
     expect(
-      formatDateOnly(ISO, 'en', {
+      formatDateOnly(LOCAL, 'en', {
         dateFormat: 'dmy_slash',
         timeFormat: 'locale',
       }),
@@ -76,22 +80,22 @@ describe('explicit format presets', () => {
 
   it('formatTimeOnly honours 24h and 12h presets (shape is timezone-stable)', () => {
     expect(
-      formatTimeOnly(ISO, 'en', { dateFormat: 'locale', timeFormat: '24h' }),
+      formatTimeOnly(LOCAL, 'en', { dateFormat: 'locale', timeFormat: '24h' }),
     ).toMatch(/^\d{2}:\d{2}$/)
     // 12h: unpadded hour + English AM/PM marker, even under a non-English UI.
     expect(
-      formatTimeOnly(ISO, 'de', { dateFormat: 'locale', timeFormat: '12h' }),
+      formatTimeOnly(LOCAL, 'de', { dateFormat: 'locale', timeFormat: '12h' }),
     ).toMatch(/^\d{1,2}:\d{2} (AM|PM)$/)
   })
 
   it('formatDateTime combines the chosen date and time presets', () => {
     expect(
-      formatDateTime(ISO, 'en', { dateFormat: 'iso', timeFormat: '24h' }),
+      formatDateTime(LOCAL, 'en', { dateFormat: 'iso', timeFormat: '24h' }),
     ).toMatch(/^2026-08-27 \d{2}:\d{2}$/)
   })
 
   it('"locale" for both keeps the single combined Intl format', () => {
-    const out = formatDateTime(ISO, 'de', {
+    const out = formatDateTime(LOCAL, 'de', {
       dateFormat: 'locale',
       timeFormat: 'locale',
     })

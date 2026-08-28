@@ -27,6 +27,40 @@ function applyLanguageIfShipped(lang: string): void {
   }
 }
 
+// Serialises the optimistic writes for one preference field. Rapid picker
+// changes fire overlapping PUTs whose responses can arrive out of order:
+// without this a slow earlier request could persist the older value on the
+// server, and a stale failure could roll the UI back over the value the user
+// actually chose (plus show a misleading error toast). Writes run in
+// submission order and only the most recent one may roll back on failure.
+type PrefWriter = { seq: number; chain: Promise<unknown> }
+
+function makePrefWriter(): PrefWriter {
+  return { seq: 0, chain: Promise.resolve() }
+}
+
+function writePref(
+  writer: PrefWriter,
+  apply: () => void,
+  patch: () => Promise<unknown>,
+  rollback: () => void,
+): Promise<void> {
+  const seq = ++writer.seq
+  apply()
+  writer.chain = writer.chain
+    .catch(() => {})
+    .then(() => patch())
+    .catch((err) => {
+      if (seq !== writer.seq) return // superseded by a newer write
+      rollback()
+      throw err
+    })
+  return writer.chain as Promise<void>
+}
+
+const dateFormatWriter = makePrefWriter()
+const timeFormatWriter = makePrefWriter()
+
 type UserSettingsStore = {
   autoSave: boolean
   language: string
@@ -93,11 +127,14 @@ export const useUserSettingsStore = create<UserSettingsStore>()((set, get) => ({
   setDateFormat: async (dateFormat) => {
     const previous = get().dateFormat
     if (dateFormat === previous) return
-    set({ dateFormat })
     try {
-      await updateUserSettings({ dateFormat })
+      await writePref(
+        dateFormatWriter,
+        () => set({ dateFormat }),
+        () => updateUserSettings({ dateFormat }),
+        () => set({ dateFormat: previous }),
+      )
     } catch (err) {
-      set({ dateFormat: previous })
       toast.error(
         mapApiError(err, t('account.preferences.dateFormatChangeError'))
           .message,
@@ -107,11 +144,14 @@ export const useUserSettingsStore = create<UserSettingsStore>()((set, get) => ({
   setTimeFormat: async (timeFormat) => {
     const previous = get().timeFormat
     if (timeFormat === previous) return
-    set({ timeFormat })
     try {
-      await updateUserSettings({ timeFormat })
+      await writePref(
+        timeFormatWriter,
+        () => set({ timeFormat }),
+        () => updateUserSettings({ timeFormat }),
+        () => set({ timeFormat: previous }),
+      )
     } catch (err) {
-      set({ timeFormat: previous })
       toast.error(
         mapApiError(err, t('account.preferences.timeFormatChangeError'))
           .message,
