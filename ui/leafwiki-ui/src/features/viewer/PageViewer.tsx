@@ -31,7 +31,10 @@ import { toast } from 'sonner'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router'
 import { BacklinkInfo } from '../links/LinkInfo'
-import { extractTocEntries } from '../preview/extractTocEntries'
+import {
+  extractPageDownloads,
+  extractTocEntries,
+} from '../preview/extractTocEntries'
 import MarkdownPreview from '../preview/MarkdownPreview'
 import { TocDropdownButton } from '../preview/TocDropdownButton'
 import { TocSidePanel } from '../preview/TocSidePanel'
@@ -143,8 +146,13 @@ export default function PageViewer() {
     () => (page ? extractTocEntries(page.content) : []),
     [page],
   )
+  const downloads = useMemo(
+    () => (page ? extractPageDownloads(page.content) : []),
+    [page],
+  )
 
   const showTocButton = tocEntries.length > 3
+  const showRightPane = showTocButton || downloads.length > 0
   // Single scroll spy for both the dropdown and the side panel.
   const tocActiveId = useTocScrollSpy(showTocButton ? tocEntries : [])
 
@@ -152,7 +160,7 @@ export default function PageViewer() {
   const tocCollapsed = useTocPanelStore((state) => state.collapsed)
 
   useEffect(() => {
-    if (!showTocButton) return
+    if (!showRightPane) return
 
     const tocToggleHotkey = createHotkeyDefinition(
       'viewer.toc.toggle',
@@ -161,7 +169,7 @@ export default function PageViewer() {
     registerHotkey(tocToggleHotkey)
 
     return () => unregisterHotkey(tocToggleHotkey.keyCombo)
-  }, [showTocButton, toggleTocCollapsed, registerHotkey, unregisterHotkey])
+  }, [showRightPane, toggleTocCollapsed, registerHotkey, unregisterHotkey])
 
   const editorName = displayUser(page?.metadata?.lastAuthor)
   const updatedRelative = formatRelativeTime(page?.metadata?.updatedAt)
@@ -175,7 +183,7 @@ export default function PageViewer() {
           <div
             className={cn(
               'page-viewer__subheader print:hidden',
-              showTocButton &&
+              showRightPane &&
                 (tocCollapsed
                   ? 'page-viewer__subheader--toc-reserved-collapsed'
                   : 'page-viewer__subheader--toc-reserved'),
@@ -224,9 +232,13 @@ export default function PageViewer() {
       : null
 
   const tocPane =
-    showTocButton && page && !error && tocPaneRoot
+    showRightPane && page && !error && tocPaneRoot
       ? createPortal(
-          <TocSidePanel entries={tocEntries} activeId={tocActiveId} />,
+          <TocSidePanel
+            entries={showTocButton ? tocEntries : []}
+            activeId={tocActiveId}
+            downloads={downloads}
+          />,
           tocPaneRoot,
         )
       : null

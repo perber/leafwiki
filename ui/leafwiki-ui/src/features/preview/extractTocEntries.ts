@@ -1,3 +1,4 @@
+import { IMAGE_EXTENSIONS } from '@/lib/config'
 import { slugifyHeadline } from './rehypeLineNumber'
 
 export type TocEntry = {
@@ -111,4 +112,26 @@ export function extractTocEntries(markdown: string): TocEntry[] {
   }
 
   return entries
+}
+
+export type PageDownload = {
+  name: string
+  url: string
+}
+
+const ASSET_LINK_RE = /(?<!!)\[([^\]]*)\]\((\/?assets\/[^)\s]+)\)/g
+
+export function extractPageDownloads(markdown: string): PageDownload[] {
+  const seen = new Set<string>()
+  const files: PageDownload[] = []
+  for (const match of markdown.matchAll(ASSET_LINK_RE)) {
+    const raw = match[2]
+    const url = raw.startsWith('/') ? raw : `/${raw}`
+    const name = url.split('/').pop() ?? url
+    const ext = name.split('.').pop()?.toLowerCase() ?? ''
+    if (IMAGE_EXTENSIONS.includes(ext) || seen.has(url)) continue
+    seen.add(url)
+    files.push({ name, url })
+  }
+  return files
 }
