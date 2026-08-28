@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"io"
 	"log/slog"
 	"net"
@@ -20,13 +19,39 @@ import (
 	"testing"
 	"time"
 
+	"github.com/urfave/cli/v3"
+
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 )
 
-func TestWriteUsage_UsesLongFlags(t *testing.T) {
+// runRootCommand parses args through the real command tree and hands the
+// resolved config to inspect, instead of running the server.
+func runRootCommand(t *testing.T, args []string, inspect func(cfg *serverConfig)) {
+	t.Helper()
+
+	cfg := &serverConfig{}
+	cmd := newRootCommandWithConfig(cfg)
+	cmd.Writer = io.Discard
+	cmd.ErrWriter = io.Discard
+	cmd.Action = func(_ context.Context, _ *cli.Command) error {
+		inspect(cfg)
+		return nil
+	}
+
+	if err := cmd.Run(context.Background(), append([]string{"leafwiki"}, args...)); err != nil {
+		t.Fatalf("cmd.Run(%q) error = %v", args, err)
+	}
+}
+
+func TestRootCommandHelp_DocumentsFlagsAndEnvVars(t *testing.T) {
 	var buf bytes.Buffer
 
-	writeUsage(&buf)
+	cmd := newRootCommand()
+	cmd.Writer = &buf
+	cmd.ErrWriter = &buf
+	if err := cmd.Run(context.Background(), []string{"leafwiki", "--help"}); err != nil {
+		t.Fatalf("cmd.Run(--help) error = %v", err)
+	}
 
 	output := buf.String()
 	for _, expected := range []string{
@@ -48,6 +73,8 @@ func TestWriteUsage_UsesLongFlags(t *testing.T) {
 		"LEAFWIKI_ENABLE_METRICS",
 		"LEAFWIKI_METRICS_HOST",
 		"LEAFWIKI_METRICS_PORT",
+		"reset-admin-password",
+		"restore-snapshot",
 	} {
 		if !strings.Contains(output, expected) {
 			t.Fatalf("expected usage output to contain %q, got %q", expected, output)
@@ -55,13 +82,8 @@ func TestWriteUsage_UsesLongFlags(t *testing.T) {
 	}
 }
 
-func TestRegisterFlags_AcceptsSingleDashLongFlags(t *testing.T) {
-	fs := flag.NewFlagSet("leafwiki", flag.ContinueOnError)
-	var errOut bytes.Buffer
-	fs.SetOutput(&errOut)
-	flags := registerFlags(fs)
-
-	err := fs.Parse([]string{
+func TestRootCommand_AcceptsSingleDashLongFlags(t *testing.T) {
+	runRootCommand(t, []string{
 		"-jwt-secret=test-secret",
 		"-admin-password=test-password",
 		"-admin-username=test-admin",
@@ -71,38 +93,31 @@ func TestRegisterFlags_AcceptsSingleDashLongFlags(t *testing.T) {
 		"-metrics-host=127.0.0.2",
 		"-metrics-port=9100",
 		"-unix-socket=/tmp/leafwiki.sock",
+	}, func(cfg *serverConfig) {
+		for _, tc := range []struct {
+			flag string
+			got  string
+			want string
+		}{
+			{"jwt-secret", cfg.auth.jwtSecret, "test-secret"},
+			{"admin-password", cfg.auth.adminPassword, "test-password"},
+			{"admin-username", cfg.auth.adminUsername, "test-admin"},
+			{"admin-email", cfg.auth.adminEmail, "test-admin@example.com"},
+			{"metrics-host", cfg.metrics.metricsHost, "127.0.0.2"},
+			{"metrics-port", cfg.metrics.metricsPort, "9100"},
+			{"unix-socket", cfg.server.unixSocket, "/tmp/leafwiki.sock"},
+		} {
+			if tc.got != tc.want {
+				t.Fatalf("expected --%s %q, got %q", tc.flag, tc.want, tc.got)
+			}
+		}
+		if !cfg.server.allowInsecure {
+			t.Fatal("expected --allow-insecure to be true")
+		}
+		if !cfg.metrics.enableMetrics {
+			t.Fatal("expected --enable-metrics to be true")
+		}
 	})
-	if err != nil {
-		t.Fatalf("expected single-dash long flags to parse, got %v (%s)", err, errOut.String())
-	}
-
-	if got := *flags.jwtSecret; got != "test-secret" {
-		t.Fatalf("expected jwt secret %q, got %q", "test-secret", got)
-	}
-	if got := *flags.adminPassword; got != "test-password" {
-		t.Fatalf("expected admin password %q, got %q", "test-password", got)
-	}
-	if got := *flags.adminUsername; got != "test-admin" {
-		t.Fatalf("expected admin username %q, got %q", "test-admin", got)
-	}
-	if got := *flags.adminEmail; got != "test-admin@example.com" {
-		t.Fatalf("expected admin email %q, got %q", "test-admin@example.com", got)
-	}
-	if !*flags.allowInsecure {
-		t.Fatalf("expected allow-insecure to be true")
-	}
-	if !*flags.enableMetrics {
-		t.Fatalf("expected enable-metrics to be true")
-	}
-	if got := *flags.metricsHost; got != "127.0.0.2" {
-		t.Fatalf("expected metrics host %q, got %q", "127.0.0.2", got)
-	}
-	if got := *flags.metricsPort; got != "9100" {
-		t.Fatalf("expected metrics port %q, got %q", "9100", got)
-	}
-	if got := *flags.unixSocket; got != "/tmp/leafwiki.sock" {
-		t.Fatalf("expected unix socket %q, got %q", "/tmp/leafwiki.sock", got)
-	}
 }
 
 func TestValidateHTTPRemoteUserConfig(t *testing.T) {
@@ -214,7 +229,6 @@ func TestResolveLogoutURL(t *testing.T) {
 		name               string
 		logoutURL          string
 		deprecatedFlagVal  string
-		visited            map[string]bool
 		wantResolved       string
 		wantUsedDeprecated bool
 	}{
@@ -226,7 +240,6 @@ func TestResolveLogoutURL(t *testing.T) {
 		{
 			name:               "only deprecated flag set",
 			deprecatedFlagVal:  "https://idp.example.com/logout",
-			visited:            map[string]bool{"http-remote-user-logout-url": true},
 			wantResolved:       "https://idp.example.com/logout",
 			wantUsedDeprecated: true,
 		},
@@ -237,11 +250,7 @@ func TestResolveLogoutURL(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			visited := tc.visited
-			if visited == nil {
-				visited = map[string]bool{}
-			}
-			resolved, usedDeprecated := resolveLogoutURL(tc.logoutURL, tc.deprecatedFlagVal, visited, "LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL")
+			resolved, usedDeprecated := resolveLogoutURL(tc.logoutURL, tc.deprecatedFlagVal)
 			if resolved != tc.wantResolved {
 				t.Fatalf("resolveLogoutURL() resolved = %q, want %q", resolved, tc.wantResolved)
 			}
@@ -252,19 +261,169 @@ func TestResolveLogoutURL(t *testing.T) {
 	}
 }
 
-func TestResolveString_TrimsCLIFlagValue(t *testing.T) {
-	visited := map[string]bool{"login-url": true}
-	got := resolveString("login-url", " https://idp.example.com/login ", visited, "LEAFWIKI_LOGIN_URL", "")
-	if want := "https://idp.example.com/login"; got != want {
-		t.Fatalf("resolveString() = %q, want %q", got, want)
+func TestRootCommand_TrimsStringFlagValue(t *testing.T) {
+	runRootCommand(t, []string{"--login-url= https://idp.example.com/login "}, func(cfg *serverConfig) {
+		if got, want := cfg.proxy.loginURL, "https://idp.example.com/login"; got != want {
+			t.Fatalf("login-url = %q, want %q", got, want)
+		}
+	})
+}
+
+func TestRootCommand_ResolutionPrecedence(t *testing.T) {
+	t.Run("environment variable overrides the default", func(t *testing.T) {
+		t.Setenv("LEAFWIKI_HOST", "0.0.0.0")
+		runRootCommand(t, nil, func(cfg *serverConfig) {
+			if got, want := cfg.server.host, "0.0.0.0"; got != want {
+				t.Fatalf("host = %q, want %q", got, want)
+			}
+		})
+	})
+
+	t.Run("flag overrides the environment variable", func(t *testing.T) {
+		t.Setenv("LEAFWIKI_HOST", "0.0.0.0")
+		runRootCommand(t, []string{"--host=192.168.0.1"}, func(cfg *serverConfig) {
+			if got, want := cfg.server.host, "192.168.0.1"; got != want {
+				t.Fatalf("host = %q, want %q", got, want)
+			}
+		})
+	})
+
+	t.Run("environment variable values are trimmed", func(t *testing.T) {
+		t.Setenv("LEAFWIKI_DATA_DIR", "  /srv/leafwiki  ")
+		runRootCommand(t, nil, func(cfg *serverConfig) {
+			if got, want := cfg.server.dataDir, "/srv/leafwiki"; got != want {
+				t.Fatalf("data-dir = %q, want %q", got, want)
+			}
+		})
+	})
+}
+
+// An environment variable that is declared without a value must not override a
+// default: compose and .env files do that routinely, and taking an empty
+// LEAFWIKI_HOST literally would bind the server to every interface.
+func TestRootCommand_EmptyEnvVarIsUnset(t *testing.T) {
+	t.Setenv("LEAFWIKI_HOST", "")
+	t.Setenv("LEAFWIKI_PORT", "   ")
+	t.Setenv("LEAFWIKI_SNAPSHOT", "")
+
+	runRootCommand(t, nil, func(cfg *serverConfig) {
+		if got, want := cfg.server.host, "127.0.0.1"; got != want {
+			t.Fatalf("host = %q, want %q", got, want)
+		}
+		if got, want := cfg.server.port, "8080"; got != want {
+			t.Fatalf("port = %q, want %q", got, want)
+		}
+		if !cfg.backup.snapshot {
+			t.Fatal("snapshot = false, want the default true")
+		}
+	})
+}
+
+func TestRootCommand_BoolEnvVarSpellings(t *testing.T) {
+	for _, tc := range []struct {
+		env  string
+		want bool
+	}{
+		{"true", true},
+		{"1", true},
+		{"yes", true},
+		{"ON", true},
+		{"y", true},
+		{"false", false},
+		{"0", false},
+		{"no", false},
+		{"off", false},
+		{"n", false},
+	} {
+		t.Run(tc.env, func(t *testing.T) {
+			t.Setenv("LEAFWIKI_PUBLIC_ACCESS", tc.env)
+			runRootCommand(t, nil, func(cfg *serverConfig) {
+				if got := cfg.auth.publicAccess; got != tc.want {
+					t.Fatalf("public-access with LEAFWIKI_PUBLIC_ACCESS=%q = %v, want %v", tc.env, got, tc.want)
+				}
+			})
+		})
 	}
 }
 
-func TestResolveLogFormat_Precedence(t *testing.T) {
+func TestRootCommand_InvalidEnvVarValueFailsFast(t *testing.T) {
+	for _, tc := range []struct{ envVar, value string }{
+		{"LEAFWIKI_PUBLIC_ACCESS", "maybe"},
+		{"LEAFWIKI_SNAPSHOT_RETENTION", "many"},
+		{"LEAFWIKI_SNAPSHOT_INTERVAL", "sometimes"},
+		{"LEAFWIKI_LOG_FORMAT", "yaml"},
+		{"LEAFWIKI_MAX_ASSET_UPLOAD_SIZE", "50 bananas"},
+		{"LEAFWIKI_RESTORE_UPLOAD_MAX_SIZE", "0"},
+		{"LEAFWIKI_LOGIN_URL", "javascript:alert(1)"},
+		{"LEAFWIKI_TOTP_ENCRYPTION_KEY", "too-short"},
+	} {
+		t.Run(tc.envVar, func(t *testing.T) {
+			t.Setenv(tc.envVar, tc.value)
+
+			cmd := newRootCommand()
+			cmd.Writer = io.Discard
+			cmd.ErrWriter = io.Discard
+			cmd.Action = func(_ context.Context, _ *cli.Command) error {
+				t.Fatalf("expected %s=%q to be rejected before the action runs", tc.envVar, tc.value)
+				return nil
+			}
+
+			if err := cmd.Run(context.Background(), []string{"leafwiki"}); err == nil {
+				t.Fatalf("expected an error for %s=%q, got nil", tc.envVar, tc.value)
+			}
+		})
+	}
+}
+
+func TestRootCommand_UsageErrorIsReportedOnce(t *testing.T) {
+	var out bytes.Buffer
+
+	cmd := newRootCommand()
+	cmd.Writer = &out
+	cmd.ErrWriter = &out
+
+	err := cmd.Run(context.Background(), []string{"leafwiki", "--hosts=1.2.3.4"})
+	if !errors.Is(err, errReported) {
+		t.Fatalf("cmd.Run() error = %v, want errReported so main stays quiet", err)
+	}
+	if got := strings.Count(out.String(), "not defined"); got != 1 {
+		t.Fatalf("expected the usage error to be printed exactly once, got %d times in %q", got, out.String())
+	}
+	if !strings.Contains(out.String(), `Did you mean "--host"?`) {
+		t.Fatalf("expected a suggestion for the mistyped flag, got %q", out.String())
+	}
+}
+
+func TestRootCommand_UnknownCommandIsRejected(t *testing.T) {
+	var out bytes.Buffer
+
+	cmd := newRootCommand()
+	cmd.Writer = &out
+	cmd.ErrWriter = &out
+	// The default handler for a cli.ExitCoder calls os.Exit, which would take
+	// the test binary down with it.
+	cmd.ExitErrHandler = func(context.Context, *cli.Command, error) {}
+
+	err := cmd.Run(context.Background(), []string{"leafwiki", "reset-admin-passwort"})
+	if err == nil {
+		t.Fatal("expected an error for an unknown command, got nil")
+	}
+	var exitErr cli.ExitCoder
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected a cli.ExitCoder, got %T: %v", err, err)
+	}
+	if exitErr.ExitCode() != 1 {
+		t.Fatalf("exit code = %d, want 1", exitErr.ExitCode())
+	}
+	if !strings.Contains(err.Error(), "reset-admin-passwort") {
+		t.Fatalf("expected the error to name the unknown command, got %q", err.Error())
+	}
+}
+
+func TestParseLogFormat_Precedence(t *testing.T) {
 	tests := []struct {
 		name     string
-		flagVal  string
-		visited  bool
+		args     []string
 		envVal   string
 		wantForm string
 	}{
@@ -284,8 +443,7 @@ func TestResolveLogFormat_Precedence(t *testing.T) {
 		},
 		{
 			name:     "cli flag overrides env var",
-			flagVal:  "text",
-			visited:  true,
+			args:     []string{"--log-format=text"},
 			envVal:   "json",
 			wantForm: "text",
 		},
@@ -293,14 +451,15 @@ func TestResolveLogFormat_Precedence(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("LEAFWIKI_LOG_FORMAT", tc.envVal)
-			visited := map[string]bool{}
-			if tc.visited {
-				visited["log-format"] = true
-			}
-			got := resolveLogFormat("log-format", tc.flagVal, visited, "LEAFWIKI_LOG_FORMAT", "text")
-			if got != tc.wantForm {
-				t.Fatalf("resolveLogFormat() = %q, want %q", got, tc.wantForm)
-			}
+			runRootCommand(t, tc.args, func(cfg *serverConfig) {
+				got, ok := parseLogFormat(cfg.server.logFormat)
+				if !ok {
+					t.Fatalf("parseLogFormat(%q) reported an invalid format", cfg.server.logFormat)
+				}
+				if got != tc.wantForm {
+					t.Fatalf("parseLogFormat() = %q, want %q", got, tc.wantForm)
+				}
+			})
 		})
 	}
 }
@@ -331,7 +490,7 @@ func TestSetupLogger_SelectsHandlerByFormat(t *testing.T) {
 }
 
 func TestRunRestoreSnapshotCommand_MissingArg_ReturnsUsageError(t *testing.T) {
-	err := runRestoreSnapshotCommand(t.TempDir(), []string{"restore-snapshot"})
+	err := runRestoreSnapshotCommand(t.TempDir(), "")
 	if !errors.Is(err, errRestoreSnapshotUsage) {
 		t.Fatalf("runRestoreSnapshotCommand() error = %v, want errRestoreSnapshotUsage", err)
 	}
@@ -341,7 +500,7 @@ func TestRunRestoreSnapshotCommand_InvalidZipPath_PropagatesError(t *testing.T) 
 	dataDir := t.TempDir()
 	zipPath := filepath.Join(dataDir, "does-not-exist.zip")
 
-	err := runRestoreSnapshotCommand(dataDir, []string{"restore-snapshot", zipPath})
+	err := runRestoreSnapshotCommand(dataDir, zipPath)
 	if err == nil {
 		t.Fatal("runRestoreSnapshotCommand() expected an error for a non-existent snapshot zip, got nil")
 	}
@@ -401,58 +560,56 @@ func TestValidateListenConfig(t *testing.T) {
 	tests := []struct {
 		name       string
 		unixSocket string
-		visited    map[string]bool
+		hostSet    bool
+		portSet    bool
 		wantErr    bool
 	}{
 		{
 			name:       "tcp only is allowed",
 			unixSocket: "",
-			visited:    map[string]bool{"host": true, "port": true},
+			hostSet:    true,
+			portSet:    true,
 			wantErr:    false,
 		},
 		{
 			name:       "unix socket only is allowed",
 			unixSocket: "/tmp/leafwiki.sock",
-			visited:    map[string]bool{},
-			wantErr:    false,
+
+			wantErr: false,
 		},
 		{
 			name:       "unix socket with host is rejected",
 			unixSocket: "/tmp/leafwiki.sock",
-			visited:    map[string]bool{"host": true},
+			hostSet:    true,
 			wantErr:    true,
 		},
 		{
 			name:       "unix socket with port is rejected",
 			unixSocket: "/tmp/leafwiki.sock",
-			visited:    map[string]bool{"port": true},
+			portSet:    true,
 			wantErr:    true,
 		},
 		{
 			name:       "unix socket with host and port is rejected",
 			unixSocket: "/tmp/leafwiki.sock",
-			visited:    map[string]bool{"host": true, "port": true},
+			hostSet:    true,
+			portSet:    true,
 			wantErr:    true,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateListenConfig(tc.unixSocket, tc.visited)
+			err := validateListenConfig(tc.unixSocket, tc.hostSet, tc.portSet)
 			if (err != nil) != tc.wantErr {
-				t.Fatalf("validateListenConfig(%q, %v) error = %v, wantErr %v", tc.unixSocket, tc.visited, err, tc.wantErr)
+				t.Fatalf("validateListenConfig(%q, host=%v, port=%v) error = %v, wantErr %v", tc.unixSocket, tc.hostSet, tc.portSet, err, tc.wantErr)
 			}
 		})
 	}
 }
 
-func TestRegisterFlags_AcceptsDoubleDashLongFlags(t *testing.T) {
-	fs := flag.NewFlagSet("leafwiki", flag.ContinueOnError)
-	var errOut bytes.Buffer
-	fs.SetOutput(&errOut)
-	flags := registerFlags(fs)
-
-	err := fs.Parse([]string{
+func TestRootCommand_AcceptsDoubleDashLongFlags(t *testing.T) {
+	runRootCommand(t, []string{
 		"--jwt-secret=test-secret",
 		"--admin-password=test-password",
 		"--admin-username=test-admin",
@@ -462,38 +619,31 @@ func TestRegisterFlags_AcceptsDoubleDashLongFlags(t *testing.T) {
 		"--metrics-host=127.0.0.2",
 		"--metrics-port=9100",
 		"--unix-socket=/tmp/leafwiki.sock",
+	}, func(cfg *serverConfig) {
+		for _, tc := range []struct {
+			flag string
+			got  string
+			want string
+		}{
+			{"jwt-secret", cfg.auth.jwtSecret, "test-secret"},
+			{"admin-password", cfg.auth.adminPassword, "test-password"},
+			{"admin-username", cfg.auth.adminUsername, "test-admin"},
+			{"admin-email", cfg.auth.adminEmail, "test-admin@example.com"},
+			{"metrics-host", cfg.metrics.metricsHost, "127.0.0.2"},
+			{"metrics-port", cfg.metrics.metricsPort, "9100"},
+			{"unix-socket", cfg.server.unixSocket, "/tmp/leafwiki.sock"},
+		} {
+			if tc.got != tc.want {
+				t.Fatalf("expected --%s %q, got %q", tc.flag, tc.want, tc.got)
+			}
+		}
+		if !cfg.server.allowInsecure {
+			t.Fatal("expected --allow-insecure to be true")
+		}
+		if !cfg.metrics.enableMetrics {
+			t.Fatal("expected --enable-metrics to be true")
+		}
 	})
-	if err != nil {
-		t.Fatalf("expected double-dash long flags to parse, got %v (%s)", err, errOut.String())
-	}
-
-	if got := *flags.jwtSecret; got != "test-secret" {
-		t.Fatalf("expected jwt secret %q, got %q", "test-secret", got)
-	}
-	if got := *flags.adminPassword; got != "test-password" {
-		t.Fatalf("expected admin password %q, got %q", "test-password", got)
-	}
-	if got := *flags.adminUsername; got != "test-admin" {
-		t.Fatalf("expected admin username %q, got %q", "test-admin", got)
-	}
-	if got := *flags.adminEmail; got != "test-admin@example.com" {
-		t.Fatalf("expected admin email %q, got %q", "test-admin@example.com", got)
-	}
-	if !*flags.allowInsecure {
-		t.Fatalf("expected allow-insecure to be true")
-	}
-	if !*flags.enableMetrics {
-		t.Fatalf("expected enable-metrics to be true")
-	}
-	if got := *flags.metricsHost; got != "127.0.0.2" {
-		t.Fatalf("expected metrics host %q, got %q", "127.0.0.2", got)
-	}
-	if got := *flags.metricsPort; got != "9100" {
-		t.Fatalf("expected metrics port %q, got %q", "9100", got)
-	}
-	if got := *flags.unixSocket; got != "/tmp/leafwiki.sock" {
-		t.Fatalf("expected unix socket %q, got %q", "/tmp/leafwiki.sock", got)
-	}
 }
 
 func TestStartMetricsServer_ServesOnlyMetricsEndpoint(t *testing.T) {
