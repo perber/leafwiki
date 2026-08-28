@@ -37,6 +37,9 @@ function makeSettings(overrides: Partial<UserSettings> = {}): UserSettings {
 describe('useUserSettingsStore', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    // Also resets the module-scoped format writers (epoch + last-persisted value)
+    // so their state doesn't leak between tests.
+    useUserSettingsStore.getState().clearUserSettings()
     useUserSettingsStore.setState({
       autoSave: true,
       language: 'en',
@@ -179,6 +182,76 @@ describe('useUserSettingsStore', () => {
     expect(
       (userSettingsApi.updateUserSettings as Mock).mock.calls.map((c) => c[0]),
     ).toEqual([{ dateFormat: 'iso' }, { dateFormat: 'dmy_dot' }])
+  })
+
+  it('a failed write rolls back to the last persisted value, not an unconfirmed pick', async () => {
+    useUserSettingsStore.setState({ dateFormat: 'locale' })
+    let failIso: (err: Error) => void = () => {}
+    let failDmy: (err: Error) => void = () => {}
+    ;(userSettingsApi.updateUserSettings as Mock)
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            failIso = reject
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            failDmy = reject
+          }),
+      )
+
+    const first = useUserSettingsStore.getState().setDateFormat('iso')
+    const second = useUserSettingsStore.getState().setDateFormat('dmy_dot')
+    expect(useUserSettingsStore.getState().dateFormat).toBe('dmy_dot')
+
+    await vi.waitFor(() =>
+      expect(userSettingsApi.updateUserSettings).toHaveBeenCalledTimes(1),
+    )
+    failIso(new Error('boom'))
+    await vi.waitFor(() =>
+      expect(userSettingsApi.updateUserSettings).toHaveBeenCalledTimes(2),
+    )
+    failDmy(new Error('boom'))
+    await Promise.all([first, second])
+
+    // Neither PUT persisted 'iso' — rolling back to it would strand the UI on
+    // a value the server never saw, so it lands on the last confirmed one.
+    expect(useUserSettingsStore.getState().dateFormat).toBe('locale')
+    expect(toast.error).toHaveBeenCalledTimes(1)
+  })
+
+  it('a format write still queued when the session ends never hits the API', async () => {
+    useUserSettingsStore.setState({ dateFormat: 'locale', loaded: true })
+    let resolveIso: (settings: UserSettings) => void = () => {}
+    ;(userSettingsApi.updateUserSettings as Mock)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveIso = resolve
+          }),
+      )
+      .mockResolvedValueOnce(makeSettings({ dateFormat: 'dmy_dot' }))
+
+    const first = useUserSettingsStore.getState().setDateFormat('iso')
+    const second = useUserSettingsStore.getState().setDateFormat('dmy_dot')
+
+    await vi.waitFor(() =>
+      expect(userSettingsApi.updateUserSettings).toHaveBeenCalledTimes(1),
+    )
+
+    // Session ends before the queued 'dmy_dot' write gets its turn.
+    useUserSettingsStore.getState().clearUserSettings()
+
+    resolveIso(makeSettings({ dateFormat: 'iso' }))
+    await Promise.all([first, second])
+
+    // The queued write is dropped rather than PUT under the next session, and
+    // the post-logout defaults are left untouched.
+    expect(userSettingsApi.updateUserSettings).toHaveBeenCalledTimes(1)
+    expect(useUserSettingsStore.getState().dateFormat).toBe('locale')
+    expect(toast.success).not.toHaveBeenCalled()
   })
 
   it('clearUserSettings resets the format preference to locale', () => {

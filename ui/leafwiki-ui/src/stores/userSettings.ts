@@ -33,39 +33,66 @@ function applyLanguageIfShipped(lang: string): void {
 // server, and a stale failure could roll the UI back over the value the user
 // actually chose (plus show a misleading error toast). Writes run in
 // submission order and only the most recent one may roll back on failure.
-type PrefWriter = { seq: number; chain: Promise<unknown> }
-
-function makePrefWriter(): PrefWriter {
-  return { seq: 0, chain: Promise.resolve() }
+type PrefWriter = {
+  // Identifies the most recent write; only it is allowed to roll back.
+  seq: number
+  // Bumped on login/logout: a write still queued behind a slow PUT checks
+  // this and aborts rather than writing into a different user's session.
+  epoch: number
+  // The last value the server has actually confirmed — the rollback target.
+  persisted: string
+  chain: Promise<unknown>
 }
 
-// Resolves `true` when this write is the latest one and its PUT succeeded
-// (the caller then confirms the save), `false` when a newer write superseded
-// it (the newer write owns the user feedback), and rejects when the latest
-// write fails (the caller shows the error and the optimistic value is rolled
-// back).
+function makePrefWriter(persisted: string): PrefWriter {
+  return { seq: 0, epoch: 0, persisted, chain: Promise.resolve() }
+}
+
+// Points every writer at the value the server just returned and starts a
+// fresh epoch, so any patch still queued from a previous session is skipped
+// rather than written into the current one.
+function resetPrefWriter(writer: PrefWriter, persisted: string): void {
+  writer.seq = 0
+  writer.epoch += 1
+  writer.persisted = persisted
+}
+
+// Resolves 'saved' when this is the latest write and its PUT succeeded (the
+// caller then confirms the save), 'skipped' when a newer write superseded it
+// or the session changed before its turn, and rejects when the latest write
+// fails — after rolling the field back to the last server-confirmed value
+// (never to an earlier, still-unpersisted optimistic pick).
 function writePref(
   writer: PrefWriter,
-  apply: () => void,
-  patch: () => Promise<unknown>,
-  rollback: () => void,
-): Promise<boolean> {
+  value: string,
+  apply: (v: string) => void,
+  patch: (v: string) => Promise<unknown>,
+): Promise<'saved' | 'skipped'> {
   const seq = ++writer.seq
-  apply()
+  const epoch = writer.epoch
+  apply(value)
   writer.chain = writer.chain
     .catch(() => {})
-    .then(() => patch())
-    .then(() => seq === writer.seq)
+    .then(async () => {
+      if (writer.epoch !== epoch) return 'skipped' as const // session changed
+      await patch(value)
+      if (writer.epoch !== epoch) return 'skipped' as const // session changed mid-PUT
+      writer.persisted = value
+      return seq === writer.seq ? ('saved' as const) : ('skipped' as const)
+    })
     .catch((err) => {
-      if (seq !== writer.seq) return false // superseded by a newer write
-      rollback()
+      // superseded, or the session changed: the newer write / new session
+      // owns the visible state, so leave it alone.
+      if (writer.epoch !== epoch || seq !== writer.seq)
+        return 'skipped' as const
+      apply(writer.persisted)
       throw err
     })
-  return writer.chain as Promise<boolean>
+  return writer.chain as Promise<'saved' | 'skipped'>
 }
 
-const dateFormatWriter = makePrefWriter()
-const timeFormatWriter = makePrefWriter()
+const dateFormatWriter = makePrefWriter(DEFAULT_DATE_FORMAT)
+const timeFormatWriter = makePrefWriter(DEFAULT_TIME_FORMAT)
 
 type UserSettingsStore = {
   autoSave: boolean
@@ -90,13 +117,17 @@ export const useUserSettingsStore = create<UserSettingsStore>()((set, get) => ({
   loadUserSettings: async () => {
     try {
       const settings = await getUserSettings()
+      const dateFormat = settings.dateFormat ?? DEFAULT_DATE_FORMAT
+      const timeFormat = settings.timeFormat ?? DEFAULT_TIME_FORMAT
       set({
         autoSave: settings.autoSave,
         language: settings.language,
-        dateFormat: settings.dateFormat ?? DEFAULT_DATE_FORMAT,
-        timeFormat: settings.timeFormat ?? DEFAULT_TIME_FORMAT,
+        dateFormat,
+        timeFormat,
         loaded: true,
       })
+      resetPrefWriter(dateFormatWriter, dateFormat)
+      resetPrefWriter(timeFormatWriter, timeFormat)
       applyLanguageIfShipped(settings.language)
     } catch (err) {
       console.warn('Failed to load user settings:', err)
@@ -133,16 +164,15 @@ export const useUserSettingsStore = create<UserSettingsStore>()((set, get) => ({
     }
   },
   setDateFormat: async (dateFormat) => {
-    const previous = get().dateFormat
-    if (dateFormat === previous) return
+    if (dateFormat === get().dateFormat) return
     try {
-      const applied = await writePref(
+      const result = await writePref(
         dateFormatWriter,
-        () => set({ dateFormat }),
-        () => updateUserSettings({ dateFormat }),
-        () => set({ dateFormat: previous }),
+        dateFormat,
+        (v) => set({ dateFormat: v }),
+        (v) => updateUserSettings({ dateFormat: v }),
       )
-      if (applied) toast.success(t('account.preferences.savedToast'))
+      if (result === 'saved') toast.success(t('account.preferences.savedToast'))
     } catch (err) {
       toast.error(
         mapApiError(err, t('account.preferences.dateFormatChangeError'))
@@ -151,16 +181,15 @@ export const useUserSettingsStore = create<UserSettingsStore>()((set, get) => ({
     }
   },
   setTimeFormat: async (timeFormat) => {
-    const previous = get().timeFormat
-    if (timeFormat === previous) return
+    if (timeFormat === get().timeFormat) return
     try {
-      const applied = await writePref(
+      const result = await writePref(
         timeFormatWriter,
-        () => set({ timeFormat }),
-        () => updateUserSettings({ timeFormat }),
-        () => set({ timeFormat: previous }),
+        timeFormat,
+        (v) => set({ timeFormat: v }),
+        (v) => updateUserSettings({ timeFormat: v }),
       )
-      if (applied) toast.success(t('account.preferences.savedToast'))
+      if (result === 'saved') toast.success(t('account.preferences.savedToast'))
     } catch (err) {
       toast.error(
         mapApiError(err, t('account.preferences.timeFormatChangeError'))
@@ -168,12 +197,15 @@ export const useUserSettingsStore = create<UserSettingsStore>()((set, get) => ({
       )
     }
   },
-  clearUserSettings: () =>
+  clearUserSettings: () => {
+    resetPrefWriter(dateFormatWriter, DEFAULT_DATE_FORMAT)
+    resetPrefWriter(timeFormatWriter, DEFAULT_TIME_FORMAT)
     set({
       autoSave: true,
       language: DEFAULT_LANGUAGE,
       dateFormat: DEFAULT_DATE_FORMAT,
       timeFormat: DEFAULT_TIME_FORMAT,
       loaded: false,
-    }),
+    })
+  },
 }))
