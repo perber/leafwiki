@@ -39,23 +39,29 @@ function makePrefWriter(): PrefWriter {
   return { seq: 0, chain: Promise.resolve() }
 }
 
+// Resolves `true` when this write is the latest one and its PUT succeeded
+// (the caller then confirms the save), `false` when a newer write superseded
+// it (the newer write owns the user feedback), and rejects when the latest
+// write fails (the caller shows the error and the optimistic value is rolled
+// back).
 function writePref(
   writer: PrefWriter,
   apply: () => void,
   patch: () => Promise<unknown>,
   rollback: () => void,
-): Promise<void> {
+): Promise<boolean> {
   const seq = ++writer.seq
   apply()
   writer.chain = writer.chain
     .catch(() => {})
     .then(() => patch())
+    .then(() => seq === writer.seq)
     .catch((err) => {
-      if (seq !== writer.seq) return // superseded by a newer write
+      if (seq !== writer.seq) return false // superseded by a newer write
       rollback()
       throw err
     })
-  return writer.chain as Promise<void>
+  return writer.chain as Promise<boolean>
 }
 
 const dateFormatWriter = makePrefWriter()
@@ -102,6 +108,7 @@ export const useUserSettingsStore = create<UserSettingsStore>()((set, get) => ({
     set({ autoSave: next })
     try {
       await updateUserSettings({ autoSave: next })
+      toast.success(t('account.preferences.savedToast'))
     } catch (err) {
       set({ autoSave: previous })
       toast.error(
@@ -116,6 +123,7 @@ export const useUserSettingsStore = create<UserSettingsStore>()((set, get) => ({
     applyLanguageIfShipped(language)
     try {
       await updateUserSettings({ language })
+      toast.success(t('account.preferences.savedToast'))
     } catch (err) {
       set({ language: previous })
       applyLanguageIfShipped(previous)
@@ -128,12 +136,13 @@ export const useUserSettingsStore = create<UserSettingsStore>()((set, get) => ({
     const previous = get().dateFormat
     if (dateFormat === previous) return
     try {
-      await writePref(
+      const applied = await writePref(
         dateFormatWriter,
         () => set({ dateFormat }),
         () => updateUserSettings({ dateFormat }),
         () => set({ dateFormat: previous }),
       )
+      if (applied) toast.success(t('account.preferences.savedToast'))
     } catch (err) {
       toast.error(
         mapApiError(err, t('account.preferences.dateFormatChangeError'))
@@ -145,12 +154,13 @@ export const useUserSettingsStore = create<UserSettingsStore>()((set, get) => ({
     const previous = get().timeFormat
     if (timeFormat === previous) return
     try {
-      await writePref(
+      const applied = await writePref(
         timeFormatWriter,
         () => set({ timeFormat }),
         () => updateUserSettings({ timeFormat }),
         () => set({ timeFormat: previous }),
       )
+      if (applied) toast.success(t('account.preferences.savedToast'))
     } catch (err) {
       toast.error(
         mapApiError(err, t('account.preferences.timeFormatChangeError'))

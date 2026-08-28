@@ -27,6 +27,7 @@
       "sectionDescription": "Editing preferences, synced across your devices.",
       "autoSaveLabel": "Enable auto-save",
       "autoSaveDescription": "Automatically save your changes while editing a page.",
+      "savedToast": "Preference saved",
       "autoSaveToggleError": "Could not update auto-save setting",
       "languageLabel": "Language",
       "languageChangeError": "Could not update language setting",

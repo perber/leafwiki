@@ -132,6 +132,8 @@ describe('useUserSettingsStore', () => {
     expect(userSettingsApi.updateUserSettings).toHaveBeenCalledWith({
       dateFormat: 'iso',
     })
+    // A successful save is confirmed with a toast, like the app's other saves.
+    expect(toast.success).toHaveBeenCalledTimes(1)
   })
 
   it('setTimeFormat rolls back and toasts on a failed update', async () => {
@@ -172,6 +174,8 @@ describe('useUserSettingsStore', () => {
     // and its PUT ran before the newer one so the server ends up on 'dmy_dot'.
     expect(useUserSettingsStore.getState().dateFormat).toBe('dmy_dot')
     expect(toast.error).not.toHaveBeenCalled()
+    // Only the write that actually stuck confirms — the superseded one stays quiet.
+    expect(toast.success).toHaveBeenCalledTimes(1)
     expect(
       (userSettingsApi.updateUserSettings as Mock).mock.calls.map((c) => c[0]),
     ).toEqual([{ dateFormat: 'iso' }, { dateFormat: 'dmy_dot' }])
