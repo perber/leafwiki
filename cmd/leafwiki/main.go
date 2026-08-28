@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"log/slog"
@@ -37,6 +36,7 @@ import (
 	wikibackup "github.com/perber/wiki/internal/wiki/backup"
 	wikirestore "github.com/perber/wiki/internal/wiki/restore"
 	wikisnapshot "github.com/perber/wiki/internal/wiki/snapshot"
+	"github.com/urfave/cli/v3"
 )
 
 // Version is the LeafWiki build version. It defaults to "dev" for
@@ -48,160 +48,7 @@ var Version = "dev"
 const (
 	gitBackupSSHKeyFlagName       = "git-backup-ssh-key"
 	gitBackupHTTPPasswordFlagName = "git-backup-http-password"
-	errInvalidEnvVarValue         = "Invalid environment variable value"
 )
-
-func writeUsage(w io.Writer) {
-	if _, err := fmt.Fprintln(w, `LeafWiki – lightweight selfhosted wiki 🌿
-
-	Usage:
-	leafwiki --jwt-secret <SECRET> --admin-password <PASSWORD> [--host <HOST>] [--port <PORT>] [--unix-socket <PATH>] [--data-dir <DIR>]
-	leafwiki --disable-auth [--host <HOST>] [--port <PORT>] [--unix-socket <PATH>] [--data-dir <DIR>]
-	leafwiki reset-admin-password
-	leafwiki [--data-dir <DIR>] restore-snapshot <path-to-zip>
-	leafwiki --help
-
-	Options:
-	--log-format       Log output format: text or json (default: text)
-	--host             Host/IP address to bind the server to (default: 127.0.0.1)
-	--port             Port to run the server on (default: 8080)
-	--unix-socket      Path to a unix domain socket to listen on (overrides --host and --port)
-	--data-dir         Path to data directory (default: ./data)
-	--admin-password   Initial admin password (used only if no admin exists), min 8 characters
-	--admin-username   Initial admin username (used only if no admin exists) (default: admin)
-	--admin-email      Initial admin email (used only if no admin exists) (default: admin@localhost)
-	--jwt-secret       Secret for signing auth tokens (JWT) (required)
-	--totp-encryption-key    Key to encrypt per-user TOTP secrets at rest, min 32 bytes
-	                         (required only once a user enables TOTP; leave unset to keep
-	                         TOTP self-service unavailable) (default: "")
-	--public-access    Allow public access to the wiki only with read access (default: false)
-	--allow-insecure   Allow insecure HTTP connections (default: false)                      
-	--access-token-timeout  Access token timeout duration (e.g. 24h, 15m) (default: 15m)
-	--refresh-token-timeout Refresh token timeout duration (e.g. 168h) (default: 168h)
-	--inject-code-in-header  Raw HTML/JS code injected into <head> tag (e.g., analytics, custom CSS) (default: "")
-	                         WARNING: Use only with trusted code to avoid XSS vulnerabilities. No sanitization is performed.
-	--custom-stylesheet      Path to a .css file inside the data dir, served publicly as /custom.css
-	                         (or <base-path>/custom.css when --base-path is set) (default: "")
-	--disable-auth                Disable authentication completely (default: false) (WARNING: only use in trusted networks!)
-	--hide-link-metadata-section  Hide link metadata section in the frontend UI (default: false)
-	--base-path                   URL prefix when served behind a reverse proxy (e.g. /wiki) (default: "")
-	--max-asset-upload-size       Maximum size for asset uploads (for example 50MiB, 50MB, 52428800) (default: 50MiB)
-	--enable-revision             Enable the revision / page history feature (default: false)
-	--enable-link-refactor        Enable the link refactoring dialog and rewrite flow (default: false)
-	--enable-api-key-management   Enable the experimental API key management feature (default: false)
-	--enable-metrics              Enable the Prometheus /metrics endpoint on a separate listener (default: false)
-	--metrics-host                Host/IP for the metrics listener (default: 127.0.0.1)
-	--metrics-port                Port for the metrics listener (default: 9091)
-	--max-revision-history        Maximum revisions kept per page; 0 = unlimited (default: 100)
-	--editor-limit                Maximum admin+editor users allowed; 0 = unlimited (default: 0)
-	--revision-coalesce-window    Window for coalescing rapid successive saves by the same author (e.g. 5m, 0 = disabled) (default: 5m)
-	--enable-http-remote-user               Enable reverse-proxy authentication via HTTP header (default: false)
-	--http-remote-user-header-name          HTTP header carrying the username or email from a trusted proxy (default: Remote-User)
-	--enable-http-remote-user-auto-create   Auto-provision users asserted by the trusted proxy but unknown to LeafWiki (default: false)
-	--http-remote-user-email-header-name    HTTP header carrying the email for auto-created users (default: "")
-	--http-remote-user-default-role         Role assigned to auto-created users; must not be "admin" (default: viewer)
-	--trusted-proxy-ips                     Comma-separated trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)
-	--login-url                     URL the frontend redirects to instead of the built-in login form
-	                                 (e.g. an external SSO/IdP login page) (default: "")
-	--logout-url                    URL the frontend redirects to after logout
-	                                 (e.g. an external SSO/IdP logout page) (default: "")
-	--http-remote-user-logout-url   Deprecated: use --logout-url instead
-	--user-management-url           URL to an external user-management page; when set, the built-in
-	                                 User Management UI is replaced with a link to this URL (default: "")
-	--default-language              Default UI language code for the frontend (e.g. en, de); must match
-	                                 a language shipped with the frontend, otherwise it is ignored (default: "")
-	--disable-request-log           Suppress per-request HTTP access log lines (default: false)
-	--git-backup                   Enable git backup to a remote repository (default: false)
-	--git-backup-author-name       Git commit author name for backups (default: LeafWiki Backup)
-	--git-backup-author-email      Git commit author email for backups (default: backup@leafwiki.local)
-	--git-backup-remote            Git remote URL (SSH or HTTP(S)) for backups (required when git-backup is enabled)
-	--git-backup-branch            Git branch to push to (default: main)
-	--git-backup-ssh-key-path      Path to SSH private key for git backup
-	--git-backup-ssh-key           Raw SSH private key for git backup (env var preferred)
-	--git-backup-ssh-known-hosts   Path to known_hosts file for SSH host key verification (MITM protection)
-	--git-backup-http-username     Username for HTTP(S) basic auth (used instead of an SSH key on http(s):// remotes)
-	--git-backup-http-password     Password or access token for HTTP(S) basic auth (env var preferred)
-	--git-backup-interval          Git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)
-	--snapshot                     Enable full backup snapshots (ZIP incl. the SQLite database) (default: true)
-	--snapshot-interval            Snapshot interval (e.g. 24h, 6h); 0 = manual-only, no automatic scheduling (default: 24h)
-	--snapshot-retention           Number of most recent snapshots to keep; <= 0 = keep all (default: 10)
-	--snapshot-dir                 Directory to store snapshot ZIPs in (default: <data-dir>/snapshots)
-	--restore-upload-max-size      Maximum size for an uploaded backup ZIP to restore from
-	                               (for example 500MiB, 500MB, 524288000) (default: 500MiB)
-	                               When --snapshot is enabled, live restore-from-snapshot is also available
-	                               via the admin UI (Settings > Full Backup) and gates writes (503) while a
-	                               restore is swapping files. For disaster recovery or migrating a snapshot
-	                               to a fresh instance, use the "restore-snapshot" subcommand instead (run it
-	                               before starting the server against that data directory; pass --data-dir
-	                               *before* the subcommand, e.g. "leafwiki --data-dir ./data restore-snapshot file.zip").
-
-	Environment variables:
-	LEAFWIKI_HOST
-	LEAFWIKI_PORT
-	LEAFWIKI_UNIX_SOCKET
-	LEAFWIKI_DATA_DIR
-	LEAFWIKI_JWT_SECRET
-	LEAFWIKI_TOTP_ENCRYPTION_KEY
-	LEAFWIKI_LOG_LEVEL
-	LEAFWIKI_LOG_FORMAT
-	LEAFWIKI_ADMIN_PASSWORD
-	LEAFWIKI_ADMIN_USERNAME
-	LEAFWIKI_ADMIN_EMAIL
-	LEAFWIKI_PUBLIC_ACCESS
-	LEAFWIKI_EDITOR_LIMIT
-	LEAFWIKI_ALLOW_INSECURE
-	LEAFWIKI_INJECT_CODE_IN_HEADER
-	LEAFWIKI_CUSTOM_STYLESHEET
-	LEAFWIKI_ACCESS_TOKEN_TIMEOUT
-	LEAFWIKI_REFRESH_TOKEN_TIMEOUT
-	LEAFWIKI_DISABLE_AUTH
-	LEAFWIKI_HIDE_LINK_METADATA_SECTION
-	LEAFWIKI_BASE_PATH
-	LEAFWIKI_MAX_ASSET_UPLOAD_SIZE
-	LEAFWIKI_ENABLE_REVISION
-	LEAFWIKI_ENABLE_LINK_REFACTOR
-	LEAFWIKI_ENABLE_API_KEY_MANAGEMENT
-	LEAFWIKI_ENABLE_METRICS
-	LEAFWIKI_METRICS_HOST
-	LEAFWIKI_METRICS_PORT
-	LEAFWIKI_MAX_REVISION_HISTORY
-	LEAFWIKI_REVISION_COALESCE_WINDOW
-	LEAFWIKI_ENABLE_HTTP_REMOTE_USER
-	LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME
-	LEAFWIKI_ENABLE_HTTP_REMOTE_USER_AUTO_CREATE
-	LEAFWIKI_HTTP_REMOTE_USER_EMAIL_HEADER_NAME
-	LEAFWIKI_HTTP_REMOTE_USER_DEFAULT_ROLE
-	LEAFWIKI_TRUSTED_PROXY_IPS
-	LEAFWIKI_LOGIN_URL
-	LEAFWIKI_LOGOUT_URL
-	LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL  (deprecated: use LEAFWIKI_LOGOUT_URL instead)
-	LEAFWIKI_USER_MANAGEMENT_URL
-	LEAFWIKI_DEFAULT_LANGUAGE
-	LEAFWIKI_DISABLE_REQUEST_LOG
-	LEAFWIKI_GIT_BACKUP
-	LEAFWIKI_GIT_BACKUP_AUTHOR_NAME
-	LEAFWIKI_GIT_BACKUP_AUTHOR_EMAIL
-	LEAFWIKI_GIT_BACKUP_REMOTE
-	LEAFWIKI_GIT_BACKUP_BRANCH
-	LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH
-	LEAFWIKI_GIT_BACKUP_SSH_KEY
-	LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS
-	LEAFWIKI_GIT_BACKUP_HTTP_USERNAME
-	LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD
-	LEAFWIKI_GIT_BACKUP_INTERVAL
-	LEAFWIKI_SNAPSHOT
-	LEAFWIKI_SNAPSHOT_INTERVAL
-	LEAFWIKI_SNAPSHOT_RETENTION
-	LEAFWIKI_SNAPSHOT_DIR
-	LEAFWIKI_RESTORE_UPLOAD_MAX_SIZE
-	`); err != nil {
-		panic(err)
-	}
-}
-
-func printUsage() {
-	writeUsage(os.Stdout)
-}
 
 func setupLogger(w io.Writer, format string) {
 	level := slog.LevelInfo
@@ -236,414 +83,177 @@ func fail(msg string, args ...any) {
 
 var errRestoreSnapshotUsage = errors.New("restore-snapshot requires a path to a snapshot zip: leafwiki [--data-dir <DIR>] restore-snapshot <path-to-zip>")
 
-// runRestoreSnapshotCommand implements the `restore-snapshot` subcommand: args
-// is flag.Args() (args[0] == "restore-snapshot"), so a snapshot path is
-// present at args[1].
-func runRestoreSnapshotCommand(dataDir string, args []string) error {
-	if len(args) < 2 {
+// runRestoreSnapshotCommand implements the `restore-snapshot` command.
+func runRestoreSnapshotCommand(dataDir, snapshotPath string) error {
+	if snapshotPath == "" {
 		return errRestoreSnapshotUsage
 	}
-	return restore.RestoreOffline(dataDir, args[1])
+	if err := restore.RestoreOffline(dataDir, snapshotPath); err != nil {
+		return fmt.Errorf("restore failed: %w", err)
+	}
+	fmt.Println("Snapshot restored successfully. Start the server normally to pick up the restored data.")
+	return nil
 }
 
 var gracefulShutdownTimeout = 10 * time.Second
 
-type cliFlags struct {
-	logFormat                      *string
-	host                           *string
-	port                           *string
-	unixSocket                     *string
-	dataDir                        *string
-	adminUsername                  *string
-	adminEmail                     *string
-	adminPassword                  *string
-	jwtSecret                      *string
-	totpEncryptionKey              *string
-	publicAccess                   *bool
-	allowInsecure                  *bool
-	injectCodeInHeader             *string
-	customStylesheet               *string
-	disableAuth                    *bool
-	hideLinkMetadataSection        *bool
-	accessTokenTimeout             *time.Duration
-	refreshTokenTimeout            *time.Duration
-	basePath                       *string
-	maxAssetUploadSize             *string
-	enableRevision                 *bool
-	enableLinkRefactor             *bool
-	enableAPIKeyManagement         *bool
-	enableMetrics                  *bool
-	metricsHost                    *string
-	metricsPort                    *string
-	maxRevisionHistory             *int
-	editorLimit                    *int
-	enableHTTPRemoteUser           *bool
-	httpRemoteUserHeader           *string
-	enableHTTPRemoteUserAutoCreate *bool
-	httpRemoteUserEmailHeader      *string
-	httpRemoteUserDefaultRole      *string
-	trustedProxyIPs                *string
-	loginURL                       *string
-	logoutURL                      *string
-	httpRemoteUserLogoutURL        *string
-	userManagementURL              *string
-	defaultLanguage                *string
-	disableRequestLog              *bool
-	gitBackup                      *bool
-	gitBackupAuthorName            *string
-	gitBackupAuthorEmail           *string
-	gitBackupRemote                *string
-	gitBackupBranch                *string
-	gitBackupSSHKeyPath            *string
-	gitBackupSSHKey                *string
-	gitBackupSSHKnownHosts         *string
-	gitBackupHTTPUsername          *string
-	gitBackupHTTPPassword          *string
-	gitBackupInterval              *time.Duration
-	revisionCoalesceWindow         *time.Duration
-	snapshotEnabled                *bool
-	snapshotInterval               *time.Duration
-	snapshotRetention              *int
-	snapshotDir                    *string
-	restoreUploadMaxSize           *string
-	smtpHost                       *string
-	smtpPort                       *int
-	smtpUsername                   *string
-	smtpPassword                   *string
-	smtpFrom                       *string
-	smtpFromName                   *string
-	smtpSecurity                   *string
-	smtpInsecureSkipVerify         *bool
-	smtpTimeout                    *time.Duration
-	publicURL                      *string
-}
-
-func registerFlags(fs *flag.FlagSet) *cliFlags {
-	return &cliFlags{
-		logFormat:                      fs.String("log-format", "", "log output format: text or json (default: text)"),
-		host:                           fs.String("host", "", "host/IP address to bind the server to (e.g. 127.0.0.1 or 0.0.0.0)"),
-		port:                           fs.String("port", "", "port to run the server on"),
-		unixSocket:                     fs.String("unix-socket", "", "path to a unix domain socket to listen on; overrides --host and --port"),
-		dataDir:                        fs.String("data-dir", "", "path to data directory"),
-		adminUsername:                  fs.String("admin-username", "", "initial admin username (used only if no admin exists) (default: admin)"),
-		adminEmail:                     fs.String("admin-email", "", "initial admin email (used only if no admin exists) (default: admin@localhost)"),
-		adminPassword:                  fs.String("admin-password", "", "initial admin password, min 8 characters"),
-		jwtSecret:                      fs.String("jwt-secret", "", "JWT secret for authentication"),
-		totpEncryptionKey:              fs.String("totp-encryption-key", "", "key to encrypt per-user TOTP secrets at rest, min 32 bytes (leave unset to keep TOTP self-service unavailable)"),
-		publicAccess:                   fs.Bool("public-access", false, "allow public access to the wiki with read access (default: false)"),
-		allowInsecure:                  fs.Bool("allow-insecure", false, "allow insecure HTTP connections (default: false)"),
-		injectCodeInHeader:             fs.String("inject-code-in-header", "", "raw string injected into <head> (default: \"\")"),
-		customStylesheet:               fs.String("custom-stylesheet", "", "path to a custom CSS file served as /custom.css"),
-		disableAuth:                    fs.Bool("disable-auth", false, "disable authentication completely (default: false) (WARNING: only use in trusted networks!)"),
-		hideLinkMetadataSection:        fs.Bool("hide-link-metadata-section", false, "hide link metadata section (default: false)"),
-		accessTokenTimeout:             fs.Duration("access-token-timeout", 15*time.Minute, "access token timeout duration (e.g. 24h, 15m) (default: 15m)"),
-		refreshTokenTimeout:            fs.Duration("refresh-token-timeout", 7*24*time.Hour, "refresh token timeout duration (e.g. 168h) (default: 168h)"),
-		basePath:                       fs.String("base-path", "", "URL prefix when served behind a reverse proxy (e.g. /wiki)"),
-		maxAssetUploadSize:             fs.String("max-asset-upload-size", "", "maximum size for asset uploads (for example 50MiB, 50MB, 52428800)"),
-		enableRevision:                 fs.Bool("enable-revision", false, "enable the revision / page history feature (default: false)"),
-		enableLinkRefactor:             fs.Bool("enable-link-refactor", false, "enable the link refactoring dialog and rewrite flow (default: false)"),
-		enableAPIKeyManagement:         fs.Bool("enable-api-key-management", false, "enable the experimental API key management feature (default: false)"),
-		enableMetrics:                  fs.Bool("enable-metrics", false, "enable the Prometheus /metrics endpoint on a separate listener (default: false)"),
-		metricsHost:                    fs.String("metrics-host", "", "host/IP address for the Prometheus metrics listener (default: 127.0.0.1)"),
-		metricsPort:                    fs.String("metrics-port", "", "port for the Prometheus metrics listener (default: 9091)"),
-		maxRevisionHistory:             fs.Int("max-revision-history", 100, "maximum revisions kept per page; 0 = unlimited (default: 100)"),
-		editorLimit:                    fs.Int("editor-limit", 0, "maximum admin+editor users allowed; 0 = unlimited (default: 0)"),
-		enableHTTPRemoteUser:           fs.Bool("enable-http-remote-user", false, "enable reverse-proxy authentication via HTTP header (default: false)"),
-		httpRemoteUserHeader:           fs.String("http-remote-user-header-name", "Remote-User", "HTTP header name carrying the username or email from a trusted proxy (default: Remote-User)"),
-		enableHTTPRemoteUserAutoCreate: fs.Bool("enable-http-remote-user-auto-create", false, "auto-provision users asserted by the trusted proxy but unknown to LeafWiki (default: false)"),
-		httpRemoteUserEmailHeader:      fs.String("http-remote-user-email-header-name", "", "HTTP header name carrying the email for auto-created users (default: \"\")"),
-		httpRemoteUserDefaultRole:      fs.String("http-remote-user-default-role", "viewer", "role assigned to auto-created users; must not be \"admin\" (default: viewer)"),
-		trustedProxyIPs:                fs.String("trusted-proxy-ips", "", "comma-separated list of trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)"),
-		loginURL:                       fs.String("login-url", "", "URL the frontend redirects to instead of the built-in login form (e.g. an external SSO/IdP login page)"),
-		logoutURL:                      fs.String("logout-url", "", "URL the frontend redirects to after logout (e.g. an external SSO/IdP logout page)"),
-		httpRemoteUserLogoutURL:        fs.String("http-remote-user-logout-url", "", "deprecated: use --logout-url instead"),
-		userManagementURL:              fs.String("user-management-url", "", "URL to an external user-management page; when set, the built-in User Management UI is replaced with a link to this URL"),
-		defaultLanguage:                fs.String("default-language", "", "default UI language code for the frontend (e.g. en, de); must match a language shipped with the frontend, otherwise it is ignored"),
-		disableRequestLog:              fs.Bool("disable-request-log", false, "suppress per-request HTTP access log lines (default: false)"),
-		gitBackup:                      fs.Bool("git-backup", false, "enable git backup to a remote repository (default: false)"),
-		gitBackupAuthorName:            fs.String("git-backup-author-name", "", "git commit author name for backups (default: LeafWiki Backup)"),
-		gitBackupAuthorEmail:           fs.String("git-backup-author-email", "", "git commit author email for backups (default: backup@leafwiki.local)"),
-		gitBackupRemote:                fs.String("git-backup-remote", "", "git remote URL (SSH or HTTP(S)) for backups (required when git-backup is enabled)"),
-		gitBackupBranch:                fs.String("git-backup-branch", "", "git branch to push to (default: main)"),
-		gitBackupSSHKeyPath:            fs.String("git-backup-ssh-key-path", "", "path to SSH private key for git backup"),
-		gitBackupSSHKey:                fs.String(gitBackupSSHKeyFlagName, "", "raw SSH private key for git backup (env var preferred)"),
-		gitBackupSSHKnownHosts:         fs.String("git-backup-ssh-known-hosts", "", "path to known_hosts file for SSH host key verification (MITM protection)"),
-		gitBackupHTTPUsername:          fs.String("git-backup-http-username", "", "username for HTTP(S) basic auth on http(s):// remotes"),
-		gitBackupHTTPPassword:          fs.String(gitBackupHTTPPasswordFlagName, "", "password or access token for HTTP(S) basic auth (env var preferred)"),
-		gitBackupInterval:              fs.Duration("git-backup-interval", 60*time.Minute, "git backup interval (e.g. 60m, 2h); 0 = manual-only, no automatic scheduling (default: 60m)"),
-		revisionCoalesceWindow:         fs.Duration("revision-coalesce-window", 5*time.Minute, "window for coalescing rapid successive saves by the same author; 0 = disabled (default: 5m)"),
-		snapshotEnabled:                fs.Bool("snapshot", true, "enable full backup snapshots (ZIP incl. the SQLite database) (default: true)"),
-		snapshotInterval:               fs.Duration("snapshot-interval", 24*time.Hour, "snapshot interval (e.g. 24h, 6h); 0 = manual-only, no automatic scheduling (default: 24h)"),
-		snapshotRetention:              fs.Int("snapshot-retention", 10, "number of most recent snapshots to keep; <= 0 = keep all (default: 10)"),
-		snapshotDir:                    fs.String("snapshot-dir", "", "directory to store snapshot ZIPs in (default: <data-dir>/snapshots)"),
-		restoreUploadMaxSize:           fs.String("restore-upload-max-size", "", "maximum size for an uploaded backup ZIP to restore from (for example 500MiB, 500MB, 524288000) (default: 500MiB)"),
-		smtpHost:                       fs.String("smtp-host", "", "SMTP server host for password-reset/invite email; unset disables the feature entirely (default: \"\")"),
-		smtpPort:                       fs.Int("smtp-port", 587, "SMTP server port (default: 587)"),
-		smtpUsername:                   fs.String("smtp-username", "", "SMTP auth username"),
-		smtpPassword:                   fs.String("smtp-password", "", "SMTP auth password (env var preferred)"),
-		smtpFrom:                       fs.String("smtp-from", "", "From address for outgoing email (required when --smtp-host is set)"),
-		smtpFromName:                   fs.String("smtp-from-name", "LeafWiki", "From display name for outgoing email (default: LeafWiki)"),
-		smtpSecurity:                   fs.String("smtp-security", "starttls", "SMTP transport security: none, starttls, or tls (default: starttls)"),
-		smtpInsecureSkipVerify:         fs.Bool("smtp-insecure-skip-verify", false, "skip TLS certificate verification for SMTP (default: false; do not use in production)"),
-		smtpTimeout:                    fs.Duration("smtp-timeout", 10*time.Second, "timeout for a single SMTP send (e.g. 10s) (default: 10s)"),
-		publicURL:                      fs.String("public-url", "", "absolute base URL used to build links in outgoing email, e.g. https://wiki.example.com (required when --smtp-host is set)"),
-	}
-}
+// errLogged reports a failure that has already been logged through the
+// configured logger; errReported one that was written to stderr before the
+// logger existed. main exits on either without reporting it a second time.
+var (
+	errLogged   = errors.New("logged error")
+	errReported = errors.New("reported error")
+)
 
 func main() {
-	exitCode := 0
-	defer func() {
-		if exitCode != 0 {
-			os.Exit(exitCode)
+	// Errors that surface here come from flag parsing and validation, which
+	// happen before there is a configured logger - they are CLI diagnostics, so
+	// they go to stderr as plain text. Anything that fails once the logger is up
+	// logs itself and returns errLogged.
+	if err := newRootCommand().Run(context.Background(), os.Args); err != nil {
+		if !errors.Is(err, errLogged) && !errors.Is(err, errReported) {
+			fmt.Fprintln(os.Stderr, "Error:", err)
 		}
-	}()
+		os.Exit(1)
+	}
+}
 
-	flag.Usage = func() {
-		writeUsage(flag.CommandLine.Output())
+func runResetAdminPasswordCommand(cfg *serverConfig) error {
+	user, err := tools.ResetAdminPassword(cfg.server.dataDir, cfg.auth.adminUsername, cfg.auth.adminEmail)
+	if err != nil {
+		return fmt.Errorf("password reset failed: %w", err)
 	}
 
-	flags := registerFlags(flag.CommandLine)
-	flag.Parse()
+	fmt.Println("Admin password reset successfully.")
+	fmt.Printf("New password for user %s: %s\n", user.Username, user.Password)
+	return nil
+}
 
-	// Track which flags were explicitly set on CLI
-	visited := map[string]bool{}
-	flag.Visit(func(f *flag.Flag) { visited[f.Name] = true })
+// runServerCommand is the root action: with no subcommand given, leafwiki runs
+// the wiki server.
+func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) error {
+	basePath := normalizeBasePath(cfg.server.basePath)
+	maxAssetUploadSize := mustParseByteSize(cfg.frontend.maxAssetUploadSize, "max asset upload size")
+	restoreUploadMaxSize := mustParseByteSize(cfg.backup.restoreUploadMaxSize, "restore upload max size")
 
-	logFormat := resolveLogFormat("log-format", *flags.logFormat, visited, "LEAFWIKI_LOG_FORMAT", "text")
-	setupLogger(os.Stdout, logFormat)
+	// If disable-auth is set, the wiki is public regardless of --public-access.
+	publicAccess := cfg.auth.publicAccess
 
-	host := resolveString("host", *flags.host, visited, "LEAFWIKI_HOST", "127.0.0.1")
-	port := resolveString("port", *flags.port, visited, "LEAFWIKI_PORT", "8080")
-	unixSocket := resolveString("unix-socket", *flags.unixSocket, visited, "LEAFWIKI_UNIX_SOCKET", "")
-	dataDir := resolveString("data-dir", *flags.dataDir, visited, "LEAFWIKI_DATA_DIR", "./data")
-	adminPassword := resolveString("admin-password", *flags.adminPassword, visited, "LEAFWIKI_ADMIN_PASSWORD", "")
-	// Empty stays empty here; auth.UserService applies the "admin"/"admin@localhost"
-	// fallback itself, so that default lives in exactly one place.
-	adminUsername := resolveString("admin-username", *flags.adminUsername, visited, "LEAFWIKI_ADMIN_USERNAME", "")
-	adminEmail := resolveString("admin-email", *flags.adminEmail, visited, "LEAFWIKI_ADMIN_EMAIL", "")
-	jwtSecret := resolveString("jwt-secret", *flags.jwtSecret, visited, "LEAFWIKI_JWT_SECRET", "")
-	totpEncryptionKey := resolveString("totp-encryption-key", *flags.totpEncryptionKey, visited, "LEAFWIKI_TOTP_ENCRYPTION_KEY", "")
-	injectCodeInHeader := resolveString("inject-code-in-header", *flags.injectCodeInHeader, visited, "LEAFWIKI_INJECT_CODE_IN_HEADER", "")
-	customStylesheet := resolveString("custom-stylesheet", *flags.customStylesheet, visited, "LEAFWIKI_CUSTOM_STYLESHEET", "")
-	allowInsecure := resolveBool("allow-insecure", *flags.allowInsecure, visited, "LEAFWIKI_ALLOW_INSECURE")
-	publicAccess := resolveBool("public-access", *flags.publicAccess, visited, "LEAFWIKI_PUBLIC_ACCESS")
-	hideLinkMetadataSection := resolveBool("hide-link-metadata-section", *flags.hideLinkMetadataSection, visited, "LEAFWIKI_HIDE_LINK_METADATA_SECTION")
-	accessTokenTimeout := resolveDuration("access-token-timeout", *flags.accessTokenTimeout, visited, "LEAFWIKI_ACCESS_TOKEN_TIMEOUT")
-	refreshTokenTimeout := resolveDuration("refresh-token-timeout", *flags.refreshTokenTimeout, visited, "LEAFWIKI_REFRESH_TOKEN_TIMEOUT")
-	// If disable-auth is set, later logic will override publicAccess accordingly
-	disableAuth := resolveBool("disable-auth", *flags.disableAuth, visited, "LEAFWIKI_DISABLE_AUTH")
-	basePath := normalizeBasePath(resolveString("base-path", *flags.basePath, visited, "LEAFWIKI_BASE_PATH", ""))
-	maxAssetUploadSize := parseByteSize(
-		resolveString("max-asset-upload-size", *flags.maxAssetUploadSize, visited, "LEAFWIKI_MAX_ASSET_UPLOAD_SIZE", "50MiB"),
-		"max asset upload size",
-	)
-	restoreUploadMaxSize := parseByteSize(
-		resolveString("restore-upload-max-size", *flags.restoreUploadMaxSize, visited, "LEAFWIKI_RESTORE_UPLOAD_MAX_SIZE", "500MiB"),
-		"restore upload max size",
-	)
-	enableRevision := resolveBool("enable-revision", *flags.enableRevision, visited, "LEAFWIKI_ENABLE_REVISION")
-	enableLinkRefactor := resolveBool("enable-link-refactor", *flags.enableLinkRefactor, visited, "LEAFWIKI_ENABLE_LINK_REFACTOR")
-	enableAPIKeyManagement := resolveBool("enable-api-key-management", *flags.enableAPIKeyManagement, visited, "LEAFWIKI_ENABLE_API_KEY_MANAGEMENT")
-	enableMetrics := resolveBool("enable-metrics", *flags.enableMetrics, visited, "LEAFWIKI_ENABLE_METRICS")
-	metricsHost := resolveString("metrics-host", *flags.metricsHost, visited, "LEAFWIKI_METRICS_HOST", "127.0.0.1")
-	metricsPort := resolveString("metrics-port", *flags.metricsPort, visited, "LEAFWIKI_METRICS_PORT", "9091")
-	maxRevisionHistory := resolveInt("max-revision-history", *flags.maxRevisionHistory, visited, "LEAFWIKI_MAX_REVISION_HISTORY", 100)
-	editorLimit := resolveInt("editor-limit", *flags.editorLimit, visited, "LEAFWIKI_EDITOR_LIMIT", 0)
-	revisionCoalesceWindow := resolveDuration("revision-coalesce-window", *flags.revisionCoalesceWindow, visited, "LEAFWIKI_REVISION_COALESCE_WINDOW")
-	enableHTTPRemoteUser := resolveBool("enable-http-remote-user", *flags.enableHTTPRemoteUser, visited, "LEAFWIKI_ENABLE_HTTP_REMOTE_USER")
-	httpRemoteUserHeader := resolveString("http-remote-user-header-name", *flags.httpRemoteUserHeader, visited, "LEAFWIKI_HTTP_REMOTE_USER_HEADER_NAME", "Remote-User")
-	enableHTTPRemoteUserAutoCreate := resolveBool("enable-http-remote-user-auto-create", *flags.enableHTTPRemoteUserAutoCreate, visited, "LEAFWIKI_ENABLE_HTTP_REMOTE_USER_AUTO_CREATE")
-	httpRemoteUserEmailHeader := resolveString("http-remote-user-email-header-name", *flags.httpRemoteUserEmailHeader, visited, "LEAFWIKI_HTTP_REMOTE_USER_EMAIL_HEADER_NAME", "")
-	httpRemoteUserDefaultRole := resolveString("http-remote-user-default-role", *flags.httpRemoteUserDefaultRole, visited, "LEAFWIKI_HTTP_REMOTE_USER_DEFAULT_ROLE", "viewer")
-	trustedProxyIPsRaw := resolveString("trusted-proxy-ips", *flags.trustedProxyIPs, visited, "LEAFWIKI_TRUSTED_PROXY_IPS", "")
-	loginURL := resolveString("login-url", *flags.loginURL, visited, "LEAFWIKI_LOGIN_URL", "")
-	logoutURL := resolveString("logout-url", *flags.logoutURL, visited, "LEAFWIKI_LOGOUT_URL", "")
-	if resolved, usedDeprecated := resolveLogoutURL(logoutURL, *flags.httpRemoteUserLogoutURL, visited, "LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL"); usedDeprecated {
+	logoutURL := cfg.proxy.logoutURL
+	if resolved, usedDeprecated := resolveLogoutURL(logoutURL, cfg.proxy.httpRemoteUserLogoutURL); usedDeprecated {
 		slog.Default().Warn("--http-remote-user-logout-url/LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL is deprecated, use --logout-url/LEAFWIKI_LOGOUT_URL instead")
 		logoutURL = resolved
 	}
-	userManagementURL := resolveString("user-management-url", *flags.userManagementURL, visited, "LEAFWIKI_USER_MANAGEMENT_URL", "")
-	defaultLanguage := resolveString("default-language", *flags.defaultLanguage, visited, "LEAFWIKI_DEFAULT_LANGUAGE", "")
-	disableRequestLog := resolveBool("disable-request-log", *flags.disableRequestLog, visited, "LEAFWIKI_DISABLE_REQUEST_LOG")
-	gitBackupEnabled := resolveBool("git-backup", *flags.gitBackup, visited, "LEAFWIKI_GIT_BACKUP")
-	gitBackupAuthorName := resolveString("git-backup-author-name", *flags.gitBackupAuthorName, visited, "LEAFWIKI_GIT_BACKUP_AUTHOR_NAME", "LeafWiki Backup")
-	gitBackupAuthorEmail := resolveString("git-backup-author-email", *flags.gitBackupAuthorEmail, visited, "LEAFWIKI_GIT_BACKUP_AUTHOR_EMAIL", "backup@leafwiki.local")
-	gitBackupRemote := resolveString("git-backup-remote", *flags.gitBackupRemote, visited, "LEAFWIKI_GIT_BACKUP_REMOTE", "")
-	gitBackupBranch := resolveString("git-backup-branch", *flags.gitBackupBranch, visited, "LEAFWIKI_GIT_BACKUP_BRANCH", "main")
-	gitBackupSSHKeyPath := resolveString("git-backup-ssh-key-path", *flags.gitBackupSSHKeyPath, visited, "LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH", "")
-	gitBackupSSHKey := resolveString(gitBackupSSHKeyFlagName, *flags.gitBackupSSHKey, visited, "LEAFWIKI_GIT_BACKUP_SSH_KEY", "")
-	gitBackupInterval := resolveDuration("git-backup-interval", *flags.gitBackupInterval, visited, "LEAFWIKI_GIT_BACKUP_INTERVAL")
-	gitBackupSSHKnownHosts := resolveString("git-backup-ssh-known-hosts", *flags.gitBackupSSHKnownHosts, visited, "LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS", "")
-	gitBackupHTTPUsername := resolveString("git-backup-http-username", *flags.gitBackupHTTPUsername, visited, "LEAFWIKI_GIT_BACKUP_HTTP_USERNAME", "")
-	gitBackupHTTPPassword := resolveString(gitBackupHTTPPasswordFlagName, *flags.gitBackupHTTPPassword, visited, "LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD", "")
-	snapshotEnabled := resolveBool("snapshot", *flags.snapshotEnabled, visited, "LEAFWIKI_SNAPSHOT")
-	snapshotInterval := resolveDuration("snapshot-interval", *flags.snapshotInterval, visited, "LEAFWIKI_SNAPSHOT_INTERVAL")
-	snapshotRetention := resolveInt("snapshot-retention", *flags.snapshotRetention, visited, "LEAFWIKI_SNAPSHOT_RETENTION", 10)
-	snapshotDir := resolveString("snapshot-dir", *flags.snapshotDir, visited, "LEAFWIKI_SNAPSHOT_DIR", "")
-	smtpHost := resolveString("smtp-host", *flags.smtpHost, visited, "LEAFWIKI_SMTP_HOST", "")
-	smtpPort := resolveInt("smtp-port", *flags.smtpPort, visited, "LEAFWIKI_SMTP_PORT", 587)
-	smtpUsername := resolveString("smtp-username", *flags.smtpUsername, visited, "LEAFWIKI_SMTP_USERNAME", "")
-	smtpPassword := resolveString("smtp-password", *flags.smtpPassword, visited, "LEAFWIKI_SMTP_PASSWORD", "")
-	smtpFrom := resolveString("smtp-from", *flags.smtpFrom, visited, "LEAFWIKI_SMTP_FROM", "")
-	smtpFromName := resolveString("smtp-from-name", *flags.smtpFromName, visited, "LEAFWIKI_SMTP_FROM_NAME", "LeafWiki")
-	smtpSecurity := resolveString("smtp-security", *flags.smtpSecurity, visited, "LEAFWIKI_SMTP_SECURITY", "starttls")
-	smtpInsecureSkipVerify := resolveBool("smtp-insecure-skip-verify", *flags.smtpInsecureSkipVerify, visited, "LEAFWIKI_SMTP_INSECURE_SKIP_VERIFY")
-	smtpTimeout := resolveDuration("smtp-timeout", *flags.smtpTimeout, visited, "LEAFWIKI_SMTP_TIMEOUT")
-	publicURL := resolveString("public-url", *flags.publicURL, visited, "LEAFWIKI_PUBLIC_URL", "")
-	smtpEnabled := smtpHost != ""
-	trustedProxies, err := authmw.ParseTrustedProxies(trustedProxyIPsRaw)
+
+	smtpEnabled := cfg.email.smtpHost != ""
+
+	trustedProxies, err := authmw.ParseTrustedProxies(cfg.proxy.trustedProxyIPs)
 	if err != nil {
 		fail("invalid --trusted-proxy-ips value", "error", err)
 	}
-	if err := validateListenConfig(unixSocket, visited); err != nil {
+	if err := validateListenConfig(cfg.server.unixSocket, cmd.IsSet("host"), cmd.IsSet("port")); err != nil {
 		fail("Invalid listen configuration", "error", err)
 	}
 
-	if err := validateHTTPRemoteUserConfig(enableHTTPRemoteUser, trustedProxyIPsRaw); err != nil {
+	if err := validateHTTPRemoteUserConfig(cfg.proxy.enableHTTPRemoteUser, cfg.proxy.trustedProxyIPs); err != nil {
 		fail("Invalid HTTP remote user configuration", "error", err)
 	}
 
-	if err := validateHTTPRemoteUserAutoCreateConfig(enableHTTPRemoteUserAutoCreate, enableHTTPRemoteUser, httpRemoteUserDefaultRole); err != nil {
+	if err := validateHTTPRemoteUserAutoCreateConfig(cfg.proxy.enableHTTPRemoteUserAutoCreate, cfg.proxy.enableHTTPRemoteUser, cfg.proxy.httpRemoteUserDefaultRole); err != nil {
 		fail("Invalid HTTP remote user auto-create configuration", "error", err)
 	}
 
-	if err := validateRedirectURL("login-url", loginURL); err != nil {
-		fail("Invalid login URL configuration", "error", err)
-	}
-	if err := validateRedirectURL("logout-url", logoutURL); err != nil {
-		fail("Invalid logout URL configuration", "error", err)
-	}
-
-	if err := validateSMTPConfig(smtpHost, smtpFrom, publicURL, smtpSecurity); err != nil {
+	if err := validateSMTPConfig(cfg.email.smtpHost, cfg.email.smtpFrom, cfg.email.publicURL, cfg.email.smtpSecurity); err != nil {
 		fail("Invalid SMTP configuration", "error", err)
 	}
 	if smtpEnabled {
 		// A misconfigured public URL produces broken links in emails that
 		// have already gone out — irreversible — so log the resolved value
 		// once at boot rather than only on first use.
-		slog.Default().Info("SMTP email enabled", "host", smtpHost, "port", smtpPort, "security", smtpSecurity, "publicUrl", publicURL)
-	}
-	if err := validateRedirectURL("user-management-url", userManagementURL); err != nil {
-		fail("Invalid user management URL configuration", "error", err)
+		slog.Default().Info("SMTP email enabled", "host", cfg.email.smtpHost, "port", cfg.email.smtpPort, "security", cfg.email.smtpSecurity, "publicUrl", cfg.email.publicURL)
 	}
 
-	if enableHTTPRemoteUser {
+	if cfg.proxy.enableHTTPRemoteUser {
 		slog.Default().Info("Reverse-proxy authentication enabled",
-			"header", httpRemoteUserHeader,
-			"trusted_proxies", trustedProxyIPsRaw,
-			"auto_create", enableHTTPRemoteUserAutoCreate,
-			"default_role", httpRemoteUserDefaultRole,
+			"header", cfg.proxy.httpRemoteUserHeader,
+			"trusted_proxies", cfg.proxy.trustedProxyIPs,
+			"auto_create", cfg.proxy.enableHTTPRemoteUserAutoCreate,
+			"default_role", cfg.proxy.httpRemoteUserDefaultRole,
 		)
 	}
-	if enableMetrics {
+	if cfg.metrics.enableMetrics {
 		slog.Default().Info("Prometheus metrics enabled",
-			"metrics_host", metricsHost,
-			"metrics_port", metricsPort,
+			"metrics_host", cfg.metrics.metricsHost,
+			"metrics_port", cfg.metrics.metricsPort,
 		)
 	}
 
 	// Validate git backup configuration
 	// Note: git-backup-remote is optional (local-only mode is supported)
-	if gitBackupEnabled {
-		if err := validateGitBackupRemote(gitBackupRemote, gitBackupSSHKey, gitBackupSSHKeyPath, gitBackupHTTPUsername, gitBackupHTTPPassword); err != nil {
+	if cfg.backup.gitBackup {
+		if err := validateGitBackupRemote(cfg.backup.gitBackupRemote, cfg.backup.gitBackupSSHKey, cfg.backup.gitBackupSSHKeyPath, cfg.backup.gitBackupHTTPUsername, cfg.backup.gitBackupHTTPPassword); err != nil {
 			fail("Invalid git backup configuration", "error", err)
 		}
 	}
 
-	args := flag.Args()
-	if len(args) > 0 {
-		switch args[0] {
-		case "reset-admin-password":
-			user, err := tools.ResetAdminPassword(dataDir, adminUsername, adminEmail)
-			if err != nil {
-				fail("Password reset failed", "error", err)
-			}
-
-			fmt.Println("Admin password reset successfully.")
-			fmt.Printf("New password for user %s: %s\n", user.Username, user.Password)
-			return
-		case "restore-snapshot":
-			if err := runRestoreSnapshotCommand(dataDir, args); err != nil {
-				if errors.Is(err, errRestoreSnapshotUsage) {
-					fail(err.Error())
-				} else {
-					fail("Restore failed", "error", err)
-				}
-			}
-			fmt.Println("Snapshot restored successfully. Start the server normally to pick up the restored data.")
-			return
-		case "--help", "-h", "help":
-			printUsage()
-			return
-		default:
-			fmt.Printf("Unknown command: %s\n\n", args[0])
-			printUsage()
-			return
-		}
-	}
-
-	if disableAuth {
+	if cfg.auth.disableAuth {
 		publicAccess = true
 		slog.Default().Warn("Authentication disabled. Wiki is publicly accessible without authentication.")
 	}
 
-	if allowInsecure {
+	if cfg.server.allowInsecure {
 		slog.Default().Warn("allow-insecure enabled. Auth cookies may be transmitted over plain HTTP (INSECURE).")
 	}
 
 	// Check if data directory exists
-	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(dataDir, 0755); err != nil {
+	if _, err := os.Stat(cfg.server.dataDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(cfg.server.dataDir, 0755); err != nil {
 			fail("Failed to create data directory", "error", err)
 		}
-		slog.Default().Info("Data directory created", "path", dataDir)
+		slog.Default().Info("Data directory created", "path", cfg.server.dataDir)
 	}
 
-	if !disableAuth {
-		if jwtSecret == "" {
+	if !cfg.auth.disableAuth {
+		if cfg.auth.jwtSecret == "" {
 			fail("JWT secret is required. Set it using --jwt-secret or LEAFWIKI_JWT_SECRET environment variable.")
 		}
 
-		if adminPassword == "" {
+		if cfg.auth.adminPassword == "" {
 			fail("admin password is required. Set it using --admin-password or LEAFWIKI_ADMIN_PASSWORD environment variable.")
 		}
 	}
 
-	if totpEncryptionKey != "" && len(totpEncryptionKey) < auth.MinTOTPEncryptionKeyLen {
-		fail("--totp-encryption-key/LEAFWIKI_TOTP_ENCRYPTION_KEY is too short", "minimum_bytes", auth.MinTOTPEncryptionKeyLen, "got", len(totpEncryptionKey))
-	}
-
 	var metrics *httpmetrics.HTTPMetrics
-	if enableMetrics {
+	if cfg.metrics.enableMetrics {
 		metrics = httpmetrics.NewHTTPMetrics(Version)
 	}
 
 	w, err := wiki.NewWiki(&wiki.WikiOptions{
-		StorageDir:             dataDir,
-		AdminUsername:          adminUsername,
-		AdminEmail:             adminEmail,
-		AdminPassword:          adminPassword,
-		JWTSecret:              jwtSecret,
-		TOTPEncryptionKey:      totpEncryptionKey,
-		AccessTokenTimeout:     accessTokenTimeout,
-		RefreshTokenTimeout:    refreshTokenTimeout,
-		AuthDisabled:           disableAuth,
-		EnableRevision:         enableRevision,
-		EnableAPIKeyManagement: enableAPIKeyManagement,
-		MaxRevisionHistory:     maxRevisionHistory,
-		EditorLimit:            editorLimit,
-		RevisionCoalesceWindow: revisionCoalesceWindow,
+		StorageDir:             cfg.server.dataDir,
+		AdminUsername:          cfg.auth.adminUsername,
+		AdminEmail:             cfg.auth.adminEmail,
+		AdminPassword:          cfg.auth.adminPassword,
+		JWTSecret:              cfg.auth.jwtSecret,
+		TOTPEncryptionKey:      cfg.auth.totpEncryptionKey,
+		AccessTokenTimeout:     cfg.auth.accessTokenTimeout,
+		RefreshTokenTimeout:    cfg.auth.refreshTokenTimeout,
+		AuthDisabled:           cfg.auth.disableAuth,
+		EnableRevision:         cfg.frontend.enableRevision,
+		EnableAPIKeyManagement: cfg.frontend.enableAPIKeyManagement,
+		MaxRevisionHistory:     cfg.frontend.maxRevisionHistory,
+		EditorLimit:            cfg.auth.editorLimit,
+		RevisionCoalesceWindow: cfg.frontend.revisionCoalesceWindow,
 		SMTP: email.Config{
-			Host:               smtpHost,
-			Port:               smtpPort,
-			Username:           smtpUsername,
-			Password:           smtpPassword,
-			From:               smtpFrom,
-			FromName:           smtpFromName,
-			Security:           email.Security(smtpSecurity),
-			InsecureSkipVerify: smtpInsecureSkipVerify,
-			Timeout:            smtpTimeout,
-			PublicURL:          publicURL,
+			Host:               cfg.email.smtpHost,
+			Port:               cfg.email.smtpPort,
+			Username:           cfg.email.smtpUsername,
+			Password:           cfg.email.smtpPassword,
+			From:               cfg.email.smtpFrom,
+			FromName:           cfg.email.smtpFromName,
+			Security:           email.Security(cfg.email.smtpSecurity),
+			InsecureSkipVerify: cfg.email.smtpInsecureSkipVerify,
+			Timeout:            cfg.email.smtpTimeout,
+			PublicURL:          cfg.email.publicURL,
 		},
 		Metrics: metrics,
 	})
@@ -652,7 +262,7 @@ func main() {
 	}
 
 	// Log .leafwikiignore status
-	rootDir := filepath.Join(dataDir, "root")
+	rootDir := filepath.Join(cfg.server.dataDir, "root")
 	if ignoreFile, err := ignore.LoadFromDir(rootDir); err != nil {
 		slog.Default().Warn("invalid .leafwikiignore", "error", err)
 	} else if ignoreFile != nil {
@@ -667,30 +277,30 @@ func main() {
 
 	// Initialize git backup if enabled
 	var backupScheduler *backup.Scheduler
-	if gitBackupEnabled {
-		if visited[gitBackupSSHKeyFlagName] {
+	if cfg.backup.gitBackup {
+		if cfg.backup.gitBackupSSHKey != "" && os.Getenv("LEAFWIKI_GIT_BACKUP_SSH_KEY") == "" {
 			slog.Warn("SSH private key passed via --git-backup-ssh-key flag is visible in process listings; prefer the LEAFWIKI_GIT_BACKUP_SSH_KEY environment variable")
 		}
-		if visited[gitBackupHTTPPasswordFlagName] {
+		if cfg.backup.gitBackupHTTPPassword != "" && os.Getenv("LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD") == "" {
 			slog.Warn("HTTP password passed via --git-backup-http-password flag is visible in process listings; prefer the LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD environment variable")
 		}
-		if strings.HasPrefix(strings.ToLower(gitBackupRemote), "http://") {
+		if strings.HasPrefix(strings.ToLower(cfg.backup.gitBackupRemote), "http://") {
 			slog.Warn("--git-backup-remote uses plain http://; git backup credentials and wiki content are transmitted unencrypted — use https:// unless the remote is on a trusted network")
 		}
 		backupRepo, err := backup.Init(backup.Config{
 			Enabled:           true,
-			RootDir:           filepath.Join(dataDir, "root"),
-			AssetsDir:         filepath.Join(dataDir, "assets"),
-			AuthorName:        gitBackupAuthorName,
-			AuthorEmail:       gitBackupAuthorEmail,
-			RemoteURL:         gitBackupRemote,
-			Branch:            gitBackupBranch,
-			SSHKeyPath:        gitBackupSSHKeyPath,
-			SSHKey:            gitBackupSSHKey,
-			SSHKnownHostsPath: gitBackupSSHKnownHosts,
-			HTTPUsername:      gitBackupHTTPUsername,
-			HTTPPassword:      gitBackupHTTPPassword,
-			Interval:          gitBackupInterval,
+			RootDir:           filepath.Join(cfg.server.dataDir, "root"),
+			AssetsDir:         filepath.Join(cfg.server.dataDir, "assets"),
+			AuthorName:        cfg.backup.gitBackupAuthorName,
+			AuthorEmail:       cfg.backup.gitBackupAuthorEmail,
+			RemoteURL:         cfg.backup.gitBackupRemote,
+			Branch:            cfg.backup.gitBackupBranch,
+			SSHKeyPath:        cfg.backup.gitBackupSSHKeyPath,
+			SSHKey:            cfg.backup.gitBackupSSHKey,
+			SSHKnownHostsPath: cfg.backup.gitBackupSSHKnownHosts,
+			HTTPUsername:      cfg.backup.gitBackupHTTPUsername,
+			HTTPPassword:      cfg.backup.gitBackupHTTPPassword,
+			Interval:          cfg.backup.gitBackupInterval,
 		})
 		if err != nil {
 			fail("git backup init failed: %v", err)
@@ -702,35 +312,35 @@ func main() {
 
 	// Initialize full backup snapshots if enabled
 	var writeGate *restore.WriteGate
-	if snapshotEnabled {
-		snapshotsDir := snapshotDir
+	if cfg.backup.snapshot {
+		snapshotsDir := cfg.backup.snapshotDir
 		if snapshotsDir == "" {
-			snapshotsDir = filepath.Join(dataDir, "snapshots")
+			snapshotsDir = filepath.Join(cfg.server.dataDir, "snapshots")
 		}
 		snapshotManager := snapshot.NewManager(snapshot.Config{
 			BackupsDir:         snapshotsDir,
-			RootDir:            filepath.Join(dataDir, "root"),
-			AssetsDir:          filepath.Join(dataDir, "assets"),
-			BrandingDir:        filepath.Join(dataDir, "branding"),
-			AvatarsDir:         filepath.Join(dataDir, "avatars"),
-			BrandingConfigFile: filepath.Join(dataDir, "branding.json"),
-			SchemaFile:         filepath.Join(dataDir, "schema.json"),
-			UsersDBPath:        filepath.Join(dataDir, "users.db"),
-			APIKeysDBPath:      filepath.Join(dataDir, "api_keys.db"),
-			FavoritesDBPath:    filepath.Join(dataDir, "favorites.db"),
-			UserSettingsDBPath: filepath.Join(dataDir, "usersettings.db"),
+			RootDir:            filepath.Join(cfg.server.dataDir, "root"),
+			AssetsDir:          filepath.Join(cfg.server.dataDir, "assets"),
+			BrandingDir:        filepath.Join(cfg.server.dataDir, "branding"),
+			AvatarsDir:         filepath.Join(cfg.server.dataDir, "avatars"),
+			BrandingConfigFile: filepath.Join(cfg.server.dataDir, "branding.json"),
+			SchemaFile:         filepath.Join(cfg.server.dataDir, "schema.json"),
+			UsersDBPath:        filepath.Join(cfg.server.dataDir, "users.db"),
+			APIKeysDBPath:      filepath.Join(cfg.server.dataDir, "api_keys.db"),
+			FavoritesDBPath:    filepath.Join(cfg.server.dataDir, "favorites.db"),
+			UserSettingsDBPath: filepath.Join(cfg.server.dataDir, "usersettings.db"),
 			WikiVersion:        Version,
-			Interval:           snapshotInterval,
-			RetentionCount:     snapshotRetention,
+			Interval:           cfg.backup.snapshotInterval,
+			RetentionCount:     cfg.backup.snapshotRetention,
 		})
 		snapshotScheduler := snapshot.NewScheduler(snapshotManager)
 		defer snapshotScheduler.Stop()
-		w.SetSnapshotRoutes(wikisnapshot.NewRoutes(snapshotManager, snapshotScheduler, w.AuthService(), snapshotRetention))
+		w.SetSnapshotRoutes(wikisnapshot.NewRoutes(snapshotManager, snapshotScheduler, w.AuthService(), cfg.backup.snapshotRetention))
 
 		writeGate = restore.NewWriteGate()
 		restoreManager := restore.NewManager(restore.Config{
 			SnapshotManager:    snapshotManager,
-			DataDir:            dataDir,
+			DataDir:            cfg.server.dataDir,
 			WikiVersion:        Version,
 			WriteGate:          writeGate,
 			AuthService:        w.AuthService(),
@@ -751,38 +361,38 @@ func main() {
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            publicAccess,
-		EditorLimit:             editorLimit,
-		InjectCodeInHeader:      injectCodeInHeader,
-		CustomStylesheet:        customStylesheet,
-		AllowInsecure:           allowInsecure,
-		HideLinkMetadataSection: hideLinkMetadataSection,
-		AccessTokenTimeout:      accessTokenTimeout,
-		RefreshTokenTimeout:     refreshTokenTimeout,
-		AuthDisabled:            disableAuth,
+		EditorLimit:             cfg.auth.editorLimit,
+		InjectCodeInHeader:      cfg.frontend.injectCodeInHeader,
+		CustomStylesheet:        cfg.frontend.customStylesheet,
+		AllowInsecure:           cfg.server.allowInsecure,
+		HideLinkMetadataSection: cfg.frontend.hideLinkMetadataSection,
+		AccessTokenTimeout:      cfg.auth.accessTokenTimeout,
+		RefreshTokenTimeout:     cfg.auth.refreshTokenTimeout,
+		AuthDisabled:            cfg.auth.disableAuth,
 		BasePath:                basePath,
 		MaxAssetUploadSizeBytes: maxAssetUploadSize,
-		EnableRevision:          enableRevision,
-		EnableLinkRefactor:      enableLinkRefactor,
-		EnableAPIKeyManagement:  enableAPIKeyManagement,
+		EnableRevision:          cfg.frontend.enableRevision,
+		EnableLinkRefactor:      cfg.frontend.enableLinkRefactor,
+		EnableAPIKeyManagement:  cfg.frontend.enableAPIKeyManagement,
 		Metrics:                 metrics,
-		GitBackupEnabled:        gitBackupEnabled,
-		SnapshotEnabled:         snapshotEnabled,
+		GitBackupEnabled:        cfg.backup.gitBackup,
+		SnapshotEnabled:         cfg.backup.snapshot,
 		SMTPEnabled:             smtpEnabled,
 		TOTPAvailable:           w.TOTPService() != nil,
 		HTTPRemoteUser: httpinternal.HTTPRemoteUserConfig{
-			Enabled:         enableHTTPRemoteUser,
-			HeaderName:      httpRemoteUserHeader,
-			AutoCreate:      enableHTTPRemoteUserAutoCreate,
-			EmailHeaderName: httpRemoteUserEmailHeader,
-			DefaultRole:     httpRemoteUserDefaultRole,
+			Enabled:         cfg.proxy.enableHTTPRemoteUser,
+			HeaderName:      cfg.proxy.httpRemoteUserHeader,
+			AutoCreate:      cfg.proxy.enableHTTPRemoteUserAutoCreate,
+			EmailHeaderName: cfg.proxy.httpRemoteUserEmailHeader,
+			DefaultRole:     cfg.proxy.httpRemoteUserDefaultRole,
 			TrustedProxies:  trustedProxies,
 			UserService:     w.UserService,
 		},
 		APIKeyService:     w.APIKeyService(),
-		DisableRequestLog: disableRequestLog,
-		UserManagementURL: userManagementURL,
-		DefaultLanguage:   defaultLanguage,
-		LoginURL:          loginURL,
+		DisableRequestLog: cfg.server.disableRequestLog,
+		UserManagementURL: cfg.proxy.userManagementURL,
+		DefaultLanguage:   cfg.frontend.defaultLanguage,
+		LoginURL:          cfg.proxy.loginURL,
 		LogoutURL:         logoutURL,
 		WriteGate:         writeGate,
 	})
@@ -795,11 +405,12 @@ func main() {
 	signal.Notify(shutdownSignals, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(shutdownSignals)
 
-	if err := runServer(router, host, port, unixSocket, dataDir, metrics, metricsHost, metricsPort, w.TriggerResyncAsync, reloadSignals, shutdownSignals); err != nil {
+	if err := runServer(router, cfg.server.host, cfg.server.port, cfg.server.unixSocket, cfg.server.dataDir, metrics, cfg.metrics.metricsHost, cfg.metrics.metricsPort, w.TriggerResyncAsync, reloadSignals, shutdownSignals); err != nil {
 		slog.Default().Error("Failed to start server", "error", err)
-		exitCode = 1
-		return
+		return errLogged
 	}
+
+	return nil
 }
 
 func runServer(
@@ -928,38 +539,6 @@ func removeStaleUnixSocket(socketPath string) error {
 	return err
 }
 
-// CLI > ENV > default(flag)
-func resolveString(flagName, flagVal string, visited map[string]bool, envVar string, def string) string {
-	// If flag was explicitly set, it takes precedence
-	if visited[flagName] {
-		return strings.TrimSpace(flagVal)
-	}
-	// Next, check environment variable
-	if env := strings.TrimSpace(os.Getenv(envVar)); env != "" {
-		return env
-	}
-	// Fall back to provided default when flag wasn't set and no env var is present
-	return def
-}
-
-// CLI > ENV > default
-func resolveLogFormat(flagName, flagVal string, visited map[string]bool, envVar string, def string) string {
-	if visited[flagName] {
-		if f, ok := parseLogFormat(flagVal); ok {
-			return f
-		}
-		fail("Invalid flag value", "flag", flagName, "value", flagVal, "expected", "text or json")
-	}
-	if env := strings.TrimSpace(os.Getenv(envVar)); env != "" {
-		if f, ok := parseLogFormat(env); ok {
-			return f
-		}
-		// If env var is set but invalid, fail fast (helps operators)
-		fail(errInvalidEnvVarValue, "variable", envVar, "value", env, "expected", "text or json")
-	}
-	return def
-}
-
 func parseLogFormat(s string) (string, bool) {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "text":
@@ -968,63 +547,6 @@ func parseLogFormat(s string) (string, bool) {
 		return "json", true
 	}
 	return "", false
-}
-
-// CLI > ENV > default(flag)
-func resolveBool(flagName string, flagVal bool, visited map[string]bool, envVar string) bool {
-	if visited[flagName] {
-		return flagVal
-	}
-	if env := strings.TrimSpace(os.Getenv(envVar)); env != "" {
-		if b, ok := parseBool(env); ok {
-			return b
-		}
-		// If env var is set but invalid, fail fast (helps operators)
-		fail(errInvalidEnvVarValue, "variable", envVar, "value", env, "expected", "true/false/1/0/yes/no")
-	}
-	return flagVal // default from flag
-}
-
-func resolveInt(flagName string, flagVal int, visited map[string]bool, envVar string, def int) int {
-	if visited[flagName] {
-		return flagVal
-	}
-	if env := strings.TrimSpace(os.Getenv(envVar)); env != "" {
-		var n int
-		if _, err := fmt.Sscanf(env, "%d", &n); err == nil {
-			return n
-		}
-		fail(errInvalidEnvVarValue, "variable", envVar, "value", env, "expected", "integer")
-	}
-	return def
-}
-
-func resolveDuration(flagName string, flagVal time.Duration, visited map[string]bool, envVar string) time.Duration {
-	if visited[flagName] {
-		return flagVal
-	}
-	if env := strings.TrimSpace(os.Getenv(envVar)); env != "" {
-		if d, ok := parseDuration(env); ok {
-			return d
-		}
-		// If env var is set but invalid, fail fast (helps operators)
-		fail(errInvalidEnvVarValue, "variable", envVar, "value", env, "expected", "duration like 24h, 15m")
-	}
-	return flagVal // default from flag
-}
-
-func parseByteSize(raw string, label string) int64 {
-	size, err := humanize.ParseBytes(strings.TrimSpace(raw))
-	if err != nil {
-		fail("Invalid byte size value", "setting", label, "value", raw, "error", err)
-	}
-	if size == 0 {
-		fail("Byte size value must be greater than zero", "setting", label, "value", raw)
-	}
-	if size > math.MaxInt64 {
-		fail("Byte size value is too large", "setting", label, "value", raw)
-	}
-	return int64(size)
 }
 
 func parseBool(s string) (bool, bool) {
@@ -1039,12 +561,27 @@ func parseBool(s string) (bool, bool) {
 	return false, false
 }
 
-func parseDuration(s string) (time.Duration, bool) {
-	d, err := time.ParseDuration(s)
+func parseByteSize(raw string) (int64, error) {
+	size, err := humanize.ParseBytes(strings.TrimSpace(raw))
 	if err != nil {
-		return 0, false
+		return 0, fmt.Errorf("invalid byte size %q: %w", raw, err)
 	}
-	return d, true
+	if size == 0 {
+		return 0, fmt.Errorf("byte size must be greater than zero, got %q", raw)
+	}
+	if size > math.MaxInt64 {
+		return 0, fmt.Errorf("byte size %q is too large", raw)
+	}
+	return int64(size), nil
+}
+
+// mustParseByteSize is for values a flag validator has already accepted.
+func mustParseByteSize(raw, label string) int64 {
+	size, err := parseByteSize(raw)
+	if err != nil {
+		fail("Invalid byte size value", "setting", label, "error", err)
+	}
+	return size
 }
 
 func validateHTTPRemoteUserConfig(enabled bool, trustedProxyIPsRaw string) error {
@@ -1115,11 +652,10 @@ func validateSMTPConfig(host, from, publicURL, security string) error {
 // the deprecated --http-remote-user-logout-url/LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL
 // when the new option isn't set. usedDeprecated tells the caller whether to log
 // a deprecation warning.
-func resolveLogoutURL(logoutURL, deprecatedFlagVal string, visited map[string]bool, deprecatedEnvVar string) (resolved string, usedDeprecated bool) {
+func resolveLogoutURL(logoutURL, deprecated string) (resolved string, usedDeprecated bool) {
 	if logoutURL != "" {
 		return logoutURL, false
 	}
-	deprecated := resolveString("http-remote-user-logout-url", deprecatedFlagVal, visited, deprecatedEnvVar, "")
 	if deprecated == "" {
 		return "", false
 	}
@@ -1174,11 +710,11 @@ func validateRedirectURL(flagName, url string) error {
 	return nil
 }
 
-func validateListenConfig(unixSocket string, visited map[string]bool) error {
+func validateListenConfig(unixSocket string, hostSet, portSet bool) error {
 	if unixSocket == "" {
 		return nil
 	}
-	if visited["host"] || visited["port"] {
+	if hostSet || portSet {
 		return fmt.Errorf("--unix-socket cannot be used together with --host or --port")
 	}
 	return nil

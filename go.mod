@@ -13,6 +13,7 @@ require (
 	github.com/prometheus/client_golang v1.24.1
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/teris-io/shortid v0.0.0-20220617161101-71ec9f2aa569
+	github.com/urfave/cli/v3 v3.11.0
 	github.com/yuin/goldmark v1.8.5
 	golang.org/x/crypto v0.54.0
 	golang.org/x/image v0.45.0
