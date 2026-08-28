@@ -113,6 +113,34 @@ describe('useUserSettingsStore', () => {
     expect(useUserSettingsStore.getState().loaded).toBe(false)
   })
 
+  it('toggleAutoSave confirms a successful save with a toast', async () => {
+    useUserSettingsStore.setState({ autoSave: true })
+    ;(userSettingsApi.updateUserSettings as Mock).mockResolvedValue(
+      makeSettings({ autoSave: false }),
+    )
+
+    await useUserSettingsStore.getState().toggleAutoSave()
+
+    expect(useUserSettingsStore.getState().autoSave).toBe(false)
+    expect(userSettingsApi.updateUserSettings).toHaveBeenCalledWith({
+      autoSave: false,
+    })
+    expect(toast.success).toHaveBeenCalledTimes(1)
+  })
+
+  it('toggleAutoSave rolls back and toasts on a failed update', async () => {
+    useUserSettingsStore.setState({ autoSave: true })
+    ;(userSettingsApi.updateUserSettings as Mock).mockRejectedValue(
+      new Error('boom'),
+    )
+
+    await useUserSettingsStore.getState().toggleAutoSave()
+
+    expect(useUserSettingsStore.getState().autoSave).toBe(true)
+    expect(toast.error).toHaveBeenCalled()
+    expect(toast.success).not.toHaveBeenCalled()
+  })
+
   it('loadUserSettings hydrates the date/time format preference', async () => {
     ;(userSettingsApi.getUserSettings as Mock).mockResolvedValue(
       makeSettings({ dateFormat: 'dmy_dot', timeFormat: '24h' }),
