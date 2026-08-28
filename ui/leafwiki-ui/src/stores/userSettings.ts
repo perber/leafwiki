@@ -27,31 +27,28 @@ function applyLanguageIfShipped(lang: string): void {
   }
 }
 
-// Serialises the optimistic writes for one preference field. Rapid picker
-// changes fire overlapping PUTs whose responses can arrive out of order:
-// without this a slow earlier request could persist the older value on the
-// server, and a stale failure could roll the UI back over the value the user
-// actually chose (plus show a misleading error toast). Writes run in
-// submission order and only the most recent one may roll back on failure.
-type PrefWriter = {
+// Every preference field persists through one of these. It serialises the
+// optimistic writes so overlapping, out-of-order PUTs can't leave the server
+// on a stale value, and it keeps just enough state to fail safely:
+type PrefWriter<T> = {
   // Identifies the most recent write; only it is allowed to roll back.
   seq: number
   // Bumped on login/logout: a write still queued behind a slow PUT checks
   // this and aborts rather than writing into a different user's session.
   epoch: number
   // The last value the server has actually confirmed — the rollback target.
-  persisted: string
+  persisted: T
   chain: Promise<unknown>
 }
 
-function makePrefWriter(persisted: string): PrefWriter {
+function makePrefWriter<T>(persisted: T): PrefWriter<T> {
   return { seq: 0, epoch: 0, persisted, chain: Promise.resolve() }
 }
 
-// Points every writer at the value the server just returned and starts a
-// fresh epoch, so any patch still queued from a previous session is skipped
-// rather than written into the current one.
-function resetPrefWriter(writer: PrefWriter, persisted: string): void {
+// Points a writer at the value the server just returned and starts a fresh
+// epoch, so any patch still queued from a previous session is skipped rather
+// than written into the current one. Called on both login and logout.
+function resetPrefWriter<T>(writer: PrefWriter<T>, persisted: T): void {
   writer.seq = 0
   writer.epoch += 1
   writer.persisted = persisted
@@ -61,12 +58,14 @@ function resetPrefWriter(writer: PrefWriter, persisted: string): void {
 // caller then confirms the save), 'skipped' when a newer write superseded it
 // or the session changed before its turn, and rejects when the latest write
 // fails — after rolling the field back to the last server-confirmed value
-// (never to an earlier, still-unpersisted optimistic pick).
-function writePref(
-  writer: PrefWriter,
-  value: string,
-  apply: (v: string) => void,
-  patch: (v: string) => Promise<unknown>,
+// (never to an earlier, still-unpersisted optimistic pick). `apply` is reused
+// for the rollback, so it must carry every side effect of showing the value
+// (e.g. switching the i18n language), not just the store write.
+function writePref<T>(
+  writer: PrefWriter<T>,
+  value: T,
+  apply: (v: T) => void,
+  patch: (v: T) => Promise<unknown>,
 ): Promise<'saved' | 'skipped'> {
   const seq = ++writer.seq
   const epoch = writer.epoch
@@ -91,8 +90,12 @@ function writePref(
   return writer.chain as Promise<'saved' | 'skipped'>
 }
 
-const dateFormatWriter = makePrefWriter(DEFAULT_DATE_FORMAT)
-const timeFormatWriter = makePrefWriter(DEFAULT_TIME_FORMAT)
+const autoSaveWriter = makePrefWriter<boolean>(true)
+const languageWriter = makePrefWriter<string>(DEFAULT_LANGUAGE)
+const dateFormatWriter = makePrefWriter<string>(DEFAULT_DATE_FORMAT)
+const timeFormatWriter = makePrefWriter<string>(DEFAULT_TIME_FORMAT)
+
+const savedToast = () => toast.success(t('account.preferences.savedToast'))
 
 type UserSettingsStore = {
   autoSave: boolean
@@ -126,6 +129,8 @@ export const useUserSettingsStore = create<UserSettingsStore>()((set, get) => ({
         timeFormat,
         loaded: true,
       })
+      resetPrefWriter(autoSaveWriter, settings.autoSave)
+      resetPrefWriter(languageWriter, settings.language)
       resetPrefWriter(dateFormatWriter, dateFormat)
       resetPrefWriter(timeFormatWriter, timeFormat)
       applyLanguageIfShipped(settings.language)
@@ -134,30 +139,34 @@ export const useUserSettingsStore = create<UserSettingsStore>()((set, get) => ({
     }
   },
   toggleAutoSave: async () => {
-    const previous = get().autoSave
-    const next = !previous
-    set({ autoSave: next })
     try {
-      await updateUserSettings({ autoSave: next })
-      toast.success(t('account.preferences.savedToast'))
+      const result = await writePref(
+        autoSaveWriter,
+        !get().autoSave,
+        (v) => set({ autoSave: v }),
+        (v) => updateUserSettings({ autoSave: v }),
+      )
+      if (result === 'saved') savedToast()
     } catch (err) {
-      set({ autoSave: previous })
       toast.error(
         mapApiError(err, t('account.preferences.autoSaveToggleError')).message,
       )
     }
   },
   setLanguage: async (language) => {
-    const previous = get().language
-    if (language === previous) return
-    set({ language })
-    applyLanguageIfShipped(language)
+    if (language === get().language) return
     try {
-      await updateUserSettings({ language })
-      toast.success(t('account.preferences.savedToast'))
+      const result = await writePref(
+        languageWriter,
+        language,
+        (v) => {
+          set({ language: v })
+          applyLanguageIfShipped(v)
+        },
+        (v) => updateUserSettings({ language: v }),
+      )
+      if (result === 'saved') savedToast()
     } catch (err) {
-      set({ language: previous })
-      applyLanguageIfShipped(previous)
       toast.error(
         mapApiError(err, t('account.preferences.languageChangeError')).message,
       )
@@ -172,7 +181,7 @@ export const useUserSettingsStore = create<UserSettingsStore>()((set, get) => ({
         (v) => set({ dateFormat: v }),
         (v) => updateUserSettings({ dateFormat: v }),
       )
-      if (result === 'saved') toast.success(t('account.preferences.savedToast'))
+      if (result === 'saved') savedToast()
     } catch (err) {
       toast.error(
         mapApiError(err, t('account.preferences.dateFormatChangeError'))
@@ -189,7 +198,7 @@ export const useUserSettingsStore = create<UserSettingsStore>()((set, get) => ({
         (v) => set({ timeFormat: v }),
         (v) => updateUserSettings({ timeFormat: v }),
       )
-      if (result === 'saved') toast.success(t('account.preferences.savedToast'))
+      if (result === 'saved') savedToast()
     } catch (err) {
       toast.error(
         mapApiError(err, t('account.preferences.timeFormatChangeError'))
@@ -198,6 +207,8 @@ export const useUserSettingsStore = create<UserSettingsStore>()((set, get) => ({
     }
   },
   clearUserSettings: () => {
+    resetPrefWriter(autoSaveWriter, true)
+    resetPrefWriter(languageWriter, DEFAULT_LANGUAGE)
     resetPrefWriter(dateFormatWriter, DEFAULT_DATE_FORMAT)
     resetPrefWriter(timeFormatWriter, DEFAULT_TIME_FORMAT)
     set({
