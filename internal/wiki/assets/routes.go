@@ -67,6 +67,11 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		}
 	}
 
+	if opts.PublicAccess {
+		pub := ctx.Base.Group("/api")
+		pub.GET("/pages/:id/assets", r.handleList)
+	}
+
 	authGroup := ctx.Base.Group("/api")
 	authGroup.Use(
 		authmw.InjectPublicEditor(opts.AuthDisabled),
@@ -75,7 +80,9 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	)
 
 	authGroup.POST("/pages/:id/assets", authmw.RequireEditorOrAdmin(), r.handleUpload(opts.MaxAssetUploadSizeBytes))
-	authGroup.GET("/pages/:id/assets", authmw.RequireEditorOrAdmin(), r.handleList)
+	if !opts.PublicAccess {
+		authGroup.GET("/pages/:id/assets", r.handleList)
+	}
 	authGroup.PUT("/pages/:id/assets/rename", authmw.RequireEditorOrAdmin(), r.handleRename)
 	authGroup.DELETE("/pages/:id/assets/:name", authmw.RequireEditorOrAdmin(), r.handleDelete)
 }

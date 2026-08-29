@@ -11,6 +11,7 @@ import {
 } from '@/lib/registries'
 import { buildHistoryUrl } from '@/lib/routePath'
 import { FavoriteToggleButton } from '@/features/favorites/FavoriteToggleButton'
+import { getPageAttachments, type PageAttachment } from '@/lib/api/assets'
 import { pinPage } from '@/lib/api/pages'
 import { createHotkeyDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { useScrollRestoration } from '@/lib/useScrollRestoration'
@@ -25,16 +26,13 @@ import { useHotKeysStore } from '@/stores/hotkeys'
 import { useSessionStore } from '@/stores/session'
 import { useTocPanelStore } from '@/stores/tocPanel'
 import { useTreeStore } from '@/stores/tree'
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router'
 import { BacklinkInfo } from '../links/LinkInfo'
-import {
-  extractPageDownloads,
-  extractTocEntries,
-} from '../preview/extractTocEntries'
+import { extractTocEntries } from '../preview/extractTocEntries'
 import MarkdownPreview from '../preview/MarkdownPreview'
 import { TocDropdownButton } from '../preview/TocDropdownButton'
 import { TocSidePanel } from '../preview/TocSidePanel'
@@ -146,13 +144,30 @@ export default function PageViewer() {
     () => (page ? extractTocEntries(page.content) : []),
     [page],
   )
-  const downloads = useMemo(
-    () => (page ? extractPageDownloads(page.content) : []),
-    [page],
-  )
+  const [attachments, setAttachments] = useState<PageAttachment[]>([])
+
+  useEffect(() => {
+    if (!page?.id) {
+      setAttachments([])
+      return
+    }
+
+    let cancelled = false
+    getPageAttachments(page.id)
+      .then((files) => {
+        if (!cancelled) setAttachments(files)
+      })
+      .catch(() => {
+        if (!cancelled) setAttachments([])
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [page?.id])
 
   const showTocButton = tocEntries.length > 3
-  const showRightPane = showTocButton || downloads.length > 0
+  const showRightPane = showTocButton || attachments.length > 0
   // Single scroll spy for both the dropdown and the side panel.
   const tocActiveId = useTocScrollSpy(showTocButton ? tocEntries : [])
 
@@ -237,7 +252,7 @@ export default function PageViewer() {
           <TocSidePanel
             entries={showTocButton ? tocEntries : []}
             activeId={tocActiveId}
-            downloads={downloads}
+            downloads={attachments}
           />,
           tocPaneRoot,
         )

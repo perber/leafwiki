@@ -4,13 +4,14 @@ import { cn } from '@/lib/utils'
 import { useTocPanelStore } from '@/stores/tocPanel'
 import { PanelRightClose, PanelRightOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { PageDownload, TocEntry } from './extractTocEntries'
+import type { PageAttachment } from '@/lib/api/assets'
+import type { TocEntry } from './extractTocEntries'
 import { useTocScrollSpy } from './useTocScrollSpy'
 
 type Props = {
   entries: TocEntry[]
   activeId?: string | null
-  downloads?: PageDownload[]
+  downloads?: PageAttachment[]
 }
 
 function getIndentClass(level: number): string {
