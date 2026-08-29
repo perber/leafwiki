@@ -3,6 +3,8 @@
 <!-- Every PR must reference an existing issue. Example: Fixes #123 -->
 Fixes #
 
+<!-- To build a test image for this PR, use the `/create-test-image` command in a PR comment. -->
+
 ## What changed
 
 <!-- Short description of the change -->
