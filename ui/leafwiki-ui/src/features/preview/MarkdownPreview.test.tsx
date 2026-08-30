@@ -184,4 +184,114 @@ echo two
     expect(container.querySelector('mark')).toBeNull()
     expect(container.querySelector('code')?.textContent).toContain('==')
   })
+
+  it('resizes images using the size syntax', () => {
+    const { container } = renderPreview(
+      '![Resizable image](https://example.com/image.png){size=75%}',
+    )
+
+    const image = container.querySelector('img')
+
+    expect(image).not.toBeNull()
+    expect(image).toHaveStyle({
+      width: '75%',
+      height: 'auto',
+    })
+  })
+
+  it('supports decimal image sizes', () => {
+    const { container } = renderPreview(
+      '![Resizable image](https://example.com/image.png){size=37.5%}',
+    )
+
+    const image = container.querySelector('img')
+
+    expect(image).not.toBeNull()
+    expect(image).toHaveStyle({
+      width: '37.5%',
+      height: 'auto',
+    })
+  })
+
+  it('does not resize images without a size', () => {
+    const { container } = renderPreview(
+      '![Normal image](https://example.com/image.png)',
+    )
+
+    const image = container.querySelector('img')
+
+    expect(image).not.toBeNull()
+    expect(image).not.toHaveStyle({ width: '75%' })
+  })
+
+  it('does not resize images with an invalid size', () => {
+    const { container } = renderPreview(
+      '![Image](https://example.com/image.png){size=101%}',
+    )
+
+    const image = container.querySelector('img')
+
+    expect(image).not.toBeNull()
+    expect(image).not.toHaveStyle({ width: '101%' })
+  })
+
+  it('resizes images using the size syntax', () => {
+    const { container } = renderPreview(
+      '![Resizable image](https://example.com/image.png){size=75%}',
+    )
+
+    const image = container.querySelector('img')
+
+    expect(image).not.toBeNull()
+    expect(image).toHaveStyle({
+      width: '75%',
+      height: 'auto',
+    })
+  })
+
+  it('supports decimal image sizes', () => {
+    const { container } = renderPreview(
+      '![Resizable image](https://example.com/image.png){size=37.5%}',
+    )
+
+    const image = container.querySelector('img')
+
+    expect(image).not.toBeNull()
+    expect(image).toHaveStyle({
+      width: '37.5%',
+      height: 'auto',
+    })
+  })
+
+  it('does not resize images without a size', () => {
+    const { container } = renderPreview(
+      '![Normal image](https://example.com/image.png)',
+    )
+
+    const image = container.querySelector('img')
+
+    expect(image).not.toBeNull()
+    expect(image).not.toHaveStyle({ width: '75%' })
+  })
+
+  it('does not resize images with an invalid size', () => {
+    const { container } = renderPreview(
+      '![Image](https://example.com/image.png){size=101%}',
+    )
+
+    const image = container.querySelector('img')
+
+    expect(image).not.toBeNull()
+    expect(image).not.toHaveStyle({ width: '101%' })
+  })
+
+  it('renders external images from sanitized inline html', () => {
+    const { container } = renderPreview(
+      '<img src="https://example.com/banner.png" alt="Remote banner" />',
+    )
+    const image = container.querySelector('img')
+    expect(image).not.toBeNull()
+    expect(image?.getAttribute('src')).toBe('https://example.com/banner.png')
+    expect(image?.getAttribute('alt')).toBe('Remote banner')
+  })
 })
