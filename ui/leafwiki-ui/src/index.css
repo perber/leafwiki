@@ -1799,7 +1799,7 @@
      lines as the pane narrows during the collapse transition, which reads as
      jumbled reflow rather than a clean shrink. */
   .page-viewer__toc-panel-entry {
-    @apply text-interface-text/70 hover:text-interface-text block w-full cursor-pointer overflow-hidden py-0.5 pr-3 text-left text-sm leading-snug text-ellipsis whitespace-nowrap transition-colors;
+    @apply text-interface-text/70 hover:text-interface-text block w-full cursor-pointer overflow-hidden py-0.5 pr-3 text-left text-sm leading-snug text-ellipsis whitespace-nowrap no-underline transition-colors;
     background: none;
     border: none;
   }
