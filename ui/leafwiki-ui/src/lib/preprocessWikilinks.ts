@@ -54,10 +54,17 @@ export function preprocessWikilinks(
 
       if (matches.length === 0) {
         // No exact title match. A slash-containing target is retried as a
-        // route-path hint ([[Folder/Title]] → /Folder/Title); angle-bracket
-        // the destination so spaces in the target stay parseable.
-        if (trimmedTarget.includes('/')) {
-          return `[${displayText}](</${trimmedTarget}>)`
+        // route-path hint ([[Folder/Title]] → /Folder/Title). The destination
+        // is angle-bracketed so spaces in the target stay parseable; leading
+        // slashes are collapsed to exactly one (so the target can't become a
+        // protocol-relative "//host" URL) and "<"/">" are percent-escaped (so
+        // they can't terminate the <...> destination early).
+        const routePath = trimmedTarget
+          .replace(/^\/+/, '')
+          .replace(/</g, '%3C')
+          .replace(/>/g, '%3E')
+        if (trimmedTarget.includes('/') && routePath !== '') {
+          return `[${displayText}](</${routePath}>)`
         }
         return `[${displayText}](wikilink-notfound:${encodeURIComponent(trimmedTarget)})`
       }

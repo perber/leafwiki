@@ -123,6 +123,24 @@ describe('preprocessWikilinks', () => {
       expect(result).toBe('[some/nested page](</some/nested page>)')
     })
 
+    // The path-hint destination must not become a protocol-relative "//host"
+    // URL just because the target had a leading slash.
+    it('collapses leading slashes in the path-hint destination to exactly one', () => {
+      const result = preprocessWikilinks('[[//evil.example/path]]', noMatch)
+      expect(result).toBe('[//evil.example/path](</evil.example/path>)')
+    })
+
+    it('strips a single leading slash from the path-hint destination', () => {
+      const result = preprocessWikilinks('[[/docs/intro]]', noMatch)
+      expect(result).toBe('[/docs/intro](</docs/intro>)')
+    })
+
+    // "<" / ">" in the target must not terminate the <...> destination early.
+    it('percent-escapes angle brackets in the path-hint destination', () => {
+      const result = preprocessWikilinks('[[docs/<script>]]', noMatch)
+      expect(result).toBe('[docs/<script>](</docs/%3Cscript%3E>)')
+    })
+
     it('treats an ambiguous slash-containing title as ambiguous, not a path hint', () => {
       const matches = multiMatch([
         page('1', 'a/tcp-ip', 'TCP/IP'),
