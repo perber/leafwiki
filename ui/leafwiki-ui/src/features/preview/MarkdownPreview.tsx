@@ -24,7 +24,10 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react'
-import ReactMarkdown, { defaultUrlTransform, type ExtraProps } from 'react-markdown'
+import ReactMarkdown, {
+  defaultUrlTransform,
+  type ExtraProps,
+} from 'react-markdown'
 import { JSX } from 'react/jsx-runtime'
 import rehypeHighlight from 'rehype-highlight'
 import rehypeKatex from 'rehype-katex'
@@ -328,14 +331,14 @@ export default function MarkdownPreview({
         JSX.IntrinsicAttributes &
         ClassAttributes<HTMLImageElement> &
         HTMLAttributes<HTMLImageElement>) => {
-          return (
-            <MarkdownImage
-              node={node}
-              resolveAssetUrl={resolveAssetUrl}
-              {...props}
-            />
-          )
-        },
+        return (
+          <MarkdownImage
+            node={node}
+            resolveAssetUrl={resolveAssetUrl}
+            {...props}
+          />
+        )
+      },
       audio: ({
         node,
         ...props
