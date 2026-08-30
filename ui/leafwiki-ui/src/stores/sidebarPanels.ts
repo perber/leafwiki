@@ -18,6 +18,20 @@ export const useSidebarPanelsStore = create<SidebarPanelsStore>()(
     }),
     {
       name: 'leafwiki-sidebar-panels', // localStorage key
+      merge: (persistedState, currentState) => {
+        const openSections = (
+          persistedState as Partial<SidebarPanelsStore> | null | undefined
+        )?.openSections
+
+        return {
+          ...currentState,
+          openSections:
+            Array.isArray(openSections) &&
+            openSections.every((id) => typeof id === 'string')
+              ? openSections
+              : currentState.openSections,
+        }
+      },
     },
   ),
 )
