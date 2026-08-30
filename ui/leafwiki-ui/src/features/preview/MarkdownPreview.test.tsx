@@ -1,6 +1,9 @@
 import { render } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
+import type { PageNode } from '@/lib/api/pages'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useDesignModeStore } from '@/features/designtoggle/designmode'
+import { useTreeStore } from '@/stores/tree'
 import MarkdownPreview from './MarkdownPreview'
 
 function renderPreview(content: string) {
@@ -183,5 +186,67 @@ echo two
 
     expect(container.querySelector('mark')).toBeNull()
     expect(container.querySelector('code')?.textContent).toContain('==')
+  })
+})
+
+describe('MarkdownPreview wikilinks with a slash in the title', () => {
+  const node = (id: string, path: string, title: string): PageNode => ({
+    id,
+    title,
+    slug: path.split('/').pop() ?? path,
+    path,
+    version: 'v1',
+    kind: 'page',
+    children: null,
+    parentId: null,
+  })
+
+  beforeEach(() => {
+    useTreeStore.setState({ byId: {}, byPath: {} })
+    localStorage.setItem('design-mode', 'light')
+    useDesignModeStore.setState({ mode: 'light' })
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(prefers-color-scheme: light)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+  })
+
+  // Regression for the ADR index bug: [[ADR-0011: SMTP as a CLI/ENV-Only
+  // Optional Feature]] used to hit the path-hint branch (because of the "/" in
+  // "CLI/ENV") and emit a bare markdown link whose destination contained
+  // spaces — invalid CommonMark, so the preview showed the raw "[text](url)".
+  it('renders a slash-and-space title as a resolved link, not raw text', () => {
+    const adr = node(
+      'adr-11',
+      'ai-gen-infos/adr/adr-0011-smtp',
+      'ADR-0011: SMTP as a CLI/ENV-Only Optional Feature',
+    )
+    useTreeStore.setState({
+      byId: { 'adr-11': adr },
+      byPath: { 'ai-gen-infos/adr/adr-0011-smtp': adr },
+    })
+
+    const { container } = render(
+      <MemoryRouter>
+        <TooltipProvider>
+          <MarkdownPreview content="[[ADR-0011: SMTP as a CLI/ENV-Only Optional Feature]]" />
+        </TooltipProvider>
+      </MemoryRouter>,
+    )
+
+    const link = container.querySelector(
+      'a[href="/ai-gen-infos/adr/adr-0011-smtp"]',
+    )
+    expect(link).not.toBeNull()
+    expect(link?.textContent).toBe(
+      'ADR-0011: SMTP as a CLI/ENV-Only Optional Feature',
+    )
+    expect(container.textContent).not.toContain('](')
   })
 })
