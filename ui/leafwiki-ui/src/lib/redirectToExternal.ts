@@ -6,7 +6,17 @@ export function redirectToExternal(url: string, returnTo?: string) {
     window.location.href = url
     return
   }
-  const separator = url.includes('?') ? '&' : '?'
   const absoluteReturnTo = `${window.location.origin}${returnTo}`
-  window.location.href = `${url}${separator}redirect_uri=${encodeURIComponent(absoluteReturnTo)}`
+
+  try {
+    const redirectUrl = new URL(url)
+    redirectUrl.searchParams.set('redirect_uri', absoluteReturnTo)
+    window.location.href = redirectUrl.toString()
+  } catch {
+    const hashIndex = url.indexOf('#')
+    const base = hashIndex === -1 ? url : url.slice(0, hashIndex)
+    const hash = hashIndex === -1 ? '' : url.slice(hashIndex)
+    const separator = base.includes('?') ? '&' : '?'
+    window.location.href = `${base}${separator}redirect_uri=${encodeURIComponent(absoluteReturnTo)}${hash}`
+  }
 }
