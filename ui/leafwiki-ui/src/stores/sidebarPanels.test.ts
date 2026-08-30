@@ -3,12 +3,14 @@ import { useSidebarPanelsStore } from './sidebarPanels'
 
 describe('useSidebarPanelsStore', () => {
   beforeEach(() => {
-    useSidebarPanelsStore.setState({ openSections: ['pinned', 'pages'] })
+    localStorage.clear()
+    useSidebarPanelsStore.setState(useSidebarPanelsStore.getInitialState())
   })
 
-  it('starts with pinned and pages expanded by default', () => {
+  it('starts with pinned, favorites, and pages expanded by default', () => {
     expect(useSidebarPanelsStore.getState().openSections).toEqual([
       'pinned',
+      'favorites',
       'pages',
     ])
   })
@@ -32,5 +34,40 @@ describe('useSidebarPanelsStore', () => {
       'pages',
       'favorites',
     ])
+  })
+
+  it.each([
+    null,
+    {},
+    { openSections: null },
+    { openSections: {} },
+    { openSections: ['pages', 1] },
+  ])('restores defaults for invalid persisted state %#', async (state) => {
+    localStorage.setItem(
+      'leafwiki-sidebar-panels',
+      JSON.stringify({ state, version: 0 }),
+    )
+
+    await useSidebarPanelsStore.persist.rehydrate()
+
+    expect(useSidebarPanelsStore.getState().openSections).toEqual([
+      'pinned',
+      'favorites',
+      'pages',
+    ])
+    expect(useSidebarPanelsStore.getState().setOpenSections).toBeTypeOf(
+      'function',
+    )
+  })
+
+  it('preserves an empty persisted section list', async () => {
+    localStorage.setItem(
+      'leafwiki-sidebar-panels',
+      JSON.stringify({ state: { openSections: [] }, version: 0 }),
+    )
+
+    await useSidebarPanelsStore.persist.rehydrate()
+
+    expect(useSidebarPanelsStore.getState().openSections).toEqual([])
   })
 })
