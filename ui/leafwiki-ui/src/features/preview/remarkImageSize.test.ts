@@ -1,4 +1,4 @@
-import type { Root } from 'mdast'
+import type { Paragraph, Root } from 'mdast'
 
 import { describe, expect, it } from 'vitest'
 
@@ -13,6 +13,16 @@ function transform(children: Root['children']): Root {
   remarkImageSize()(tree)
 
   return tree
+}
+
+function getParagraph(tree: Root): Paragraph {
+  const node = tree.children[0]
+
+  if (node.type !== 'paragraph') {
+    throw new Error(`Expected paragraph, got ${node.type}`)
+  }
+
+  return node
 }
 
 function imageWithSize(value: string, imageData?: object) {
@@ -40,7 +50,7 @@ describe('remarkImageSize', () => {
     'sets the image width to %s',
     (size) => {
       const tree = imageWithSize(`{size=${size}}`)
-      const paragraph = tree.children[0]
+      const paragraph = getParagraph(tree)
 
       expect(paragraph).toMatchObject({
         type: 'paragraph',
@@ -60,7 +70,7 @@ describe('remarkImageSize', () => {
 
   it('removes the size marker when it is the only following text', () => {
     const tree = imageWithSize('{size=75%}')
-    const paragraph = tree.children[0]
+    const paragraph = getParagraph(tree)
 
     expect(paragraph.children).toHaveLength(1)
     expect(paragraph.children[0]).toMatchObject({
@@ -70,7 +80,7 @@ describe('remarkImageSize', () => {
 
   it('preserves text following the size marker', () => {
     const tree = imageWithSize('{size=75%} caption')
-    const paragraph = tree.children[0]
+    const paragraph = getParagraph(tree)
 
     expect(paragraph.children).toHaveLength(2)
     expect(paragraph.children[1]).toMatchObject({
@@ -100,13 +110,13 @@ describe('remarkImageSize', () => {
     'ignores out-of-range size %s',
     (size) => {
       const tree = imageWithSize(size)
-      const paragraph = tree.children[0]
+      const paragraph = getParagraph(tree)
       const image = paragraph.children[0]
 
       expect(image).toMatchObject({
         type: 'image',
       })
-      expect((image as { data?: { hProperties?: object } }).data).toBeUndefined()
+      expect(image).not.toHaveProperty('data')
       expect(paragraph.children[1]).toMatchObject({
         type: 'text',
         value: size,
@@ -114,25 +124,23 @@ describe('remarkImageSize', () => {
     },
   )
 
-  it.each([
-    '{size=-1%}',
-    '{size=abc%}',
-    '{size=75}',
-    '{size=75%%}',
-  ])('ignores invalid size syntax %s', (size) => {
-    const tree = imageWithSize(size)
-    const paragraph = tree.children[0]
-    const image = paragraph.children[0]
+  it.each(['{size=-1%}', '{size=abc%}', '{size=75}', '{size=75%%}'])(
+    'ignores invalid size syntax %s',
+    (size) => {
+      const tree = imageWithSize(size)
+      const paragraph = getParagraph(tree)
+      const image = paragraph.children[0]
 
-    expect(image).toMatchObject({
-      type: 'image',
-    })
-    expect((image as { data?: { hProperties?: object } }).data).toBeUndefined()
-    expect(paragraph.children[1]).toMatchObject({
-      type: 'text',
-      value: size,
-    })
-  })
+      expect(image).toMatchObject({
+        type: 'image',
+      })
+      expect(image).not.toHaveProperty('data')
+      expect(paragraph.children[1]).toMatchObject({
+        type: 'text',
+        value: size,
+      })
+    },
+  )
 
   it('does not resize an image when the next node is not text', () => {
     const tree = transform([
@@ -170,7 +178,8 @@ describe('remarkImageSize', () => {
         className: ['custom-image'],
       },
     })
-    const image = tree.children[0].children[0]
+    const paragraph = getParagraph(tree)
+    const image = paragraph.children[0]
 
     expect(image).toMatchObject({
       data: {
