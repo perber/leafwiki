@@ -79,14 +79,57 @@ describe('preprocessWikilinks', () => {
   })
 
   describe('path hints ([[Folder/Title]])', () => {
-    it('converts a slash-containing target to a direct path link', () => {
+    it('converts a slash-containing target with no title match to a direct path link', () => {
       const result = preprocessWikilinks('[[docs/intro]]', noMatch)
-      expect(result).toBe('[docs/intro](/docs/intro)')
+      expect(result).toBe('[docs/intro](</docs/intro>)')
     })
 
     it('uses the alias as display text for path hints', () => {
       const result = preprocessWikilinks('[[docs/intro|Introduction]]', noMatch)
-      expect(result).toBe('[Introduction](/docs/intro)')
+      expect(result).toBe('[Introduction](</docs/intro>)')
+    })
+
+    // Regression: a slash in the *title* must not short-circuit the title
+    // lookup. Mirrors the backend's resolveWikiLinkTargets, which always tries
+    // a title match first (its motivating examples: "TCP/IP", "C/C++ Guide").
+    it('resolves a slash-containing target by title when a single page matches', () => {
+      const guide = page('1', 'dev/c-cpp-guide', 'C/C++ Guide')
+      const result = preprocessWikilinks('[[C/C++ Guide]]', singleMatch(guide))
+      expect(result).toBe('[C/C++ Guide](/dev/c-cpp-guide)')
+    })
+
+    // Regression for the ADR-0011 index bug: title contains "/" ("CLI/ENV") and
+    // also spaces, so the old path-hint branch emitted a bare markdown link
+    // whose destination had spaces — invalid CommonMark, rendered as raw text.
+    it('resolves a slash-and-space title against the tree instead of emitting raw text', () => {
+      const adr = page(
+        '1',
+        'ai-gen-infos/adr/adr-0011-smtp',
+        'ADR-0011: SMTP as a CLI/ENV-Only Optional Feature',
+      )
+      const result = preprocessWikilinks(
+        '[[ADR-0011: SMTP as a CLI/ENV-Only Optional Feature]]',
+        singleMatch(adr),
+      )
+      expect(result).toBe(
+        '[ADR-0011: SMTP as a CLI/ENV-Only Optional Feature](/ai-gen-infos/adr/adr-0011-smtp)',
+      )
+    })
+
+    // A slash-containing target with no title match AND spaces still has to
+    // produce a parseable link — angle-bracket the destination.
+    it('angle-brackets an unresolved slash target so spaces stay parseable', () => {
+      const result = preprocessWikilinks('[[some/nested page]]', noMatch)
+      expect(result).toBe('[some/nested page](</some/nested page>)')
+    })
+
+    it('treats an ambiguous slash-containing title as ambiguous, not a path hint', () => {
+      const matches = multiMatch([
+        page('1', 'a/tcp-ip', 'TCP/IP'),
+        page('2', 'b/tcp-ip', 'TCP/IP'),
+      ])
+      const result = preprocessWikilinks('[[TCP/IP]]', matches)
+      expect(result).toBe('[TCP/IP](wikilink-ambiguous:TCP%2FIP)')
     })
   })
 
