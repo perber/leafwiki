@@ -521,6 +521,46 @@ func TestSwapper_SwapAll_LeavesItemUntouchedWhenNotCapturedBySnapshot(t *testing
 	}
 }
 
+func TestSwapper_SwapAll_EmptyDraftSnapshotClearsLiveDrafts(t *testing.T) {
+	dataDir := t.TempDir()
+	stagingDir := t.TempDir()
+	test_utils.WriteFile(t, dataDir, ".leafwiki/drafts/page-1.json", `{"pageId":"page-1"}`)
+	if err := os.MkdirAll(filepath.Join(stagingDir, ".leafwiki", "drafts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	sw := newSwapper(dataDir, stagingDir)
+	if err := sw.SwapAll(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dataDir, ".leafwiki", "drafts", "page-1.json")); !os.IsNotExist(err) {
+		t.Fatalf("live draft survived empty snapshot: %v", err)
+	}
+
+	// Legacy snapshots have no .leafwiki/drafts entry and remain non-destructive.
+	legacyStaging := t.TempDir()
+	test_utils.WriteFile(t, dataDir, ".leafwiki/drafts/page-2.json", `{"pageId":"page-2"}`)
+	if err := newSwapper(dataDir, legacyStaging).SwapAll(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dataDir, ".leafwiki", "drafts", "page-2.json")); err != nil {
+		t.Fatalf("legacy snapshot removed live draft: %v", err)
+	}
+}
+
+func TestSwapper_SwapAll_RestoresDraftsWithoutExistingStateDirectory(t *testing.T) {
+	dataDir := t.TempDir()
+	stagingDir := t.TempDir()
+	test_utils.WriteFile(t, stagingDir, ".leafwiki/drafts/page-1.json", `{"pageId":"page-1"}`)
+
+	if err := newSwapper(dataDir, stagingDir).SwapAll(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dataDir, ".leafwiki", "drafts", "page-1.json")); err != nil {
+		t.Fatalf("restored draft missing: %v", err)
+	}
+}
+
 // TestSwapper_RollbackAll_RestoresItemWhenMoveInNeverHappened is the
 // regression test for a real bug found in review: when SwapAll's move-aside
 // step succeeds but the following move-in step fails, the item was

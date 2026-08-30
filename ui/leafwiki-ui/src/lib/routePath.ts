@@ -64,6 +64,10 @@ export function buildEditUrl(pathname: string): string {
   return `/e/${p}`
 }
 
+export function buildPendingDraftEditUrl(id: string): string {
+  return `/pending-drafts/${encodeURIComponent(id)}/edit`
+}
+
 /**
  * Builds the internal history route for a wiki page path.
  *

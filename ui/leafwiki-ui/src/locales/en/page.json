@@ -12,6 +12,8 @@
     "slugNotGenerated": "Slug could not be generated. Please enter it manually.",
     "slugStillGenerating": "Please wait until the slug is fully generated.",
     "createdToast": "{{item}} created",
+    "draftCreatedToast": "Draft page created",
+    "createAsDraft": "Create as draft",
     "createErrorFallback": "Error creating {{item}}",
     "create": "Create",
     "createAndEdit": "Create & Edit {{item}}",

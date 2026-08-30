@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/core/draft"
 	"github.com/perber/wiki/internal/core/markdown"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
@@ -45,6 +46,7 @@ type Routes struct {
 	addFavorite      *AddFavoriteUseCase
 	removeFavorite   *RemoveFavoriteUseCase
 	listFavorites    *ListFavoritesUseCase
+	drafts           *draft.Store
 	userResolver     *coreauth.UserResolver
 	authService      *coreauth.AuthService
 }
@@ -72,6 +74,7 @@ type RoutesConfig struct {
 	AddFavorite      *AddFavoriteUseCase
 	RemoveFavorite   *RemoveFavoriteUseCase
 	ListFavorites    *ListFavoritesUseCase
+	Drafts           *draft.Store
 	UserResolver     *coreauth.UserResolver
 	AuthService      *coreauth.AuthService
 }
@@ -100,6 +103,7 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 		addFavorite:      cfg.AddFavorite,
 		removeFavorite:   cfg.RemoveFavorite,
 		listFavorites:    cfg.ListFavorites,
+		drafts:           cfg.Drafts,
 		userResolver:     cfg.UserResolver,
 		authService:      cfg.AuthService,
 	}
@@ -137,6 +141,16 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 	authGroup.GET("/pages/slug-suggestion", authmw.RequireEditorOrAdmin(), r.handleSuggestSlug)
 	authGroup.POST("/pages", authmw.RequireEditorOrAdmin(), r.handleCreate)
+	authGroup.POST("/pages/drafts", authmw.RequireEditorOrAdmin(), r.handleCreatePendingDraft)
+	authGroup.GET("/pages/drafts/:id", authmw.RequireEditorOrAdmin(), r.handleGetPendingDraft)
+	authGroup.PUT("/pages/drafts/:id", authmw.RequireEditorOrAdmin(), r.handleSavePendingDraft)
+	authGroup.POST("/pages/drafts/:id/publish", authmw.RequireEditorOrAdmin(), r.handlePublishPendingDraft)
+	authGroup.DELETE("/pages/drafts/:id", authmw.RequireEditorOrAdmin(), r.handleDiscardPendingDraft)
+	authGroup.GET("/pages/:id/draft", authmw.RequireEditorOrAdmin(), r.handleGetDraft)
+	authGroup.POST("/pages/:id/draft", authmw.RequireEditorOrAdmin(), r.handleStartDraft)
+	authGroup.PUT("/pages/:id/draft", authmw.RequireEditorOrAdmin(), r.handleSaveDraft)
+	authGroup.POST("/pages/:id/draft/publish", authmw.RequireEditorOrAdmin(), r.handlePublishDraft)
+	authGroup.DELETE("/pages/:id/draft", authmw.RequireEditorOrAdmin(), r.handleDiscardDraft)
 	authGroup.PUT(pagesIdRoutePath, authmw.RequireEditorOrAdmin(), r.handleUpdate)
 	authGroup.DELETE(pagesIdRoutePath, authmw.RequireEditorOrAdmin(), r.handleDelete)
 	authGroup.PUT("/pages/:id/move", authmw.RequireEditorOrAdmin(), r.handleMove)
@@ -267,6 +281,9 @@ func (r *Routes) handleCreate(c *gin.Context) {
 	if user == nil {
 		return
 	}
+	if req.ParentID != nil && *req.ParentID != "" && *req.ParentID != "root" && !r.ensureNoDraft(c, *req.ParentID) {
+		return
+	}
 	kind := kindFromString(req.Kind)
 	out, err := r.createPage.Execute(c.Request.Context(), CreatePageInput{
 		UserID: user.ID, ParentID: req.ParentID, Title: req.Title, Slug: req.Slug, Kind: &kind,
@@ -280,6 +297,9 @@ func (r *Routes) handleCreate(c *gin.Context) {
 
 func (r *Routes) handleUpdate(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
+	if !r.ensureNoDraft(c, id) {
+		return
+	}
 	var req struct {
 		Version    string            `json:"version" binding:"required"`
 		Title      string            `json:"title" binding:"required"`
@@ -324,6 +344,9 @@ func (r *Routes) handleUpdate(c *gin.Context) {
 
 func (r *Routes) handleDelete(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
+	if !r.ensureNoDraft(c, r.subtreeIDs(id)...) {
+		return
+	}
 	recursive := c.DefaultQuery("recursive", "false") == "true"
 	version := c.Query("version")
 	user := authmw.MustGetUser(c)
@@ -341,6 +364,9 @@ func (r *Routes) handleDelete(c *gin.Context) {
 
 func (r *Routes) handleMove(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
+	if !r.ensureNoDraft(c, r.subtreeIDs(id)...) {
+		return
+	}
 	var req struct {
 		Version  string `json:"version" binding:"required"`
 		ParentID string `json:"parentId"`
@@ -348,6 +374,9 @@ func (r *Routes) handleMove(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidPayload, "Invalid payload", "invalid payload")
+		return
+	}
+	if req.ParentID != "" && req.ParentID != "root" && !r.ensureNoDraft(c, req.ParentID) {
 		return
 	}
 	user := authmw.MustGetUser(c)
@@ -383,6 +412,9 @@ func (r *Routes) handleSort(c *gin.Context) {
 
 func (r *Routes) handlePin(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
+	if !r.ensureNoDraft(c, id) {
+		return
+	}
 	var req struct {
 		Version string `json:"version" binding:"required"`
 		Pinned  bool   `json:"pinned"`
@@ -466,6 +498,22 @@ func (r *Routes) handleEnsurePath(c *gin.Context) {
 	if user == nil {
 		return
 	}
+	lookup, err := r.treeService.LookupPagePath(req.Path)
+	if err != nil {
+		respondWithPageError(c, err)
+		return
+	}
+	if !lookup.Exists {
+		for i := len(lookup.Segments) - 1; i >= 0; i-- {
+			segment := lookup.Segments[i]
+			if segment.Exists && segment.ID != nil {
+				if !r.ensureNoDraft(c, *segment.ID) {
+					return
+				}
+				break
+			}
+		}
+	}
 	kind := kindFromString(req.Kind)
 	out, err := r.ensurePath.Execute(c.Request.Context(), EnsurePathInput{
 		UserID: user.ID, TargetPath: req.Path, TargetTitle: req.Title, Kind: &kind,
@@ -479,6 +527,9 @@ func (r *Routes) handleEnsurePath(c *gin.Context) {
 
 func (r *Routes) handleConvert(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
+	if !r.ensureNoDraft(c, id) {
+		return
+	}
 	var req struct {
 		Kind    string `json:"targetKind" binding:"required"`
 		Version string `json:"version" binding:"required"`
@@ -519,6 +570,9 @@ func (r *Routes) handleCopy(c *gin.Context) {
 	if user == nil {
 		return
 	}
+	if req.ParentID != nil && *req.ParentID != "" && *req.ParentID != "root" && !r.ensureNoDraft(c, *req.ParentID) {
+		return
+	}
 	out, err := r.copyPage.Execute(c.Request.Context(), CopyPageInput{
 		UserID: user.ID, SourcePageID: sourceID, TargetParentID: req.ParentID,
 		Title: req.Title, Slug: req.Slug,
@@ -556,6 +610,9 @@ func (r *Routes) handleRefactorPreview(c *gin.Context) {
 
 func (r *Routes) handleRefactorApply(c *gin.Context) {
 	id := strings.TrimSpace(c.Param("id"))
+	if !r.ensureNoDraft(c, r.subtreeIDs(id)...) {
+		return
+	}
 	var req struct {
 		Version      string  `json:"version" binding:"required"`
 		Kind         string  `json:"kind" binding:"required"`
@@ -568,6 +625,9 @@ func (r *Routes) handleRefactorApply(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
+		return
+	}
+	if req.NewParentID != nil && *req.NewParentID != "" && *req.NewParentID != "root" && !r.ensureNoDraft(c, *req.NewParentID) {
 		return
 	}
 	user := authmw.MustGetUser(c)
@@ -589,6 +649,13 @@ func (r *Routes) handleRefactorApply(c *gin.Context) {
 		return
 	}
 	r.respondPage(c, http.StatusOK, page)
+}
+
+func (r *Routes) subtreeIDs(id string) []string {
+	if node, err := r.treeService.FindPageByID(id); err == nil && node != nil {
+		return collectSubtreeIDs(node)
+	}
+	return []string{id}
 }
 
 func (r *Routes) respondPage(c *gin.Context, status int, page *tree.Page) {

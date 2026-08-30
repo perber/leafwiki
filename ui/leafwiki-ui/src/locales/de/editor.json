@@ -1,4 +1,15 @@
 {
+  "draft": {
+    "start": "Entwurf starten",
+    "editing": "Entwurf bearbeiten",
+    "publish": "Entwurf veröffentlichen",
+    "discard": "Entwurf verwerfen",
+    "discardTitle": "Diesen Entwurf verwerfen?",
+    "discardDescription": "Dadurch wird die unveröffentlichte Arbeitskopie dauerhaft gelöscht.",
+    "cancel": "Abbrechen",
+    "published": "Entwurf veröffentlicht",
+    "discarded": "Entwurf verworfen"
+  },
   "wikiLinkDisambiguation": {
     "title": "Mehrere Seiten gefunden",
     "descriptionPrefix": "Mehrere Seiten stimmen überein mit",

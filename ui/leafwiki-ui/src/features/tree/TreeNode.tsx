@@ -161,22 +161,24 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
           {(isMobile || hovered || isActionsMenuOpen) && (
             <div className={clsx('tree-node__actions', treeActionButtonStyle)}>
               {!readOnlyMode && (
-                <TreeViewActionButton
-                  actionName="add"
-                  icon={
-                    <FilePlus
-                      size={18}
-                      className={clsx(
-                        'tree-node__action-icon',
-                        isMobile && 'text-brand/70!',
-                      )}
-                    />
-                  }
-                  tooltip={t('treeActions.createNewPageTooltip')}
-                  onClick={() =>
-                    openDialog(DIALOG_ADD_PAGE, { parentId: node.id })
-                  }
-                />
+                <>
+                  <TreeViewActionButton
+                    actionName="add"
+                    icon={
+                      <FilePlus
+                        size={18}
+                        className={clsx(
+                          'tree-node__action-icon',
+                          isMobile && 'text-brand/70!',
+                        )}
+                      />
+                    }
+                    tooltip={t('treeActions.createNewPageTooltip')}
+                    onClick={() =>
+                      openDialog(DIALOG_ADD_PAGE, { parentId: node.id })
+                    }
+                  />
+                </>
               )}
               {(!readOnlyMode || isLoggedIn) && (
                 <TreeNodeActionsMenu node={node} />

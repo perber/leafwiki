@@ -1,7 +1,21 @@
 import Page404 from '@/components/Page404'
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
+import { NODE_KIND_PAGE } from '@/lib/api/pages'
 import { mapApiError, asApiLocalizedError } from '@/lib/api/errors'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
-import { buildBrowserEditUrl } from '@/lib/routePath'
+import { buildBrowserEditUrl, buildEditUrl } from '@/lib/routePath'
 import { DIALOG_LINK_INSERT } from '@/lib/registries'
 import { getWikiTargetRoutePath } from '@/lib/wikiPath'
 import { useDialogsStore } from '@/stores/dialogs'
@@ -20,7 +34,7 @@ import { useToolbarActions } from './useToolbarActions'
 
 export default function PageEditor() {
   const { t } = useTranslation('editor')
-  const { '*': path } = useParams()
+  const { '*': path, draftId } = useParams()
 
   const { pathname } = useLocation()
   const navigate = useNavigate()
@@ -34,6 +48,13 @@ export default function PageEditor() {
   const setTags = usePageEditorStore((s) => s.setTags)
   const setFrontmatterFields = usePageEditorStore((s) => s.setFrontmatterFields)
   const loadPageData = usePageEditorStore((s) => s.loadPageData)
+  const loadPendingDraft = usePageEditorStore((s) => s.loadPendingDraft)
+  const isPendingDraft = usePageEditorStore((s) => s.isPendingDraft)
+  const pendingParentId = usePageEditorStore((s) => s.pendingParentId)
+  const isDraft = usePageEditorStore((s) => s.isDraft)
+  const startDraft = usePageEditorStore((s) => s.startDraft)
+  const publishDraft = usePageEditorStore((s) => s.publishDraft)
+  const discardDraft = usePageEditorStore((s) => s.discardDraft)
   const initialPage = usePageEditorStore((s) => s.initialPage) // contains the initial page data when loaded
   const tags = usePageEditorStore((s) => s.tags)
   const frontmatterFields = usePageEditorStore((s) => s.frontmatterFields)
@@ -45,9 +66,10 @@ export default function PageEditor() {
   const error = usePageEditorStore((s) => s.error)
   const openNode = useTreeStore((s) => s.openNode)
   const dirty = usePageEditorStore(isDirtyState)
+  const canStartDraft = initialPage?.kind === NODE_KIND_PAGE
 
   // Auto-save hook — must be called unconditionally
-  useAutoSave()
+  const { status: autoSaveStatus } = useAutoSave()
 
   // Shows Unsaved Changes Dialog when navigating away with dirty state
   useNavigationGuard({
@@ -59,9 +81,9 @@ export default function PageEditor() {
 
   // Load page data when path changes
   useEffect(() => {
-    if (!path) return
-    loadPageData(path)
-  }, [path, loadPageData])
+    if (draftId) loadPendingDraft(draftId)
+    else if (path) loadPageData(path)
+  }, [path, draftId, loadPageData, loadPendingDraft])
 
   // Open node
   useEffect(() => {
@@ -154,7 +176,14 @@ export default function PageEditor() {
       skipNavigationGuardRef.current = true
     }
 
-    if (currentPage?.path) {
+    if (state.isPendingDraft) {
+      const parent = state.pendingParentId
+        ? useTreeStore.getState().getPathById(state.pendingParentId)
+        : ''
+      navigate(parent ? `/${parent}` : '/', {
+        state: createNavigationVisitState(),
+      })
+    } else if (currentPage?.path) {
       navigate(`/${currentPage.path}`, {
         state: createNavigationVisitState(),
       })
@@ -194,6 +223,47 @@ export default function PageEditor() {
     [setContent],
   )
 
+  const handleStartDraft = useCallback(() => {
+    startDraft().catch((err) =>
+      toast.error(mapApiError(err, t('pageEditor.saveErrorFallback')).message),
+    )
+  }, [startDraft, t])
+
+  const handlePublishDraft = useCallback(() => {
+    publishDraft()
+      .then(async (page) => {
+        if (page) {
+          await reloadTree()
+          if (isPendingDraft)
+            navigate(buildEditUrl(page.path), { replace: true })
+          toast.success(t('draft.published'))
+        }
+      })
+      .catch((err) =>
+        toast.error(
+          mapApiError(err, t('pageEditor.saveErrorFallback')).message,
+        ),
+      )
+  }, [publishDraft, reloadTree, t, isPendingDraft, navigate])
+
+  const handleDiscardDraft = useCallback(() => {
+    discardDraft()
+      .then(() => {
+        if (isPendingDraft) {
+          const parent = pendingParentId
+            ? useTreeStore.getState().getPathById(pendingParentId)
+            : ''
+          navigate(parent ? `/${parent}` : '/', { replace: true })
+        }
+        toast.success(t('draft.discarded'))
+      })
+      .catch((err) =>
+        toast.error(
+          mapApiError(err, t('pageEditor.saveErrorFallback')).message,
+        ),
+      )
+  }, [discardDraft, t, isPendingDraft, pendingParentId, navigate])
+
   if (notFound) {
     return <Page404 targetPath={getWikiTargetRoutePath(pathname)} />
   }
@@ -210,6 +280,68 @@ export default function PageEditor() {
       <div className="page-editor">
         {initialPage && (
           <>
+            {(isDraft || canStartDraft) && (
+              <div className="page-editor__draft-actions">
+                {isDraft ? (
+                  <>
+                    <span className="text-sm font-medium">
+                      {t('draft.editing')}
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handlePublishDraft}
+                      disabled={autoSaveStatus === 'saving'}
+                    >
+                      {t('draft.publish')}
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={autoSaveStatus === 'saving'}
+                        >
+                          {t('draft.discard')}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            {t('draft.discardTitle')}
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            {t('draft.discardDescription')}
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>
+                            {t('draft.cancel')}
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={handleDiscardDraft}
+                          >
+                            {t('draft.discard')}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </>
+                ) : (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleStartDraft}
+                    disabled={dirty || autoSaveStatus === 'saving'}
+                  >
+                    {t('draft.start')}
+                  </Button>
+                )}
+              </div>
+            )}
             <PageFrontmatterPanel
               tags={tags}
               fields={frontmatterFields}
@@ -219,6 +351,7 @@ export default function PageEditor() {
               onFieldsChange={setFrontmatterFields}
             />
             <MarkdownEditor
+              key={`${initialPage.id}:${isDraft ? 'draft' : 'published'}`}
               ref={editorRef}
               pageId={initialPage.id}
               initialValue={initialPage.content || ''}

@@ -12,6 +12,8 @@
     "slugNotGenerated": "Der Slug konnte nicht generiert werden. Bitte geben Sie ihn manuell ein.",
     "slugStillGenerating": "Bitte warten Sie, bis der Slug vollständig generiert wurde.",
     "createdToast": "{{item}} erstellt",
+    "draftCreatedToast": "Entwurfsseite erstellt",
+    "createAsDraft": "Als Entwurf erstellen",
     "createErrorFallback": "Fehler beim Erstellen von {{item}}",
     "create": "Erstellen",
     "createAndEdit": "{{item}} erstellen & bearbeiten",
