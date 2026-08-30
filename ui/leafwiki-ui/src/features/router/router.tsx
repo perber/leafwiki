@@ -112,6 +112,16 @@ export const createLeafWikiRouter = (
         ],
       },
       {
+        path: '/pending-drafts/:draftId/edit',
+        element: isReadOnlyViewer ? (
+          <Navigate to="/" />
+        ) : (
+          <AuthWrapper>
+            <PageEditor />
+          </AuthWrapper>
+        ),
+      },
+      {
         path: '/e/*',
         element: isReadOnlyViewer ? (
           <Navigate to="/" />

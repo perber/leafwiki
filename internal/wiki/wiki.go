@@ -12,6 +12,7 @@ import (
 	"github.com/perber/wiki/internal/branding"
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/core/draft"
 	"github.com/perber/wiki/internal/core/email"
 	"github.com/perber/wiki/internal/core/ignore"
 	"github.com/perber/wiki/internal/core/revision"
@@ -62,6 +63,7 @@ type Wiki struct {
 	searchIndex       *search.SQLiteIndex
 	status            *search.IndexingStatus
 	storageDir        string
+	drafts            *draft.Store
 
 	// Domain route registrars (populated by NewWiki).
 	pagesRoutes        *wikipages.Routes
@@ -124,6 +126,7 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
 	w := &Wiki{
 		storageDir:     options.StorageDir,
+		drafts:         draft.NewStore(options.StorageDir),
 		log:            slog.Default().With("component", "Wiki"),
 		resyncJob:      wikiresync.NewResyncJob(),
 		shutdownCtx:    shutdownCtx,
@@ -499,6 +502,7 @@ func (w *Wiki) buildPagesRoutes() *wikipages.Routes {
 		AddFavorite:      wikipages.NewAddFavoriteUseCase(w.tree, w.favorites),
 		RemoveFavorite:   wikipages.NewRemoveFavoriteUseCase(w.favorites),
 		ListFavorites:    wikipages.NewListFavoritesUseCase(w.tree, w.favorites, w.log),
+		Drafts:           w.drafts,
 		UserResolver:     w.userResolver,
 		AuthService:      w.auth,
 	})

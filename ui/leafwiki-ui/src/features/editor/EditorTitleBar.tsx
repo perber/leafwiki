@@ -22,6 +22,7 @@ export function EditorTitleBar() {
   const openDialog = useDialogsStore((s) => s.openDialog)
   const getPageByPath = useTreeStore((state) => state.getPageByPath)
   const dirty = usePageEditorStore(isDirtyState)
+  const isDraft = usePageEditorStore((state) => state.isDraft)
 
   const onEditClicked = () => {
     if (!page) return
@@ -58,6 +59,7 @@ export function EditorTitleBar() {
     <div className="editor-title-bar">
       <button
         onClick={onEditClicked}
+        disabled={isDraft}
         className="editor-title-bar__button"
         data-testid="edit-page-metadata-button"
       >

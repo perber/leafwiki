@@ -172,6 +172,38 @@ describe('MarkdownEditor – breakpoint remount preserves content', () => {
     expect(mountSpy).not.toHaveBeenCalled()
   })
 
+  it('passes canonical content to CodeMirror when the same page leaves draft mode', () => {
+    const onChange = vi.fn()
+    const { rerender } = render(
+      <MarkdownEditor
+        key="page-1:draft"
+        initialValue="discarded draft"
+        pageId="page-1"
+        onChange={onChange}
+      />,
+    )
+
+    mountSpy.mockClear()
+    rerender(
+      <MarkdownEditor
+        key="page-1:published"
+        initialValue="canonical content"
+        pageId="page-1"
+        onChange={onChange}
+      />,
+    )
+
+    expect(mountSpy).toHaveBeenCalledTimes(1)
+    expect(mountSpy).toHaveBeenCalledWith('canonical content')
+
+    mountSpy.mockClear()
+    act(() => {
+      capturedOnChange?.('canonical content!')
+    })
+    expect(onChange).toHaveBeenLastCalledWith('canonical content!')
+    expect(mountSpy).not.toHaveBeenCalled()
+  })
+
   it('renders stacked desktop layout classes when preview is stacked', () => {
     mockEditorState = {
       ...mockEditorState,

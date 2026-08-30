@@ -13,11 +13,14 @@ import (
 
 // CreatePageInput is the input for CreatePageUseCase.
 type CreatePageInput struct {
-	UserID   string
-	ParentID *string
-	Title    string
-	Slug     string
-	Kind     *tree.NodeKind
+	UserID     string
+	ParentID   *string
+	Title      string
+	Slug       string
+	Kind       *tree.NodeKind
+	Content    *string
+	Tags       []string
+	Properties map[string]string
 }
 
 // CreatePageOutput is the output of CreatePageUseCase.
@@ -76,7 +79,12 @@ func (uc *CreatePageUseCase) Execute(_ context.Context, in CreatePageInput) (out
 		}
 	}
 
-	id, err := uc.tree.CreateNode(in.UserID, in.ParentID, in.Title, in.Slug, in.Kind)
+	var id *string
+	if in.Content != nil {
+		id, err = uc.tree.CreateNodeWithContentAndMetadata(in.UserID, in.ParentID, in.Title, in.Slug, *in.Content, in.Kind, in.Tags, in.Properties)
+	} else {
+		id, err = uc.tree.CreateNode(in.UserID, in.ParentID, in.Title, in.Slug, in.Kind)
+	}
 	if err != nil {
 		return nil, err
 	}

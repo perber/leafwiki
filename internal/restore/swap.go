@@ -220,7 +220,7 @@ func sanityCheckSQLiteDB(path, table string, columns []string) error {
 // of being restored. "avatars" is a plain per-user-avatar asset directory
 // (like "assets"/"branding") — no hot-swappable service owns it, so it
 // carries no reload/rollback step of its own.
-var swapNames = []string{"root", "assets", "branding", "avatars", "branding.json", "schema.json", "users.db", "api_keys.db", "favorites.db", "usersettings.db"}
+var swapNames = []string{"root", ".leafwiki/drafts", "assets", "branding", "avatars", "branding.json", "schema.json", "users.db", "api_keys.db", "favorites.db", "usersettings.db"}
 
 // walSidecarDBNames lists every WAL-mode database whose stale -wal/-shm
 // sidecars may need cleaning up before a swap — derived from swapNames
@@ -335,6 +335,9 @@ func (sw *swapper) SwapAll() error {
 		}
 		item.movedAside = true
 
+		if err := os.MkdirAll(filepath.Dir(item.livePath), 0o755); err != nil {
+			return fmt.Errorf("failed to prepare restored %s: %w", item.name, err)
+		}
 		if err := os.Rename(item.stagedPath, item.livePath); err != nil {
 			return fmt.Errorf("failed to move in restored %s: %w", item.name, err)
 		}

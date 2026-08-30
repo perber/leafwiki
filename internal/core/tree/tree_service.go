@@ -222,6 +222,28 @@ func (t *TreeService) CreateNode(userID string, parentID *string, title string, 
 	return result, err
 }
 
+// CreateNodeWithContentAndMetadata makes a page visible only after its final
+// editor content and metadata have been written.
+func (t *TreeService) CreateNodeWithContentAndMetadata(userID string, parentID *string, title, slug, content string, nodeKind *NodeKind, tags []string, properties map[string]string) (*string, error) {
+	var result *string
+	err := t.withLockedTree(func() error {
+		created, err := t.createNodeLocked(userID, parentID, title, slug, nodeKind, createNodeOptions{})
+		if err != nil {
+			return err
+		}
+		if err := t.store.UpsertContentAndMetadata(created.entry, content, tags, properties); err != nil {
+			rollbackErr := t.rollbackCreatedNodeLocked(created.parent, created.entry, created.parentWasConverted)
+			if rollbackErr != nil {
+				return errors.Join(fmt.Errorf("write initial page content: %w", err), fmt.Errorf("rollback created node: %w", rollbackErr))
+			}
+			return fmt.Errorf("write initial page content: %w", err)
+		}
+		result = &created.id
+		return nil
+	})
+	return result, err
+}
+
 func (t *TreeService) RestoreNode(userID, id string, parentID *string, title, slug string, nodeKind NodeKind, content string, metadata PageMetadata) (*Page, error) {
 	var restored *Page
 	err := t.withLockedTree(func() error {

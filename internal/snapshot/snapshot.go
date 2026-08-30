@@ -18,6 +18,7 @@ import (
 type Config struct {
 	BackupsDir         string
 	RootDir            string
+	DraftsDir          string // storageDir/.leafwiki/drafts — private working copies
 	AssetsDir          string
 	BrandingDir        string
 	BrandingConfigFile string // storageDir/branding.json (site name, active logo/favicon filename) — separate from BrandingDir, which only holds the uploaded logo/favicon image files
@@ -193,6 +194,9 @@ func writeSnapshotZip(zipPath string, cfg Config, id string, createdAt time.Time
 	if err := addDirToZip(w, cfg.RootDir, "root/"); err != nil {
 		return err
 	}
+	if err := addDraftsDirToZip(w, cfg.DraftsDir); err != nil {
+		return err
+	}
 	if err := addDirToZip(w, cfg.AssetsDir, "assets/"); err != nil {
 		return err
 	}
@@ -233,6 +237,25 @@ func writeSnapshotZip(zipPath string, cfg Config, id string, createdAt time.Time
 		return fmt.Errorf("failed to close zip writer: %w", err)
 	}
 	return nil
+}
+
+// addDraftsDirToZip deliberately records the directory itself. Unlike legacy
+// snapshots without a drafts entry, an empty current snapshot must clear any
+// drafts created after that snapshot during restore.
+func addDraftsDirToZip(w *zip.Writer, dir string) error {
+	if dir == "" {
+		return nil
+	}
+	if _, err := w.CreateHeader(&zip.FileHeader{Name: ".leafwiki/drafts/", Method: zip.Store}); err != nil {
+		return fmt.Errorf("failed to create drafts directory entry: %w", err)
+	}
+	if _, err := os.Stat(dir); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to stat %s: %w", dir, err)
+	}
+	return addDirToZip(w, dir, ".leafwiki/drafts/")
 }
 
 // addDirToZip walks srcDir and adds every file under it to the zip, prefixed

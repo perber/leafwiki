@@ -23,10 +23,12 @@ func newTestConfig(t *testing.T) Config {
 	assetsDir := filepath.Join(base, "assets")
 	backupsDir := filepath.Join(base, "backups")
 	usersDBPath := filepath.Join(base, "users.db")
+	draftsDir := filepath.Join(base, ".leafwiki", "drafts")
 	brandingConfigFile := test_utils.WriteFile(t, base, "branding.json", `{"siteName":"Test Site"}`)
 
 	test_utils.WriteFile(t, rootDir, "page.md", "# Hello\n")
 	test_utils.WriteFile(t, assetsDir, "image.png", "fake-image-bytes")
+	test_utils.WriteFile(t, draftsDir, "page-1.json", `{"pageId":"page-1"}`)
 
 	createTestUsersDB(t, usersDBPath)
 
@@ -34,6 +36,7 @@ func newTestConfig(t *testing.T) Config {
 		BackupsDir:         backupsDir,
 		RootDir:            rootDir,
 		AssetsDir:          assetsDir,
+		DraftsDir:          draftsDir,
 		BrandingConfigFile: brandingConfigFile,
 		UsersDBPath:        usersDBPath,
 		WikiVersion:        "v0.0.0-test",
@@ -158,11 +161,43 @@ func TestCreateSnapshot_ContainsExpectedFiles(t *testing.T) {
 		got[f.Name] = true
 	}
 
-	for _, want := range []string{"root/page.md", "assets/image.png", "users.db", "branding.json", "backup-meta.json"} {
+	for _, want := range []string{"root/page.md", "assets/image.png", ".leafwiki/drafts/page-1.json", "users.db", "branding.json", "backup-meta.json"} {
 		if !got[want] {
 			t.Errorf("zip missing expected entry %q; got entries: %v", want, got)
 		}
 	}
+}
+
+func TestCreateSnapshot_RecordsEmptyDraftState(t *testing.T) {
+	cfg := newTestConfig(t)
+	if err := os.RemoveAll(cfg.DraftsDir); err != nil {
+		t.Fatal(err)
+	}
+
+	m := NewManager(cfg)
+	if err := m.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := m.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	zipPath, err := m.SnapshotZipPath(entries[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = r.Close() }()
+
+	for _, f := range r.File {
+		if f.Name == ".leafwiki/drafts/" {
+			return
+		}
+	}
+	t.Fatal("snapshot did not record an empty drafts directory")
 }
 
 func TestCreateSnapshot_BrandingConfigFileIsOptional(t *testing.T) {

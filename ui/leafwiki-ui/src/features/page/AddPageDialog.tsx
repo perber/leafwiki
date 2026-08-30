@@ -1,11 +1,12 @@
 import BaseDialog, { BaseDialogConfirmButton } from '@/components/BaseDialog'
 import { FormInput } from '@/components/FormInput'
 import { Button } from '@/components/ui/button'
-import { createPage, NODE_KIND_PAGE } from '@/lib/api/pages'
+import { Checkbox } from '@/components/ui/checkbox'
+import { createPage, createPendingDraft, NODE_KIND_PAGE } from '@/lib/api/pages'
 import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import i18next from '@/lib/i18n'
 import { DIALOG_ADD_PAGE } from '@/lib/registries'
-import { buildEditUrl } from '@/lib/routePath'
+import { buildEditUrl, buildPendingDraftEditUrl } from '@/lib/routePath'
 import { useTreeStore } from '@/stores/tree'
 import { CalendarDays } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
@@ -32,6 +33,7 @@ export function AddPageDialog({
   const [slugLoading, setSlugLoading] = useState(false)
   const [lastSlugTitle, setLastSlugTitle] = useState('')
   const [slugTouched, setSlugTouched] = useState(false)
+  const [createAsDraft, setCreateAsDraft] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const parentPath = useTreeStore((s) => s.getPathById(parentId) || '')
@@ -59,6 +61,7 @@ export function AddPageDialog({
     setSlug('')
     setSlugTouched(false)
     setLastSlugTitle('')
+    setCreateAsDraft(false)
     setFieldErrors({})
     setLoading(false)
   }, [])
@@ -89,15 +92,23 @@ export function AddPageDialog({
       setLoading(true)
       setFieldErrors({})
       try {
-        await createPage({ title, slug, parentId, kind: nodeKind })
+        if (createAsDraft) {
+          const draft = await createPendingDraft({ title, slug, parentId })
+          navigate(buildPendingDraftEditUrl(draft.page.id))
+        } else {
+          await createPage({ title, slug, parentId, kind: nodeKind })
+        }
         toast.success(
-          t('addDialog.createdToast', { item: itemLabelCapitalized }),
+          createAsDraft
+            ? t('addDialog.draftCreatedToast')
+            : t('addDialog.createdToast', { item: itemLabelCapitalized }),
         )
-        await reloadTree()
-        if (redirect) {
+        if (!createAsDraft) await reloadTree()
+        if (redirect && !createAsDraft) {
           const fullPath = parentPath !== '' ? `${parentPath}/${slug}` : slug
           navigate(buildEditUrl(fullPath))
         }
+        resetForm()
         return true
       } catch (err: unknown) {
         console.warn(err)
@@ -124,6 +135,8 @@ export function AddPageDialog({
       itemLabel,
       itemLabelCapitalized,
       t,
+      createAsDraft,
+      resetForm,
     ],
   )
 
@@ -226,6 +239,15 @@ export function AddPageDialog({
           error={fieldErrors.slug}
           allowedHotkeys={DIALOG_INPUT_ALLOWED_HOTKEYS}
         />
+        {nodeKind === NODE_KIND_PAGE && (
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={createAsDraft}
+              onCheckedChange={(checked) => setCreateAsDraft(!!checked)}
+            />
+            {t('addDialog.createAsDraft')}
+          </label>
+        )}
       </div>
       <span className="dialog__path" data-testid="add-page-path-display">
         {t('addDialog.pathPrefix')} {parentPath !== '' && `${parentPath}/`}

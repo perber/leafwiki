@@ -320,6 +320,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		snapshotManager := snapshot.NewManager(snapshot.Config{
 			BackupsDir:         snapshotsDir,
 			RootDir:            filepath.Join(cfg.server.dataDir, "root"),
+			DraftsDir:          filepath.Join(cfg.server.dataDir, ".leafwiki", "drafts"),
 			AssetsDir:          filepath.Join(cfg.server.dataDir, "assets"),
 			BrandingDir:        filepath.Join(cfg.server.dataDir, "branding"),
 			AvatarsDir:         filepath.Join(cfg.server.dataDir, "avatars"),

@@ -1,4 +1,15 @@
 {
+  "draft": {
+    "start": "Start draft",
+    "editing": "Editing draft",
+    "publish": "Publish draft",
+    "discard": "Discard draft",
+    "discardTitle": "Discard this draft?",
+    "discardDescription": "This permanently deletes the unpublished working copy.",
+    "cancel": "Cancel",
+    "published": "Draft published",
+    "discarded": "Draft discarded"
+  },
   "wikiLinkDisambiguation": {
     "title": "Multiple pages found",
     "descriptionPrefix": "Several pages match",
