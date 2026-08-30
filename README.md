@@ -72,7 +72,7 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
 - Backlinks and link status per page (incoming, outgoing, broken links)
 - Built-in Markdown editor with live preview, keyboard shortcuts, and autocomplete for internal page links
 - Optimistic locking for concurrent edits
-- Markdown: tables, task lists, footnotes, callouts (`:::info` / `:::warning`), collapsible blocks (`:::collapsible` / `:::collapsed`), Mermaid diagrams, KaTeX math blocks (`$$...$$`, inline `$...$` not supported), sanitized inline HTML
+- Markdown: tables, task lists, footnotes, callouts (`:::info` / `:::warning`), collapsible blocks (`:::collapsible` / `:::collapsed`), Mermaid diagrams, KaTeX math blocks (`$$...$$`, inline `$...$` not supported), image sizing, sanitized inline HTML
 
 **Customization:**
 - Custom stylesheet (`--custom-stylesheet`, v0.8.5+)
@@ -605,6 +605,20 @@ For most setups, prefer `--public-access` for read-only public access and the vi
 `Esc` closes modals, dialogs, and edit mode.
 
 Press `Ctrl+/` / `Cmd+/` in the app for the full in-product shortcuts list.
+
+---
+
+## Image Sizing
+
+Images can be displayed at a specific percentage of their available width by adding `{size=N%}` immediately after the image:
+
+```markdown
+![image.png](/assets/example/image.png){size=75%}
+```
+
+The size must be greater than `0%` and no more than `100%`. Decimal values are also supported, for example `{size=62.5%}`.
+
+If no size is specified, the image is rendered at its default size.
 
 ---
 
