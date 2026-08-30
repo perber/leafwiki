@@ -1541,6 +1541,10 @@
     @apply text-brand-dark font-semibold;
   }
 
+  .page-viewer__content mark.search-query-highlight {
+    @apply bg-brand/25 text-inherit rounded-sm px-0.5;
+  }
+
   .page-refactor-dialog__results-view {
     @apply max-h-60 rounded-none border-0;
   }
