@@ -118,7 +118,10 @@ export default class TreeView {
   }
 
   async isSidebarVisible(): Promise<boolean> {
-    return this.treeView().isVisible();
+    return (
+      (await this.page.getByTestId('sidebar-toggle-button').getAttribute('aria-expanded')) ===
+      'true'
+    );
   }
 
   async getNumberOfTreeNodes() {
@@ -161,15 +164,29 @@ export default class TreeView {
     const nodeLink = await this.findPageByTitle(title);
     await nodeLink.waitFor({ state: 'visible' });
     await nodeLink.scrollIntoViewIfNeeded();
-    if (options?.button === 'middle' || options?.modifiers?.length) {
+    if (options?.button === 'middle') {
+      await nodeLink.dispatchEvent('auxclick', { button: 1 });
+      return;
+    }
+
+    if (options?.modifiers?.length) {
       const modifiers = new Set(options.modifiers ?? []);
-      await nodeLink.dispatchEvent(options.button === 'middle' ? 'auxclick' : 'click', {
-        button: options.button === 'middle' ? 1 : 0,
-        ctrlKey: modifiers.has('Control'),
-        metaKey: modifiers.has('Meta'),
-        shiftKey: modifiers.has('Shift'),
-        altKey: modifiers.has('Alt'),
-      });
+      await nodeLink.evaluate(
+        (element, init) => {
+          element.addEventListener('click', (event) => event.preventDefault(), {
+            once: true,
+          });
+          element.dispatchEvent(
+            new MouseEvent('click', { ...init, bubbles: true, cancelable: true }),
+          );
+        },
+        {
+          ctrlKey: modifiers.has('Control'),
+          metaKey: modifiers.has('Meta'),
+          shiftKey: modifiers.has('Shift'),
+          altKey: modifiers.has('Alt'),
+        },
+      );
       return;
     }
 
