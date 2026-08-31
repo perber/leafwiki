@@ -1,3 +1,4 @@
+import { TooltipWrapper } from '@/components/TooltipWrapper'
 import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
 import { NODE_KIND_SECTION, PageNode } from '@/lib/api/pages'
 import { DIALOG_ADD_PAGE } from '@/lib/registries'
@@ -10,7 +11,13 @@ import { useSessionStore } from '@/stores/session'
 import { useTreeStore } from '@/stores/tree'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import clsx from 'clsx'
-import { ChevronUp, FilePlus, FolderPlus } from 'lucide-react'
+import {
+  ChevronUp,
+  FileClock,
+  FilePenLine,
+  FilePlus,
+  FolderPlus,
+} from 'lucide-react'
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
@@ -39,6 +46,13 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
   const isActive = isStoreActive
   const isPendingDraft = node.draft === 'pending'
   const isDraft = !!node.draft
+  const draftLabel = node.draft
+    ? t(
+        isPendingDraft
+          ? 'treeActions.pendingDraftMarker'
+          : 'treeActions.draftMarker',
+      )
+    : ''
 
   const handleLinkClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (
@@ -104,20 +118,18 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
           {node.title || t('treeActions.untitledPage')}
         </span>
         {node.draft && (
-          <span
-            className="text-muted-foreground ml-1 text-xs"
-            aria-label={t(
-              node.draft === 'pending'
-                ? 'treeActions.pendingDraftMarker'
-                : 'treeActions.draftMarker',
-            )}
-          >
-            {t(
-              node.draft === 'pending'
-                ? 'treeActions.pendingDraftMarker'
-                : 'treeActions.draftMarker',
-            )}
-          </span>
+          <TooltipWrapper asChild label={draftLabel}>
+            <span
+              className="text-muted-foreground shrink-0"
+              aria-label={draftLabel}
+            >
+              {node.draft === 'pending' ? (
+                <FileClock size={14} />
+              ) : (
+                <FilePenLine size={14} />
+              )}
+            </span>
+          </TooltipWrapper>
         )}
       </Link>
     </div>
