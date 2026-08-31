@@ -364,13 +364,11 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--snapshot-dir`                 | Directory to store snapshot ZIPs in                                     | `<data-dir>/snapshots` | v0.12.0 |
 | `--restore-upload-max-size`      | Max size for an uploaded backup ZIP to restore from                    | `500MiB`      | v0.12.0 |
 | `--git-backup`                   | ⚗️ Enable git backup to a remote repository                             | `false`       | v0.11.3 |
-| `--git-backup-remote`            | ⚗️ SSH or HTTP(S) remote URL for git backup (e.g. `git@github.com:user/repo.git`, `https://github.com/user/repo.git`) | `""` | v0.11.3 |
+| `--git-backup-remote`            | ⚗️ SSH remote URL for git backup (e.g. `git@github.com:user/repo.git`) | `""` | v0.11.3 |
 | `--git-backup-branch`            | ⚗️ Branch to push to                                                    | `main`        | v0.11.3 |
 | `--git-backup-ssh-key`           | ⚗️ Raw SSH private key (prefer env var)                                 | `""`          | v0.11.3 |
 | `--git-backup-ssh-key-path`      | ⚗️ Path to SSH private key file                                         | `""`          | v0.11.3 |
 | `--git-backup-ssh-known-hosts`   | ⚗️ Path to `known_hosts` for MITM protection                            | `""`          | v0.11.3 |
-| `--git-backup-http-username`     | ⚗️ Username for HTTP(S) basic auth                                      | `""`          | v0.12.2 |
-| `--git-backup-http-password`     | ⚗️ Password or access token for HTTP(S) basic auth (prefer env var)     | `""`          | v0.12.2 |
 | `--git-backup-author-name`       | ⚗️ Git commit author name                                               | `LeafWiki Backup` | v0.11.3 |
 | `--git-backup-author-email`      | ⚗️ Git commit author email                                              | `backup@leafwiki.local` | v0.11.3 |
 | `--git-backup-interval`          | ⚗️ Backup interval (e.g. `60m`, `2h`); `0` = manual-only               | `60m`         | v0.11.3 |
@@ -425,13 +423,11 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_SNAPSHOT_DIR`                 | Directory to store snapshot ZIPs in                  | `<data-dir>/snapshots` | v0.12.0 |
 | `LEAFWIKI_RESTORE_UPLOAD_MAX_SIZE`      | Max size for an uploaded backup ZIP to restore from  | `500MiB`      | v0.12.0 |
 | `LEAFWIKI_GIT_BACKUP`                   | ⚗️ Enable git backup                                | `false`       | v0.11.3 |
-| `LEAFWIKI_GIT_BACKUP_REMOTE`            | ⚗️ SSH or HTTP(S) remote URL                        | `""`          | v0.11.3 |
+| `LEAFWIKI_GIT_BACKUP_REMOTE`            | ⚗️ SSH remote URL                                   | `""`          | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_BRANCH`            | ⚗️ Branch to push to                                | `main`        | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_SSH_KEY`           | ⚗️ Raw SSH private key (preferred over path)        | `""`          | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH`      | ⚗️ Path to SSH private key file                     | `""`          | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS`   | ⚗️ Path to `known_hosts` file                       | `""`          | v0.11.3 |
-| `LEAFWIKI_GIT_BACKUP_HTTP_USERNAME`     | ⚗️ Username for HTTP(S) basic auth                  | `""`          | v0.12.2 |
-| `LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD`     | ⚗️ Password or access token for HTTP(S) basic auth  | `""`          | v0.12.2 |
 | `LEAFWIKI_GIT_BACKUP_AUTHOR_NAME`       | ⚗️ Git commit author name                           | `LeafWiki Backup` | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_AUTHOR_EMAIL`      | ⚗️ Git commit author email                          | `backup@leafwiki.local` | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_INTERVAL`          | ⚗️ Backup interval (e.g. `60m`); `0` = manual-only | `60m`         | v0.11.3 |
@@ -519,9 +515,7 @@ Use `--unix-socket` when LeafWiki should listen on a local unix domain socket in
 
 > **Experimental** — This feature is new and may change in future releases. Test it thoroughly before relying on it for critical data.
 
-Git Backup pushes wiki **content** to a remote Git repository on a configurable interval, either via **SSH** or via **HTTP(S) with username + password** (v0.12.2+). It covers the `root/` (pages) and `assets/` directories. Database files (`.db`, `.db-wal`, etc.) and runtime files are excluded via `.gitignore`.
-
-Which transport you use is derived from the remote URL: `git@...` / `ssh://...` authenticate with an SSH key, `https://...` / `http://...` with a username and password. On GitHub, GitLab and friends the "password" is an access token — which is often the more practical option, because a fine-grained token can be scoped to a **single repository**, whereas an SSH key added to your account grants access to everything that account can reach.
+Git Backup pushes wiki **content** to a remote Git repository on a configurable interval, either via **SSH**. It covers the `root/` (pages) and `assets/` directories. Database files (`.db`, `.db-wal`, etc.) and runtime files are excluded via `.gitignore`.
 
 Backups run automatically on a configurable interval and can also be triggered manually from the **Git Content Backup** page.
 
