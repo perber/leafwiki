@@ -69,3 +69,27 @@ func TestStorePersistsPendingDraft(t *testing.T) {
 		t.Fatalf("get deleted pending = %v", err)
 	}
 }
+
+func TestStoreListsValidDraftSummariesWithoutContent(t *testing.T) {
+	store := NewStore(t.TempDir())
+	if err := store.Save(Draft{PageID: "page-z", BaseVersion: "v1", Title: "Page", Content: "private"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Save(Draft{PageID: "page-a", BaseVersion: "v1", Title: "Page", Content: "private"}); err != nil {
+		t.Fatal(err)
+	}
+	pending, err := store.CreatePending("", "Pending", "pending")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pending.Content = "private"
+	if err := store.SavePending(*pending); err != nil {
+		t.Fatal(err)
+	}
+	if got := store.List(); len(got) != 2 || got[0].PageID != "page-a" || got[1].PageID != "page-z" || got[0].Content != "" {
+		t.Fatalf("draft list = %#v", got)
+	}
+	if got := store.ListPending(); len(got) != 1 || got[0].Content != "" {
+		t.Fatalf("pending list = %#v", got)
+	}
+}

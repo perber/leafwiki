@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/perber/wiki/internal/core/shared"
@@ -129,6 +130,30 @@ func (s *Store) Exists(pageID string) (bool, error) {
 	return false, fmt.Errorf("stat draft: %w", err)
 }
 
+// List returns valid existing-page drafts without their content. Invalid files
+// are ignored so one bad record cannot hide the remaining editor drafts.
+func (s *Store) List() []Draft {
+	entries, err := os.ReadDir(s.dir)
+	if errors.Is(err, os.ErrNotExist) || err != nil {
+		return nil
+	}
+	result := make([]Draft, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		id := strings.TrimSuffix(entry.Name(), ".json")
+		if d, err := s.Get(id); err == nil {
+			d.Content = ""
+			d.Tags = nil
+			d.Properties = nil
+			result = append(result, *d)
+		}
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].PageID < result[j].PageID })
+	return result
+}
+
 func (s *Store) CreatePending(parentID, title, slug string) (*PendingDraft, error) {
 	id, err := shared.GenerateUniqueID()
 	if err != nil {
@@ -201,6 +226,30 @@ func (s *Store) DeletePending(id string) error {
 		return fmt.Errorf("delete pending draft: %w", err)
 	}
 	return nil
+}
+
+// ListPending returns valid unpublished drafts without their content.
+func (s *Store) ListPending() []PendingDraft {
+	dir := filepath.Join(s.dir, "pending")
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, os.ErrNotExist) || err != nil {
+		return nil
+	}
+	result := make([]PendingDraft, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		id := strings.TrimSuffix(entry.Name(), ".json")
+		if d, err := s.GetPending(id); err == nil {
+			d.Content = ""
+			d.Tags = nil
+			d.Properties = nil
+			result = append(result, *d)
+		}
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
+	return result
 }
 
 func (s *Store) path(pageID string) (string, error) {

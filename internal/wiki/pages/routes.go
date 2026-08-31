@@ -142,6 +142,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	authGroup.GET("/pages/slug-suggestion", authmw.RequireEditorOrAdmin(), r.handleSuggestSlug)
 	authGroup.POST("/pages", authmw.RequireEditorOrAdmin(), r.handleCreate)
 	authGroup.POST("/pages/drafts", authmw.RequireEditorOrAdmin(), r.handleCreatePendingDraft)
+	authGroup.GET("/pages/drafts", authmw.RequireEditorOrAdmin(), r.handleListDrafts)
 	authGroup.GET("/pages/drafts/:id", authmw.RequireEditorOrAdmin(), r.handleGetPendingDraft)
 	authGroup.PUT("/pages/drafts/:id", authmw.RequireEditorOrAdmin(), r.handleSavePendingDraft)
 	authGroup.POST("/pages/drafts/:id/publish", authmw.RequireEditorOrAdmin(), r.handlePublishPendingDraft)

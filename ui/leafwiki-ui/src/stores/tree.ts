@@ -1,5 +1,6 @@
 import {
   fetchTree,
+  listDrafts,
   NODE_KIND_PAGE,
   NODE_KIND_SECTION,
   PageNode,
@@ -8,6 +9,39 @@ import i18next from '@/lib/i18n'
 import { FlatPageSearchItem, buildFlatPageSearchItems } from '@/lib/pageSearch'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { useConfigStore } from './config'
+import { useSessionStore } from './session'
+
+export function mergeDraftOverlay(
+  canonicalTree: PageNode,
+  summary: Awaited<ReturnType<typeof listDrafts>>,
+): PageNode {
+  const tree = structuredClone(canonicalTree)
+  const { byId } = buildIndexes(tree)
+  for (const draft of summary.drafts) {
+    if (byId[draft.pageId]) byId[draft.pageId].draft = 'active'
+  }
+  for (const draft of summary.pending) {
+    const parent = draft.parentId ? byId[draft.parentId] : tree
+    // A pending draft must remain reachable even if its original parent was
+    // removed after creation. Publishing will still surface the missing-parent
+    // error instead of silently creating it at the root.
+    const target = parent ?? tree
+    target.children ??= []
+    target.children.push({
+      id: draft.id,
+      title: draft.title,
+      slug: draft.slug,
+      path: target.path ? `${target.path}/${draft.slug}` : draft.slug,
+      version: 'pending',
+      children: [],
+      kind: NODE_KIND_PAGE,
+      draft: 'pending',
+    })
+  }
+  assignParentIds(tree)
+  return tree
+}
 
 function buildIndexes(root: PageNode) {
   const byPath: Record<string, PageNode> = {}
@@ -151,7 +185,7 @@ export const useTreeStore = create<TreeStore>()(
       getPagesByTitle: (title: string) => {
         const lower = title.toLowerCase()
         return Object.values(get().byId ?? {}).filter(
-          (n) => n.title.toLowerCase() === lower,
+          (n) => n.draft !== 'pending' && n.title.toLowerCase() === lower,
         )
       },
       getPathById: (id: string) => get().byId?.[id]?.path ?? null,
@@ -265,10 +299,23 @@ export const useTreeStore = create<TreeStore>()(
         else set({ loading: true, error: null })
 
         try {
-          const tree = await fetchTree()
+          const canonicalTree = await fetchTree()
+          assignParentIds(canonicalTree)
+          const { byPath, byId } = buildIndexes(canonicalTree)
+          const flatPages = buildFlatPageSearchItems(canonicalTree)
+          const user = useSessionStore.getState().user
+          const editor = user?.role === 'editor' || user?.role === 'admin'
+          const authDisabled = useConfigStore.getState().authDisabled
+          let tree = canonicalTree
+          if (editor || authDisabled) {
+            try {
+              tree = mergeDraftOverlay(canonicalTree, await listDrafts())
+            } catch (err) {
+              console.warn('Could not load draft tree overlay', err)
+            }
+          }
           assignParentIds(tree)
-          const { byPath, byId } = buildIndexes(tree)
-          const flatPages = buildFlatPageSearchItems(tree)
+          const { byId: overlayById } = buildIndexes(tree)
           const persistedOpen = get().openNodeIds
           const pinnedPages = Object.values(byId)
             .filter((n) => n.pinned === true)
@@ -276,7 +323,7 @@ export const useTreeStore = create<TreeStore>()(
           set({
             tree,
             byPath,
-            byId,
+            byId: overlayById,
             flatPages,
             pinnedPages,
             openNodeIdSet: toSetRecord(persistedOpen),

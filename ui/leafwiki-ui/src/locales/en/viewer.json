@@ -109,6 +109,8 @@
     "renameErrorFallback": "Failed to rename page",
     "deleteEditingWarning": "This {{item}} is currently being edited. Please close the editor before deleting it.",
     "menuAddPage": "Add Page",
+    "draftMarker": "Draft",
+    "pendingDraftMarker": "Unpublished draft",
     "menuAddSection": "Add Section",
     "menuEdit": "Edit {{item}}",
     "menuRename": "Rename {{item}}",

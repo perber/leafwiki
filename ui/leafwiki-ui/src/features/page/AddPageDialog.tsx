@@ -103,7 +103,7 @@ export function AddPageDialog({
             ? t('addDialog.draftCreatedToast')
             : t('addDialog.createdToast', { item: itemLabelCapitalized }),
         )
-        if (!createAsDraft) await reloadTree()
+        await reloadTree()
         if (redirect && !createAsDraft) {
           const fullPath = parentPath !== '' ? `${parentPath}/${slug}` : slug
           navigate(buildEditUrl(fullPath))

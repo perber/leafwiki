@@ -35,6 +35,10 @@ func TestDraftLifecycleKeepsCanonicalPagePublicUntilPublish(t *testing.T) {
 	if draft.BaseVersion != page.Version || draft.Page.Content != page.Content {
 		t.Fatalf("unexpected draft %#v", draft)
 	}
+	summary := authenticatedRequest(t, router, http.MethodGet, "/api/pages/drafts", nil)
+	if summary.Code != http.StatusOK || !strings.Contains(summary.Body.String(), page.ID) || strings.Contains(summary.Body.String(), `"content"`) {
+		t.Fatalf("draft summary = %d: %s", summary.Code, summary.Body.String())
+	}
 
 	saveBody := `{"title":"Draft title","content":"private draft","tags":["go"],"properties":{"status":"editing"}}`
 	save := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+page.ID+"/draft", strings.NewReader(saveBody))
@@ -74,6 +78,9 @@ func TestDraftLifecycleKeepsCanonicalPagePublicUntilPublish(t *testing.T) {
 	viewer := authenticatedRequestAs(t, router, "draft-viewer", "viewerpass", http.MethodGet, "/api/pages/"+page.ID+"/draft", nil)
 	if viewer.Code != http.StatusForbidden {
 		t.Fatalf("viewer GET draft = %d, want 403", viewer.Code)
+	}
+	if viewerSummary := authenticatedRequestAs(t, router, "draft-viewer", "viewerpass", http.MethodGet, "/api/pages/drafts", nil); viewerSummary.Code != http.StatusForbidden {
+		t.Fatalf("viewer GET draft summary = %d, want 403", viewerSummary.Code)
 	}
 	viewerPage := authenticatedRequestAs(t, router, "draft-viewer", "viewerpass", http.MethodGet, "/api/pages/"+page.ID, nil)
 	if viewerPage.Code != http.StatusOK {
@@ -139,6 +146,9 @@ func TestPendingDraftLifecycleStaysPrivateUntilPublish(t *testing.T) {
 	}
 	if err := json.Unmarshal(created.Body.Bytes(), &pending); err != nil {
 		t.Fatal(err)
+	}
+	if summary := authenticatedRequest(t, router, http.MethodGet, "/api/pages/drafts", nil); summary.Code != http.StatusOK || !strings.Contains(summary.Body.String(), pending.Page.ID) || strings.Contains(summary.Body.String(), `"content"`) {
+		t.Fatalf("pending draft summary = %d: %s", summary.Code, summary.Body.String())
 	}
 	if rec := authenticatedRequest(t, router, http.MethodGet, "/api/tree", nil); strings.Contains(rec.Body.String(), pending.Page.ID) {
 		t.Fatalf("pending draft leaked into tree: %s", rec.Body.String())

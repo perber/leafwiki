@@ -274,7 +274,7 @@ export default function TreeNodeActionsMenu({
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
-        {!readOnlyMode && (
+        {!readOnlyMode && node.draft !== 'active' && (
           <>
             <DropdownMenuItem
               className="cursor-pointer"
@@ -370,6 +370,17 @@ export default function TreeNodeActionsMenu({
             <DropdownMenuSeparator />
           </>
         )}
+        {!readOnlyMode && node.draft === 'active' && (
+          <DropdownMenuItem
+            className="cursor-pointer"
+            onClick={() => {
+              navigate(`/e/${node.path}`)
+            }}
+          >
+            <Pencil size={18} className="tree-node__action-icon" />{' '}
+            {t('treeActions.menuEdit', { item: itemLabelCapitalized })}
+          </DropdownMenuItem>
+        )}
         {isLoggedIn && (
           <DropdownMenuItem
             className="cursor-pointer"
@@ -386,7 +397,7 @@ export default function TreeNodeActionsMenu({
               : t('favorites.addFavorite')}
           </DropdownMenuItem>
         )}
-        {!readOnlyMode && (
+        {!readOnlyMode && node.draft !== 'active' && (
           <DropdownMenuItem
             className="cursor-pointer"
             data-testid="tree-view-action-button-pin"
@@ -405,7 +416,7 @@ export default function TreeNodeActionsMenu({
             )}
           </DropdownMenuItem>
         )}
-        {!readOnlyMode && (
+        {!readOnlyMode && node.draft !== 'active' && (
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem

@@ -109,6 +109,8 @@
     "renameErrorFallback": "Seite konnte nicht umbenannt werden",
     "deleteEditingWarning": "{{item}} wird gerade bearbeitet. Schließen Sie den Editor, bevor Sie ihn löschen.",
     "menuAddPage": "Seite hinzufügen",
+    "draftMarker": "Entwurf",
+    "pendingDraftMarker": "Unveröffentlichter Entwurf",
     "menuAddSection": "Bereich hinzufügen",
     "menuEdit": "{{item}} bearbeiten",
     "menuRename": "{{item}} umbenennen",

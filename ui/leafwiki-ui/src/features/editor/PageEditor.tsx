@@ -12,10 +12,9 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { NODE_KIND_PAGE } from '@/lib/api/pages'
 import { mapApiError, asApiLocalizedError } from '@/lib/api/errors'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
-import { buildBrowserEditUrl, buildEditUrl } from '@/lib/routePath'
+import { buildBrowserEditUrl, buildViewUrl } from '@/lib/routePath'
 import { DIALOG_LINK_INSERT } from '@/lib/registries'
 import { getWikiTargetRoutePath } from '@/lib/wikiPath'
 import { useDialogsStore } from '@/stores/dialogs'
@@ -49,10 +48,7 @@ export default function PageEditor() {
   const setFrontmatterFields = usePageEditorStore((s) => s.setFrontmatterFields)
   const loadPageData = usePageEditorStore((s) => s.loadPageData)
   const loadPendingDraft = usePageEditorStore((s) => s.loadPendingDraft)
-  const isPendingDraft = usePageEditorStore((s) => s.isPendingDraft)
-  const pendingParentId = usePageEditorStore((s) => s.pendingParentId)
   const isDraft = usePageEditorStore((s) => s.isDraft)
-  const startDraft = usePageEditorStore((s) => s.startDraft)
   const publishDraft = usePageEditorStore((s) => s.publishDraft)
   const discardDraft = usePageEditorStore((s) => s.discardDraft)
   const initialPage = usePageEditorStore((s) => s.initialPage) // contains the initial page data when loaded
@@ -66,7 +62,6 @@ export default function PageEditor() {
   const error = usePageEditorStore((s) => s.error)
   const openNode = useTreeStore((s) => s.openNode)
   const dirty = usePageEditorStore(isDirtyState)
-  const canStartDraft = initialPage?.kind === NODE_KIND_PAGE
 
   // Auto-save hook — must be called unconditionally
   const { status: autoSaveStatus } = useAutoSave()
@@ -107,11 +102,13 @@ export default function PageEditor() {
     savePage()
       .then(async (page) => {
         if (page) {
-          window.history.replaceState(
-            null,
-            '',
-            buildBrowserEditUrl(`/${page?.path}`),
-          )
+          if (!usePageEditorStore.getState().isPendingDraft) {
+            window.history.replaceState(
+              null,
+              '',
+              buildBrowserEditUrl(`/${page.path}`),
+            )
+          }
           toast.success(t('pageEditor.savedToast'))
         }
       })
@@ -223,19 +220,12 @@ export default function PageEditor() {
     [setContent],
   )
 
-  const handleStartDraft = useCallback(() => {
-    startDraft().catch((err) =>
-      toast.error(mapApiError(err, t('pageEditor.saveErrorFallback')).message),
-    )
-  }, [startDraft, t])
-
   const handlePublishDraft = useCallback(() => {
     publishDraft()
       .then(async (page) => {
         if (page) {
           await reloadTree()
-          if (isPendingDraft)
-            navigate(buildEditUrl(page.path), { replace: true })
+          navigate(buildViewUrl(page.path), { replace: true })
           toast.success(t('draft.published'))
         }
       })
@@ -244,16 +234,23 @@ export default function PageEditor() {
           mapApiError(err, t('pageEditor.saveErrorFallback')).message,
         ),
       )
-  }, [publishDraft, reloadTree, t, isPendingDraft, navigate])
+  }, [publishDraft, reloadTree, t, navigate])
 
   const handleDiscardDraft = useCallback(() => {
+    const state = usePageEditorStore.getState()
+    const discardedPagePath = state.page?.path ?? '/'
+    const discardedPendingDraft = state.isPendingDraft
+    const discardedPendingParentId = state.pendingParentId
     discardDraft()
-      .then(() => {
-        if (isPendingDraft) {
-          const parent = pendingParentId
-            ? useTreeStore.getState().getPathById(pendingParentId)
+      .then(async () => {
+        await reloadTree()
+        if (discardedPendingDraft) {
+          const parent = discardedPendingParentId
+            ? useTreeStore.getState().getPathById(discardedPendingParentId)
             : ''
           navigate(parent ? `/${parent}` : '/', { replace: true })
+        } else {
+          navigate(buildViewUrl(discardedPagePath), { replace: true })
         }
         toast.success(t('draft.discarded'))
       })
@@ -262,7 +259,7 @@ export default function PageEditor() {
           mapApiError(err, t('pageEditor.saveErrorFallback')).message,
         ),
       )
-  }, [discardDraft, t, isPendingDraft, pendingParentId, navigate])
+  }, [discardDraft, reloadTree, t, navigate])
 
   if (notFound) {
     return <Page404 targetPath={getWikiTargetRoutePath(pathname)} />
@@ -280,66 +277,54 @@ export default function PageEditor() {
       <div className="page-editor">
         {initialPage && (
           <>
-            {(isDraft || canStartDraft) && (
+            {isDraft && (
               <div className="page-editor__draft-actions">
-                {isDraft ? (
-                  <>
-                    <span className="text-sm font-medium">
-                      {t('draft.editing')}
-                    </span>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={handlePublishDraft}
-                      disabled={autoSaveStatus === 'saving'}
-                    >
-                      {t('draft.publish')}
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={autoSaveStatus === 'saving'}
-                        >
-                          {t('draft.discard')}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>
-                            {t('draft.discardTitle')}
-                          </AlertDialogTitle>
-                          <AlertDialogDescription>
-                            {t('draft.discardDescription')}
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>
-                            {t('draft.cancel')}
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            onClick={handleDiscardDraft}
-                          >
-                            {t('draft.discard')}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </>
-                ) : (
+                <>
+                  <span className="text-sm font-medium">
+                    {t('draft.editing')}
+                  </span>
                   <Button
                     type="button"
                     size="sm"
-                    variant="outline"
-                    onClick={handleStartDraft}
-                    disabled={dirty || autoSaveStatus === 'saving'}
+                    onClick={handlePublishDraft}
+                    disabled={autoSaveStatus === 'saving'}
                   >
-                    {t('draft.start')}
+                    {t('draft.publish')}
                   </Button>
-                )}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={autoSaveStatus === 'saving'}
+                      >
+                        {t('draft.discard')}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          {t('draft.discardTitle')}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {t('draft.discardDescription')}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>
+                          {t('draft.cancel')}
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={handleDiscardDraft}
+                        >
+                          {t('draft.discard')}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </>
               </div>
             )}
             <PageFrontmatterPanel

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Page } from '@/lib/api/pages'
+import { ApiLocalizedError } from '@/lib/api/errors'
+import { useTreeStore } from '@/stores/tree'
 
 const api = vi.hoisted(() => ({
   discardDraft: vi.fn(),
@@ -79,6 +81,61 @@ describe('pageEditorStore drafts', () => {
     await usePageEditorStore.getState().startDraft()
 
     expect(api.startDraft).toHaveBeenCalledWith('page-1')
+    expect(usePageEditorStore.getState()).toMatchObject({
+      isDraft: true,
+      content: 'stored draft',
+    })
+  })
+
+  it('starts a draft on opening a leaf page and retries the race through get', async () => {
+    api.getPageByPath.mockResolvedValue(published)
+    api.getDraft
+      .mockRejectedValueOnce(
+        new ApiLocalizedError({
+          code: 'draft_not_found',
+          message: 'missing',
+          template: 'missing',
+        }),
+      )
+      .mockResolvedValueOnce({ page: draftPage, baseVersion: 'v1' })
+    api.startDraft.mockRejectedValueOnce(
+      new ApiLocalizedError({
+        code: 'draft_exists',
+        message: 'exists',
+        template: 'exists',
+      }),
+    )
+    const reloadTree = vi.fn().mockResolvedValue(undefined)
+    useTreeStore.setState({ reloadTree })
+
+    await usePageEditorStore.getState().loadPageData('published')
+
+    expect(api.startDraft).toHaveBeenCalledWith('page-1')
+    expect(api.getDraft).toHaveBeenCalledTimes(2)
+    expect(reloadTree).toHaveBeenCalledWith({ silent: true })
+    expect(usePageEditorStore.getState()).toMatchObject({
+      isDraft: true,
+      content: 'stored draft',
+    })
+  })
+
+  it('starts a draft on opening a leaf page when none exists', async () => {
+    api.getPageByPath.mockResolvedValue(published)
+    api.getDraft.mockRejectedValueOnce(
+      new ApiLocalizedError({
+        code: 'draft_not_found',
+        message: 'missing',
+        template: 'missing',
+      }),
+    )
+    api.startDraft.mockResolvedValue({ page: draftPage, baseVersion: 'v1' })
+    const reloadTree = vi.fn().mockResolvedValue(undefined)
+    useTreeStore.setState({ reloadTree })
+
+    await usePageEditorStore.getState().loadPageData('published')
+
+    expect(api.startDraft).toHaveBeenCalledWith('page-1')
+    expect(reloadTree).toHaveBeenCalledWith({ silent: true })
     expect(usePageEditorStore.getState()).toMatchObject({
       isDraft: true,
       content: 'stored draft',

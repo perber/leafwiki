@@ -1,5 +1,6 @@
 import { useDialogsStore } from '@/stores/dialogs'
 import { useConfigStore } from '@/stores/config'
+import { useSessionStore } from '@/stores/session'
 import { usePageEditorStore } from '@/features/editor/pageEditorStore'
 import { DIALOG_EDIT_PAGE_METADATA } from '@/lib/registries'
 import {
@@ -88,6 +89,15 @@ describe('TreeNodeActionsMenu', () => {
     usePageEditorStore.setState({ page: null })
     useTreeNodeActionsMenusStore.setState({ openMenuNodeId: node.id })
     useConfigStore.setState({ enableLinkRefactor: false })
+    useSessionStore.setState({
+      user: {
+        id: 'editor-1',
+        username: 'editor',
+        email: 'editor@example.com',
+        role: 'editor',
+        totpEnabled: false,
+      },
+    })
   })
 
   it('opens the metadata dialog for renaming a tree node', () => {
@@ -110,6 +120,34 @@ describe('TreeNodeActionsMenu', () => {
       slug: node.slug,
     })
     expect(dialogState.dialogProps?.onChange).toEqual(expect.any(Function))
+  })
+
+  it('keeps only edit and favorite actions for an active draft', () => {
+    render(
+      <MemoryRouter>
+        <TreeNodeActionsMenu node={{ ...node, draft: 'active' }} />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText('treeActions.menuEdit')).toBeInTheDocument()
+    expect(
+      screen.getByTestId('tree-view-action-button-favorite'),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText('treeActions.menuAddPage'),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByTestId('tree-view-action-button-rename'),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByTestId('tree-view-action-button-move'),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByTestId('tree-view-action-button-pin'),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByTestId('tree-view-action-button-delete'),
+    ).not.toBeInTheDocument()
   })
 
   it('renames via plain page update instead of the refactor endpoints when link refactor is disabled', async () => {
