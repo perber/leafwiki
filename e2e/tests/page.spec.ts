@@ -1541,6 +1541,35 @@ Target content`;
       .toBe('#你好-世界');
   });
 
+  test('inline code inside a heading stays visible in the viewer', async ({ page }) => {
+    const timestamp = Date.now();
+    const slug = `heading-inline-code-${timestamp}`;
+    const title = `Heading Inline Code ${timestamp}`;
+    const content = `## Config for \`server.port\` value
+
+Body text.`;
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    const headingCode = page.locator('article h2 code.inline-code');
+    await headingCode.waitFor({ state: 'visible' });
+    await test.expect(headingCode).toHaveText('server.port');
+
+    // Regression: an over-broad `.headline-anchor span` rule used to pull the
+    // inline-code wrapper out of flow (position: absolute; opacity: 0) so the
+    // code only flashed into view — mispositioned — while hovering the heading.
+    const styles = await headingCode.evaluate((el) => {
+      const wrapper = el.closest('.markdown-inline-code') as HTMLElement;
+      const computed = window.getComputedStyle(wrapper);
+      return { opacity: computed.opacity, position: computed.position };
+    });
+    test.expect(styles.opacity).toBe('1');
+    test.expect(styles.position).not.toBe('absolute');
+  });
+
   test('headline hash navigation keeps target below sticky toc', async ({ page }) => {
     const timestamp = Date.now();
     const slug = `headline-anchor-sticky-${timestamp}`;
