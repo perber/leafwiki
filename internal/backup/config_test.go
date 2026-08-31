@@ -53,7 +53,7 @@ func TestConfig_ValidateForSettings_RequiresRemote(t *testing.T) {
 func TestConfig_ValidateForSettings_RejectsCredentialTransportMismatch(t *testing.T) {
 	cfg := validSettingsConfig()
 	cfg.RemoteURL = "git@github.com:acme/wiki-backup.git" // SSH remote...
-	cfg.HTTPUsername, cfg.HTTPPassword = "u", "p"          // ...but only HTTP creds
+	cfg.HTTPUsername, cfg.HTTPPassword = "u", "p"         // ...but only HTTP creds
 	cfg.SSHKey, cfg.SSHKeyPath = "", ""
 	if err := cfg.ValidateForSettings(); err == nil {
 		t.Fatal("expected an error for an SSH remote with no SSH key")
