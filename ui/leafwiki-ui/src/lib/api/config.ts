@@ -28,6 +28,7 @@ export type Config = {
   enableLinkRefactor: boolean
   enableApiKeyManagement: boolean
   gitBackupEnabled: boolean
+  gitBackupEnvManaged: boolean
   snapshotEnabled: boolean
   smtpEnabled: boolean
   totpAvailable: boolean
