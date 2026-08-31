@@ -1,7 +1,7 @@
 import test, { expect } from '@playwright/test';
-import EditPage from '../pages/EditPage';
 import EditPageMetadataDialog from '../pages/EditPageMetadataDialog';
 import LoginPage from '../pages/LoginPage';
+import TreeView from '../pages/TreeView';
 import ViewPage from '../pages/ViewPage';
 
 const user = process.env.E2E_ADMIN_USER || 'admin';
@@ -258,17 +258,13 @@ test.describe('History', () => {
       '\nSecond revision content',
     ]);
 
-    await viewPage.clickEditPageButton();
-
-    const editPage = new EditPage(page);
-    await editPage.openMetadataDialog();
+    const treeView = new TreeView(page);
+    await treeView.openRenameDialogForPage(originalTitle);
 
     const metadataDialog = new EditPageMetadataDialog(page);
     await metadataDialog.fillTitle(renamedTitle);
     await metadataDialog.fillSlug(renamedSlug);
     await metadataDialog.submit();
-    await editPage.savePage();
-    await editPage.publishDraft();
     await viewPage.openCurrentPageHistory();
     await openPreviousRevision(page);
     await page.locator('[data-testid="page-history-page-changes-tab"]').click();
@@ -292,17 +288,13 @@ test.describe('History', () => {
       '\nSecond revision content',
     ]);
 
-    await viewPage.clickEditPageButton();
-
-    const editPage = new EditPage(page);
-    await editPage.openMetadataDialog();
+    const treeView = new TreeView(page);
+    await treeView.openRenameDialogForPage(originalTitle);
 
     const metadataDialog = new EditPageMetadataDialog(page);
     await metadataDialog.fillTitle(renamedTitle);
     await metadataDialog.expectSlug(renamedSlug);
     await metadataDialog.submit();
-    await editPage.savePage();
-    await editPage.publishDraft();
 
     await viewPage.openCurrentPageHistory();
     await openPreviousRevision(page);
@@ -319,17 +311,13 @@ test.describe('History', () => {
       '\nSecond revision content',
     ]);
 
-    await viewPage.clickEditPageButton();
-
-    const editPage = new EditPage(page);
-    await editPage.openMetadataDialog();
+    const treeView = new TreeView(page);
+    await treeView.openRenameDialogForPage(originalTitle);
 
     const metadataDialog = new EditPageMetadataDialog(page);
     await metadataDialog.fillTitle(renamedTitle);
     await metadataDialog.expectSlug(renamedTitle);
     await metadataDialog.submit();
-    await editPage.savePage();
-    await editPage.publishDraft();
 
     await viewPage.openCurrentPageHistory();
 
@@ -402,17 +390,13 @@ test.describe('History', () => {
       `\n${updatedContent}`,
     ]);
 
-    await viewPage.clickEditPageButton();
-
-    const editPage = new EditPage(page);
-    await editPage.openMetadataDialog();
+    const treeView = new TreeView(page);
+    await treeView.openRenameDialogForPage(title);
 
     const metadataDialog = new EditPageMetadataDialog(page);
     await metadataDialog.fillTitle(renamedTitle);
     await metadataDialog.expectSlug(renamedTitle);
     await metadataDialog.submit();
-    await editPage.savePage();
-    await editPage.publishDraft();
 
     await viewPage.openCurrentPageHistory();
     await openPreviousRevision(page);

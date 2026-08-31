@@ -1,9 +1,9 @@
 import test, { Page, expect } from '@playwright/test';
 import DeletePageDialog from '../pages/DeletePageDialog';
-import EditPage from '../pages/EditPage';
 import EditPageMetadataDialog from '../pages/EditPageMetadataDialog';
 import LoginPage from '../pages/LoginPage';
 import MovePageDialog from '../pages/MovePageDialog';
+import TreeView from '../pages/TreeView';
 import ViewPage from '../pages/ViewPage';
 
 const user = process.env.E2E_ADMIN_USER || 'admin';
@@ -261,24 +261,13 @@ test.describe('WikiLink [[Title]] refactoring and link status', () => {
 
     const viewPage = new ViewPage(page);
     await viewPage.goto(`/${targetSlug}`);
-    await viewPage.clickEditPageButton();
-
-    const editPage = new EditPage(page);
-    await editPage.openMetadataDialog();
+    const treeView = new TreeView(page);
+    await treeView.openRenameDialogForPage(targetTitle);
 
     const metaDialog = new EditPageMetadataDialog(page);
     await metaDialog.fillTitle(newTitle);
     await metaDialog.fillSlug(newSlug);
     await metaDialog.submit();
-
-    // Auto-save skips slug changes — trigger a manual save.
-    // Wait until the toolbar reflects the metadata change so the manual save
-    // click actually starts the refactor flow.
-    const saveButton = page.locator('button[data-testid="save-page-button"]');
-    await expect(saveButton).toBeEnabled();
-    // Click the button without awaiting completion: the refactor dialog appears
-    // mid-save and must be confirmed before the save promise resolves.
-    await saveButton.click();
 
     // Slug changed → refactor preview dialog must appear.
     const movePageDialog = new MovePageDialog(page);
@@ -292,11 +281,6 @@ test.describe('WikiLink [[Title]] refactoring and link status', () => {
     ).toContainText(targetTitle);
 
     await movePageDialog.confirmRefactorDialog();
-
-    // Wait for the save to complete after the dialog is confirmed.
-    await page.getByText('Page saved successfully').last().waitFor({ state: 'visible' });
-
-    await editPage.publishDraft();
 
     // After rewrite, the stored ref page content must use the new title.
     const refContent = await getPageContent(page, refSlug);
