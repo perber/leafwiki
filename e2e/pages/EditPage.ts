@@ -59,6 +59,14 @@ export default class EditPage {
     await this.page.waitForLoadState('networkidle');
   }
 
+  async publishDraft() {
+    const publishButton = this.page.locator('button[data-testid="publish-draft-button"]');
+    await publishButton.waitFor({ state: 'visible' });
+    await publishButton.click();
+    await this.page.getByText('Draft published').last().waitFor({ state: 'visible' });
+    await this.page.waitForLoadState('networkidle');
+  }
+
   async clickLeaveAnyway() {
     const leaveButton = this.page.locator(
       'button[data-testid="unsaved-changes-dialog-button-confirm"]',
