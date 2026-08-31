@@ -268,7 +268,7 @@ test.describe('History', () => {
     await metadataDialog.fillSlug(renamedSlug);
     await metadataDialog.submit();
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
     await viewPage.openCurrentPageHistory();
     await openPreviousRevision(page);
     await page.locator('[data-testid="page-history-page-changes-tab"]').click();
@@ -302,7 +302,7 @@ test.describe('History', () => {
     await metadataDialog.expectSlug(renamedSlug);
     await metadataDialog.submit();
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     await viewPage.openCurrentPageHistory();
     await openPreviousRevision(page);
@@ -329,7 +329,7 @@ test.describe('History', () => {
     await metadataDialog.expectSlug(renamedTitle);
     await metadataDialog.submit();
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     await viewPage.openCurrentPageHistory();
 
@@ -412,7 +412,7 @@ test.describe('History', () => {
     await metadataDialog.expectSlug(renamedTitle);
     await metadataDialog.submit();
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     await viewPage.openCurrentPageHistory();
     await openPreviousRevision(page);

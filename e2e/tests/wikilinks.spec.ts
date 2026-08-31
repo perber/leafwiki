@@ -111,7 +111,7 @@ test.describe('WikiLink autocomplete', () => {
     await editPage.selectAutocompleteOption(targetTitle);
 
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     // WikiLink should render as a hyperlink in the page view
     await expect(page.locator('article a', { hasText: targetTitle })).toBeVisible();

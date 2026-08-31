@@ -296,7 +296,7 @@ test.describe('WikiLink [[Title]] refactoring and link status', () => {
     // Wait for the save to complete after the dialog is confirmed.
     await page.getByText('Page saved successfully').last().waitFor({ state: 'visible' });
 
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     // After rewrite, the stored ref page content must use the new title.
     const refContent = await getPageContent(page, refSlug);

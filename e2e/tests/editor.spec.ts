@@ -316,7 +316,7 @@ test.describe('Editor', () => {
     await addProperty(page, 'status', 'draft');
 
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     // Viewer shows the tag chip
     await page
@@ -357,7 +357,7 @@ test.describe('Editor', () => {
     await removeTag(page, 'andere');
 
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     await expect(page.locator('.page-metadata__tag-chip')).toHaveCount(0);
 
@@ -412,7 +412,7 @@ test.describe('Editor', () => {
     await page.locator('[data-testid="page-frontmatter-field-value-0"]').fill('two');
 
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     // Viewer shows updated tag, not the old one
     await expect(
@@ -453,7 +453,7 @@ test.describe('Editor', () => {
 
     await editPage.savePage();
     await expect(saveButton).toBeDisabled();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     const propsToggle = page.locator('.page-metadata__props-toggle');
     await propsToggle.waitFor({ state: 'visible' });
@@ -497,7 +497,7 @@ test.describe('Editor', () => {
 
     await editPage.savePage();
     await expect(saveButton).toBeDisabled();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     await expect(page.locator('.page-metadata')).toHaveCount(0);
 
@@ -890,7 +890,7 @@ test.describe('Editor formatting', () => {
     await page.keyboard.press('ArrowRight');
 
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     await page.locator('article strong').getByText('Bold Text').waitFor({ state: 'visible' });
   });
@@ -916,7 +916,7 @@ test.describe('Editor formatting', () => {
     await page.keyboard.press('ArrowRight');
 
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     await page.locator('article em').getByText('Italic Text').waitFor({ state: 'visible' });
   });
@@ -943,7 +943,7 @@ test.describe('Editor formatting', () => {
     await page.keyboard.press('ArrowRight');
 
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     await page.locator('article strong').getByText('Bold Text').waitFor({ state: 'visible' });
   });
@@ -969,7 +969,7 @@ test.describe('Editor formatting', () => {
     await page.keyboard.press('ArrowRight');
 
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     await page.locator('article em').getByText('Italic Text').waitFor({ state: 'visible' });
   });

@@ -48,7 +48,7 @@ test.describe('Asset Uploads', () => {
 
     await editPage.insertFirstAssetIntoPage();
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     test.expect(await viewPage.amountOfImages()).toBe(1);
   });
@@ -73,7 +73,7 @@ test.describe('Asset Uploads', () => {
     await editPage.insertAssetAsLink('upload-test.png');
 
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     test.expect(await page.locator('article img').count()).toBe(0);
     await page.locator('article a[href*="upload-test.png"]').waitFor({ state: 'visible' });
@@ -105,7 +105,7 @@ test.describe('Asset Uploads', () => {
     await editPage.insertAssetAsPlayer('upload-test.mp4');
 
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     await page.locator('article audio[controls]').waitFor({ state: 'visible' });
     await page.locator('article video[controls]').waitFor({ state: 'visible' });

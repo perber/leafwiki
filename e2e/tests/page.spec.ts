@@ -850,7 +850,7 @@ async function expectEditAndSaveShortcutWorks(
   });
   await page.getByText('Page saved successfully').waitFor({ state: 'visible' });
 
-  await editPage.closeEditor();
+  await editPage.publishDraft();
 
   await page.locator('article').getByText(newContent).waitFor({ state: 'visible' });
 }
@@ -896,7 +896,7 @@ async function expectEditorFormattingShortcutsWork(
   });
 
   await editPage.savePage();
-  await editPage.closeEditor();
+  await editPage.publishDraft();
 
   await page.locator('article strong').getByText('Bold Text').waitFor({
     state: 'visible',
@@ -930,7 +930,7 @@ async function expectMarkdownLinkAutocompleteWorks(page: import('@playwright/tes
   await page.keyboard.type(')');
 
   await editPage.savePage();
-  await editPage.closeEditor();
+  await editPage.publishDraft();
 
   const welcomeLink = page.locator(`article a[href="${toAppPath('/welcome-to-leafwiki')}"]`);
   await welcomeLink.getByText('Welcome').waitFor({ state: 'visible' });
@@ -956,7 +956,7 @@ async function expectSearchAndReplaceWorks(page: import('@playwright/test').Page
   await editPage.openReplacePanel();
   await editPage.replaceAll('Alpha', 'Beta');
   await editPage.savePage();
-  await editPage.closeEditor();
+  await editPage.publishDraft();
 
   const content = await viewPage.getContent();
   test.expect(content).toContain('Beta paragraph');
@@ -1190,7 +1190,7 @@ test.describe('Authenticated', () => {
     await metadataDialog.submit();
 
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     await movePageByPath(page, {
       path: `${sourceParentTitle}/${renamedChildTitle}`,
@@ -1303,7 +1303,7 @@ test.describe('Authenticated', () => {
     const editPage = new EditPage(page);
     await editPage.writeContent('```ts\nconst answer = 42;\nconsole.log(answer);\n```');
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     const copyButton = page.locator('button[data-testid="markdown-code-copy-button"]').first();
     await copyButton.waitFor({ state: 'visible' });
@@ -1359,7 +1359,7 @@ for the page edited at ${new Date().toISOString()}
     const editPage = new EditPage(page);
     await editPage.writeContent(newContent);
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     const content = await viewPage.getContent();
     test.expect(content).toContain('This is the new content!');
@@ -1403,7 +1403,7 @@ for the page edited at ${new Date().toISOString()}
       state: 'visible',
     });
 
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     const content = await viewPage.getContent();
     test.expect(content).toContain('Original content before concurrent edit.');
@@ -2339,7 +2339,7 @@ First reference[^leafwiki] and second reference[^leafwiki]
     await editPage.uploadAsset(currentDir + '/../assets/upload-test.png');
     await editPage.insertFirstAssetIntoPage();
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
     await treeView.clickPageByTitle(title);
     await expect(page.locator('article > h1')).toHaveText(title);
 
@@ -2526,7 +2526,7 @@ graph TD;
     const editPage = new EditPage(page);
     await editPage.writeContent(mermaidContent);
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     // expects at least one SVG element (the mermaid diagram)
     const svgCount = await viewPage.amountOfSVGElements();
@@ -2598,7 +2598,7 @@ graph TD;
     const editPage = new EditPage(page);
     await editPage.writeContent(content);
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     const inlineCode = page.locator('article code.inline-code').first();
     await inlineCode.waitFor({ state: 'visible' });
@@ -2916,7 +2916,7 @@ Paragraph outside the list.
     const editPage = new EditPage(page);
     await editPage.writeContent(`[${siblingTitle}](../${siblingTitle})`);
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     await movePageByPath(page, {
       path: `${parentTitle}/${childTitle}`,
@@ -3065,7 +3065,7 @@ Paragraph outside the list.
     const editPage = new EditPage(page);
     await editPage.writeContent(`[${targetTitle}](/${parentTitle}/${targetTitle})`);
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     await expect
       .poll(
@@ -3283,7 +3283,7 @@ Paragraph outside the list.
     const editPage = new EditPage(page);
     await editPage.writeContent(`[${targetTitle}](/${targetTitle})`);
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     await treeView.clickPageByTitle(targetTitle);
     await viewPage.clickDeletePageButton();
@@ -3361,7 +3361,7 @@ Paragraph outside the list.
     const editPage = new EditPage(page);
     await editPage.writeContent(content);
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     // switch to search tab
     await viewPage.switchToSearchTab();
@@ -3617,7 +3617,7 @@ Paragraph outside the list.
     const editPage = new EditPage(page);
     await editPage.writeContent('[' + linkLabel + '](../' + targetTitle + ')');
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     await page.getByRole('link', { name: linkLabel }).click();
     await page.waitForURL(new RegExp('/' + parentTitle + '/' + targetTitle + '$'));
@@ -3762,7 +3762,7 @@ Paragraph outside the list.
     await metadataDialog.submit();
 
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     await page.waitForURL(new RegExp('/' + expectedPath + '$'));
   });
@@ -3821,7 +3821,7 @@ Paragraph outside the list.
     // Insert first asset into page
     await editPage.insertFirstAssetIntoPage();
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
     viewPage = new ViewPage(page);
     await viewPage.amountOfImages().then((count) => {
       test.expect(count).toBeGreaterThan(0);
@@ -4029,7 +4029,7 @@ Outro paragraph`;
     await editPage.uploadAsset(currentDir + '/../assets/upload-test.png');
     await editPage.insertFirstAssetIntoPage();
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     await viewPage.amountOfImages().then((count) => {
       test.expect(count).toBeGreaterThan(0);
@@ -4083,13 +4083,13 @@ Outro paragraph`;
     const editPage = new EditPage(page);
     await editPage.writeContent(firstRevisionContent);
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
 
     viewPage = new ViewPage(page);
     await viewPage.clickEditPageButton();
     await editPage.writeContent(`\n${secondRevisionContent}`);
     await editPage.savePage();
-    await editPage.closeEditor();
+    await editPage.publishDraft();
     await treeView.clickPageByTitle(title);
     await expect(page.locator('article > h1')).toHaveText(title);
 
