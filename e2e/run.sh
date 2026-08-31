@@ -9,6 +9,7 @@ app_url="${E2E_BASE_URL:-http://localhost:${app_port}}"
 run_mode="${E2E_RUN_MODE:-docker}"
 server_pid=""
 server_log=""
+server_bin=""
 local_data_dir=""
 docker_data_volume=""
 
@@ -102,12 +103,24 @@ start_local() {
 
   local_data_dir="$(mktemp -d /tmp/leafwiki-e2e-data.XXXXXX)"
   server_log="$(mktemp /tmp/leafwiki-e2e-server.XXXXXX.log)"
+  server_bin="$(mktemp /tmp/leafwiki-e2e-bin.XXXXXX)"
+
+  # Build the binary first, then run it directly in the background. Using
+  # `go run` here would make `$!` the PID of the `go run` wrapper, not of the
+  # compiled server it execs as a child — so `stop_local`'s `kill` would leave
+  # the real server orphaned, holding the port after the script exits.
+  echo "🔨 Building leafwiki binary for local E2E run..."
+  (
+    cd "$repo_root"
+    go build \
+      -ldflags="-X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production -X github.com/perber/wiki/internal/wiki/auth.DisableRefreshTokenRateLimit=true" \
+      -o "$server_bin" \
+      ./cmd/leafwiki
+  )
 
   (
     cd "$repo_root"
-    go run \
-      -ldflags="-X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production -X github.com/perber/wiki/internal/wiki/auth.DisableRefreshTokenRateLimit=true" \
-      ./cmd/leafwiki \
+    exec "$server_bin" \
       --host 127.0.0.1 \
       --port "$app_port" \
       --data-dir "$local_data_dir" \
@@ -136,6 +149,10 @@ stop_local() {
 
   if [ -n "$server_log" ] && [ -f "$server_log" ]; then
     rm -f "$server_log"
+  fi
+
+  if [ -n "$server_bin" ] && [ -f "$server_bin" ]; then
+    rm -f "$server_bin"
   fi
 }
 
