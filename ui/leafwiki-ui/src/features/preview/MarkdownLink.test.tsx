@@ -120,4 +120,29 @@ describe('MarkdownLink wikilink-notfound', () => {
       initialTitle: 'Foo',
     })
   })
+
+  it('becomes a link when the target appears in the tree', () => {
+    render(
+      <MemoryRouter>
+        <MarkdownLink href="/target" path="current">
+          Target
+        </MarkdownLink>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('button', { name: 'Target' })).toBeInTheDocument()
+
+    act(() => {
+      const target = makePage('target-1', 'target', null)
+      useTreeStore.setState({
+        byId: { 'target-1': target },
+        byPath: { target },
+      })
+    })
+
+    expect(screen.getByRole('link', { name: 'Target' })).toHaveAttribute(
+      'href',
+      '/target',
+    )
+  })
 })
