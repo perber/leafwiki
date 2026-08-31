@@ -183,6 +183,13 @@ func (m *Manager) CurrentConfig() (Config, error) {
 // EnvManaged reports whether the backup is driven by flags/env.
 func (m *Manager) EnvManaged() bool { return m.envManaged }
 
+// CanStoreSecrets reports whether the settings store has an encryption key, so
+// the UI can tell an admin up front that credential fields are unavailable
+// (e.g. under --disable-auth there is no JWT secret to derive a key from).
+func (m *Manager) CanStoreSecrets() bool {
+	return m.store != nil && m.store.CanEncrypt()
+}
+
 // Enabled reports whether a backup is currently running.
 func (m *Manager) Enabled() bool {
 	m.mu.Lock()

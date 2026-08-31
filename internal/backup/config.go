@@ -75,6 +75,11 @@ func (c Config) ValidateForSettings() error {
 	return ValidateRemoteCredentials(c.RemoteURL, c.SSHKey, c.SSHKeyPath, c.HTTPUsername, c.HTTPPassword)
 }
 
+// RedactRemoteURL masks any credentials embedded in a remote URL
+// (https://user:token@host/…) for safe logging and display. Non-URL remotes
+// (git@host:path) are returned unchanged.
+func RedactRemoteURL(remote string) string { return redactRemote(remote) }
+
 // ValidateRemoteCredentials checks that the remote URL is a supported transport
 // (SSH or HTTP(S)) and that credentials matching that transport are present:
 // HTTP(S) remotes need a username + password/token (or credentials embedded in
