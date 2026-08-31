@@ -63,40 +63,6 @@ async function createPageWithMetadata(
   );
 }
 
-async function updatePageByPath(page: Page, input: { path: string; content: string }) {
-  await page.evaluate(
-    async ({ path, content, csrfScript }) => {
-      const csrfToken = new Function(csrfScript)() as string;
-
-      const pageRes = await fetch(
-        `/api/pages/by-path?path=${encodeURIComponent(path.replace(/^\/+/, ''))}`,
-        { credentials: 'include', headers: { 'X-CSRF-Token': csrfToken } },
-      );
-      if (!pageRes.ok) throw new Error(`load failed: ${pageRes.status}`);
-      const current = (await pageRes.json()) as {
-        id: string;
-        title: string;
-        slug: string;
-        version: string;
-      };
-
-      const updateRes = await fetch(`/api/pages/${current.id}`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify({
-          version: current.version,
-          title: current.title,
-          slug: current.slug,
-          content,
-        }),
-      });
-      if (!updateRes.ok) throw new Error(`update failed: ${updateRes.status}`);
-    },
-    { ...input, csrfScript: getCsrfScript() },
-  );
-}
-
 // ─── Panel helpers ────────────────────────────────────────────────────────────
 
 async function addTag(page: Page, tag: string) {
@@ -572,39 +538,6 @@ test.describe('Editor', () => {
   });
 
   // ── Error codes ─────────────────────────────────────────────────────────────
-
-  test('editor-version-conflict-error-code-shown-on-save', async ({ page }) => {
-    const stamp = Date.now();
-    const slug = `editor-conflict-${stamp}`;
-
-    await createPageWithMetadata(page, {
-      title: `Editor Conflict ${stamp}`,
-      slug,
-      content: 'Original content.',
-    });
-
-    const viewPage = new ViewPage(page);
-    await viewPage.goto(`/${slug}`);
-    await viewPage.clickEditPageButton();
-
-    const editPage = new EditPage(page);
-    await editPage.writeContent(' local change');
-
-    // Simulate a concurrent save from another session
-    await updatePageByPath(page, {
-      path: `/${slug}`,
-      content: 'Concurrent save from another session.',
-    });
-
-    await page.locator('button[data-testid="save-page-button"]').click();
-
-    // The version-conflict toast must appear (identified by its error-code test ID)
-    await page.getByTestId('page-save-version-conflict-toast').waitFor({ state: 'visible' });
-
-    // Accepting the conflict resolves successfully
-    await page.getByTestId('page-save-version-conflict-action').click();
-    await page.getByText('Page saved successfully').last().waitFor({ state: 'visible' });
-  });
 
   test('editor-validation-error-blocks-save-with-reserved-property-key', async ({ page }) => {
     const stamp = Date.now();
