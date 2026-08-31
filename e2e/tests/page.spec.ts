@@ -1001,32 +1001,6 @@ test.describe('Authenticated', () => {
     await treeView.expectNumberOfTreeNodes(curNodeCount + 2);
   });
 
-  test('edit-page-metadata-keeps-existing-slug', async ({ page }) => {
-    const slug = `metadata-stable-${Date.now()}`;
-    const title = `Metadata Stable ${Date.now()}`;
-
-    await createPageWithContent(page, {
-      title,
-      slug,
-      content: 'Metadata regression guard',
-    });
-
-    const viewPage = new ViewPage(page);
-    await viewPage.goto(`/${slug}`);
-    await viewPage.clickEditPageButton();
-
-    const editPage = new EditPage(page);
-    await editPage.openMetadataDialog();
-
-    const editPageMetadataDialog = new EditPageMetadataDialog(page);
-    await editPageMetadataDialog.expectSlug(slug);
-
-    await page.keyboard.press('Escape');
-    await page.locator('[data-testid="edit-page-metadata-dialog"]').waitFor({
-      state: 'hidden',
-    });
-  });
-
   test('tags-panel-suggests-tags-and-lists-matching-pages', async ({ page }) => {
     const stamp = Date.now();
     const matchingTag = `e2e-tags-${stamp}`;
@@ -1112,17 +1086,12 @@ test.describe('Authenticated', () => {
       state: 'hidden',
     });
 
-    await viewPage.clickEditPageButton();
-    const editPage = new EditPage(page);
-    await editPage.openMetadataDialog();
+    await treeView.openRenameDialogForPage(childTitle, sourceParentTitle);
 
     const metadataDialog = new EditPageMetadataDialog(page);
     await metadataDialog.fillTitle(renamedChildTitle);
     await metadataDialog.expectSlug(renamedChildTitle);
     await metadataDialog.submit();
-
-    await editPage.savePage();
-    await editPage.publishDraft();
 
     await movePageByPath(page, {
       path: `${sourceParentTitle}/${renamedChildTitle}`,
@@ -3618,7 +3587,7 @@ Paragraph outside the list.
     test.expect(await page.locator('.cm-editor').isVisible()).toBeTruthy();
   });
 
-  test('edit-metadata-on-nested-page-keeps-parent-path', async ({ page }) => {
+  test('rename-dialog-on-nested-page-keeps-parent-path', async ({ page }) => {
     const suffix = Date.now();
     const parentTitle = 'meta-parent-' + suffix;
     const childTitle = 'meta-child-' + suffix;
@@ -3636,20 +3605,13 @@ Paragraph outside the list.
     await treeView.expandNodeByTitle(parentTitle);
     await treeView.clickPageByTitle(childTitle);
 
-    const viewPage = new ViewPage(page);
-    await viewPage.clickEditPageButton();
-
-    const editPage = new EditPage(page);
-    await editPage.openMetadataDialog();
+    await treeView.openRenameDialogForPage(childTitle, parentTitle);
 
     const metadataDialog = new EditPageMetadataDialog(page);
     await metadataDialog.fillTitle(renamedChildTitle);
     await metadataDialog.expectSlug(renamedChildTitle);
     await metadataDialog.expectPath(expectedPath);
     await metadataDialog.submit();
-
-    await editPage.savePage();
-    await editPage.publishDraft();
 
     await page.waitForURL(new RegExp('/' + expectedPath + '$'));
   });
