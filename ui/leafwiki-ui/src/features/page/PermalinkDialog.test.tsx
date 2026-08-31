@@ -38,7 +38,7 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
-const copyMock = vi.fn(() => true)
+const copyMock = vi.fn<(text: string) => boolean>(() => true)
 vi.mock('copy-to-clipboard', () => ({
   default: (text: string) => copyMock(text),
 }))
@@ -72,6 +72,8 @@ describe('PermalinkDialog', () => {
     await user.click(screen.getByTestId('permalink-dialog-copy-button'))
 
     expect(copyMock).toHaveBeenCalledTimes(1)
-    expect(copyMock.mock.calls[0][0]).toContain('/p/abc123/my-page')
+    expect(copyMock).toHaveBeenCalledWith(
+      expect.stringContaining('/p/abc123/my-page'),
+    )
   })
 })
