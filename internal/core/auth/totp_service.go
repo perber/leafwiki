@@ -7,15 +7,13 @@
 package auth
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base32"
-	"encoding/base64"
 	"fmt"
 	"strings"
 	"time"
 
+	sharedcrypto "github.com/perber/wiki/internal/core/shared/crypto"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 	"golang.org/x/crypto/bcrypt"
@@ -33,9 +31,9 @@ const (
 )
 
 // TOTPService is safe for concurrent use; it holds no mutable state beyond the
-// AES-GCM cipher derived once from the configured encryption key.
+// AES-GCM secret box derived once from the configured encryption key.
 type TOTPService struct {
-	gcm cipher.AEAD
+	box *sharedcrypto.SecretBox
 }
 
 // NewTOTPService creates a TOTPService that encrypts/decrypts TOTP secrets
@@ -45,15 +43,11 @@ func NewTOTPService(encryptionKey []byte) (*TOTPService, error) {
 	if len(encryptionKey) < MinTOTPEncryptionKeyLen {
 		return nil, fmt.Errorf("TOTP encryption key must be at least %d bytes, got %d", MinTOTPEncryptionKeyLen, len(encryptionKey))
 	}
-	block, err := aes.NewCipher(encryptionKey[:MinTOTPEncryptionKeyLen])
+	box, err := sharedcrypto.NewSecretBox(encryptionKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize TOTP secret cipher: %w", err)
 	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize TOTP secret cipher: %w", err)
-	}
-	return &TOTPService{gcm: gcm}, nil
+	return &TOTPService{box: box}, nil
 }
 
 // GeneratedSecret carries a freshly generated TOTP secret in the forms the
@@ -165,27 +159,9 @@ func VerifyRecoveryCode(code string, hashes []string) (matchedIndex int, ok bool
 }
 
 func (s *TOTPService) encrypt(plaintext string) (string, error) {
-	nonce := make([]byte, s.gcm.NonceSize())
-	if _, err := rand.Read(nonce); err != nil {
-		return "", fmt.Errorf("failed to generate nonce for TOTP secret encryption: %w", err)
-	}
-	ciphertext := s.gcm.Seal(nonce, nonce, []byte(plaintext), nil)
-	return base64.StdEncoding.EncodeToString(ciphertext), nil
+	return s.box.Seal(plaintext)
 }
 
 func (s *TOTPService) decrypt(encoded string) (string, error) {
-	data, err := base64.StdEncoding.DecodeString(encoded)
-	if err != nil {
-		return "", fmt.Errorf("failed to decode encrypted TOTP secret: %w", err)
-	}
-	nonceSize := s.gcm.NonceSize()
-	if len(data) < nonceSize {
-		return "", fmt.Errorf("encrypted TOTP secret is too short")
-	}
-	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
-	plaintext, err := s.gcm.Open(nil, nonce, ciphertext, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to decrypt TOTP secret: %w", err)
-	}
-	return string(plaintext), nil
+	return s.box.Open(encoded)
 }

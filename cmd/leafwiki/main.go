@@ -690,35 +690,7 @@ func resolveLogoutURL(logoutURL, deprecated string) (resolved string, usedDeprec
 // a private key. An empty remote means local-only backup and needs no
 // credentials at all.
 func validateGitBackupRemote(remote, sshKey, sshKeyPath, httpUsername, httpPassword string) error {
-	if remote == "" {
-		return nil
-	}
-	lower := strings.ToLower(remote)
-
-	switch {
-	case strings.HasPrefix(lower, "http://"), strings.HasPrefix(lower, "https://"):
-		if httpUsername == "" && httpPassword == "" {
-			// Credentials may instead be embedded in the URL
-			// (https://user:token@host/repo.git), which git supports natively.
-			if parsed, err := url.Parse(remote); err == nil && parsed.User != nil {
-				return nil
-			}
-			return fmt.Errorf("--git-backup-http-username and --git-backup-http-password are required when --git-backup-remote is an HTTP(S) URL. Use LEAFWIKI_GIT_BACKUP_HTTP_USERNAME or LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD")
-		}
-		if httpUsername == "" || httpPassword == "" {
-			return fmt.Errorf("--git-backup-http-username and --git-backup-http-password must both be set; got only one of them")
-		}
-		return nil
-
-	case strings.HasPrefix(lower, "git@"), strings.HasPrefix(lower, "ssh://"):
-		if sshKey == "" && sshKeyPath == "" {
-			return fmt.Errorf("--git-backup-ssh-key or --git-backup-ssh-key-path is required when --git-backup-remote is set. Use LEAFWIKI_GIT_BACKUP_SSH_KEY or LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH")
-		}
-		return nil
-
-	default:
-		return fmt.Errorf("--git-backup-remote must be an SSH URL (e.g. git@github.com:user/repo.git or ssh://...) or an HTTP(S) URL (e.g. https://github.com/user/repo.git)")
-	}
+	return backup.ValidateRemoteCredentials(remote, sshKey, sshKeyPath, httpUsername, httpPassword)
 }
 
 func validateRedirectURL(flagName, url string) error {
