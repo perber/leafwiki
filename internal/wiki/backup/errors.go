@@ -3,12 +3,12 @@ package wikibackup
 import "github.com/gin-gonic/gin"
 
 const (
-	ErrCodeBackupNotEnabled       = "backup_not_enabled"
-	ErrCodeBackupInternalError    = "backup_internal_error"
-	ErrCodeBackupEnvManaged       = "backup_env_managed"
-	ErrCodeBackupInvalidConfig    = "backup_invalid_config"
+	ErrCodeBackupNotEnabled        = "backup_not_enabled"
+	ErrCodeBackupInternalError     = "backup_internal_error"
+	ErrCodeBackupEnvManaged        = "backup_env_managed"
+	ErrCodeBackupInvalidConfig     = "backup_invalid_config"
 	ErrCodeBackupRemoteUnreachable = "backup_remote_unreachable"
-	ErrCodeBackupNoEncryptionKey  = "backup_no_encryption_key"
+	ErrCodeBackupNoEncryptionKey   = "backup_no_encryption_key"
 )
 
 // BackupErrorResponse is the structured JSON error body returned by backup endpoints.
