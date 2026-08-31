@@ -176,6 +176,7 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 			})
 		w.ensureBaselineRevisions()
 	}
+	w.metrics.RegisterRuntimeStats(runtimeStatsSource{w: w})
 	w.buildRoutes(options)
 	return w, nil
 }
