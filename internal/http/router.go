@@ -124,7 +124,8 @@ type RouterOptions struct {
 	EnableLinkRefactor      bool                     // Whether the link refactoring feature is enabled in the frontend
 	EnableAPIKeyManagement  bool                     // Whether the experimental API key management feature is enabled
 	Metrics                 *httpmetrics.HTTPMetrics // Optional Prometheus HTTP metrics collector; nil disables request instrumentation
-	GitBackupEnabled        bool                     // Whether git backup is enabled (surfaced to admin UI via /api/config)
+	GitBackupEnabled        bool                     // Whether git backup is currently running (surfaced to admin UI via /api/config)
+	GitBackupEnvManaged     bool                     // Whether git backup is configured via flags/env (settings UI is status-only); surfaced via /api/config
 	SnapshotEnabled         bool                     // Whether full-backup (snapshot) is enabled (surfaced to admin UI via /api/config)
 	SMTPEnabled             bool                     // Whether SMTP (password reset / user invite email) is configured (surfaced to UI via /api/config)
 	TOTPAvailable           bool                     // Whether a TOTP encryption key is configured, i.e. TOTP self-service can be offered (surfaced to UI via /api/config)

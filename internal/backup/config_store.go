@@ -60,6 +60,10 @@ func NewConfigStore(dataDir string, box *sharedcrypto.SecretBox) *ConfigStore {
 // Path returns the absolute path of the backing file (useful for logging).
 func (s *ConfigStore) Path() string { return s.path }
 
+// CanEncrypt reports whether the store has an encryption key, i.e. whether
+// configs carrying secrets can be saved.
+func (s *ConfigStore) CanEncrypt() bool { return s.box != nil }
+
 // Exists reports whether git-backup.json is present on disk.
 func (s *ConfigStore) Exists() bool {
 	_, err := os.Stat(s.path)

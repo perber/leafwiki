@@ -19,6 +19,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	backupSvc "github.com/perber/wiki/internal/backup"
+	sharedcrypto "github.com/perber/wiki/internal/core/shared/crypto"
 	gossh "golang.org/x/crypto/ssh"
 )
 
@@ -68,7 +69,7 @@ func TestHandleTriggerPull_Success(t *testing.T) {
 		t.Fatalf("Init failed: %v", err)
 	}
 
-	routes := &Routes{repo: repo}
+	routes := &Routes{mgr: backupSvc.NewEnvManager(repo, nil)}
 	c, rec := newTestGinContext()
 
 	routes.handleTriggerPull(c)
@@ -173,7 +174,7 @@ func TestHandleTriggerPull_ErrorHasEmptyTemplate(t *testing.T) {
 		t.Fatalf("WriteFile local change: %v", err)
 	}
 
-	routes := &Routes{repo: repo}
+	routes := &Routes{mgr: backupSvc.NewEnvManager(repo, nil)}
 	c, rec := newTestGinContext()
 
 	routes.handleTriggerPull(c)
@@ -192,4 +193,154 @@ func TestHandleTriggerPull_ErrorHasEmptyTemplate(t *testing.T) {
 	if !strings.Contains(body.Error.Message, "conflict") {
 		t.Errorf("expected message to contain the conflict detail, got %q", body.Error.Message)
 	}
+}
+
+// ─── settings-mode config endpoints ────────────────────────────────────────
+
+func ginPOSTJSON(t *testing.T, path, body string) (*gin.Context, *httptest.ResponseRecorder) {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	return c, rec
+}
+
+func settingsRoutes(t *testing.T) *Routes {
+	t.Helper()
+	dataDir := t.TempDir()
+	rootDir := filepath.Join(dataDir, "root")
+	assetsDir := filepath.Join(dataDir, "assets")
+	if err := os.MkdirAll(rootDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.MkdirAll(assetsDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	key, _ := sharedcrypto.DeriveKey([]byte("test-secret"), "leafwiki:git-backup-credentials:v1")
+	box, _ := sharedcrypto.NewSecretBox(key)
+	store := backupSvc.NewConfigStore(dataDir, box)
+	mgr, err := backupSvc.NewSettingsManager(store, rootDir, assetsDir)
+	if err != nil {
+		t.Fatalf("NewSettingsManager: %v", err)
+	}
+	t.Cleanup(mgr.Stop)
+	return &Routes{mgr: mgr}
+}
+
+func TestHandleSaveBackupConfig_EnvManaged_Returns409(t *testing.T) {
+	bareDir := t.TempDir()
+	if _, err := gogit.PlainInit(bareDir, true); err != nil {
+		t.Fatalf("PlainInit: %v", err)
+	}
+	tmp := t.TempDir()
+	rootDir := filepath.Join(tmp, "root")
+	assetsDir := filepath.Join(tmp, "assets")
+	_ = os.MkdirAll(rootDir, 0o755)
+	_ = os.MkdirAll(assetsDir, 0o755)
+	repo, err := backupSvc.Init(backupSvc.Config{
+		RootDir: rootDir, AssetsDir: assetsDir, AuthorName: "T", AuthorEmail: "t@t.com", Branch: "main",
+	})
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	routes := &Routes{mgr: backupSvc.NewEnvManager(repo, nil)}
+
+	c, rec := ginPOSTJSON(t, "/api/admin/backup/config", `{"remoteUrl":"https://example.com/r.git","httpUsername":"u","httpPassword":"p","intervalMinutes":30}`)
+	routes.handleSaveBackupConfig(c)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d, body: %s", rec.Code, rec.Body.String())
+	}
+	var body BackupErrorResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if body.Error.Code != ErrCodeBackupEnvManaged {
+		t.Fatalf("expected code %q, got %q", ErrCodeBackupEnvManaged, body.Error.Code)
+	}
+}
+
+func TestHandleSaveBackupConfig_IntervalOutOfRange_Returns400(t *testing.T) {
+	routes := settingsRoutes(t)
+	c, rec := ginPOSTJSON(t, "/api/admin/backup/config", `{"remoteUrl":"https://example.com/r.git","httpUsername":"u","httpPassword":"p","intervalMinutes":1}`)
+	routes.handleSaveBackupConfig(c)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for a 1-minute interval, got %d, body: %s", rec.Code, rec.Body.String())
+	}
+	var body BackupErrorResponse
+	_ = json.Unmarshal(rec.Body.Bytes(), &body)
+	if body.Error.Code != ErrCodeBackupInvalidConfig {
+		t.Fatalf("expected %q, got %q", ErrCodeBackupInvalidConfig, body.Error.Code)
+	}
+}
+
+func TestHandleSaveBackupConfig_UnreachableRemote_Returns400AndPersistsNothing(t *testing.T) {
+	routes := settingsRoutes(t)
+	// Well-formed HTTPS URL (passes ValidateForSettings) that cannot connect,
+	// so the failure comes from TestRemote, not validation.
+	c, rec := ginPOSTJSON(t, "/api/admin/backup/config",
+		`{"remoteUrl":"https://127.0.0.1:1/nope.git","httpUsername":"u","httpPassword":"p","intervalMinutes":30}`)
+	routes.handleSaveBackupConfig(c)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for an unreachable remote, got %d, body: %s", rec.Code, rec.Body.String())
+	}
+	var body BackupErrorResponse
+	_ = json.Unmarshal(rec.Body.Bytes(), &body)
+	if body.Error.Code != ErrCodeBackupRemoteUnreachable {
+		t.Fatalf("expected %q, got %q", ErrCodeBackupRemoteUnreachable, body.Error.Code)
+	}
+	if routes.mgr.Enabled() {
+		t.Fatal("backup must not be enabled after a failed save")
+	}
+	if cur, _ := routes.mgr.CurrentConfig(); cur.RemoteURL != "" {
+		t.Fatal("nothing should have been persisted after a failed save")
+	}
+}
+
+func TestHandleGetBackupConfig_RedactsSecrets(t *testing.T) {
+	routes := settingsRoutes(t)
+
+	// Bring a backup up directly (Manager.Reconfigure skips the URL-scheme
+	// validation, so we can point at a local bare repo) then check the GET.
+	bareDir := t.TempDir()
+	if _, err := gogit.PlainInit(bareDir, true); err != nil {
+		t.Fatalf("PlainInit: %v", err)
+	}
+	if err := routes.mgr.Reconfigure(backupSvc.Config{
+		RemoteURL: "file://" + bareDir,
+		Branch:    "main",
+		SSHKey:    testEd25519PEM(t),
+		Interval:  30 * time.Minute,
+	}); err != nil {
+		t.Fatalf("Reconfigure: %v", err)
+	}
+
+	get, getRec := ginPOSTJSON(t, "/api/admin/backup/config", "")
+	routes.handleGetBackupConfig(get)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("get failed: %d", getRec.Code)
+	}
+	body := getRec.Body.String()
+	if strings.Contains(body, "PRIVATE KEY") {
+		t.Fatalf("GET /backup/config leaked the SSH key:\n%s", body)
+	}
+	if !strings.Contains(body, `"hasSshKey":true`) {
+		t.Fatalf("expected hasSshKey:true in response, got:\n%s", body)
+	}
+}
+
+func testEd25519PEM(t *testing.T) string {
+	t.Helper()
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+	block, err := gossh.MarshalPrivateKey(priv, "")
+	if err != nil {
+		t.Fatalf("MarshalPrivateKey: %v", err)
+	}
+	return string(pem.EncodeToMemory(block))
 }

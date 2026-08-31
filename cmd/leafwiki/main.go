@@ -25,6 +25,7 @@ import (
 	"github.com/perber/wiki/internal/backup"
 	"github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/core/email"
+	sharedcrypto "github.com/perber/wiki/internal/core/shared/crypto"
 	"github.com/perber/wiki/internal/core/ignore"
 	"github.com/perber/wiki/internal/core/tools"
 	httpinternal "github.com/perber/wiki/internal/http"
@@ -278,8 +279,16 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		}
 	}()
 
-	// Initialize git backup if enabled
-	var backupScheduler *backup.Scheduler
+	// Initialize git backup. Two modes:
+	//   * env-managed: --git-backup / LEAFWIKI_GIT_BACKUP is set. Config comes
+	//     from flags/env; the settings UI is status-only (historical behaviour).
+	//   * settings-managed: otherwise. Config lives in <data-dir>/git-backup.json,
+	//     written by admins via /settings/backup, with credentials encrypted at
+	//     rest using a key derived from the JWT secret.
+	backupRootDir := filepath.Join(cfg.server.dataDir, "root")
+	backupAssetsDir := filepath.Join(cfg.server.dataDir, "assets")
+
+	var backupManager *backup.Manager
 	if cfg.backup.gitBackup {
 		if cfg.backup.gitBackupSSHKey != "" && os.Getenv("LEAFWIKI_GIT_BACKUP_SSH_KEY") == "" {
 			slog.Warn("SSH private key passed via --git-backup-ssh-key flag is visible in process listings; prefer the LEAFWIKI_GIT_BACKUP_SSH_KEY environment variable")
@@ -292,8 +301,8 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		}
 		backupRepo, err := backup.Init(backup.Config{
 			Enabled:           true,
-			RootDir:           filepath.Join(cfg.server.dataDir, "root"),
-			AssetsDir:         filepath.Join(cfg.server.dataDir, "assets"),
+			RootDir:           backupRootDir,
+			AssetsDir:         backupAssetsDir,
 			AuthorName:        cfg.backup.gitBackupAuthorName,
 			AuthorEmail:       cfg.backup.gitBackupAuthorEmail,
 			RemoteURL:         cfg.backup.gitBackupRemote,
@@ -308,10 +317,25 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		if err != nil {
 			fail("git backup init failed: %v", err)
 		}
-		backupScheduler = backup.NewScheduler(backupRepo)
-		defer backupScheduler.Stop()
-		w.SetBackupRoutes(wikibackup.NewRoutes(backupRepo, backupScheduler, w.AuthService()))
+		backupManager = backup.NewEnvManager(backupRepo, backup.NewScheduler(backupRepo))
+	} else {
+		var backupBox *sharedcrypto.SecretBox
+		if cfg.auth.jwtSecret != "" {
+			if key, kerr := sharedcrypto.DeriveKey([]byte(cfg.auth.jwtSecret), "leafwiki:git-backup-credentials:v1"); kerr == nil {
+				backupBox, _ = sharedcrypto.NewSecretBox(key)
+			}
+		}
+		m, merr := backup.NewSettingsManager(
+			backup.NewConfigStore(cfg.server.dataDir, backupBox),
+			backupRootDir, backupAssetsDir,
+		)
+		if merr != nil {
+			fail("git backup init failed: %v", merr)
+		}
+		backupManager = m
 	}
+	defer backupManager.Stop()
+	w.SetBackupRoutes(wikibackup.NewRoutes(backupManager, w.AuthService()))
 
 	// Initialize full backup snapshots if enabled
 	var writeGate *restore.WriteGate
@@ -379,7 +403,8 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		EnableLinkRefactor:      cfg.frontend.enableLinkRefactor,
 		EnableAPIKeyManagement:  cfg.frontend.enableAPIKeyManagement,
 		Metrics:                 metrics,
-		GitBackupEnabled:        cfg.backup.gitBackup,
+		GitBackupEnabled:        backupManager.Enabled(),
+		GitBackupEnvManaged:     backupManager.EnvManaged(),
 		SnapshotEnabled:         cfg.backup.snapshot,
 		SMTPEnabled:             smtpEnabled,
 		TOTPAvailable:           w.TOTPService() != nil,
