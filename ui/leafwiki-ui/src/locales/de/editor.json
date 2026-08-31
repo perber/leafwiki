@@ -1,8 +1,8 @@
 {
   "draft": {
-    "editing": "Entwurf bearbeiten",
-    "publish": "Entwurf veröffentlichen",
-    "discard": "Entwurf verwerfen",
+    "editing": "Bearbeiten",
+    "publish": "Veröffentlichen",
+    "discard": "Verwerfen",
     "discardTitle": "Diesen Entwurf verwerfen?",
     "discardDescription": "Dadurch wird die unveröffentlichte Arbeitskopie dauerhaft gelöscht.",
     "cancel": "Abbrechen",

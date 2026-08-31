@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -7,6 +7,7 @@ const reloadTree = vi.fn().mockResolvedValue(undefined)
 const publishDraft = vi.fn()
 const discardDraft = vi.fn()
 const getPathById = vi.fn()
+const registerToolbarActions = vi.fn()
 
 vi.mock('react-router', () => ({
   useLocation: () => ({ pathname: '/pending-drafts/pending-1/edit' }),
@@ -38,25 +39,16 @@ vi.mock('./pageEditorStore', () => ({
 }))
 vi.mock('./useAutoSave', () => ({ useAutoSave: () => ({ status: 'idle' }) }))
 vi.mock('./useNavigationGuard', () => ({ default: () => undefined }))
-vi.mock('./useToolbarActions', () => ({ useToolbarActions: () => undefined }))
+vi.mock('./useToolbarActions', () => ({
+  useToolbarActions: (actions: unknown) => registerToolbarActions(actions),
+}))
 vi.mock('./MarkdownEditor', () => ({ default: () => <div /> }))
 vi.mock('./PageFrontmatterPanel', () => ({
   PageFrontmatterPanel: () => <div />,
 }))
-vi.mock('@/components/ui/button', () => ({
-  Button: ({
-    children,
-    onClick,
-  }: {
-    children: ReactNode
-    onClick?: () => void
-  }) => <button onClick={onClick}>{children}</button>,
-}))
 vi.mock('@/components/ui/alert-dialog', () => ({
-  AlertDialog: ({ children }: { children: ReactNode }) => <>{children}</>,
-  AlertDialogTrigger: ({ children }: { children: ReactNode }) => (
-    <>{children}</>
-  ),
+  AlertDialog: ({ children, open }: { children: ReactNode; open?: boolean }) =>
+    open ? <>{children}</> : null,
   AlertDialogContent: ({ children }: { children: ReactNode }) => (
     <>{children}</>
   ),
@@ -116,6 +108,13 @@ function loadDraft(overrides: Record<string, unknown> = {}) {
   }
 }
 
+function toolbarActions() {
+  return registerToolbarActions.mock.lastCall?.[0] as {
+    publishDraft: () => void
+    discardDraft: () => void
+  }
+}
+
 describe('PageEditor draft lifecycle navigation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -127,7 +126,7 @@ describe('PageEditor draft lifecycle navigation', () => {
     publishDraft.mockResolvedValue(page)
     loadDraft()
     const { rerender } = render(<PageEditor />)
-    fireEvent.click(screen.getByText('draft.publish'))
+    toolbarActions().publishDraft()
     await waitFor(() =>
       expect(navigate).toHaveBeenCalledWith('/published', { replace: true }),
     )
@@ -135,7 +134,7 @@ describe('PageEditor draft lifecycle navigation', () => {
     navigate.mockClear()
     loadDraft({ isPendingDraft: true })
     rerender(<PageEditor />)
-    fireEvent.click(screen.getByText('draft.publish'))
+    toolbarActions().publishDraft()
     await waitFor(() =>
       expect(navigate).toHaveBeenCalledWith('/published', { replace: true }),
     )
@@ -145,7 +144,8 @@ describe('PageEditor draft lifecycle navigation', () => {
     discardDraft.mockResolvedValue(undefined)
     loadDraft()
     const { rerender } = render(<PageEditor />)
-    fireEvent.click(screen.getAllByText('draft.discard')[1])
+    act(() => toolbarActions().discardDraft())
+    fireEvent.click(screen.getByText('draft.discard'))
     await waitFor(() =>
       expect(navigate).toHaveBeenCalledWith('/published', { replace: true }),
     )
@@ -153,7 +153,8 @@ describe('PageEditor draft lifecycle navigation', () => {
     navigate.mockClear()
     loadDraft({ isPendingDraft: true, pendingParentId: 'parent-1' })
     rerender(<PageEditor />)
-    fireEvent.click(screen.getAllByText('draft.discard')[1])
+    act(() => toolbarActions().discardDraft())
+    fireEvent.click(screen.getByText('draft.discard'))
     await waitFor(() =>
       expect(navigate).toHaveBeenCalledWith('/parent', { replace: true }),
     )

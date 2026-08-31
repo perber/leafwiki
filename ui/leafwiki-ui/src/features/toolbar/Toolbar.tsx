@@ -17,8 +17,11 @@ const VISIBLE_BUTTONS = 2
 export function Toolbar() {
   const { t } = useTranslation('viewer')
   const buttons = useToolbarStore((state) => state.buttons)
-  const visibleButtons = buttons.slice(0, VISIBLE_BUTTONS)
-  const overflowButtons = buttons.slice(VISIBLE_BUTTONS)
+  const visibleCount = buttons.some((button) => button.id === 'publish-draft')
+    ? 4
+    : VISIBLE_BUTTONS
+  const visibleButtons = buttons.slice(0, visibleCount)
+  const overflowButtons = buttons.slice(visibleCount)
 
   return (
     <div className="flex items-center gap-1">
