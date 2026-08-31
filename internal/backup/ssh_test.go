@@ -36,7 +36,7 @@ func TestBuildSSHAuth_NoKeyConfigured_ReturnsError(t *testing.T) {
 	repo.cfg.SSHKey = ""
 	repo.cfg.SSHKeyPath = ""
 
-	_, err := repo.buildSSHAuth()
+	_, err := buildSSHAuth(repo.cfg)
 	if err == nil {
 		t.Fatal("expected error when neither SSHKey nor SSHKeyPath is set")
 	}
@@ -46,7 +46,7 @@ func TestBuildSSHAuth_InvalidPEM_ReturnsError(t *testing.T) {
 	repo := baseRepo(t)
 	repo.cfg.SSHKey = "not a valid PEM key"
 
-	_, err := repo.buildSSHAuth()
+	_, err := buildSSHAuth(repo.cfg)
 	if err == nil {
 		t.Fatal("expected error for invalid PEM data")
 	}
@@ -56,7 +56,7 @@ func TestBuildSSHAuth_SSHKeyPathNotFound_ReturnsError(t *testing.T) {
 	repo := baseRepo(t)
 	repo.cfg.SSHKeyPath = "/nonexistent/path/id_ed25519"
 
-	_, err := repo.buildSSHAuth()
+	_, err := buildSSHAuth(repo.cfg)
 	if err == nil {
 		t.Fatal("expected error when SSHKeyPath does not exist")
 	}
@@ -66,7 +66,7 @@ func TestBuildSSHAuth_ValidInlineKey_ReturnsAuth(t *testing.T) {
 	repo := baseRepo(t)
 	repo.cfg.SSHKey = testSSHKeyPEM
 
-	auth, err := repo.buildSSHAuth()
+	auth, err := buildSSHAuth(repo.cfg)
 	if err != nil {
 		t.Fatalf("expected no error for valid inline key, got: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestBuildSSHAuth_ValidKeyFile_ReturnsAuth(t *testing.T) {
 	repo := baseRepo(t)
 	repo.cfg.SSHKeyPath = keyFile
 
-	auth, err := repo.buildSSHAuth()
+	auth, err := buildSSHAuth(repo.cfg)
 	if err != nil {
 		t.Fatalf("expected no error for valid key file, got: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestBuildSSHAuth_KnownHostsPathMissing_ReturnsError(t *testing.T) {
 	repo.cfg.SSHKey = testSSHKeyPEM
 	repo.cfg.SSHKnownHostsPath = "/nonexistent/known_hosts"
 
-	_, err := repo.buildSSHAuth()
+	_, err := buildSSHAuth(repo.cfg)
 	if err == nil {
 		t.Fatal("expected error when SSHKnownHostsPath is configured but file does not exist")
 	}
