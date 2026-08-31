@@ -2958,7 +2958,7 @@ Paragraph outside the list.
       targetParentPath: '',
       rewriteLinks: true,
     });
-    await page.goto(toAppPath(`/${referrerTitle}`));
+    await viewPage.goto(`/${referrerTitle}`);
     await expect(page.locator('article').getByRole('link', { name: targetTitle })).toHaveAttribute(
       'href',
       toAppPath(`/${targetTitle}`),

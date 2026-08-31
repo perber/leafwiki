@@ -61,7 +61,7 @@ export function MarkdownLink({
   void node
   const { t } = useTranslation('viewer')
   const openDialog = useDialogsStore((s) => s.openDialog)
-  const getPageByPath = useTreeStore((s) => s.getPageByPath)
+  const pagesByPath = useTreeStore((s) => s.byPath)
   const getPageById = useTreeStore((s) => s.getPageById)
 
   const editMode = useAppMode() === 'edit'
@@ -106,9 +106,8 @@ export function MarkdownLink({
           onClick={async () => {
             // Create the new page in the same folder as the page containing
             // the link, not at the wiki root.
-            const currentPage = getPageByPath(
-              toWikiLookupPath(getCurrentWikiPath()),
-            )
+            const currentPage =
+              pagesByPath[toWikiLookupPath(getCurrentWikiPath())]
             const parentId = currentPage?.parentId ?? ''
             const folderPath = parentId
               ? (getPageById(parentId)?.path ?? '')
@@ -198,7 +197,7 @@ export function MarkdownLink({
     const normalizedTargetPath = toWikiLookupPath(normalizedHref)
 
     // Check if the page exists
-    const page = getPageByPath(normalizedTargetPath)
+    const page = pagesByPath[normalizedTargetPath]
     const pageExists = !!page
     if (!pageExists && !readOnly) {
       return (
