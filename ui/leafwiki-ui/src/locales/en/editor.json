@@ -1,8 +1,8 @@
 {
   "draft": {
-    "editing": "Editing draft",
-    "publish": "Publish draft",
-    "discard": "Discard draft",
+    "editing": "Editing",
+    "publish": "Publish",
+    "discard": "Discard",
     "discardTitle": "Discard this draft?",
     "discardDescription": "This permanently deletes the unpublished working copy.",
     "cancel": "Cancel",

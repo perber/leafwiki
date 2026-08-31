@@ -9,9 +9,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
 import { mapApiError, asApiLocalizedError } from '@/lib/api/errors'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { buildBrowserEditUrl, buildViewUrl } from '@/lib/routePath'
@@ -19,7 +17,7 @@ import { DIALOG_LINK_INSERT } from '@/lib/registries'
 import { getWikiTargetRoutePath } from '@/lib/wikiPath'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -39,6 +37,7 @@ export default function PageEditor() {
   const navigate = useNavigate()
   const editorRef = useRef<MarkdownEditorRef>(null)
   const skipNavigationGuardRef = useRef(false)
+  const [discardDialogOpen, setDiscardDialogOpen] = useState(false)
   const openDialog = useDialogsStore((s) => s.openDialog)
   const reloadTree = useTreeStore((s) => s.reloadTree)
   const savePage = usePageEditorStore((s) => s.savePage)
@@ -200,18 +199,6 @@ export default function PageEditor() {
     openDialog(DIALOG_LINK_INSERT, { editorRef, selectedText })
   }, [editorRef, openDialog])
 
-  // register toolbar actions
-  useToolbarActions({
-    savePage: () => handleSave(),
-    closePage: handleClose,
-    formatBold: () => editorRef.current?.insertWrappedText('**', '**'),
-    formatItalic: () => editorRef.current?.insertWrappedText('_', '_'),
-    formatInlineCode: () => editorRef.current?.insertWrappedText('`', '`'),
-    openLinkDialog,
-    insertHeading: (level) => editorRef.current?.insertHeading(level),
-    getEditorView: () => editorRef.current?.editorViewRef.current ?? null,
-  })
-
   // content changes in the editor are synced to the store
   const handleEditorChange = useCallback(
     (value: string) => {
@@ -261,6 +248,21 @@ export default function PageEditor() {
       )
   }, [discardDraft, reloadTree, t, navigate])
 
+  // register toolbar actions
+  useToolbarActions({
+    savePage: () => handleSave(),
+    closePage: handleClose,
+    publishDraft: handlePublishDraft,
+    discardDraft: () => setDiscardDialogOpen(true),
+    draftActionsDisabled: autoSaveStatus === 'saving',
+    formatBold: () => editorRef.current?.insertWrappedText('**', '**'),
+    formatItalic: () => editorRef.current?.insertWrappedText('_', '_'),
+    formatInlineCode: () => editorRef.current?.insertWrappedText('`', '`'),
+    openLinkDialog,
+    insertHeading: (level) => editorRef.current?.insertHeading(level),
+    getEditorView: () => editorRef.current?.editorViewRef.current ?? null,
+  })
+
   if (notFound) {
     return <Page404 targetPath={getWikiTargetRoutePath(pathname)} />
   }
@@ -277,56 +279,6 @@ export default function PageEditor() {
       <div className="page-editor">
         {initialPage && (
           <>
-            {isDraft && (
-              <div className="page-editor__draft-actions">
-                <>
-                  <span className="text-sm font-medium">
-                    {t('draft.editing')}
-                  </span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handlePublishDraft}
-                    disabled={autoSaveStatus === 'saving'}
-                  >
-                    {t('draft.publish')}
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={autoSaveStatus === 'saving'}
-                      >
-                        {t('draft.discard')}
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>
-                          {t('draft.discardTitle')}
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                          {t('draft.discardDescription')}
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>
-                          {t('draft.cancel')}
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          onClick={handleDiscardDraft}
-                        >
-                          {t('draft.discard')}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </>
-              </div>
-            )}
             <PageFrontmatterPanel
               tags={tags}
               fields={frontmatterFields}
@@ -345,6 +297,25 @@ export default function PageEditor() {
           </>
         )}
       </div>
+      <AlertDialog open={discardDialogOpen} onOpenChange={setDiscardDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('draft.discardTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('draft.discardDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('draft.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDiscardDraft}
+            >
+              {t('draft.discard')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

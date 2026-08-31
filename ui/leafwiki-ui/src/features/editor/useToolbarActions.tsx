@@ -11,7 +11,7 @@ import { HotKeyDefinition, useHotKeysStore } from '@/stores/hotkeys'
 import { closeSearchPanel, searchPanelOpen } from '@codemirror/search'
 import type { EditorView } from '@codemirror/view'
 import { completionStatus } from '@codemirror/autocomplete'
-import { Save, X, Cloud } from 'lucide-react'
+import { Cloud, Save, Trash2, Upload, X } from 'lucide-react'
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useUserSettingsStore } from '@/stores/userSettings'
@@ -23,6 +23,9 @@ import { isDirtyState } from './pageEditorStore'
 export interface ToolbarActionsOptions {
   savePage: () => void
   closePage: () => void
+  publishDraft: () => void
+  discardDraft: () => void
+  draftActionsDisabled: boolean
   formatBold: () => void
   formatItalic: () => void
   formatInlineCode: () => void
@@ -35,6 +38,9 @@ export interface ToolbarActionsOptions {
 export function useToolbarActions({
   savePage,
   closePage,
+  publishDraft,
+  discardDraft,
+  draftActionsDisabled,
   formatBold,
   formatItalic,
   formatInlineCode,
@@ -51,6 +57,7 @@ export function useToolbarActions({
   const unregisterHotkey = useHotKeysStore((s) => s.unregisterHotkey)
 
   const dirty = usePageEditorStore(isDirtyState)
+  const isDraft = usePageEditorStore((state) => state.isDraft)
   const autoSave = useUserSettingsStore((s) => s.autoSave)
   const toggleAutoSave = useUserSettingsStore((s) => s.toggleAutoSave)
   const isMacOS =
@@ -86,6 +93,31 @@ export function useToolbarActions({
       },
     ]
 
+    if (isDraft) {
+      buttons.push(
+        {
+          id: 'publish-draft',
+          label: t('draft.publish'),
+          hotkey: '',
+          icon: <Upload size={18} />,
+          variant: 'default',
+          disabled: draftActionsDisabled,
+          className: 'rounded-full!',
+          action: publishDraft,
+        },
+        {
+          id: 'discard-draft',
+          label: t('draft.discard'),
+          hotkey: '',
+          icon: <Trash2 size={18} />,
+          variant: 'destructive',
+          disabled: draftActionsDisabled,
+          className: 'rounded-full!',
+          action: discardDraft,
+        },
+      )
+    }
+
     if (!isMobile) {
       buttons.push({
         id: 'toggle-auto-save',
@@ -106,8 +138,12 @@ export function useToolbarActions({
     isMobile,
     setButtons,
     dirty,
+    isDraft,
     savePage,
     closePage,
+    publishDraft,
+    discardDraft,
+    draftActionsDisabled,
     autoSave,
     toggleAutoSave,
     isMacOS,

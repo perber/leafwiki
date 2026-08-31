@@ -1069,10 +1069,6 @@
     @apply text-error p-6 text-sm;
   }
 
-  .page-editor__draft-actions {
-    @apply border-surface-border bg-surface flex items-center gap-2 border-b px-3 py-2;
-  }
-
   .page-frontmatter-panel {
     @apply border-surface-border bg-surface mt-0 mb-0 border-b px-3;
   }
