@@ -2,6 +2,7 @@ import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
 import { NODE_KIND_SECTION, PageNode } from '@/lib/api/pages'
 import { DIALOG_ADD_PAGE } from '@/lib/registries'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
+import { buildPendingDraftEditUrl } from '@/lib/routePath'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { useDialogsStore } from '@/stores/dialogs'
@@ -36,6 +37,8 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
   )
   const isLoggedIn = useSessionStore((s) => s.user !== null)
   const isActive = isStoreActive
+  const isPendingDraft = node.draft === 'pending'
+  const isDraft = !!node.draft
 
   const handleLinkClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (
@@ -65,12 +68,12 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
   } = useDraggable({
     id: node.id,
     data: { node },
-    disabled: !dndEnabled,
+    disabled: !dndEnabled || isDraft,
   })
   const { setNodeRef: setDropRef } = useDroppable({
     id: node.id,
     data: { node },
-    disabled: !dndEnabled,
+    disabled: !dndEnabled || isDraft,
   })
   const setRowRef = (el: HTMLElement | null) => {
     setDragRef(el)
@@ -83,7 +86,9 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
   const linkText = (
     <div className={clsx('flex', 'tree-node__tooltip-parent')}>
       <Link
-        to={`/${node.path}`}
+        to={
+          isPendingDraft ? buildPendingDraftEditUrl(node.id) : `/${node.path}`
+        }
         state={createNavigationVisitState()}
         className="tree-node__link"
         data-testid={`tree-node-link-${node.id}`}
@@ -98,6 +103,22 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
         >
           {node.title || t('treeActions.untitledPage')}
         </span>
+        {node.draft && (
+          <span
+            className="text-muted-foreground ml-1 text-xs"
+            aria-label={t(
+              node.draft === 'pending'
+                ? 'treeActions.pendingDraftMarker'
+                : 'treeActions.draftMarker',
+            )}
+          >
+            {t(
+              node.draft === 'pending'
+                ? 'treeActions.pendingDraftMarker'
+                : 'treeActions.draftMarker',
+            )}
+          </span>
+        )}
       </Link>
     </div>
   )
@@ -108,7 +129,7 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
     <>
       <div
         ref={setRowRef}
-        {...(dndEnabled ? listeners : {})}
+        {...(dndEnabled && !isDraft ? listeners : {})}
         className={clsx('tree-node', {
           'tree-node--active': isActive,
           'tree-node--inactive': !isActive,
@@ -138,7 +159,7 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
         />
 
         <div className="tree-node__main">
-          {node.kind === NODE_KIND_SECTION && (
+          {(node.kind === NODE_KIND_SECTION || hasChildren) && (
             <ChevronUp
               data-testid={`tree-node-toggle-icon-${node.id}`}
               size={16}
@@ -146,21 +167,19 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
                 'tree-node__toggle--open': open,
                 'tree-node__toggle--closed': !open,
               })}
-              onClick={() =>
-                node.kind === NODE_KIND_SECTION && toggleNode(node.id)
-              }
+              onClick={() => toggleNode(node.id)}
             />
           )}
           {
             // add empty space to align with nodes that have children
-            node.kind !== NODE_KIND_SECTION && (
+            node.kind !== NODE_KIND_SECTION && !hasChildren && (
               <div className="tree-node__toggle-spacer" />
             )
           }
           {linkText}
           {(isMobile || hovered || isActionsMenuOpen) && (
             <div className={clsx('tree-node__actions', treeActionButtonStyle)}>
-              {!readOnlyMode && (
+              {!readOnlyMode && !isDraft && (
                 <>
                   <TreeViewActionButton
                     actionName="add"
@@ -180,7 +199,7 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
                   />
                 </>
               )}
-              {(!readOnlyMode || isLoggedIn) && (
+              {!isPendingDraft && (!readOnlyMode || isLoggedIn) && (
                 <TreeNodeActionsMenu node={node} />
               )}
             </div>

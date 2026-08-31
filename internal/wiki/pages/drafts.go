@@ -23,6 +23,40 @@ type pendingDraftResponse struct {
 	ParentID string    `json:"parentId"`
 }
 
+type draftSummaryResponse struct {
+	Drafts  []draftSummary        `json:"drafts"`
+	Pending []pendingDraftSummary `json:"pending"`
+}
+
+type draftSummary struct {
+	PageID string `json:"pageId"`
+}
+
+type pendingDraftSummary struct {
+	ID       string `json:"id"`
+	ParentID string `json:"parentId"`
+	Title    string `json:"title"`
+	Slug     string `json:"slug"`
+}
+
+func (r *Routes) handleListDrafts(c *gin.Context) {
+	active := r.drafts.List()
+	pending := r.drafts.ListPending()
+	response := draftSummaryResponse{
+		Drafts:  make([]draftSummary, 0, len(active)),
+		Pending: make([]pendingDraftSummary, 0, len(pending)),
+	}
+	for _, d := range active {
+		if _, err := r.treeService.GetPage(d.PageID); err == nil {
+			response.Drafts = append(response.Drafts, draftSummary{PageID: d.PageID})
+		}
+	}
+	for _, d := range pending {
+		response.Pending = append(response.Pending, pendingDraftSummary{ID: d.ID, ParentID: d.ParentID, Title: d.Title, Slug: d.Slug})
+	}
+	c.JSON(http.StatusOK, response)
+}
+
 func (r *Routes) pendingResponse(d *draft.PendingDraft) pendingDraftResponse {
 	path := d.Slug
 	if d.ParentID != "" && d.ParentID != "root" {
@@ -122,6 +156,13 @@ func (r *Routes) handleSavePendingDraft(c *gin.Context) {
 		respondWithDraftError(c, err)
 		return
 	}
+	if conflict, err := r.pendingDraftPathConflict(d.ID, d.ParentID, req.Slug); err != nil {
+		respondWithPageError(c, err)
+		return
+	} else if conflict {
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageSlugConflict, "Page already exists", "page already exists")
+		return
+	}
 	d.Title, d.Slug, d.Content, d.Tags = req.Title, req.Slug, req.Content, normalizeTagInputs(req.Tags)
 	if req.Properties == nil {
 		d.Properties = map[string]string{}
@@ -133,6 +174,29 @@ func (r *Routes) handleSavePendingDraft(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, r.pendingResponse(d))
+}
+
+func (r *Routes) pendingDraftPathConflict(excludeID, parentID, slug string) (bool, error) {
+	path := slug
+	if parentID != "" {
+		parent, err := r.treeService.GetPage(parentID)
+		if err == nil {
+			path = dto.BuildPathFromNode(parent.PageNode) + "/" + slug
+		} else if !errors.Is(err, tree.ErrPageNotFound) {
+			return false, err
+		}
+	}
+	if _, err := r.treeService.FindPageByRoutePath(path); err == nil {
+		return true, nil
+	} else if !errors.Is(err, tree.ErrPageNotFound) {
+		return false, err
+	}
+	for _, pending := range r.drafts.ListPending() {
+		if pending.ID != excludeID && pending.ParentID == parentID && pending.Slug == slug {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (r *Routes) handlePublishPendingDraft(c *gin.Context) {

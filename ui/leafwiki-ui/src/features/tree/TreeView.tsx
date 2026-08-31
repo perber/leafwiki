@@ -85,6 +85,11 @@ export default function TreeView() {
   useEffect(() => {
     if (!tree) return
     if (appMode === 'edit' && currentEditorPageId) {
+      for (const id of useTreeStore
+        .getState()
+        .getAncestors(currentEditorPageId)) {
+        openNode(id)
+      }
       openNode(currentEditorPageId)
       setActiveNodeId(currentEditorPageId)
       return

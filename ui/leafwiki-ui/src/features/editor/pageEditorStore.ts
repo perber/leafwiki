@@ -8,6 +8,7 @@ import {
   getDraft,
   getPendingDraft,
   getPageByPath,
+  NODE_KIND_PAGE,
   Page,
   publishDraft,
   publishPendingDraft,
@@ -377,6 +378,22 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
         if (asApiLocalizedError(err)?.code !== 'draft_not_found') {
           throw err
         }
+        if (canonicalPage.kind === NODE_KIND_PAGE) {
+          try {
+            const draft = await startDraft(canonicalPage.id)
+            page = draft.page
+            isDraft = true
+          } catch (startErr) {
+            if (asApiLocalizedError(startErr)?.code !== 'draft_exists') {
+              throw startErr
+            }
+            const draft = await getDraft(canonicalPage.id, signal)
+            page = draft.page
+            isDraft = true
+          }
+        }
+        if (signal.aborted) return
+        if (isDraft) await useTreeStore.getState().reloadTree({ silent: true })
       }
       const fields: EditorFrontmatterField[] = Object.entries(
         page.properties ?? {},

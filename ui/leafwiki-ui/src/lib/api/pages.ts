@@ -28,6 +28,7 @@ export type PageNode = {
   children: PageNode[] | null
   kind: 'page' | 'section'
   pinned?: boolean
+  draft?: 'active' | 'pending'
   metadata?: PageMetadata // optional metadata, because older API responses may not have it
 }
 
@@ -53,6 +54,11 @@ export type PendingDraftResponse = {
   page: Page
   pending: true
   parentId: string
+}
+
+export type DraftSummaryResponse = {
+  drafts: { pageId: string }[]
+  pending: { id: string; parentId: string; title: string; slug: string }[]
 }
 
 export type PermalinkTarget = {
@@ -147,6 +153,10 @@ export async function createPendingDraft(input: {
     method: 'POST',
     body: JSON.stringify(input),
   })) as PendingDraftResponse
+}
+
+export async function listDrafts(): Promise<DraftSummaryResponse> {
+  return (await fetchWithAuth('/api/pages/drafts')) as DraftSummaryResponse
 }
 
 export async function getPendingDraft(

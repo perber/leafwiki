@@ -9,7 +9,10 @@ export function useAppMode(): AppMode {
   const location = useLocation()
   const pathname = stripBasePath(location.pathname) ?? location.pathname
 
-  if (pathname.startsWith('/e/')) {
+  if (
+    pathname.startsWith('/e/') ||
+    (pathname.startsWith('/pending-drafts/') && pathname.endsWith('/edit'))
+  ) {
     return 'edit'
   }
 
