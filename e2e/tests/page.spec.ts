@@ -2851,46 +2851,6 @@ Paragraph outside the list.
     await expect(page.locator('article > h1')).toHaveText(childTitle);
   });
 
-  test('move-current-page-while-editing-updates-editor-url', async ({ page }) => {
-    const stamp = Date.now();
-    const sourceParentTitle = `edit-move-source-parent-${stamp}`;
-    const targetParentTitle = `edit-move-target-parent-${stamp}`;
-    const childTitle = `edit-move-child-${stamp}`;
-
-    const treeView = new TreeView(page);
-    const curNodeCount = await treeView.getNumberOfTreeNodes();
-    await treeView.clickRootAddButton();
-
-    const addPageDialog = new AddPageDialog(page);
-    await addPageDialog.fillTitle(sourceParentTitle);
-    await addPageDialog.submitWithoutRedirect();
-    await treeView.expectNumberOfTreeNodes(curNodeCount + 1);
-
-    await treeView.clickRootAddButton();
-    await addPageDialog.fillTitle(targetParentTitle);
-    await addPageDialog.submitWithoutRedirect();
-    await treeView.expectNumberOfTreeNodes(curNodeCount + 2);
-
-    await treeView.createSubPageOfParent(sourceParentTitle, childTitle);
-    await treeView.expectNumberOfTreeNodes(curNodeCount + 3);
-
-    await treeView.expandNodeByTitle(sourceParentTitle);
-    await treeView.clickPageByTitle(childTitle);
-
-    const viewPage = new ViewPage(page);
-    await viewPage.clickEditPageButton();
-
-    await movePageByPath(page, {
-      path: `${sourceParentTitle}/${childTitle}`,
-      targetParentPath: targetParentTitle,
-    });
-    await page.goto(toAppPath(`/e/${targetParentTitle}/${childTitle}`));
-    await expect
-      .poll(() => new URL(page.url()).pathname)
-      .toBe(`/e/${targetParentTitle}/${childTitle}`);
-    await expect(page.locator('.cm-editor')).toBeVisible();
-  });
-
   test('move-page-updates-incoming-links-via-refactor-dialog', async ({ page }) => {
     const stamp = Date.now();
     const parentTitle = `incoming-parent-${stamp}`;

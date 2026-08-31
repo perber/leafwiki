@@ -72,6 +72,11 @@ func TestDraftLifecycleKeepsCanonicalPagePublicUntilPublish(t *testing.T) {
 	if blockedDelete.Code != http.StatusConflict {
 		t.Fatalf("delete with draft = %d, want 409", blockedDelete.Code)
 	}
+	moveTarget := createPageViaAPI(t, router, "Move target", "move-target", nil, pageNodeKind())
+	blockedMove := authenticatedRequest(t, router, http.MethodPut, "/api/pages/"+page.ID+"/move", strings.NewReader(`{"version":"`+page.Version+`","parentId":"`+moveTarget.ID+`"}`))
+	if blockedMove.Code != http.StatusConflict {
+		t.Fatalf("move with draft = %d, want 409", blockedMove.Code)
+	}
 
 	createViewer := `{"username":"draft-viewer","email":"draft-viewer@example.com","password":"viewerpass","role":"viewer"}`
 	_ = authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(createViewer))
