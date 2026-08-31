@@ -213,7 +213,7 @@ func (r *Routes) handleSaveBackupConfig(c *gin.Context) {
 			r.respondEnvManaged(c)
 		case errors.Is(err, backupSvc.ErrNoEncryptionKey):
 			respondWithBackupStatusError(c, http.StatusBadRequest, ErrCodeBackupNoEncryptionKey,
-				"Storing backup credentials requires an encryption key; it is unavailable when authentication is disabled", "backup no encryption key")
+				"Storing backup credentials requires an encryption key; it is unavailable when authentication is disabled", "")
 		default:
 			respondWithBackupStatusError(c, http.StatusInternalServerError, ErrCodeBackupInternalError, err.Error(), "backup internal error")
 		}
@@ -267,7 +267,7 @@ func (r *Routes) bindAndValidateConfig(c *gin.Context) (backupSvc.Config, bool) 
 
 	var req backupConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		respondWithBackupStatusError(c, http.StatusBadRequest, ErrCodeBackupInvalidConfig, "Invalid request body", "backup invalid config")
+		respondWithBackupStatusError(c, http.StatusBadRequest, ErrCodeBackupInvalidConfig, "Invalid request body", "")
 		return backupSvc.Config{}, false
 	}
 
@@ -312,7 +312,7 @@ func (r *Routes) bindAndValidateConfig(c *gin.Context) (backupSvc.Config, bool) 
 
 func (r *Routes) respondEnvManaged(c *gin.Context) {
 	respondWithBackupStatusError(c, http.StatusConflict, ErrCodeBackupEnvManaged,
-		"Git backup is configured via environment variables and cannot be changed here", "backup env managed")
+		"Git backup is configured via environment variables and cannot be changed here", "")
 }
 
 func authModeFor(remoteURL string) string {

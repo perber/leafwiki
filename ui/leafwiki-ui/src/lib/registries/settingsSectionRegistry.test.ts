@@ -10,6 +10,7 @@ const baseCtx: SettingsSectionContext = {
   role: 'admin',
   authDisabled: false,
   gitBackupEnabled: false,
+  gitBackupEnvManaged: false,
   snapshotEnabled: false,
   enableApiKeyManagement: false,
   totpAvailable: false,
@@ -116,13 +117,17 @@ describe('isSectionVisible', () => {
 })
 
 describe('settingsSections gating (regression for the pre-registry backup/snapshots URL-bypass gap)', () => {
-  it('gates backup behind gitBackupEnabled', () => {
+  it('shows backup to admins whether or not a backup is configured (form vs. status-only is decided inside the section)', () => {
     const backup = settingsSections.find((s) => s.id === 'backup')!
     expect(
       isSectionVisible(backup, { ...baseCtx, gitBackupEnabled: false }),
-    ).toBe(false)
+    ).toBe(true)
     expect(
-      isSectionVisible(backup, { ...baseCtx, gitBackupEnabled: true }),
+      isSectionVisible(backup, {
+        ...baseCtx,
+        gitBackupEnabled: true,
+        gitBackupEnvManaged: true,
+      }),
     ).toBe(true)
   })
 
