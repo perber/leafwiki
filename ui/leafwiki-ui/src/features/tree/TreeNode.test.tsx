@@ -1,6 +1,8 @@
+import { TooltipProvider } from '@/components/ui/tooltip'
 import type { PageNode } from '@/lib/api/pages'
 import { useTreeStore } from '@/stores/tree'
 import { fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -36,6 +38,16 @@ const pending: PageNode = {
   draft: 'pending',
 }
 
+function renderTree(node: PageNode) {
+  return render(
+    <TooltipProvider>
+      <MemoryRouter>
+        <TreeNode node={node} />
+      </MemoryRouter>
+    </TooltipProvider>,
+  )
+}
+
 describe('TreeNode draft overlay', () => {
   beforeEach(() => {
     dnd.useDraggable.mockReturnValue({ setNodeRef: vi.fn(), listeners: {} })
@@ -56,11 +68,7 @@ describe('TreeNode draft overlay', () => {
       draft: undefined,
       children: [pending],
     }
-    render(
-      <MemoryRouter>
-        <TreeNode node={parent} />
-      </MemoryRouter>,
-    )
+    renderTree(parent)
 
     expect(
       screen.getByTestId('tree-node-toggle-icon-page-1'),
@@ -73,6 +81,7 @@ describe('TreeNode draft overlay', () => {
     expect(
       screen.getByLabelText('treeActions.pendingDraftMarker'),
     ).toBeInTheDocument()
+    expect(screen.queryByText('treeActions.pendingDraftMarker')).toBeNull()
     expect(screen.queryByText('menu')).not.toBeInTheDocument()
     expect(dnd.useDraggable).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'pending-1', disabled: true }),
@@ -80,5 +89,16 @@ describe('TreeNode draft overlay', () => {
     expect(dnd.useDroppable).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'pending-1', disabled: true }),
     )
+  })
+
+  it('renders working draft status as a labeled icon with hover text', async () => {
+    const user = userEvent.setup()
+    renderTree({ ...pending, draft: 'active' })
+
+    const marker = screen.getByLabelText('treeActions.draftMarker')
+    expect(marker).toBeInTheDocument()
+    expect(screen.queryByText('treeActions.draftMarker')).toBeNull()
+    await user.hover(marker)
+    expect(await screen.findByText('treeActions.draftMarker')).toBeVisible()
   })
 })

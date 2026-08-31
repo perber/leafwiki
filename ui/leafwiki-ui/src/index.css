@@ -2757,11 +2757,11 @@
   }
 
   .tree-node__link {
-    @apply w-full py-2;
+    @apply flex w-full min-w-0 items-center gap-1.5 py-2;
   }
 
   .tree-node__title {
-    @apply text-interface-text block truncate overflow-hidden text-sm text-ellipsis;
+    @apply text-interface-text block min-w-0 truncate overflow-hidden text-sm text-ellipsis;
   }
 
   .tree-node__title--active {
