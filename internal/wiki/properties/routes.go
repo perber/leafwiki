@@ -38,23 +38,16 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	opts := ctx.Opts
 
-	if opts.PublicAccess.Enabled() {
-		pub := ctx.Base.Group("/api")
-		pub.GET("/properties", r.handleGetPropertyKeys)
-		pub.GET("/properties/pages", r.handleGetPagesByProperty)
-	}
-
-	authGroup := ctx.Base.Group("/api")
-	authGroup.Use(
+	// Registered once, gated per request: RequireAuthOrPublicRead lets these
+	// reads flip between authenticated-only and public without a restart.
+	readGroup := ctx.Base.Group("/api")
+	readGroup.Use(
 		authmw.InjectPublicEditor(opts.AuthDisabled),
-		authmw.RequireAuth(r.authService, ctx.AuthCookies, opts.AuthDisabled),
+		authmw.RequireAuthOrPublicRead(r.authService, ctx.AuthCookies, opts.AuthDisabled, opts.PublicAccess),
 		security.CSRFMiddleware(ctx.CSRFCookie),
 	)
-
-	if !opts.PublicAccess.Enabled() {
-		authGroup.GET("/properties", r.handleGetPropertyKeys)
-		authGroup.GET("/properties/pages", r.handleGetPagesByProperty)
-	}
+	readGroup.GET("/properties", r.handleGetPropertyKeys)
+	readGroup.GET("/properties/pages", r.handleGetPagesByProperty)
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────

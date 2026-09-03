@@ -52,37 +52,37 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	opts := ctx.Opts
 
-	// Static file serving for /assets with access control.
+	// Static file serving for /assets. Gated per request so the
+	// public/authenticated decision follows a runtime toggle. With auth
+	// disabled InjectPublicEditor sets a user so the gate passes; with public
+	// mode on an anonymous request passes; otherwise a session is required.
 	if r.assetsDir != "" {
 		assetsFS := gin.Dir(r.assetsDir, false)
-		if opts.PublicAccess.Enabled() || opts.AuthDisabled {
-			ctx.Base.StaticFS("/assets", assetsFS)
-		} else {
-			assetsGroup := ctx.Base.Group("/assets")
-			assetsGroup.Use(
-				authmw.InjectPublicEditor(opts.AuthDisabled),
-				authmw.RequireAuth(r.authService, ctx.AuthCookies, opts.AuthDisabled),
-			)
-			assetsGroup.StaticFS("/", assetsFS)
-		}
+		assetsGroup := ctx.Base.Group("/assets")
+		assetsGroup.Use(
+			authmw.InjectPublicEditor(opts.AuthDisabled),
+			authmw.RequireAuthOrPublicRead(r.authService, ctx.AuthCookies, opts.AuthDisabled, opts.PublicAccess),
+		)
+		assetsGroup.StaticFS("/", assetsFS)
 	}
 
-	if opts.PublicAccess.Enabled() {
-		pub := ctx.Base.Group("/api")
-		pub.GET("/pages/:id/assets", r.handleList)
-	}
+	// Listing a page's assets is a read: registered once, gated per request.
+	readGroup := ctx.Base.Group("/api")
+	readGroup.Use(
+		authmw.InjectPublicEditor(opts.AuthDisabled),
+		authmw.RequireAuthOrPublicRead(r.authService, ctx.AuthCookies, opts.AuthDisabled, opts.PublicAccess),
+		security.CSRFMiddleware(ctx.CSRFCookie),
+	)
+	readGroup.GET("/pages/:id/assets", r.handleList)
 
+	// Mutations always need a real authenticated editor/admin.
 	authGroup := ctx.Base.Group("/api")
 	authGroup.Use(
 		authmw.InjectPublicEditor(opts.AuthDisabled),
 		authmw.RequireAuth(r.authService, ctx.AuthCookies, opts.AuthDisabled),
 		security.CSRFMiddleware(ctx.CSRFCookie),
 	)
-
 	authGroup.POST("/pages/:id/assets", authmw.RequireEditorOrAdmin(), r.handleUpload(opts.MaxAssetUploadSizeBytes))
-	if !opts.PublicAccess.Enabled() {
-		authGroup.GET("/pages/:id/assets", r.handleList)
-	}
 	authGroup.PUT("/pages/:id/assets/rename", authmw.RequireEditorOrAdmin(), r.handleRename)
 	authGroup.DELETE("/pages/:id/assets/:name", authmw.RequireEditorOrAdmin(), r.handleDelete)
 }

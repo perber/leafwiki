@@ -109,31 +109,29 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	opts := ctx.Opts
 
-	if opts.PublicAccess.Enabled() {
-		pub := ctx.Base.Group("/api")
-		pub.GET("/tree", r.handleGetTree)
-		pub.GET("/pages/by-path", r.handleGetByPath)
-		pub.GET("/pages/by-title", r.handleFindByTitle)
-		pub.GET("/pages/lookup", r.handleLookupPath)
-		pub.GET("/pages/permalink/:id", r.handleResolvePermalink)
-		pub.GET(pagesIdRoutePath, r.handleGetPage)
-	}
+	// Read routes registered once, gated per request: RequireAuthOrPublicRead
+	// lets them flip between authenticated-only and public without a restart.
+	readGroup := ctx.Base.Group("/api")
+	readGroup.Use(
+		authmw.InjectPublicEditor(opts.AuthDisabled),
+		authmw.RequireAuthOrPublicRead(r.authService, ctx.AuthCookies, opts.AuthDisabled, opts.PublicAccess),
+		security.CSRFMiddleware(ctx.CSRFCookie),
+	)
+	readGroup.GET("/tree", r.handleGetTree)
+	readGroup.GET(pagesIdRoutePath, r.handleGetPage)
+	readGroup.GET("/pages/lookup", r.handleLookupPath)
+	readGroup.GET("/pages/by-path", r.handleGetByPath)
+	readGroup.GET("/pages/by-title", r.handleFindByTitle)
+	readGroup.GET("/pages/permalink/:id", r.handleResolvePermalink)
 
+	// Everything below needs a real authenticated user regardless of public
+	// mode (writes, editor-gated reads, per-user favorites).
 	authGroup := ctx.Base.Group("/api")
 	authGroup.Use(
 		authmw.InjectPublicEditor(opts.AuthDisabled),
 		authmw.RequireAuth(r.authService, ctx.AuthCookies, opts.AuthDisabled),
 		security.CSRFMiddleware(ctx.CSRFCookie),
 	)
-
-	if !opts.PublicAccess.Enabled() {
-		authGroup.GET("/tree", r.handleGetTree)
-		authGroup.GET(pagesIdRoutePath, r.handleGetPage)
-		authGroup.GET("/pages/lookup", r.handleLookupPath)
-		authGroup.GET("/pages/by-path", r.handleGetByPath)
-		authGroup.GET("/pages/by-title", r.handleFindByTitle)
-		authGroup.GET("/pages/permalink/:id", r.handleResolvePermalink)
-	}
 
 	authGroup.GET("/pages/slug-suggestion", authmw.RequireEditorOrAdmin(), r.handleSuggestSlug)
 	authGroup.POST("/pages", authmw.RequireEditorOrAdmin(), r.handleCreate)
