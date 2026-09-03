@@ -35,7 +35,7 @@
     "deletedToast": "{{item}} deleted successfully",
     "deleteErrorFallback": "Error deleting {{item}}",
     "title": "Delete {{item}}?",
-    "description": "Are you sure you want to delete this {{item}}? This action cannot be undone.",
+    "description": "Are you sure you want to delete the {{item}} \"{{name}}\"? This action cannot be undone.",
     "deleting": "Deleting...",
     "delete": "Delete",
     "modifiedWarningTitle": "This page was modified by another user.",
