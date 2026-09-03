@@ -20,7 +20,7 @@ type sessionOutcome struct {
 	body   gin.H // nil when user != nil
 }
 
-func abortStatus(status int, message string) sessionOutcome {
+func denied(status int, message string) sessionOutcome {
 	return sessionOutcome{status: status, body: gin.H{"error": message}}
 }
 
@@ -33,27 +33,27 @@ func resolveSession(c *gin.Context, authService *auth.AuthService, authCookies *
 	if userValue, exists := c.Get("user"); exists {
 		user, ok := userValue.(*auth.User)
 		if !ok || user == nil {
-			return abortStatus(http.StatusInternalServerError, "Invalid user context")
+			return denied(http.StatusInternalServerError, "Invalid user context")
 		}
 		return sessionOutcome{user: user}
 	}
 
 	if authDisabled {
-		return abortStatus(http.StatusUnauthorized, "User not authenticated and auth is disabled")
+		return denied(http.StatusUnauthorized, "User not authenticated and auth is disabled")
 	}
 
 	token, err := authCookies.ReadAccess(c)
 	if err != nil || token == "" {
-		return abortStatus(http.StatusUnauthorized, "Missing or invalid access token")
+		return denied(http.StatusUnauthorized, "Missing or invalid access token")
 	}
 
 	if authService == nil {
-		return abortStatus(http.StatusInternalServerError, "Authentication service unavailable")
+		return denied(http.StatusInternalServerError, "Authentication service unavailable")
 	}
 
 	user, err := authService.ValidateToken(token)
 	if err != nil {
-		return abortStatus(http.StatusUnauthorized, "Invalid or expired token")
+		return denied(http.StatusUnauthorized, "Invalid or expired token")
 	}
 
 	c.Set("user", user)

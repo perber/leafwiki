@@ -15,6 +15,11 @@ const (
 	ErrCodeInternal = "instance_settings_internal_error"
 )
 
+// NOTE: errorResponse / errorDetail / respondWithStatusError mirror the
+// hand-rolled localized-error-to-JSON shape every feature package carries
+// (see internal/wiki/branding/errors.go and siblings). Consolidating them
+// into one shared http helper is tracked in the architecture refactoring
+// backlog, not done here.
 type errorResponse struct {
 	Error errorDetail `json:"error"`
 }
