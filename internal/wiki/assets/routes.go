@@ -8,7 +8,6 @@ import (
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	httpinternal "github.com/perber/wiki/internal/http"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
-	"github.com/perber/wiki/internal/http/middleware/security"
 )
 
 const maxMultipartMemory = 32 << 20 // 32 MiB
@@ -52,10 +51,9 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	opts := ctx.Opts
 
-	// Static file serving for /assets. Gated per request so the
-	// public/authenticated decision follows a runtime toggle. With auth
-	// disabled InjectPublicEditor sets a user so the gate passes; with public
-	// mode on an anonymous request passes; otherwise a session is required.
+	// Static /assets files share the read gate (public mode / --disable-auth /
+	// session), but on their own path and without CSRF (GET-only static FS),
+	// so this one group is wired inline rather than via APIReadGroup.
 	if r.assetsDir != "" {
 		assetsFS := gin.Dir(r.assetsDir, false)
 		assetsGroup := ctx.Base.Group("/assets")
@@ -67,21 +65,11 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	}
 
 	// Listing a page's assets is a read: registered once, gated per request.
-	readGroup := ctx.Base.Group("/api")
-	readGroup.Use(
-		authmw.InjectPublicEditor(opts.AuthDisabled),
-		authmw.RequireAuthOrPublicRead(r.authService, ctx.AuthCookies, opts.AuthDisabled, opts.PublicAccess),
-		security.CSRFMiddleware(ctx.CSRFCookie),
-	)
+	readGroup := ctx.APIReadGroup(r.authService)
 	readGroup.GET("/pages/:id/assets", r.handleList)
 
 	// Mutations always need a real authenticated editor/admin.
-	authGroup := ctx.Base.Group("/api")
-	authGroup.Use(
-		authmw.InjectPublicEditor(opts.AuthDisabled),
-		authmw.RequireAuth(r.authService, ctx.AuthCookies, opts.AuthDisabled),
-		security.CSRFMiddleware(ctx.CSRFCookie),
-	)
+	authGroup := ctx.APIAuthGroup(r.authService)
 	authGroup.POST("/pages/:id/assets", authmw.RequireEditorOrAdmin(), r.handleUpload(opts.MaxAssetUploadSizeBytes))
 	authGroup.PUT("/pages/:id/assets/rename", authmw.RequireEditorOrAdmin(), r.handleRename)
 	authGroup.DELETE("/pages/:id/assets/:name", authmw.RequireEditorOrAdmin(), r.handleDelete)
