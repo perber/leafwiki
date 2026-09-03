@@ -278,60 +278,10 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		}
 	}()
 
-	// Initialize git backup. Two modes:
-	//   * env-managed: --git-backup / LEAFWIKI_GIT_BACKUP is set. Config comes
-	//     from flags/env; the settings UI is status-only (historical behaviour).
-	//   * settings-managed: otherwise. Config lives in <data-dir>/git-backup.json,
-	//     written by admins via /settings/backup, with credentials encrypted at
-	//     rest using a key derived from the JWT secret.
-	backupRootDir := filepath.Join(cfg.server.dataDir, "root")
-	backupAssetsDir := filepath.Join(cfg.server.dataDir, "assets")
-
-	var backupManager *backup.Manager
-	if cfg.backup.gitBackup {
-		if cfg.backup.gitBackupSSHKey != "" && os.Getenv("LEAFWIKI_GIT_BACKUP_SSH_KEY") == "" {
-			slog.Warn("SSH private key passed via --git-backup-ssh-key flag is visible in process listings; prefer the LEAFWIKI_GIT_BACKUP_SSH_KEY environment variable")
-		}
-		if cfg.backup.gitBackupHTTPPassword != "" && os.Getenv("LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD") == "" {
-			slog.Warn("HTTP password passed via --git-backup-http-password flag is visible in process listings; prefer the LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD environment variable")
-		}
-		if strings.HasPrefix(strings.ToLower(cfg.backup.gitBackupRemote), "http://") {
-			slog.Warn("--git-backup-remote uses plain http://; git backup credentials and wiki content are transmitted unencrypted — use https:// unless the remote is on a trusted network")
-		}
-		backupRepo, err := backup.Init(backup.Config{
-			Enabled:           true,
-			RootDir:           backupRootDir,
-			AssetsDir:         backupAssetsDir,
-			AuthorName:        cfg.backup.gitBackupAuthorName,
-			AuthorEmail:       cfg.backup.gitBackupAuthorEmail,
-			RemoteURL:         cfg.backup.gitBackupRemote,
-			Branch:            cfg.backup.gitBackupBranch,
-			SSHKeyPath:        cfg.backup.gitBackupSSHKeyPath,
-			SSHKey:            cfg.backup.gitBackupSSHKey,
-			SSHKnownHostsPath: cfg.backup.gitBackupSSHKnownHosts,
-			HTTPUsername:      cfg.backup.gitBackupHTTPUsername,
-			HTTPPassword:      cfg.backup.gitBackupHTTPPassword,
-			Interval:          cfg.backup.gitBackupInterval,
-		})
-		if err != nil {
-			fail("git backup init failed: %v", err)
-		}
-		backupManager = backup.NewEnvManager(backupRepo, backup.NewScheduler(backupRepo))
-	} else {
-		var backupBox *sharedcrypto.SecretBox
-		if cfg.auth.jwtSecret != "" {
-			if key, kerr := sharedcrypto.DeriveKey([]byte(cfg.auth.jwtSecret), "leafwiki:git-backup-credentials:v1"); kerr == nil {
-				backupBox, _ = sharedcrypto.NewSecretBox(key)
-			}
-		}
-		m, merr := backup.NewSettingsManager(
-			backup.NewConfigStore(cfg.server.dataDir, backupBox),
-			backupRootDir, backupAssetsDir,
-		)
-		if merr != nil {
-			fail("git backup init failed: %v", merr)
-		}
-		backupManager = m
+	// Initialize git backup (env-managed vs settings-managed — see buildBackupManager).
+	backupManager, err := buildBackupManager(cfg)
+	if err != nil {
+		fail("git backup init failed: %v", err)
 	}
 	defer backupManager.Stop()
 	w.SetBackupRoutes(wikibackup.NewRoutes(backupManager, w.AuthService()))
@@ -404,6 +354,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		Metrics:                 metrics,
 		GitBackupEnabled:        backupManager.Enabled(),
 		GitBackupEnvManaged:     backupManager.EnvManaged(),
+		GitBackupConfigured:     backupManager.Configured(),
 		SnapshotEnabled:         cfg.backup.snapshot,
 		SMTPEnabled:             smtpEnabled,
 		TOTPAvailable:           w.TOTPService() != nil,
@@ -716,6 +667,57 @@ func resolveLogoutURL(logoutURL, deprecated string) (resolved string, usedDeprec
 // credentials at all.
 func validateGitBackupRemote(remote, sshKey, sshKeyPath, httpUsername, httpPassword string) error {
 	return backup.ValidateRemoteCredentials(remote, sshKey, sshKeyPath, httpUsername, httpPassword)
+}
+
+// buildBackupManager wires up the git backup Manager in one of two modes:
+//   - env-managed: --git-backup / LEAFWIKI_GIT_BACKUP is set. Config comes from
+//     flags/env and the settings UI is status-only (historical behaviour).
+//   - settings-managed: otherwise. Config lives in <data-dir>/git-backup.json,
+//     written by admins via /settings/backup; the SSH key and HTTP password are
+//     encrypted at rest with a key derived from the JWT secret (plaintext under
+//     --disable-auth, where there is no such secret).
+func buildBackupManager(cfg *serverConfig) (*backup.Manager, error) {
+	rootDir := filepath.Join(cfg.server.dataDir, "root")
+	assetsDir := filepath.Join(cfg.server.dataDir, "assets")
+
+	if !cfg.backup.gitBackup {
+		var box *sharedcrypto.SecretBox
+		if cfg.auth.jwtSecret != "" {
+			if key, err := sharedcrypto.DeriveKey([]byte(cfg.auth.jwtSecret), backup.CredentialsKeyInfo); err == nil {
+				box, _ = sharedcrypto.NewSecretBox(key)
+			}
+		}
+		return backup.NewSettingsManager(backup.NewConfigStore(cfg.server.dataDir, box), rootDir, assetsDir)
+	}
+
+	if cfg.backup.gitBackupSSHKey != "" && os.Getenv("LEAFWIKI_GIT_BACKUP_SSH_KEY") == "" {
+		slog.Warn("SSH private key passed via --git-backup-ssh-key flag is visible in process listings; prefer the LEAFWIKI_GIT_BACKUP_SSH_KEY environment variable")
+	}
+	if cfg.backup.gitBackupHTTPPassword != "" && os.Getenv("LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD") == "" {
+		slog.Warn("HTTP password passed via --git-backup-http-password flag is visible in process listings; prefer the LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD environment variable")
+	}
+	if strings.HasPrefix(strings.ToLower(cfg.backup.gitBackupRemote), "http://") {
+		slog.Warn("--git-backup-remote uses plain http://; git backup credentials and wiki content are transmitted unencrypted — use https:// unless the remote is on a trusted network")
+	}
+	repo, err := backup.Init(backup.Config{
+		Enabled:           true,
+		RootDir:           rootDir,
+		AssetsDir:         assetsDir,
+		AuthorName:        cfg.backup.gitBackupAuthorName,
+		AuthorEmail:       cfg.backup.gitBackupAuthorEmail,
+		RemoteURL:         cfg.backup.gitBackupRemote,
+		Branch:            cfg.backup.gitBackupBranch,
+		SSHKeyPath:        cfg.backup.gitBackupSSHKeyPath,
+		SSHKey:            cfg.backup.gitBackupSSHKey,
+		SSHKnownHostsPath: cfg.backup.gitBackupSSHKnownHosts,
+		HTTPUsername:      cfg.backup.gitBackupHTTPUsername,
+		HTTPPassword:      cfg.backup.gitBackupHTTPPassword,
+		Interval:          cfg.backup.gitBackupInterval,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return backup.NewEnvManager(repo, backup.NewScheduler(repo)), nil
 }
 
 func validateRedirectURL(flagName, url string) error {

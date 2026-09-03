@@ -29,6 +29,7 @@ export type Config = {
   enableApiKeyManagement: boolean
   gitBackupEnabled: boolean
   gitBackupEnvManaged: boolean
+  gitBackupConfigured: boolean
   snapshotEnabled: boolean
   smtpEnabled: boolean
   totpAvailable: boolean

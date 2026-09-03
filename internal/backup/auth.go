@@ -18,7 +18,7 @@ import (
 // operations and by TestRemote's pre-save connectivity check so both construct
 // credentials identically.
 func buildAuth(cfg Config) (transport.AuthMethod, error) {
-	if isHTTPRemote(cfg.RemoteURL) {
+	if ClassifyRemote(cfg.RemoteURL) == TransportHTTP {
 		return buildHTTPAuth(cfg)
 	}
 	return buildSSHAuth(cfg)

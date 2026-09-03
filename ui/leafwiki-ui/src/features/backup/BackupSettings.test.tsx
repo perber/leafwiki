@@ -1,5 +1,4 @@
-import type { BackupConfig } from '@/lib/api/backup'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import BackupSettings from './BackupSettings'
 
@@ -18,19 +17,11 @@ vi.mock('@/lib/useDateTimeFormat', () => ({
 
 vi.mock('../viewer/setTitle', () => ({ useSetTitle: () => {} }))
 
-const baseConfig: BackupConfig = {
-  remoteUrl: 'https://github.com/acme/wiki-backup.git',
-  branch: 'main',
-  authorName: 'Backup Bot',
-  authorEmail: 'bot@example.com',
-  authMode: 'https',
-  sshKeyPath: '',
-  sshKnownHostsPath: '',
-  httpUsername: 'acme-bot',
-  hasSshKey: false,
-  hasHttpPassword: true,
-  intervalMinutes: 30,
-}
+// BackupConfigForm has its own test file; stub it so these tests only exercise
+// the wrapper's status view + "show the form iff not env-managed" decision.
+vi.mock('./BackupConfigForm', () => ({
+  default: () => <div data-testid="backup-config-form" />,
+}))
 
 let storeState: Record<string, unknown>
 
@@ -55,16 +46,7 @@ function makeState(overrides: Partial<Record<string, unknown>> = {}) {
     triggerPush: vi.fn(),
     forcePush: vi.fn(),
     stopPolling: vi.fn(),
-    config: baseConfig,
-    configLoading: false,
-    configError: '',
-    encryptionKeyAvailable: true,
-    minIntervalMinutes: 2,
-    maxIntervalMinutes: 1440,
     loadConfig: vi.fn(),
-    testConfig: vi.fn(),
-    saveConfig: vi.fn(),
-    disable: vi.fn(),
     ...overrides,
   }
 }
@@ -76,10 +58,7 @@ describe('BackupSettings', () => {
 
   it('renders the configuration form when the backup is settings-managed', () => {
     render(<BackupSettings />)
-    expect(screen.getByText('config.remoteUrl')).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'config.saveButton' }),
-    ).toBeInTheDocument()
+    expect(screen.getByTestId('backup-config-form')).toBeInTheDocument()
     expect(screen.queryByText('config.envManagedHint')).not.toBeInTheDocument()
   })
 
@@ -87,31 +66,6 @@ describe('BackupSettings', () => {
     storeState = makeState({ envManaged: true })
     render(<BackupSettings />)
     expect(screen.getByText('config.envManagedHint')).toBeInTheDocument()
-    expect(screen.queryByText('config.remoteUrl')).not.toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: 'config.saveButton' }),
-    ).not.toBeInTheDocument()
-  })
-
-  it('rejects an interval below the minimum and disables Save', () => {
-    render(<BackupSettings />)
-    const interval = screen.getByLabelText('config.intervalMinutes')
-    fireEvent.change(interval, { target: { value: '1' } })
-    expect(screen.getByText('config.intervalOutOfRange')).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'config.saveButton' }),
-    ).toBeDisabled()
-  })
-
-  it('accepts an interval within range', () => {
-    render(<BackupSettings />)
-    const interval = screen.getByLabelText('config.intervalMinutes')
-    fireEvent.change(interval, { target: { value: '120' } })
-    expect(
-      screen.queryByText('config.intervalOutOfRange'),
-    ).not.toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'config.saveButton' }),
-    ).not.toBeDisabled()
+    expect(screen.queryByTestId('backup-config-form')).not.toBeInTheDocument()
   })
 })

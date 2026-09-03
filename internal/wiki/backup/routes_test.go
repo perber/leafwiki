@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -209,6 +210,15 @@ func ginPOSTJSON(t *testing.T, path, body string) (*gin.Context, *httptest.Respo
 
 func settingsRoutes(t *testing.T) *Routes {
 	t.Helper()
+	return settingsRoutesWith(t, "test-secret", nil)
+}
+
+// settingsRoutesWith builds settings-mode routes whose ConfigStore is keyed from
+// jwtSecret. If stored is non-nil it is persisted to git-backup.json first, so
+// CurrentConfig() reflects it. Pass a different jwtSecret on a second call over
+// the same store to simulate a rotated key (undecryptable config).
+func settingsRoutesWith(t *testing.T, jwtSecret string, stored *backupSvc.Config) *Routes {
+	t.Helper()
 	dataDir := t.TempDir()
 	rootDir := filepath.Join(dataDir, "root")
 	assetsDir := filepath.Join(dataDir, "assets")
@@ -218,10 +228,42 @@ func settingsRoutes(t *testing.T) *Routes {
 	if err := os.MkdirAll(assetsDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	key, _ := sharedcrypto.DeriveKey([]byte("test-secret"), "leafwiki:git-backup-credentials:v1")
+	key, _ := sharedcrypto.DeriveKey([]byte(jwtSecret), backupSvc.CredentialsKeyInfo)
 	box, _ := sharedcrypto.NewSecretBox(key)
-	store := backupSvc.NewConfigStore(dataDir, box)
-	mgr, err := backupSvc.NewSettingsManager(store, rootDir, assetsDir)
+	if stored != nil {
+		if err := backupSvc.NewConfigStore(dataDir, box).Save(*stored); err != nil {
+			t.Fatalf("seed store.Save: %v", err)
+		}
+	}
+	mgr, err := backupSvc.NewSettingsManager(backupSvc.NewConfigStore(dataDir, box), rootDir, assetsDir)
+	if err != nil {
+		t.Fatalf("NewSettingsManager: %v", err)
+	}
+	t.Cleanup(mgr.Stop)
+	return &Routes{mgr: mgr}
+}
+
+// settingsRoutesUndecryptable seeds a config with one key, then builds routes
+// with a different key so git-backup.json can no longer be decrypted.
+func settingsRoutesUndecryptable(t *testing.T, stored backupSvc.Config) *Routes {
+	t.Helper()
+	dataDir := t.TempDir()
+	rootDir := filepath.Join(dataDir, "root")
+	assetsDir := filepath.Join(dataDir, "assets")
+	if err := os.MkdirAll(rootDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.MkdirAll(assetsDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	k1, _ := sharedcrypto.DeriveKey([]byte("original-secret"), backupSvc.CredentialsKeyInfo)
+	box1, _ := sharedcrypto.NewSecretBox(k1)
+	if err := backupSvc.NewConfigStore(dataDir, box1).Save(stored); err != nil {
+		t.Fatalf("seed store.Save: %v", err)
+	}
+	k2, _ := sharedcrypto.DeriveKey([]byte("rotated-secret"), backupSvc.CredentialsKeyInfo)
+	box2, _ := sharedcrypto.NewSecretBox(k2)
+	mgr, err := backupSvc.NewSettingsManager(backupSvc.NewConfigStore(dataDir, box2), rootDir, assetsDir)
 	if err != nil {
 		t.Fatalf("NewSettingsManager: %v", err)
 	}
@@ -273,6 +315,78 @@ func TestHandleSaveBackupConfig_IntervalOutOfRange_Returns400(t *testing.T) {
 	_ = json.Unmarshal(rec.Body.Bytes(), &body)
 	if body.Error.Code != ErrCodeBackupInvalidConfig {
 		t.Fatalf("expected %q, got %q", ErrCodeBackupInvalidConfig, body.Error.Code)
+	}
+}
+
+// TestHandleSaveBackupConfig_IntervalOverflow_Returns400 pins that a minutes
+// value large enough to overflow time.Duration(n)*time.Minute back into the
+// valid window is still rejected. 307445737 minutes wraps to ~2m26s of int64
+// nanoseconds, which would otherwise slip past Config.ValidateForSettings.
+func TestHandleSaveBackupConfig_IntervalOverflow_Returns400(t *testing.T) {
+	routes := settingsRoutes(t)
+	c, rec := ginPOSTJSON(t, "/api/admin/backup/config",
+		`{"remoteUrl":"https://example.com/r.git","httpUsername":"u","httpPassword":"p","intervalMinutes":307445737}`)
+	routes.handleSaveBackupConfig(c)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for an overflowing interval, got %d, body: %s", rec.Code, rec.Body.String())
+	}
+	var body BackupErrorResponse
+	_ = json.Unmarshal(rec.Body.Bytes(), &body)
+	if body.Error.Code != ErrCodeBackupInvalidConfig {
+		t.Fatalf("expected %q, got %q", ErrCodeBackupInvalidConfig, body.Error.Code)
+	}
+	if routes.mgr.Enabled() {
+		t.Fatal("backup must not be enabled after a rejected interval")
+	}
+}
+
+// TestBindAndValidateConfig_UnchangedRedactedRemote_KeepsEmbeddedCredentials
+// pins that resubmitting the redacted remote URL (what the browser was given)
+// unchanged keeps the stored credential-bearing URL rather than persisting the
+// "xxxxx" placeholder.
+func TestBindAndValidateConfig_UnchangedRedactedRemote_KeepsEmbeddedCredentials(t *testing.T) {
+	const realURL = "https://alice:s3cr3t-token@example.com/wiki.git"
+	routes := settingsRoutesWith(t, "test-secret", &backupSvc.Config{
+		Enabled: false, RemoteURL: realURL, Branch: "main",
+		AuthorName: "B", AuthorEmail: "b@b.com", Interval: 30 * time.Minute,
+	})
+
+	redacted := backupSvc.RedactRemoteURL(realURL)
+	if redacted == realURL {
+		t.Fatalf("precondition: %q should redact", realURL)
+	}
+
+	body := fmt.Sprintf(`{"remoteUrl":%q,"branch":"main","authorName":"B","authorEmail":"b@b.com","intervalMinutes":30}`, redacted)
+	c, _ := ginPOSTJSON(t, "/api/admin/backup/config", body)
+	cfg, ok := routes.bindAndValidateConfig(c)
+	if !ok {
+		t.Fatal("bindAndValidateConfig rejected an unchanged redacted URL")
+	}
+	if cfg.RemoteURL != realURL {
+		t.Fatalf("embedded credentials lost: got %q, want %q", cfg.RemoteURL, realURL)
+	}
+}
+
+// TestBindAndValidateConfig_CorruptStore_ReturnsReadableError pins that an
+// undecryptable git-backup.json produces a clear "re-enter the config" error
+// rather than a misleading "credentials required".
+func TestBindAndValidateConfig_CorruptStore_ReturnsReadableError(t *testing.T) {
+	routes := settingsRoutesUndecryptable(t, backupSvc.Config{
+		Enabled: false, RemoteURL: "https://example.com/wiki.git",
+		HTTPUsername: "u", HTTPPassword: "stored-token",
+		Branch: "main", AuthorName: "B", AuthorEmail: "b@b.com", Interval: 30 * time.Minute,
+	})
+
+	// Submit a change without re-entering the password (relies on "keep existing").
+	body := `{"remoteUrl":"https://example.com/wiki.git","httpUsername":"u","branch":"main","authorName":"B","authorEmail":"b@b.com","intervalMinutes":45}`
+	c, rec := ginPOSTJSON(t, "/api/admin/backup/config", body)
+	if _, ok := routes.bindAndValidateConfig(c); ok {
+		t.Fatal("expected rejection when the stored config is undecryptable")
+	}
+	var respBody BackupErrorResponse
+	_ = json.Unmarshal(rec.Body.Bytes(), &respBody)
+	if respBody.Error.Code != ErrCodeBackupConfigCorrupt {
+		t.Fatalf("expected %q, got %q (msg %q)", ErrCodeBackupConfigCorrupt, respBody.Error.Code, respBody.Error.Message)
 	}
 }
 
@@ -329,6 +443,37 @@ func TestHandleGetBackupConfig_RedactsSecrets(t *testing.T) {
 	}
 	if !strings.Contains(body, `"hasSshKey":true`) {
 		t.Fatalf("expected hasSshKey:true in response, got:\n%s", body)
+	}
+}
+
+// TestHandleGetBackupConfig_NoEncryptionKey_ReportsUnencrypted pins that a
+// settings manager without an encryption key (i.e. --disable-auth) still serves
+// the config form and simply advertises encryptionKeyAvailable:false rather than
+// blocking credential entry.
+func TestHandleGetBackupConfig_NoEncryptionKey_ReportsUnencrypted(t *testing.T) {
+	dataDir := t.TempDir()
+	rootDir := filepath.Join(dataDir, "root")
+	assetsDir := filepath.Join(dataDir, "assets")
+	if err := os.MkdirAll(rootDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.MkdirAll(assetsDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	mgr, err := backupSvc.NewSettingsManager(backupSvc.NewConfigStore(dataDir, nil), rootDir, assetsDir)
+	if err != nil {
+		t.Fatalf("NewSettingsManager: %v", err)
+	}
+	t.Cleanup(mgr.Stop)
+	routes := &Routes{mgr: mgr}
+
+	c, rec := ginPOSTJSON(t, "/api/admin/backup/config", "")
+	routes.handleGetBackupConfig(c)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d, body: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"encryptionKeyAvailable":false`) {
+		t.Fatalf("expected encryptionKeyAvailable:false, got:\n%s", rec.Body.String())
 	}
 }
 

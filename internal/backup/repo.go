@@ -885,13 +885,6 @@ func (r *Repository) push(force bool) error {
 	return nil
 }
 
-// isHTTPRemote reports whether the remote URL is fetched/pushed over HTTP(S)
-// rather than SSH.
-func isHTTPRemote(remoteURL string) bool {
-	lower := strings.ToLower(remoteURL)
-	return strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://")
-}
-
 // redactRemote masks credentials embedded in a remote URL
 // (https://user:token@host/repo.git) so the token never reaches a log line or a
 // status message shown in the UI. Non-URL remotes (git@host:path) are returned

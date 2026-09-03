@@ -28,6 +28,9 @@ export interface BackupConfig {
   branch: string
   authorName: string
   authorEmail: string
+  // Transport derived by the server from the remote URL scheme. The form does
+  // not use it — it derives the same thing from the URL — but it is part of the
+  // GET /backup/config response.
   authMode: BackupAuthMode
   sshKeyPath: string
   sshKnownHostsPath: string

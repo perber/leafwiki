@@ -8,28 +8,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
 
-func TestIsHTTPRemote(t *testing.T) {
-	tests := []struct {
-		remote string
-		want   bool
-	}{
-		{"https://github.com/user/repo.git", true},
-		{"http://gitea.internal/user/repo.git", true},
-		{"HTTPS://github.com/user/repo.git", true},
-		{"git@github.com:user/repo.git", false},
-		{"ssh://git@github.com/user/repo.git", false},
-		{"file:///tmp/bare", false},
-		{"", false},
-	}
-	for _, tc := range tests {
-		t.Run(tc.remote, func(t *testing.T) {
-			if got := isHTTPRemote(tc.remote); got != tc.want {
-				t.Fatalf("isHTTPRemote(%q) = %v, want %v", tc.remote, got, tc.want)
-			}
-		})
-	}
-}
-
 func TestBuildAuth_HTTPSRemote_ReturnsBasicAuth(t *testing.T) {
 	repo := baseRepo(t)
 	repo.cfg.RemoteURL = "https://github.com/user/repo.git"

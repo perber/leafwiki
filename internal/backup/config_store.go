@@ -16,10 +16,18 @@ import (
 // configuration, stored in the LeafWiki data directory alongside branding.json.
 const ConfigFileName = "git-backup.json"
 
-// ErrNoEncryptionKey is returned when a config carrying secrets must be
-// encrypted or decrypted but no key is available (e.g. --disable-auth, so
-// there is no JWT secret to derive one from).
-var ErrNoEncryptionKey = errors.New("no encryption key available for git backup credentials")
+// CredentialsKeyInfo is the HKDF info label that derives the git-backup
+// credential-encryption key from the JWT secret. Kept here so the composition
+// root and tests agree on it.
+const CredentialsKeyInfo = "leafwiki:git-backup-credentials:v1"
+
+// ErrNoEncryptionKey is returned when stored ciphertext must be decrypted but no
+// key is available. This only happens when a config was saved while
+// authentication was enabled and the server was later restarted with
+// --disable-auth: the JWT secret that keyed the SecretBox is gone. A config
+// saved under --disable-auth in the first place carries its secrets in
+// plaintext (see Save) and never hits this path.
+var ErrNoEncryptionKey = errors.New("no encryption key available to decrypt git backup credentials")
 
 // ErrConfigCorrupt is returned when git-backup.json exists but cannot be parsed
 // or its credentials cannot be decrypted. The manager surfaces this and stays
@@ -28,8 +36,13 @@ var ErrConfigCorrupt = errors.New("git backup configuration file is unreadable")
 
 // persistedConfig is the JSON shape of git-backup.json. It mirrors the
 // settings-relevant subset of Config: RootDir/AssetsDir are runtime paths
-// supplied by the composition root and are never persisted, and the two secret
-// fields hold SecretBox ciphertext, never plaintext.
+// supplied by the composition root and are never persisted.
+//
+// Each secret has two mutually exclusive fields: the "*Enc" one holds SecretBox
+// ciphertext (written when an encryption key is available, i.e. auth is on), the
+// plaintext one is written only under --disable-auth, where there is no JWT
+// secret to derive a key from. Load prefers the encrypted field and falls back
+// to the plaintext one.
 type persistedConfig struct {
 	Enabled           bool   `json:"enabled"`
 	AuthorName        string `json:"authorName,omitempty"`
@@ -38,9 +51,11 @@ type persistedConfig struct {
 	Branch            string `json:"branch,omitempty"`
 	SSHKeyPath        string `json:"sshKeyPath,omitempty"`
 	SSHKeyEnc         string `json:"sshKeyEnc,omitempty"`
+	SSHKeyPlain       string `json:"sshKey,omitempty"`
 	SSHKnownHostsPath string `json:"sshKnownHostsPath,omitempty"`
 	HTTPUsername      string `json:"httpUsername,omitempty"`
 	HTTPPasswordEnc   string `json:"httpPasswordEnc,omitempty"`
+	HTTPPasswordPlain string `json:"httpPassword,omitempty"`
 	IntervalSeconds   int64  `json:"intervalSeconds,omitempty"`
 }
 
@@ -51,8 +66,9 @@ type ConfigStore struct {
 	box  *sharedcrypto.SecretBox // may be nil when no encryption key is configured
 }
 
-// NewConfigStore builds a store for <dataDir>/git-backup.json. box may be nil;
-// in that case Load/Save succeed only for configs that carry no secrets.
+// NewConfigStore builds a store for <dataDir>/git-backup.json. box may be nil
+// (under --disable-auth there is no JWT secret to derive a key from); in that
+// case secrets are stored in plaintext in the 0600 file instead of encrypted.
 func NewConfigStore(dataDir string, box *sharedcrypto.SecretBox) *ConfigStore {
 	return &ConfigStore{path: filepath.Join(dataDir, ConfigFileName), box: box}
 }
@@ -61,7 +77,7 @@ func NewConfigStore(dataDir string, box *sharedcrypto.SecretBox) *ConfigStore {
 func (s *ConfigStore) Path() string { return s.path }
 
 // CanEncrypt reports whether the store has an encryption key, i.e. whether
-// configs carrying secrets can be saved.
+// saved credentials are encrypted at rest rather than stored in plaintext.
 func (s *ConfigStore) CanEncrypt() bool { return s.box != nil }
 
 // Exists reports whether git-backup.json is present on disk.
@@ -99,26 +115,35 @@ func (s *ConfigStore) Load() (Config, bool, error) {
 		Interval:          time.Duration(pc.IntervalSeconds) * time.Second,
 	}
 
-	if pc.SSHKeyEnc != "" {
+	switch {
+	case pc.SSHKeyEnc != "":
 		plain, err := s.decrypt(pc.SSHKeyEnc)
 		if err != nil {
 			return Config{}, false, fmt.Errorf("%w: SSH key: %v", ErrConfigCorrupt, err)
 		}
 		cfg.SSHKey = plain
+	case pc.SSHKeyPlain != "":
+		cfg.SSHKey = pc.SSHKeyPlain
 	}
-	if pc.HTTPPasswordEnc != "" {
+	switch {
+	case pc.HTTPPasswordEnc != "":
 		plain, err := s.decrypt(pc.HTTPPasswordEnc)
 		if err != nil {
 			return Config{}, false, fmt.Errorf("%w: HTTP password: %v", ErrConfigCorrupt, err)
 		}
 		cfg.HTTPPassword = plain
+	case pc.HTTPPasswordPlain != "":
+		cfg.HTTPPassword = pc.HTTPPasswordPlain
 	}
 
 	return cfg, cfg.Enabled, nil
 }
 
-// Save writes cfg to git-backup.json atomically with 0600 permissions,
-// encrypting the SSH key and HTTP password. RootDir/AssetsDir are ignored.
+// Save writes cfg to git-backup.json atomically with 0600 permissions. The SSH
+// key and HTTP password are encrypted when the store has a key, and written in
+// plaintext otherwise (under --disable-auth there is no key to derive from, and
+// with no accounts on the instance at-rest encryption keyed from a co-located
+// secret would add nothing over the 0600 file). RootDir/AssetsDir are ignored.
 func (s *ConfigStore) Save(cfg Config) error {
 	pc := persistedConfig{
 		Enabled:           cfg.Enabled,
@@ -133,18 +158,26 @@ func (s *ConfigStore) Save(cfg Config) error {
 	}
 
 	if cfg.SSHKey != "" {
-		enc, err := s.encrypt(cfg.SSHKey)
-		if err != nil {
-			return fmt.Errorf("encrypt SSH key: %w", err)
+		if s.box != nil {
+			enc, err := s.box.Seal(cfg.SSHKey)
+			if err != nil {
+				return fmt.Errorf("encrypt SSH key: %w", err)
+			}
+			pc.SSHKeyEnc = enc
+		} else {
+			pc.SSHKeyPlain = cfg.SSHKey
 		}
-		pc.SSHKeyEnc = enc
 	}
 	if cfg.HTTPPassword != "" {
-		enc, err := s.encrypt(cfg.HTTPPassword)
-		if err != nil {
-			return fmt.Errorf("encrypt HTTP password: %w", err)
+		if s.box != nil {
+			enc, err := s.box.Seal(cfg.HTTPPassword)
+			if err != nil {
+				return fmt.Errorf("encrypt HTTP password: %w", err)
+			}
+			pc.HTTPPasswordEnc = enc
+		} else {
+			pc.HTTPPasswordPlain = cfg.HTTPPassword
 		}
-		pc.HTTPPasswordEnc = enc
 	}
 
 	data, err := json.MarshalIndent(pc, "", "  ")
@@ -155,13 +188,6 @@ func (s *ConfigStore) Save(cfg Config) error {
 		return fmt.Errorf("write %s: %w", ConfigFileName, err)
 	}
 	return nil
-}
-
-func (s *ConfigStore) encrypt(plain string) (string, error) {
-	if s.box == nil {
-		return "", ErrNoEncryptionKey
-	}
-	return s.box.Seal(plain)
 }
 
 func (s *ConfigStore) decrypt(enc string) (string, error) {
