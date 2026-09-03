@@ -1,0 +1,19 @@
+{
+  "menuLabel": "Öffentlicher Zugriff",
+  "pageTitle": "Öffentlicher Zugriff",
+  "sectionTitle": "Öffentlicher Modus",
+  "sectionDescription": "Im öffentlichen Modus kann jede Seite ohne Anmeldung gelesen werden. Zum Bearbeiten ist weiterhin ein Konto nötig.",
+  "statusOn": "Der öffentliche Modus ist aktiv – jede Seite ist ohne Anmeldung lesbar.",
+  "statusOff": "Der öffentliche Modus ist aus – Besucher müssen sich anmelden, um Seiten zu lesen.",
+  "enableButton": "Öffentlichen Modus aktivieren",
+  "disableButton": "Öffentlichen Modus deaktivieren",
+  "confirmTitle": "Alle Seiten öffentlich machen?",
+  "confirmDescription": "Jede Person, die diese Seite erreicht, kann dann alle Seiten ohne Konto lesen. Du kannst das jederzeit wieder deaktivieren.",
+  "confirmAction": "Öffentlichen Modus aktivieren",
+  "cancel": "Abbrechen",
+  "enabledToast": "Öffentlicher Modus ist jetzt aktiv",
+  "disabledToast": "Öffentlicher Modus ist jetzt aus",
+  "updateError": "Öffentlicher Modus konnte nicht geändert werden",
+  "envManagedTitle": "Durch Umgebungskonfiguration festgelegt",
+  "envManagedDescription": "Der öffentliche Modus wird auf dieser Instanz über LEAFWIKI_PUBLIC_ACCESS / --public-access (oder --disable-auth) gesteuert und kann nur dort geändert werden."
+}
