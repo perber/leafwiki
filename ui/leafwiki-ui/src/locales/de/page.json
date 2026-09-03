@@ -35,7 +35,7 @@
     "deletedToast": "{{item}} erfolgreich gelöscht",
     "deleteErrorFallback": "Fehler beim Löschen von {{item}}",
     "title": "{{item}} löschen?",
-    "description": "Möchten Sie {{item}} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "description": "Möchten Sie {{item}} \"{{name}}\" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
     "deleting": "Wird gelöscht...",
     "delete": "Löschen",
     "modifiedWarningTitle": "Diese Seite wurde von einem anderen Benutzer geändert.",

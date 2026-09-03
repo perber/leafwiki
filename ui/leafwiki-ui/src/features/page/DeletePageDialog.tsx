@@ -127,7 +127,10 @@ export function DeletePageDialog({
     <BaseDialog
       dialogType={DIALOG_DELETE_PAGE_CONFIRMATION}
       dialogTitle={t('deleteDialog.title', { item: itemLabelCapitalized })}
-      dialogDescription={t('deleteDialog.description', { item: itemLabel })}
+      dialogDescription={t('deleteDialog.description', {
+        item: itemLabel,
+        name: page.title,
+      })}
       onClose={() => true}
       onConfirm={async (): Promise<boolean> => {
         return await handleDelete()
