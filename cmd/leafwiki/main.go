@@ -138,9 +138,6 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 	maxAssetUploadSize := mustParseByteSize(cfg.frontend.maxAssetUploadSize, "max asset upload size")
 	restoreUploadMaxSize := mustParseByteSize(cfg.backup.restoreUploadMaxSize, "restore upload max size")
 
-	// If disable-auth is set, the wiki is public regardless of --public-access.
-	publicAccess := cfg.auth.publicAccess
-
 	logoutURL := cfg.proxy.logoutURL
 	if resolved, usedDeprecated := resolveLogoutURL(logoutURL, cfg.proxy.httpRemoteUserLogoutURL); usedDeprecated {
 		slog.Default().Warn("--http-remote-user-logout-url/LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL is deprecated, use --logout-url/LEAFWIKI_LOGOUT_URL instead")
@@ -199,7 +196,6 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 	}
 
 	if cfg.auth.disableAuth {
-		publicAccess = true
 		slog.Default().Warn("Authentication disabled. Wiki is publicly accessible without authentication.")
 	}
 
@@ -215,7 +211,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		slog.Default().Info("Data directory created", "path", cfg.server.dataDir)
 	}
 
-	publicAccessService := buildPublicAccessService(cmd, cfg, publicAccess)
+	publicAccessService := buildPublicAccessService(cmd, cfg)
 
 	if !cfg.auth.disableAuth {
 		if cfg.auth.jwtSecret == "" {
@@ -424,12 +420,13 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 // environment configuration or toggleable at runtime from Settings.
 //
 // It is env-managed when --public-access / LEAFWIKI_PUBLIC_ACCESS was supplied
-// explicitly, or when --disable-auth forces public mode on. Otherwise it is
+// explicitly, or when --disable-auth forces public mode on (both cases keep
+// today's behaviour and get a status-only Settings view). Otherwise it is
 // settings-managed, reading its initial value from
 // <data-dir>/public-access.json (absent ⇒ disabled).
-func buildPublicAccessService(cmd *cli.Command, cfg *serverConfig, resolvedPublicAccess bool) *publicaccess.Service {
+func buildPublicAccessService(cmd *cli.Command, cfg *serverConfig) *publicaccess.Service {
 	if cmd.IsSet("public-access") || cfg.auth.disableAuth {
-		return publicaccess.NewEnvManaged(resolvedPublicAccess)
+		return publicaccess.NewEnvManaged(cfg.auth.publicAccess || cfg.auth.disableAuth)
 	}
 	svc, err := publicaccess.NewSettingsManaged(cfg.server.dataDir)
 	if err != nil {
