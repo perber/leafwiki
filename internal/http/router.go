@@ -18,6 +18,7 @@ import (
 	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/http/middleware/maintenance"
 	"github.com/perber/wiki/internal/http/middleware/security"
+	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/restore"
 )
 
@@ -88,28 +89,12 @@ type HTTPRemoteUserConfig struct {
 	UserService func() *coreauth.UserService
 }
 
-// PublicAccessProvider reports the current "public mode" state (anonymous read
-// access to every page). It is read per request rather than snapshotted at
-// route-registration time so the flag can be toggled at runtime with no
-// restart. *publicaccess.Service satisfies it. EnvManaged reports whether the
-// value is pinned by environment configuration (Settings UI shows it
-// read-only); it never changes for the life of the process.
-type PublicAccessProvider interface {
-	Enabled() bool
-	EnvManaged() bool
-}
-
-// staticPublicAccess is the fallback PublicAccessProvider used when
-// RouterOptions.PublicAccess is left nil (tests, embedders that don't care).
-// It reports a fixed value and, being immutable, presents as env-managed.
-type staticPublicAccess bool
-
-func (s staticPublicAccess) Enabled() bool    { return bool(s) }
-func (s staticPublicAccess) EnvManaged() bool { return true }
-
 // RouterOptions holds global HTTP server configuration shared across all domains.
 type RouterOptions struct {
-	PublicAccess            PublicAccessProvider     // Current public read-access state; read per request
+	// PublicAccess is the current "public mode" state (anonymous read access to
+	// every page), read per request so it can be toggled at runtime with no
+	// restart. nil is treated as a fixed-false provider. See internal/publicaccess.
+	PublicAccess            publicaccess.Provider
 	EditorLimit             int                      // Max admin+editor users allowed; 0 = unlimited
 	InjectCodeInHeader      string                   // Raw HTML/JS code to inject into the <head> tag
 	CustomStylesheet        string                   // Path to a custom CSS file (resolved by wiki before passing)
@@ -159,7 +144,7 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 	}
 
 	if opts.PublicAccess == nil {
-		opts.PublicAccess = staticPublicAccess(false)
+		opts.PublicAccess = publicaccess.Fixed(false)
 	}
 
 	if Environment == "production" {

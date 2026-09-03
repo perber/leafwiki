@@ -9,15 +9,16 @@ import (
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
+	"github.com/perber/wiki/internal/publicaccess"
 )
 
-// flipGate is a PublicReadGate whose value can be toggled between requests,
-// standing in for the runtime-mutable publicaccess.Service.
+// flipGate is a publicaccess.ReadGate whose value can be toggled between
+// requests, standing in for the runtime-mutable publicaccess.Service.
 type flipGate struct{ enabled bool }
 
 func (g *flipGate) Enabled() bool { return g.enabled }
 
-func newAuthOrPublicRouter(auth *coreauth.AuthService, authCookies *authmw.AuthCookies, authDisabled bool, gate authmw.PublicReadGate, inject gin.HandlerFunc) *gin.Engine {
+func newAuthOrPublicRouter(auth *coreauth.AuthService, authCookies *authmw.AuthCookies, authDisabled bool, gate publicaccess.ReadGate, inject gin.HandlerFunc) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	if inject != nil {
