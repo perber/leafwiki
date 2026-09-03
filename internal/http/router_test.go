@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -24,6 +25,7 @@ import (
 	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/wiki"
+	wikiinstancesettings "github.com/perber/wiki/internal/wiki/instancesettings"
 )
 
 func pageNodeKind() *tree.NodeKind {
@@ -3401,6 +3403,159 @@ func TestReadRouteAccessMatrix(t *testing.T) {
 				t.Errorf("POST /api/pages (public=%v, anon): want 401/403, got %d", public, rec.Code)
 			}
 		})
+	}
+}
+
+// routerWithPublicAccess wires the instance-settings registrar (the runtime
+// public-mode toggle endpoint) into a test router, with the same
+// publicaccess.Service backing both the toggle and the read-route gate.
+func routerWithPublicAccess(t *testing.T, w *wiki.Wiki, svc *publicaccess.Service) *gin.Engine {
+	t.Helper()
+	w.SetInstanceSettingsRoutes(wikiinstancesettings.NewRoutes(svc, w.AuthService(), slog.Default()))
+	return httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            svc,
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+	})
+}
+
+func anonStatus(router http.Handler, method, path string) int {
+	req := httptest.NewRequest(method, path, nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	return rec.Code
+}
+
+// TestPublicAccessToggle_SettingsManaged_FlipsReadAccessOnTheSameEngine is the
+// "no restart" regression pin: one *gin.Engine, an anonymous GET /api/tree
+// goes 401 → 200 → 401 as the toggle endpoint is called.
+func TestPublicAccessToggle_SettingsManaged_FlipsReadAccessOnTheSameEngine(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	svc, err := publicaccess.NewSettingsManaged(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewSettingsManaged: %v", err)
+	}
+	router := routerWithPublicAccess(t, w, svc)
+
+	if code := anonStatus(router, http.MethodGet, "/api/tree"); code != http.StatusUnauthorized {
+		t.Fatalf("before toggle: want 401, got %d", code)
+	}
+
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/admin/settings/public-access", strings.NewReader(`{"enabled":true}`))
+	if rec.Code != http.StatusOK || rec.Body.String() != `{"enabled":true}` {
+		t.Fatalf("enable: want 200 {\"enabled\":true}, got %d %s", rec.Code, rec.Body.String())
+	}
+
+	if code := anonStatus(router, http.MethodGet, "/api/tree"); code != http.StatusOK {
+		t.Fatalf("after enable: want 200 on the same engine, got %d", code)
+	}
+
+	rec = authenticatedRequest(t, router, http.MethodPut, "/api/admin/settings/public-access", strings.NewReader(`{"enabled":false}`))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("disable: want 200, got %d %s", rec.Code, rec.Body.String())
+	}
+
+	if code := anonStatus(router, http.MethodGet, "/api/tree"); code != http.StatusUnauthorized {
+		t.Fatalf("after disable: want 401 again, got %d", code)
+	}
+}
+
+func TestPublicAccessToggle_ConfigEndpointReflectsTheChange(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	svc, err := publicaccess.NewSettingsManaged(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewSettingsManaged: %v", err)
+	}
+	router := routerWithPublicAccess(t, w, svc)
+
+	readConfig := func() map[string]any {
+		req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("GET /api/config: %d", rec.Code)
+		}
+		var m map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &m); err != nil {
+			t.Fatalf("decode /api/config: %v", err)
+		}
+		return m
+	}
+
+	cfg := readConfig()
+	if cfg["publicAccess"] != false || cfg["publicAccessEnvManaged"] != false {
+		t.Fatalf("initial config: want publicAccess=false envManaged=false, got %v / %v", cfg["publicAccess"], cfg["publicAccessEnvManaged"])
+	}
+
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/admin/settings/public-access", strings.NewReader(`{"enabled":true}`))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("enable: %d %s", rec.Code, rec.Body.String())
+	}
+
+	if cfg := readConfig(); cfg["publicAccess"] != true {
+		t.Fatalf("after enable: want publicAccess=true, got %v", cfg["publicAccess"])
+	}
+}
+
+func TestPublicAccessToggle_EnvManaged_Returns409AndDoesNotChange(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	svc := publicaccess.NewEnvManaged(false)
+	router := routerWithPublicAccess(t, w, svc)
+
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/admin/settings/public-access", strings.NewReader(`{"enabled":true}`))
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("want 409 for env-managed, got %d %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), publicaccess.ErrCodeEnvManaged) {
+		t.Fatalf("want error code %q in body, got %s", publicaccess.ErrCodeEnvManaged, rec.Body.String())
+	}
+	if code := anonStatus(router, http.MethodGet, "/api/tree"); code != http.StatusUnauthorized {
+		t.Fatalf("env-managed stayed off, but anon tree is %d", code)
+	}
+}
+
+func TestPublicAccessToggle_RequiresAdmin(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	svc, err := publicaccess.NewSettingsManaged(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewSettingsManaged: %v", err)
+	}
+	router := routerWithPublicAccess(t, w, svc)
+
+	// Anonymous → 401.
+	if code := anonStatus(router, http.MethodPut, "/api/admin/settings/public-access"); code != http.StatusUnauthorized {
+		t.Fatalf("anon PUT: want 401, got %d", code)
+	}
+
+	// Editor → 403.
+	authenticatedRequest(t, router, http.MethodPost, "/api/users",
+		strings.NewReader(`{"username":"ed","email":"ed@example.com","password":"editorpass","role":"editor"}`))
+	rec := authenticatedRequestAs(t, router, "ed", "editorpass", http.MethodPut, "/api/admin/settings/public-access", strings.NewReader(`{"enabled":true}`))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("editor PUT: want 403, got %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPublicAccessToggle_BadPayload_Returns400(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	svc, err := publicaccess.NewSettingsManaged(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewSettingsManaged: %v", err)
+	}
+	router := routerWithPublicAccess(t, w, svc)
+
+	for _, body := range []string{`{}`, `{"enabled":"yes"}`, `not json`} {
+		rec := authenticatedRequest(t, router, http.MethodPut, "/api/admin/settings/public-access", strings.NewReader(body))
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("payload %q: want 400, got %d %s", body, rec.Code, rec.Body.String())
+		}
 	}
 }
 
