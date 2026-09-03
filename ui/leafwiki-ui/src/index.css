@@ -2948,6 +2948,18 @@
     @apply text-muted mt-1 text-xs;
   }
 
+  .settings__status-line {
+    @apply text-interface-text mb-3 flex items-center gap-2 text-sm;
+  }
+
+  .settings__status-icon {
+    @apply text-muted h-4 w-4 shrink-0;
+  }
+
+  .settings__notice {
+    @apply border-surface-border bg-surface-alt text-muted flex flex-col gap-1 rounded-md border p-3 text-sm;
+  }
+
   .settings__actions {
     @apply flex justify-end gap-2;
   }

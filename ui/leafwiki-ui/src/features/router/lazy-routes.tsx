@@ -27,6 +27,11 @@ export const BrandingSettings = lazy(() =>
 export const Importer = lazy(() =>
   import('../settings/adminSections').then((m) => ({ default: m.Importer })),
 )
+export const PublicAccessSettings = lazy(() =>
+  import('../settings/adminSections').then((m) => ({
+    default: m.PublicAccessSettings,
+  })),
+)
 export const SnapshotSettings = lazy(() =>
   import('../settings/adminSections').then((m) => ({
     default: m.SnapshotSettings,
