@@ -136,6 +136,17 @@ describe('settingsSections gating (regression for the pre-registry backup/snapsh
     ).toBe(true)
   })
 
+  it('shows public-access to admins and hides it from editors, with no feature flag gate', () => {
+    const publicAccess = settingsSections.find((s) => s.id === 'public-access')!
+    expect(publicAccess.isEnabled).toBeUndefined()
+    expect(isSectionVisible(publicAccess, { ...baseCtx, role: 'admin' })).toBe(
+      true,
+    )
+    expect(isSectionVisible(publicAccess, { ...baseCtx, role: 'editor' })).toBe(
+      false,
+    )
+  })
+
   it('gates api-keys behind enableApiKeyManagement', () => {
     const apiKeys = settingsSections.find((s) => s.id === 'api-keys')!
     expect(

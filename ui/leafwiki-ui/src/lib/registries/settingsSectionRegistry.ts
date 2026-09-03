@@ -11,6 +11,7 @@ import {
   BackupSettings,
   BrandingSettings,
   Importer,
+  PublicAccessSettings,
   SnapshotSettings,
   UserManagement,
 } from '@/features/router/lazy-routes'
@@ -19,6 +20,7 @@ import { useSessionStore } from '@/stores/session'
 import {
   Camera,
   GitBranch,
+  Globe,
   KeyRound,
   Palette,
   Upload,
@@ -87,6 +89,17 @@ export const settingsSections: SettingsSection[] = [
     icon: Palette,
     roles: ['admin'],
     Component: BrandingSettings,
+  },
+  {
+    id: 'public-access',
+    path: 'public-access',
+    labelKey: 'menuLabel',
+    ns: 'publicAccess',
+    icon: Globe,
+    roles: ['admin'],
+    // Always visible to admins; env-managed instances render a status-only
+    // view inside the component rather than being hidden.
+    Component: PublicAccessSettings,
   },
   {
     id: 'users',
