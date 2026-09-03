@@ -12,7 +12,6 @@ import (
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	httpinternal "github.com/perber/wiki/internal/http"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
-	"github.com/perber/wiki/internal/http/middleware/security"
 	"github.com/perber/wiki/internal/publicaccess"
 )
 
@@ -33,20 +32,13 @@ func NewRoutes(publicAccess *publicaccess.Service, authService *coreauth.AuthSer
 
 // RegisterRoutes implements RouteRegistrar.
 func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
-	opts := ctx.Opts
-
-	adminGroup := ctx.Base.Group("/api/admin/settings")
-	adminGroup.Use(
-		authmw.InjectPublicEditor(opts.AuthDisabled),
-		authmw.RequireAuth(r.authService, ctx.AuthCookies, opts.AuthDisabled),
-		security.CSRFMiddleware(ctx.CSRFCookie),
-	)
+	adminGroup := ctx.APIAuthGroup(r.authService).Group("/admin/settings")
 	// Flipping instance-wide anonymous access is a browser-session-only
 	// action, like API-key management — an API key must not be able to do it
 	// (CSRF already blocks bearer clients today, RequireCookieSession makes
 	// the intent explicit and independent of that).
 	adminGroup.PUT("/public-access",
-		authmw.RequireAdmin(opts.AuthDisabled),
+		authmw.RequireAdmin(ctx.Opts.AuthDisabled),
 		authmw.RequireCookieSession(),
 		r.handleSetPublicAccess,
 	)
