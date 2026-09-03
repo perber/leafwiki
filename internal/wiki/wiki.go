@@ -33,6 +33,7 @@ import (
 	wikibranding "github.com/perber/wiki/internal/wiki/branding"
 	wikihealth "github.com/perber/wiki/internal/wiki/health"
 	wikiimporter "github.com/perber/wiki/internal/wiki/importer"
+	wikiinstancesettings "github.com/perber/wiki/internal/wiki/instancesettings"
 	wikilinks "github.com/perber/wiki/internal/wiki/links"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
 	"github.com/perber/wiki/internal/wiki/pagesave"
@@ -64,38 +65,39 @@ type Wiki struct {
 	storageDir        string
 
 	// Domain route registrars (populated by NewWiki).
-	pagesRoutes        *wikipages.Routes
-	authRoutes         *wikiauth.Routes
-	assetsRoutes       *wikiassets.Routes
-	revisionsRoutes    *wikirevisions.Routes
-	searchRoutes       *wikisearch.Routes
-	linksRoutes        *wikilinks.Routes
-	tagsRoutes         *wikitags.Routes
-	propertiesRoutes   *wikiproperties.Routes
-	brandingRoutes     *wikibranding.Routes
-	avatarRoutes       *wikiavatar.Routes
-	apiKeysRoutes      *wikiapikeys.Routes
-	importerRoutes     *wikiimporter.Routes
-	healthRoutes       *wikihealth.Routes
-	revision           *revision.Service
-	links              *links.LinkService
-	tags               *tags.TagsService
-	props              *properties.PropertiesService
-	favorites          *favorites.FavoritesStore
-	userSettings       *usersettings.UserSettingsService
-	userSettingsRoutes *wikiusersettings.Routes
-	backupRoutes       *wikibackup.Routes
-	snapshotRoutes     *wikisnapshot.Routes
-	restoreRoutes      *wikirestore.Routes
-	resyncRoutes       *wikiresync.Routes
-	resyncJob          *wikiresync.ResyncJob
-	ignoreCache        *ignore.Cache
-	reloadMu           sync.Mutex
-	reloadWG           sync.WaitGroup
-	shutdownCtx        context.Context
-	shutdownCancel     context.CancelFunc
-	log                *slog.Logger
-	metrics            *httpmetrics.HTTPMetrics
+	pagesRoutes            *wikipages.Routes
+	authRoutes             *wikiauth.Routes
+	assetsRoutes           *wikiassets.Routes
+	revisionsRoutes        *wikirevisions.Routes
+	searchRoutes           *wikisearch.Routes
+	linksRoutes            *wikilinks.Routes
+	tagsRoutes             *wikitags.Routes
+	propertiesRoutes       *wikiproperties.Routes
+	brandingRoutes         *wikibranding.Routes
+	avatarRoutes           *wikiavatar.Routes
+	apiKeysRoutes          *wikiapikeys.Routes
+	importerRoutes         *wikiimporter.Routes
+	healthRoutes           *wikihealth.Routes
+	revision               *revision.Service
+	links                  *links.LinkService
+	tags                   *tags.TagsService
+	props                  *properties.PropertiesService
+	favorites              *favorites.FavoritesStore
+	userSettings           *usersettings.UserSettingsService
+	userSettingsRoutes     *wikiusersettings.Routes
+	backupRoutes           *wikibackup.Routes
+	snapshotRoutes         *wikisnapshot.Routes
+	restoreRoutes          *wikirestore.Routes
+	instanceSettingsRoutes *wikiinstancesettings.Routes
+	resyncRoutes           *wikiresync.Routes
+	resyncJob              *wikiresync.ResyncJob
+	ignoreCache            *ignore.Cache
+	reloadMu               sync.Mutex
+	reloadWG               sync.WaitGroup
+	shutdownCtx            context.Context
+	shutdownCancel         context.CancelFunc
+	log                    *slog.Logger
+	metrics                *httpmetrics.HTTPMetrics
 }
 
 const SYSTEM_USER_ID = "system"
@@ -677,6 +679,9 @@ func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
 	if w.restoreRoutes != nil {
 		registrars = append(registrars, w.restoreRoutes)
 	}
+	if w.instanceSettingsRoutes != nil {
+		registrars = append(registrars, w.instanceSettingsRoutes)
+	}
 	return registrars
 }
 
@@ -693,6 +698,11 @@ func (w *Wiki) SetSnapshotRoutes(r *wikisnapshot.Routes) {
 // SetRestoreRoutes sets the live-restore routes and must be called before router creation.
 func (w *Wiki) SetRestoreRoutes(r *wikirestore.Routes) {
 	w.restoreRoutes = r
+}
+
+// SetInstanceSettingsRoutes sets the runtime instance-settings routes and must be called before router creation.
+func (w *Wiki) SetInstanceSettingsRoutes(r *wikiinstancesettings.Routes) {
+	w.instanceSettingsRoutes = r
 }
 
 // AuthService returns the authentication service.
