@@ -135,12 +135,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	)
 	meGroup.GET("/auth/me", r.handleMe)
 
-	authGroup := ctx.Base.Group("/api")
-	authGroup.Use(
-		authmw.InjectPublicEditor(opts.AuthDisabled),
-		authmw.RequireAuth(r.authService, ctx.AuthCookies, opts.AuthDisabled),
-		security.CSRFMiddleware(ctx.CSRFCookie),
-	)
+	authGroup := ctx.APIAuthGroup(r.authService)
 
 	authGroup.POST("/auth/logout", r.handleLogout(ctx))
 
