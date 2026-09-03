@@ -1,0 +1,19 @@
+{
+  "menuLabel": "Public access",
+  "pageTitle": "Public access",
+  "sectionTitle": "Public mode",
+  "sectionDescription": "When public mode is on, every page can be read without signing in. Editing still requires an account.",
+  "statusOn": "Public mode is on — every page is readable without signing in.",
+  "statusOff": "Public mode is off — visitors must sign in to read pages.",
+  "enableButton": "Enable public mode",
+  "disableButton": "Turn off public mode",
+  "confirmTitle": "Make every page public?",
+  "confirmDescription": "Anyone who can reach this site will be able to read all pages without an account. You can turn this off again at any time.",
+  "confirmAction": "Enable public mode",
+  "cancel": "Cancel",
+  "enabledToast": "Public mode is now on",
+  "disabledToast": "Public mode is now off",
+  "updateError": "Could not update public mode",
+  "envManagedTitle": "Set by environment configuration",
+  "envManagedDescription": "Public mode is controlled by the LEAFWIKI_PUBLIC_ACCESS / --public-access setting (or --disable-auth) on this instance and can only be changed there."
+}
