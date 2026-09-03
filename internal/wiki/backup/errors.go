@@ -8,7 +8,7 @@ const (
 	ErrCodeBackupEnvManaged        = "backup_env_managed"
 	ErrCodeBackupInvalidConfig     = "backup_invalid_config"
 	ErrCodeBackupRemoteUnreachable = "backup_remote_unreachable"
-	ErrCodeBackupNoEncryptionKey   = "backup_no_encryption_key"
+	ErrCodeBackupConfigCorrupt     = "backup_config_corrupt"
 )
 
 // BackupErrorResponse is the structured JSON error body returned by backup endpoints.

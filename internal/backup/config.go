@@ -80,6 +80,34 @@ func (c Config) ValidateForSettings() error {
 // (git@host:path) are returned unchanged.
 func RedactRemoteURL(remote string) string { return redactRemote(remote) }
 
+// WithKeptSecrets returns c with any blank secret field (SSHKey, HTTPPassword)
+// filled from prev. It implements the settings form's "leave blank to keep the
+// stored value" contract without the plaintext secret ever being sent to the
+// browser.
+func (c Config) WithKeptSecrets(prev Config) Config {
+	if c.SSHKey == "" {
+		c.SSHKey = prev.SSHKey
+	}
+	if c.HTTPPassword == "" {
+		c.HTTPPassword = prev.HTTPPassword
+	}
+	return c
+}
+
+// WithoutForeignTransportCreds returns c with the credentials that don't belong
+// to its remote's transport cleared, so an SSH key never lingers on an HTTP(S)
+// remote and an HTTP password never lingers on an SSH remote. A local-only or
+// unrecognised remote is left untouched.
+func (c Config) WithoutForeignTransportCreds() Config {
+	switch ClassifyRemote(c.RemoteURL) {
+	case TransportHTTP:
+		c.SSHKey, c.SSHKeyPath, c.SSHKnownHostsPath = "", "", ""
+	case TransportSSH:
+		c.HTTPUsername, c.HTTPPassword = "", ""
+	}
+	return c
+}
+
 // ValidateRemoteCredentials checks that the remote URL is a supported transport
 // (SSH or HTTP(S)) and that credentials matching that transport are present:
 // HTTP(S) remotes need a username + password/token (or credentials embedded in
@@ -87,13 +115,14 @@ func RedactRemoteURL(remote string) string { return redactRemote(remote) }
 // needs nothing. This is the shared core of both the ENV/flag validation in
 // cmd/leafwiki and Config.ValidateForSettings.
 func ValidateRemoteCredentials(remote, sshKey, sshKeyPath, httpUsername, httpPassword string) error {
-	if strings.TrimSpace(remote) == "" {
-		return nil
-	}
-	lower := strings.ToLower(remote)
+	switch ClassifyRemote(remote) {
+	case TransportUnknown:
+		if strings.TrimSpace(remote) == "" {
+			return nil // local-only backup, no credentials needed
+		}
+		return fmt.Errorf("the remote must be an SSH URL (git@host:user/repo.git or ssh://...) or an HTTP(S) URL")
 
-	switch {
-	case strings.HasPrefix(lower, "http://"), strings.HasPrefix(lower, "https://"):
+	case TransportHTTP:
 		if httpUsername == "" && httpPassword == "" {
 			if parsed, err := url.Parse(remote); err == nil && parsed.User != nil {
 				return nil
@@ -105,13 +134,10 @@ func ValidateRemoteCredentials(remote, sshKey, sshKeyPath, httpUsername, httpPas
 		}
 		return nil
 
-	case strings.HasPrefix(lower, "git@"), strings.HasPrefix(lower, "ssh://"):
+	default: // TransportSSH
 		if sshKey == "" && sshKeyPath == "" {
 			return fmt.Errorf("an SSH private key (inline or a key file path) is required for an SSH remote")
 		}
 		return nil
-
-	default:
-		return fmt.Errorf("the remote must be an SSH URL (git@host:user/repo.git or ssh://...) or an HTTP(S) URL")
 	}
 }

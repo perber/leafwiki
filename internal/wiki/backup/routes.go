@@ -2,6 +2,7 @@ package wikibackup
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -175,18 +176,21 @@ func (r *Routes) handleGetBackupConfig(c *gin.Context) {
 		slog.Warn("backup: could not read current config for settings", "error", err)
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"available":              true,
-		"envManaged":             r.mgr.EnvManaged(),
-		"enabled":                r.mgr.Enabled(),
-		"encryptionKeyAvailable": r.mgr.CanStoreSecrets(),
-		"minIntervalMinutes":     int(backupSvc.MinSettingsInterval / time.Minute),
-		"maxIntervalMinutes":     int(backupSvc.MaxSettingsInterval / time.Minute),
+		"available":  true,
+		"envManaged": r.mgr.EnvManaged(),
+		"enabled":    r.mgr.Enabled(),
+		// Wire name kept as encryptionKeyAvailable; server-side this is
+		// Manager.CredentialsEncrypted() ("are saved credentials encrypted at
+		// rest"). It only drives an informational note, never any gating.
+		"encryptionKeyAvailable": r.mgr.CredentialsEncrypted(),
+		"minIntervalMinutes":     minSettingsIntervalMinutes,
+		"maxIntervalMinutes":     maxSettingsIntervalMinutes,
 		"config": gin.H{
 			"remoteUrl":         backupSvc.RedactRemoteURL(cfg.RemoteURL),
 			"branch":            cfg.Branch,
 			"authorName":        cfg.AuthorName,
 			"authorEmail":       cfg.AuthorEmail,
-			"authMode":          authModeFor(cfg.RemoteURL),
+			"authMode":          string(backupSvc.ClassifyRemote(cfg.RemoteURL)),
 			"sshKeyPath":        cfg.SSHKeyPath,
 			"sshKnownHostsPath": cfg.SSHKnownHostsPath,
 			"httpUsername":      cfg.HTTPUsername,
@@ -211,9 +215,6 @@ func (r *Routes) handleSaveBackupConfig(c *gin.Context) {
 		switch {
 		case errors.Is(err, backupSvc.ErrEnvManaged):
 			r.respondEnvManaged(c)
-		case errors.Is(err, backupSvc.ErrNoEncryptionKey):
-			respondWithBackupStatusError(c, http.StatusBadRequest, ErrCodeBackupNoEncryptionKey,
-				"Storing backup credentials requires an encryption key; it is unavailable when authentication is disabled", "")
 		default:
 			respondWithBackupStatusError(c, http.StatusInternalServerError, ErrCodeBackupInternalError, err.Error(), "backup internal error")
 		}
@@ -271,38 +272,50 @@ func (r *Routes) bindAndValidateConfig(c *gin.Context) (backupSvc.Config, bool) 
 		return backupSvc.Config{}, false
 	}
 
-	current, _ := r.mgr.CurrentConfig()
+	// Range-check the raw minutes before turning them into a time.Duration:
+	// time.Duration(req.IntervalMinutes) * time.Minute overflows int64 for
+	// large inputs and can wrap back into the [min, max] window, silently
+	// bypassing Config.ValidateForSettings' bound check further down.
+	if req.IntervalMinutes < minSettingsIntervalMinutes || req.IntervalMinutes > maxSettingsIntervalMinutes {
+		respondWithBackupStatusError(c, http.StatusBadRequest, ErrCodeBackupInvalidConfig,
+			fmt.Sprintf("sync interval must be between %d and %d minutes", minSettingsIntervalMinutes, maxSettingsIntervalMinutes), "")
+		return backupSvc.Config{}, false
+	}
+
+	current, err := r.mgr.CurrentConfig()
+	if err != nil {
+		// The stored config exists but can't be read (e.g. the JWT secret it was
+		// encrypted with changed). Don't silently treat the "keep existing"
+		// secrets as blank and fail with a misleading "credentials required" —
+		// tell the admin the stored config is unreadable so they re-enter it.
+		respondWithBackupStatusError(c, http.StatusBadRequest, ErrCodeBackupConfigCorrupt,
+			"the stored backup configuration could not be read (was the server secret changed?); re-enter the remote URL and credentials", "")
+		return backupSvc.Config{}, false
+	}
+
+	remoteURL := strings.TrimSpace(req.RemoteURL)
+	// The browser only ever received the redacted remote URL. If it comes back
+	// unchanged, keep the real credential-bearing one rather than persisting the
+	// "xxxxx" placeholder (which would then fail authentication).
+	if remoteURL != "" && current.RemoteURL != "" && remoteURL == backupSvc.RedactRemoteURL(current.RemoteURL) {
+		remoteURL = current.RemoteURL
+	}
+
 	cfg := backupSvc.Config{
-		RemoteURL:         strings.TrimSpace(req.RemoteURL),
+		RemoteURL:         remoteURL,
 		Branch:            strings.TrimSpace(req.Branch),
 		AuthorName:        strings.TrimSpace(req.AuthorName),
 		AuthorEmail:       strings.TrimSpace(req.AuthorEmail),
+		SSHKey:            req.SSHKey, // blank -> kept from current below
 		SSHKeyPath:        strings.TrimSpace(req.SSHKeyPath),
 		SSHKnownHostsPath: strings.TrimSpace(req.SSHKnownHostsPath),
 		HTTPUsername:      strings.TrimSpace(req.HTTPUsername),
+		HTTPPassword:      req.HTTPPassword, // blank -> kept from current below
 		Interval:          time.Duration(req.IntervalMinutes) * time.Minute,
 	}
-	// "keep existing" secrets.
-	if req.SSHKey != "" {
-		cfg.SSHKey = req.SSHKey
-	} else {
-		cfg.SSHKey = current.SSHKey
-	}
-	if req.HTTPPassword != "" {
-		cfg.HTTPPassword = req.HTTPPassword
-	} else {
-		cfg.HTTPPassword = current.HTTPPassword
-	}
-	// Drop credentials that don't match the chosen transport so stale ones from
-	// the other mode never linger in git-backup.json.
-	switch authModeFor(cfg.RemoteURL) {
-	case "https":
-		cfg.SSHKey, cfg.SSHKeyPath, cfg.SSHKnownHostsPath = "", "", ""
-	case "ssh":
-		cfg.HTTPUsername, cfg.HTTPPassword = "", ""
-	}
-
-	cfg = cfg.WithSettingsDefaults()
+	cfg = cfg.WithKeptSecrets(current).
+		WithoutForeignTransportCreds().
+		WithSettingsDefaults()
 	if err := cfg.ValidateForSettings(); err != nil {
 		respondWithBackupStatusError(c, http.StatusBadRequest, ErrCodeBackupInvalidConfig, err.Error(), "")
 		return backupSvc.Config{}, false
@@ -315,21 +328,17 @@ func (r *Routes) respondEnvManaged(c *gin.Context) {
 		"Git backup is configured via environment variables and cannot be changed here", "")
 }
 
-func authModeFor(remoteURL string) string {
-	l := strings.ToLower(strings.TrimSpace(remoteURL))
-	switch {
-	case l == "":
-		return ""
-	case strings.HasPrefix(l, "http://"), strings.HasPrefix(l, "https://"):
-		return "https"
-	default:
-		return "ssh"
-	}
-}
+// minSettingsIntervalMinutes / maxSettingsIntervalMinutes are the sync-interval
+// bounds expressed in whole minutes, matching what the UI submits and what
+// GET /backup/config advertises.
+const (
+	minSettingsIntervalMinutes = int(backupSvc.MinSettingsInterval / time.Minute)
+	maxSettingsIntervalMinutes = int(backupSvc.MaxSettingsInterval / time.Minute)
+)
 
 func intervalMinutes(cfg backupSvc.Config) int {
 	if cfg.Interval <= 0 {
-		return int(backupSvc.MinSettingsInterval / time.Minute)
+		return minSettingsIntervalMinutes
 	}
 	return int(cfg.Interval / time.Minute)
 }

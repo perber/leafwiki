@@ -224,6 +224,7 @@ func (r *Routes) handleConfig(ctx httpinternal.RouterContext) gin.HandlerFunc {
 			"enableApiKeyManagement":   opts.EnableAPIKeyManagement,
 			"gitBackupEnabled":         opts.GitBackupEnabled,
 			"gitBackupEnvManaged":      opts.GitBackupEnvManaged,
+			"gitBackupConfigured":      opts.GitBackupConfigured,
 			"snapshotEnabled":          opts.SnapshotEnabled,
 			"smtpEnabled":              opts.SMTPEnabled,
 			"totpAvailable":            opts.TOTPAvailable,

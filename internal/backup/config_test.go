@@ -66,3 +66,59 @@ func TestConfig_WithSettingsDefaults_FillsOptionalFields(t *testing.T) {
 		t.Fatalf("defaults not applied: %+v", got)
 	}
 }
+
+func TestConfig_WithKeptSecrets(t *testing.T) {
+	prev := Config{SSHKey: "OLD-KEY", HTTPPassword: "OLD-PASS"}
+
+	// Blank incoming secrets are backfilled from prev.
+	got := Config{}.WithKeptSecrets(prev)
+	if got.SSHKey != "OLD-KEY" || got.HTTPPassword != "OLD-PASS" {
+		t.Fatalf("blank secrets not kept: %+v", got)
+	}
+
+	// Provided incoming secrets win.
+	got = Config{SSHKey: "NEW-KEY", HTTPPassword: "NEW-PASS"}.WithKeptSecrets(prev)
+	if got.SSHKey != "NEW-KEY" || got.HTTPPassword != "NEW-PASS" {
+		t.Fatalf("provided secrets should win: %+v", got)
+	}
+
+	// Mixed: keep one, replace the other.
+	got = Config{SSHKey: "NEW-KEY"}.WithKeptSecrets(prev)
+	if got.SSHKey != "NEW-KEY" || got.HTTPPassword != "OLD-PASS" {
+		t.Fatalf("mixed keep/replace wrong: %+v", got)
+	}
+}
+
+func TestConfig_WithoutForeignTransportCreds(t *testing.T) {
+	full := Config{
+		SSHKey: "k", SSHKeyPath: "/k", SSHKnownHostsPath: "/kh",
+		HTTPUsername: "u", HTTPPassword: "p",
+	}
+
+	https := full
+	https.RemoteURL = "https://example.com/r.git"
+	https = https.WithoutForeignTransportCreds()
+	if https.SSHKey != "" || https.SSHKeyPath != "" || https.SSHKnownHostsPath != "" {
+		t.Fatalf("HTTP(S) remote kept SSH creds: %+v", https)
+	}
+	if https.HTTPUsername != "u" || https.HTTPPassword != "p" {
+		t.Fatalf("HTTP(S) remote dropped its own creds: %+v", https)
+	}
+
+	ssh := full
+	ssh.RemoteURL = "git@example.com:r.git"
+	ssh = ssh.WithoutForeignTransportCreds()
+	if ssh.HTTPUsername != "" || ssh.HTTPPassword != "" {
+		t.Fatalf("SSH remote kept HTTP creds: %+v", ssh)
+	}
+	if ssh.SSHKey != "k" || ssh.SSHKeyPath != "/k" || ssh.SSHKnownHostsPath != "/kh" {
+		t.Fatalf("SSH remote dropped its own creds: %+v", ssh)
+	}
+
+	// Unknown / local-only remote: nothing is touched.
+	local := full
+	local.RemoteURL = ""
+	if local.WithoutForeignTransportCreds() != full {
+		t.Fatalf("local-only remote should keep everything")
+	}
+}

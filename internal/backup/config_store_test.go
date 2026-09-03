@@ -13,7 +13,7 @@ import (
 
 func testBox(t *testing.T) *sharedcrypto.SecretBox {
 	t.Helper()
-	key, err := sharedcrypto.DeriveKey([]byte("test-jwt-secret"), "leafwiki:git-backup-credentials:v1")
+	key, err := sharedcrypto.DeriveKey([]byte("test-jwt-secret"), CredentialsKeyInfo)
 	if err != nil {
 		t.Fatalf("DeriveKey: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestConfigStore_Load_WrongKey_ReturnsErrConfigCorrupt(t *testing.T) {
 		t.Fatalf("Save: %v", err)
 	}
 
-	otherKey, _ := sharedcrypto.DeriveKey([]byte("a-different-jwt-secret"), "leafwiki:git-backup-credentials:v1")
+	otherKey, _ := sharedcrypto.DeriveKey([]byte("a-different-jwt-secret"), CredentialsKeyInfo)
 	otherBox, _ := sharedcrypto.NewSecretBox(otherKey)
 
 	if _, _, err := NewConfigStore(dir, otherBox).Load(); !errors.Is(err, ErrConfigCorrupt) {
@@ -141,11 +141,59 @@ func TestConfigStore_Load_WrongKey_ReturnsErrConfigCorrupt(t *testing.T) {
 	}
 }
 
-func TestConfigStore_Save_NoBoxButSecretPresent_ReturnsErrNoEncryptionKey(t *testing.T) {
-	s := NewConfigStore(t.TempDir(), nil)
-	err := s.Save(Config{Enabled: true, RemoteURL: "https://x/y.git", HTTPUsername: "u", HTTPPassword: "s", Interval: time.Hour})
-	if !errors.Is(err, ErrNoEncryptionKey) {
-		t.Fatalf("expected ErrNoEncryptionKey, got %v", err)
+func TestConfigStore_Save_NoBox_StoresSecretInPlaintext(t *testing.T) {
+	dir := t.TempDir()
+	s := NewConfigStore(dir, nil) // --disable-auth: no key to encrypt with
+
+	const secret = "ghp_disable_auth_plaintext_token"
+	if err := s.Save(Config{
+		Enabled:      true,
+		RemoteURL:    "https://example.com/repo.git",
+		HTTPUsername: "u",
+		HTTPPassword: secret,
+		Interval:     time.Hour,
+	}); err != nil {
+		t.Fatalf("Save without a box should succeed: %v", err)
+	}
+
+	// Deliberate tradeoff: with no key and no accounts on the instance, the
+	// secret lives in the 0600 file in plaintext. Pin it so a regression is a
+	// conscious decision, not an accident.
+	raw, err := os.ReadFile(filepath.Join(dir, ConfigFileName))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), secret) {
+		t.Fatalf("expected the secret in plaintext on disk under --disable-auth, got:\n%s", raw)
+	}
+	if info, _ := os.Stat(filepath.Join(dir, ConfigFileName)); info.Mode().Perm() != 0o600 {
+		t.Fatalf("git-backup.json perm = %o, want 600", info.Mode().Perm())
+	}
+
+	got, enabled, err := s.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !enabled || got.HTTPPassword != secret || got.HTTPUsername != "u" {
+		t.Fatalf("plaintext creds did not round trip: %+v enabled=%v", got, enabled)
+	}
+}
+
+func TestConfigStore_Load_CiphertextButNoBox_ReturnsErrConfigCorrupt(t *testing.T) {
+	// Config saved while auth was enabled, then the server restarts with
+	// --disable-auth: the ciphertext can no longer be opened.
+	dir := t.TempDir()
+	if err := NewConfigStore(dir, testBox(t)).Save(Config{
+		Enabled:      true,
+		RemoteURL:    "https://example.com/repo.git",
+		HTTPUsername: "u",
+		HTTPPassword: "secret",
+		Interval:     2 * time.Minute,
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	if _, _, err := NewConfigStore(dir, nil).Load(); !errors.Is(err, ErrConfigCorrupt) {
+		t.Fatalf("expected ErrConfigCorrupt when the encryption key is gone, got %v", err)
 	}
 }
 
