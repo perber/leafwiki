@@ -4,6 +4,7 @@ import (
 	"github.com/perber/wiki/internal/branding"
 	"github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/favorites"
+	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/snapshot"
 	"github.com/perber/wiki/internal/usersettings"
 )
@@ -46,6 +47,11 @@ type Config struct {
 	// BrandingService's in-memory config cache is reloaded from the restored
 	// branding.json after the file swap.
 	BrandingService *branding.BrandingService
+	// PublicAccess's in-memory flag is reloaded from the restored
+	// public-access.json after the file swap, mirroring BrandingService. nil
+	// (and Reload is a no-op) for env-managed instances; nil-guarded anyway
+	// for test-fixture parity.
+	PublicAccess *publicaccess.Service
 	// UserResolver's own in-memory author-label cache is reloaded after
 	// AuthService.ReplaceUserStore succeeds — the live UserService pointer
 	// alone doesn't invalidate labels already cached before the restore. nil

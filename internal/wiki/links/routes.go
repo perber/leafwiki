@@ -34,7 +34,7 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	opts := ctx.Opts
 
-	if opts.PublicAccess {
+	if opts.PublicAccess.Enabled() {
 		pub := ctx.Base.Group("/api")
 		pub.GET("/pages/:id/links", r.handleGetLinkStatus)
 	}
@@ -46,7 +46,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		security.CSRFMiddleware(ctx.CSRFCookie),
 	)
 
-	if !opts.PublicAccess {
+	if !opts.PublicAccess.Enabled() {
 		authGroup.GET("/pages/:id/links", r.handleGetLinkStatus)
 	}
 }

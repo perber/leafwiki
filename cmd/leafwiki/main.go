@@ -30,6 +30,7 @@ import (
 	httpinternal "github.com/perber/wiki/internal/http"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
+	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/restore"
 	"github.com/perber/wiki/internal/snapshot"
 	"github.com/perber/wiki/internal/wiki"
@@ -213,6 +214,8 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		slog.Default().Info("Data directory created", "path", cfg.server.dataDir)
 	}
 
+	publicAccessService := buildPublicAccessService(cmd, cfg, publicAccess)
+
 	if !cfg.auth.disableAuth {
 		if cfg.auth.jwtSecret == "" {
 			fail("JWT secret is required. Set it using --jwt-secret or LEAFWIKI_JWT_SECRET environment variable.")
@@ -348,6 +351,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 			Favorites:          w.Favorites(),
 			UserSettings:       w.UserSettingsService(),
 			BrandingService:    w.BrandingService(),
+			PublicAccess:       publicAccessService,
 			UserResolver:       w.UserResolver(),
 			TriggerResync:      w.TriggerResyncAsync,
 			MaxUploadSizeBytes: restoreUploadMaxSize,
@@ -360,7 +364,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 	}
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            publicAccess,
+		PublicAccess:            publicAccessService,
 		EditorLimit:             cfg.auth.editorLimit,
 		InjectCodeInHeader:      cfg.frontend.injectCodeInHeader,
 		CustomStylesheet:        cfg.frontend.customStylesheet,
@@ -411,6 +415,24 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 	}
 
 	return nil
+}
+
+// buildPublicAccessService decides whether "public mode" is pinned by
+// environment configuration or toggleable at runtime from Settings.
+//
+// It is env-managed when --public-access / LEAFWIKI_PUBLIC_ACCESS was supplied
+// explicitly, or when --disable-auth forces public mode on. Otherwise it is
+// settings-managed, reading its initial value from
+// <data-dir>/public-access.json (absent ⇒ disabled).
+func buildPublicAccessService(cmd *cli.Command, cfg *serverConfig, resolvedPublicAccess bool) *publicaccess.Service {
+	if cmd.IsSet("public-access") || cfg.auth.disableAuth {
+		return publicaccess.NewEnvManaged(resolvedPublicAccess)
+	}
+	svc, err := publicaccess.NewSettingsManaged(cfg.server.dataDir)
+	if err != nil {
+		fail("Failed to load public-access configuration", "error", err)
+	}
+	return svc
 }
 
 func runServer(
