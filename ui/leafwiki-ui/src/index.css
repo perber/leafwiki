@@ -2724,12 +2724,25 @@
     @apply hover:bg-tree-node-hover;
   }
 
+  /* Keeps the row of the page a delete confirmation dialog is about to
+     remove visually distinct while that dialog is open, even though the
+     "..." menu that opened it has already closed. Takes precedence over
+     --active (defined below it) since deleting a different page than the
+     one you're currently viewing must never look ambiguous. */
+  .tree-node--delete-target {
+    @apply bg-error/10;
+  }
+
   .tree-node__marker {
     @apply bg-surface-border absolute top-0 bottom-0 w-0.5;
   }
 
   .tree-node__marker--active {
     @apply bg-brand/60;
+  }
+
+  .tree-node__marker--delete-target {
+    @apply bg-error/60;
   }
 
   .tree-node__main {
@@ -2766,6 +2779,10 @@
 
   .tree-node__title--active {
     @apply text-brand;
+  }
+
+  .tree-node__title--delete-target {
+    @apply text-error;
   }
 
   .tree-node__actions {
