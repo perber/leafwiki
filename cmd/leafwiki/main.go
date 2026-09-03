@@ -35,6 +35,7 @@ import (
 	"github.com/perber/wiki/internal/snapshot"
 	"github.com/perber/wiki/internal/wiki"
 	wikibackup "github.com/perber/wiki/internal/wiki/backup"
+	wikiinstancesettings "github.com/perber/wiki/internal/wiki/instancesettings"
 	wikirestore "github.com/perber/wiki/internal/wiki/restore"
 	wikisnapshot "github.com/perber/wiki/internal/wiki/snapshot"
 	"github.com/urfave/cli/v3"
@@ -263,6 +264,8 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 	if err != nil {
 		fail("Failed to initialize Wiki", "error", err)
 	}
+
+	w.SetInstanceSettingsRoutes(wikiinstancesettings.NewRoutes(publicAccessService, w.AuthService(), slog.Default()))
 
 	// Log .leafwikiignore status
 	rootDir := filepath.Join(cfg.server.dataDir, "root")
