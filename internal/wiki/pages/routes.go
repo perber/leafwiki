@@ -13,7 +13,6 @@ import (
 	httpinternal "github.com/perber/wiki/internal/http"
 	"github.com/perber/wiki/internal/http/dto"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
-	"github.com/perber/wiki/internal/http/middleware/security"
 )
 
 const (
@@ -109,14 +108,9 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	opts := ctx.Opts
 
-	// Read routes registered once, gated per request: RequireAuthOrPublicRead
-	// lets them flip between authenticated-only and public without a restart.
-	readGroup := ctx.Base.Group("/api")
-	readGroup.Use(
-		authmw.InjectPublicEditor(opts.AuthDisabled),
-		authmw.RequireAuthOrPublicRead(r.authService, ctx.AuthCookies, opts.AuthDisabled, opts.PublicAccess),
-		security.CSRFMiddleware(ctx.CSRFCookie),
-	)
+	// Read routes registered once, gated per request so they can flip between
+	// authenticated-only and public without a restart (see APIReadGroup).
+	readGroup := ctx.APIReadGroup(r.authService)
 	readGroup.GET("/tree", r.handleGetTree)
 	readGroup.GET(pagesIdRoutePath, r.handleGetPage)
 	readGroup.GET("/pages/lookup", r.handleLookupPath)
@@ -126,12 +120,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 	// Everything below needs a real authenticated user regardless of public
 	// mode (writes, editor-gated reads, per-user favorites).
-	authGroup := ctx.Base.Group("/api")
-	authGroup.Use(
-		authmw.InjectPublicEditor(opts.AuthDisabled),
-		authmw.RequireAuth(r.authService, ctx.AuthCookies, opts.AuthDisabled),
-		security.CSRFMiddleware(ctx.CSRFCookie),
-	)
+	authGroup := ctx.APIAuthGroup(r.authService)
 
 	authGroup.GET("/pages/slug-suggestion", authmw.RequireEditorOrAdmin(), r.handleSuggestSlug)
 	authGroup.POST("/pages", authmw.RequireEditorOrAdmin(), r.handleCreate)
