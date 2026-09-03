@@ -41,7 +41,15 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		authmw.RequireAuth(r.authService, ctx.AuthCookies, opts.AuthDisabled),
 		security.CSRFMiddleware(ctx.CSRFCookie),
 	)
-	adminGroup.PUT("/public-access", authmw.RequireAdmin(opts.AuthDisabled), r.handleSetPublicAccess)
+	// Flipping instance-wide anonymous access is a browser-session-only
+	// action, like API-key management — an API key must not be able to do it
+	// (CSRF already blocks bearer clients today, RequireCookieSession makes
+	// the intent explicit and independent of that).
+	adminGroup.PUT("/public-access",
+		authmw.RequireAdmin(opts.AuthDisabled),
+		authmw.RequireCookieSession(),
+		r.handleSetPublicAccess,
+	)
 }
 
 // ─── Handlers ───────────────────────────────────────────────────────────────
