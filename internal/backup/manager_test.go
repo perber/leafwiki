@@ -251,7 +251,7 @@ func TestManager_Reconfigure_DoesNotBlockGettersDuringGitIO(t *testing.T) {
 	go func() {
 		m.Enabled()
 		m.Status()
-		m.BootError()
+		_ = m.BootError()
 		close(done)
 	}()
 	select {
