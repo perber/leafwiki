@@ -20,6 +20,7 @@ import (
 	"github.com/perber/wiki/internal/core/tree"
 	httpinternal "github.com/perber/wiki/internal/http"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
+	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/wiki"
 )
@@ -54,7 +55,7 @@ func createRouterTestInstance(w *wiki.Wiki, t *testing.T) *gin.Engine {
 
 func createRouterTestInstanceWithMetricsEnabled(w *wiki.Wiki, t *testing.T) *gin.Engine {
 	return httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            false,
+		PublicAccess:            publicaccess.NewEnvManaged(false),
 		InjectCodeInHeader:      "",
 		CustomStylesheet:        "",
 		AllowInsecure:           true,
@@ -68,7 +69,7 @@ func createRouterTestInstanceWithMetricsEnabled(w *wiki.Wiki, t *testing.T) *gin
 
 func createRouterTestInstanceWithRevision(w *wiki.Wiki, t *testing.T) *gin.Engine {
 	return httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            false,
+		PublicAccess:            publicaccess.NewEnvManaged(false),
 		InjectCodeInHeader:      "",
 		CustomStylesheet:        "",
 		AllowInsecure:           true,
@@ -82,7 +83,7 @@ func createRouterTestInstanceWithRevision(w *wiki.Wiki, t *testing.T) *gin.Engin
 
 func createRouterTestInstanceWithMaxAssetUploadSize(w *wiki.Wiki, t *testing.T, maxAssetUploadSizeBytes int64) *gin.Engine {
 	return httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            false,
+		PublicAccess:            publicaccess.NewEnvManaged(false),
 		InjectCodeInHeader:      "",
 		CustomStylesheet:        "",
 		AllowInsecure:           true,
@@ -95,7 +96,7 @@ func createRouterTestInstanceWithMaxAssetUploadSize(w *wiki.Wiki, t *testing.T, 
 
 func createRouterTestInstanceWithAllowInsecure(w *wiki.Wiki, allowInsecure bool, t *testing.T) *gin.Engine {
 	return httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            false,
+		PublicAccess:            publicaccess.NewEnvManaged(false),
 		InjectCodeInHeader:      "",
 		CustomStylesheet:        "",
 		AllowInsecure:           allowInsecure,
@@ -1064,7 +1065,7 @@ func TestConfigEndpoint_IncludesMaxAssetUploadSizeBytes(t *testing.T) {
 
 	const maxAssetUploadSizeBytes int64 = 123456
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            true,
+		PublicAccess:            publicaccess.NewEnvManaged(true),
 		InjectCodeInHeader:      "",
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,
@@ -1101,7 +1102,7 @@ func TestConfigEndpoint_IncludesEnableLinkRefactor(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            true,
+		PublicAccess:            publicaccess.NewEnvManaged(true),
 		InjectCodeInHeader:      "",
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,
@@ -1139,7 +1140,7 @@ func TestConfigEndpoint_IncludesEnableAPIKeyManagement(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            true,
+		PublicAccess:            publicaccess.NewEnvManaged(true),
 		InjectCodeInHeader:      "",
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,
@@ -1177,7 +1178,7 @@ func TestConfigEndpoint_EnableAPIKeyManagementDefaultsToFalse(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            true,
+		PublicAccess:            publicaccess.NewEnvManaged(true),
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,
 		RefreshTokenTimeout:     7 * 24 * time.Hour,
@@ -1212,7 +1213,7 @@ func TestConfigEndpoint_IncludesTOTPAvailable(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            true,
+		PublicAccess:            publicaccess.NewEnvManaged(true),
 		InjectCodeInHeader:      "",
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,
@@ -1250,7 +1251,7 @@ func TestConfigEndpoint_TOTPAvailableDefaultsToFalse(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            true,
+		PublicAccess:            publicaccess.NewEnvManaged(true),
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,
 		RefreshTokenTimeout:     7 * 24 * time.Hour,
@@ -1285,7 +1286,7 @@ func TestConfigEndpoint_IncludesUserManagementUrl(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            true,
+		PublicAccess:            publicaccess.NewEnvManaged(true),
 		InjectCodeInHeader:      "",
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,
@@ -1323,7 +1324,7 @@ func TestConfigEndpoint_UserManagementUrlDefaultsToEmpty(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            true,
+		PublicAccess:            publicaccess.NewEnvManaged(true),
 		InjectCodeInHeader:      "",
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,
@@ -1360,7 +1361,7 @@ func TestConfigEndpoint_IncludesLoginAndLogoutUrl(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            true,
+		PublicAccess:            publicaccess.NewEnvManaged(true),
 		InjectCodeInHeader:      "",
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,
@@ -1406,7 +1407,7 @@ func TestConfigEndpoint_LoginAndLogoutUrlDefaultToEmpty(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            true,
+		PublicAccess:            publicaccess.NewEnvManaged(true),
 		InjectCodeInHeader:      "",
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,
@@ -1450,7 +1451,7 @@ func TestConfigEndpoint_IncludesDefaultLanguage(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            true,
+		PublicAccess:            publicaccess.NewEnvManaged(true),
 		InjectCodeInHeader:      "",
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,
@@ -1488,7 +1489,7 @@ func TestConfigEndpoint_DefaultLanguageDefaultsToEmpty(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            true,
+		PublicAccess:            publicaccess.NewEnvManaged(true),
 		InjectCodeInHeader:      "",
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,
@@ -1525,7 +1526,7 @@ func TestRefactorPreviewEndpoint_UsesFrontendJSONShape(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            false,
+		PublicAccess:            publicaccess.NewEnvManaged(false),
 		InjectCodeInHeader:      "",
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,
@@ -1584,7 +1585,7 @@ func TestRefactorPreviewEndpoint_IsDisabledWhenFlagIsOff(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            false,
+		PublicAccess:            publicaccess.NewEnvManaged(false),
 		InjectCodeInHeader:      "",
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,
@@ -1607,7 +1608,7 @@ func TestRefactorApply_DoesNotPersistRevisionsWhenRevisionDisabled(t *testing.T)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            false,
+		PublicAccess:            publicaccess.NewEnvManaged(false),
 		InjectCodeInHeader:      "",
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,
@@ -1663,7 +1664,7 @@ func TestUploadAssetEndpoint_RejectsFilesExceedingConfiguredLimit(t *testing.T) 
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            false,
+		PublicAccess:            publicaccess.NewEnvManaged(false),
 		InjectCodeInHeader:      "",
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,
@@ -3275,7 +3276,7 @@ func TestGetPagePermalinkEndpoint_PublicAccessAllowsUnauthenticatedReads(t *test
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            true,
+		PublicAccess:            publicaccess.NewEnvManaged(true),
 		InjectCodeInHeader:      "",
 		CustomStylesheet:        "",
 		AllowInsecure:           true,
@@ -3984,7 +3985,7 @@ func TestRequireAdminMiddleware_BlockedWhenAuthDisabled(t *testing.T) {
 
 	// Create router with auth disabled
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            false,
+		PublicAccess:            publicaccess.NewEnvManaged(false),
 		InjectCodeInHeader:      "",
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,
@@ -4481,7 +4482,7 @@ func TestAssetAccessControl(t *testing.T) {
 
 		// Create router with PublicAccess=false and AuthDisabled=false
 		router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-			PublicAccess:            false,
+			PublicAccess:            publicaccess.NewEnvManaged(false),
 			InjectCodeInHeader:      "",
 			CustomStylesheet:        "",
 			AllowInsecure:           true,
@@ -4511,7 +4512,7 @@ func TestAssetAccessControl(t *testing.T) {
 
 		// Create router with PublicAccess=false and AuthDisabled=false
 		router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-			PublicAccess:            false,
+			PublicAccess:            publicaccess.NewEnvManaged(false),
 			InjectCodeInHeader:      "",
 			CustomStylesheet:        "",
 			AllowInsecure:           true,
@@ -4550,7 +4551,7 @@ func TestAssetAccessControl(t *testing.T) {
 
 		// Create router with PublicAccess=true
 		router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-			PublicAccess:            true,
+			PublicAccess:            publicaccess.NewEnvManaged(true),
 			InjectCodeInHeader:      "",
 			CustomStylesheet:        "",
 			AllowInsecure:           true,
@@ -4586,7 +4587,7 @@ func TestAssetAccessControl(t *testing.T) {
 
 		// Create router with AuthDisabled=true
 		router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-			PublicAccess:            false,
+			PublicAccess:            publicaccess.NewEnvManaged(false),
 			InjectCodeInHeader:      "",
 			CustomStylesheet:        "",
 			AllowInsecure:           true,
@@ -4692,7 +4693,7 @@ func TestCustomStylesheetRoute(t *testing.T) {
 	}
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            false,
+		PublicAccess:            publicaccess.NewEnvManaged(false),
 		InjectCodeInHeader:      "",
 		CustomStylesheet:        customCSSPath,
 		AllowInsecure:           true,
@@ -4729,7 +4730,7 @@ func TestCustomStylesheetRoute_RejectsPathOutsideStorageDir(t *testing.T) {
 	}
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            false,
+		PublicAccess:            publicaccess.NewEnvManaged(false),
 		InjectCodeInHeader:      "",
 		CustomStylesheet:        outsideCSSPath,
 		AllowInsecure:           true,
@@ -4758,7 +4759,7 @@ func TestCustomStylesheetRoute_RejectsNonCSSFile(t *testing.T) {
 	}
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            false,
+		PublicAccess:            publicaccess.NewEnvManaged(false),
 		InjectCodeInHeader:      "",
 		CustomStylesheet:        textFilePath,
 		AllowInsecure:           true,
@@ -4808,7 +4809,7 @@ func TestFaviconRoute_DisablesClientCache(t *testing.T) {
 	}()
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            false,
+		PublicAccess:            publicaccess.NewEnvManaged(false),
 		InjectCodeInHeader:      "",
 		CustomStylesheet:        "",
 		AllowInsecure:           true,

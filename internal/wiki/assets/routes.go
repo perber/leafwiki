@@ -55,7 +55,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	// Static file serving for /assets with access control.
 	if r.assetsDir != "" {
 		assetsFS := gin.Dir(r.assetsDir, false)
-		if opts.PublicAccess || opts.AuthDisabled {
+		if opts.PublicAccess.Enabled() || opts.AuthDisabled {
 			ctx.Base.StaticFS("/assets", assetsFS)
 		} else {
 			assetsGroup := ctx.Base.Group("/assets")
@@ -67,7 +67,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		}
 	}
 
-	if opts.PublicAccess {
+	if opts.PublicAccess.Enabled() {
 		pub := ctx.Base.Group("/api")
 		pub.GET("/pages/:id/assets", r.handleList)
 	}
@@ -80,7 +80,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	)
 
 	authGroup.POST("/pages/:id/assets", authmw.RequireEditorOrAdmin(), r.handleUpload(opts.MaxAssetUploadSizeBytes))
-	if !opts.PublicAccess {
+	if !opts.PublicAccess.Enabled() {
 		authGroup.GET("/pages/:id/assets", r.handleList)
 	}
 	authGroup.PUT("/pages/:id/assets/rename", authmw.RequireEditorOrAdmin(), r.handleRename)

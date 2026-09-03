@@ -88,9 +88,28 @@ type HTTPRemoteUserConfig struct {
 	UserService func() *coreauth.UserService
 }
 
+// PublicAccessProvider reports the current "public mode" state (anonymous read
+// access to every page). It is read per request rather than snapshotted at
+// route-registration time so the flag can be toggled at runtime with no
+// restart. *publicaccess.Service satisfies it. EnvManaged reports whether the
+// value is pinned by environment configuration (Settings UI shows it
+// read-only); it never changes for the life of the process.
+type PublicAccessProvider interface {
+	Enabled() bool
+	EnvManaged() bool
+}
+
+// staticPublicAccess is the fallback PublicAccessProvider used when
+// RouterOptions.PublicAccess is left nil (tests, embedders that don't care).
+// It reports a fixed value and, being immutable, presents as env-managed.
+type staticPublicAccess bool
+
+func (s staticPublicAccess) Enabled() bool    { return bool(s) }
+func (s staticPublicAccess) EnvManaged() bool { return true }
+
 // RouterOptions holds global HTTP server configuration shared across all domains.
 type RouterOptions struct {
-	PublicAccess            bool                     // Whether the wiki allows public read access
+	PublicAccess            PublicAccessProvider     // Current public read-access state; read per request
 	EditorLimit             int                      // Max admin+editor users allowed; 0 = unlimited
 	InjectCodeInHeader      string                   // Raw HTML/JS code to inject into the <head> tag
 	CustomStylesheet        string                   // Path to a custom CSS file (resolved by wiki before passing)
@@ -137,6 +156,10 @@ type FrontendConfig struct {
 func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts RouterOptions) *gin.Engine {
 	if opts.MaxAssetUploadSizeBytes <= 0 {
 		opts.MaxAssetUploadSizeBytes = assets.DefaultMaxUploadSizeBytes
+	}
+
+	if opts.PublicAccess == nil {
+		opts.PublicAccess = staticPublicAccess(false)
 	}
 
 	if Environment == "production" {

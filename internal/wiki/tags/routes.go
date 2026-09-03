@@ -39,7 +39,7 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	opts := ctx.Opts
 
-	if opts.PublicAccess {
+	if opts.PublicAccess.Enabled() {
 		pub := ctx.Base.Group("/api")
 		pub.GET("/tags", r.handleGetTags)
 		pub.GET("/tags/pages", r.handleGetPagesByTags)
@@ -52,7 +52,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		security.CSRFMiddleware(ctx.CSRFCookie),
 	)
 
-	if !opts.PublicAccess {
+	if !opts.PublicAccess.Enabled() {
 		authGroup.GET("/tags", r.handleGetTags)
 		authGroup.GET("/tags/pages", r.handleGetPagesByTags)
 	}
