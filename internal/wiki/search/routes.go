@@ -39,23 +39,16 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	opts := ctx.Opts
 
-	if opts.PublicAccess.Enabled() {
-		pub := ctx.Base.Group("/api")
-		pub.GET("/search/status", r.handleGetIndexingStatus)
-		pub.GET("/search", r.handleSearch)
-	}
-
-	authGroup := ctx.Base.Group("/api")
-	authGroup.Use(
+	// Registered once, gated per request: RequireAuthOrPublicRead lets these
+	// reads flip between authenticated-only and public without a restart.
+	readGroup := ctx.Base.Group("/api")
+	readGroup.Use(
 		authmw.InjectPublicEditor(opts.AuthDisabled),
-		authmw.RequireAuth(r.authService, ctx.AuthCookies, opts.AuthDisabled),
+		authmw.RequireAuthOrPublicRead(r.authService, ctx.AuthCookies, opts.AuthDisabled, opts.PublicAccess),
 		security.CSRFMiddleware(ctx.CSRFCookie),
 	)
-
-	if !opts.PublicAccess.Enabled() {
-		authGroup.GET("/search/status", r.handleGetIndexingStatus)
-		authGroup.GET("/search", r.handleSearch)
-	}
+	readGroup.GET("/search/status", r.handleGetIndexingStatus)
+	readGroup.GET("/search", r.handleSearch)
 }
 
 // ─── Handlers ───────────────────────────────────────────────────────────────

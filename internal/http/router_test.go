@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -3301,6 +3302,105 @@ func TestGetPagePermalinkEndpoint_PublicAccessAllowsUnauthenticatedReads(t *test
 	}
 	if target.Path != "public-page" {
 		t.Fatalf("expected path public-page, got %q", target.Path)
+	}
+}
+
+// TestReadRouteAccessMatrix pins the PR-2 refactor that collapsed the
+// per-domain "public group vs authed group" fork into a single group gated by
+// RequireAuthOrPublicRead. It asserts the auth *decision* (401 vs. not) for
+// every read endpoint that used to be duplicated, across public on/off and
+// anonymous/authenticated — without depending on seeded business data.
+func TestReadRouteAccessMatrix(t *testing.T) {
+	buildRouter := func(t *testing.T, public bool) (*gin.Engine, *wiki.Wiki) {
+		t.Helper()
+		w := createWikiTestInstance(t)
+		t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(w.Close, t) })
+		router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+			PublicAccess:            publicaccess.NewEnvManaged(public),
+			AllowInsecure:           true,
+			AccessTokenTimeout:      15 * time.Minute,
+			RefreshTokenTimeout:     7 * 24 * time.Hour,
+			MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+		})
+		return router, w
+	}
+
+	// Every read endpoint that had a public/authed duplication before PR 2.
+	// A bogus :id is fine — we only care that the auth gate, not the handler,
+	// decides the outcome.
+	readPaths := []string{
+		"/api/tree",
+		"/api/pages/bogus-id",
+		"/api/pages/by-path?path=whatever",
+		"/api/pages/by-title?title=whatever",
+		"/api/pages/lookup?path=whatever",
+		"/api/pages/permalink/bogus-id",
+		"/api/pages/bogus-id/links",
+		"/api/pages/bogus-id/assets",
+		"/api/search?q=whatever",
+		"/api/search/status",
+		"/api/tags",
+		"/api/tags/pages?tags=whatever",
+		"/api/properties",
+		"/api/properties/pages?key=k&value=v",
+		"/assets/whatever.txt",
+	}
+
+	get := func(router http.Handler, path string, cookies []*http.Cookie) int {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		for _, c := range cookies {
+			req.AddCookie(c)
+		}
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		return rec.Code
+	}
+
+	t.Run("PublicOff_Anonymous_Every401", func(t *testing.T) {
+		router, _ := buildRouter(t, false)
+		for _, p := range readPaths {
+			if code := get(router, p, nil); code != http.StatusUnauthorized {
+				t.Errorf("GET %s (public off, anon): want 401, got %d", p, code)
+			}
+		}
+	})
+
+	t.Run("PublicOn_Anonymous_Never401", func(t *testing.T) {
+		router, _ := buildRouter(t, true)
+		for _, p := range readPaths {
+			if code := get(router, p, nil); code == http.StatusUnauthorized {
+				t.Errorf("GET %s (public on, anon): want a non-401 business code, got 401", p)
+			}
+		}
+	})
+
+	for _, public := range []bool{false, true} {
+		public := public
+		t.Run(fmt.Sprintf("Public%v_Authenticated_Never401", public), func(t *testing.T) {
+			router, _ := buildRouter(t, public)
+			_, cookies := loginAdminAndGetCSRF(t, router)
+			for _, p := range readPaths {
+				if code := get(router, p, cookies); code == http.StatusUnauthorized {
+					t.Errorf("GET %s (public=%v, authed): want a non-401 business code, got 401", p, public)
+				}
+			}
+		})
+	}
+
+	// The collapse must not have loosened writes: an unauthenticated POST is
+	// still rejected (401 missing auth, or 403 missing CSRF) in both modes.
+	for _, public := range []bool{false, true} {
+		public := public
+		t.Run(fmt.Sprintf("Public%v_AnonymousWrite_StillRejected", public), func(t *testing.T) {
+			router, _ := buildRouter(t, public)
+			req := httptest.NewRequest(http.MethodPost, "/api/pages", strings.NewReader(`{"title":"x","slug":"x","parentId":"root"}`))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+			if rec.Code != http.StatusUnauthorized && rec.Code != http.StatusForbidden {
+				t.Errorf("POST /api/pages (public=%v, anon): want 401/403, got %d", public, rec.Code)
+			}
+		})
 	}
 }
 
