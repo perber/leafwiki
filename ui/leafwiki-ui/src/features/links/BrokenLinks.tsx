@@ -92,80 +92,86 @@ export default function BrokenLinks() {
   }, [data])
 
   return (
-    <div className="w-full">
-      <div className="mb-6 flex items-start justify-between gap-6">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="border-error/20 bg-error/5 text-error grid h-9 w-9 shrink-0 place-items-center rounded-lg border">
-              <Link2Off className="h-4.5 w-4.5" />
+    <>
+      <div className="settings">
+        <h1 className="settings__title">{t('pageTitle')}</h1>
+
+        <div className="w-full">
+          <div className="mb-6 flex items-start justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-3">
+                <div className="border-error/20 bg-error/5 text-error grid h-9 w-9 shrink-0 place-items-center rounded-lg border">
+                  <Link2Off className="h-4.5 w-4.5" />
+                </div>
+
+                <h2 className="settings__section-title">{t('title')}</h2>
+              </div>
+
+              <p className="settings__section-description">{t('description')}</p>
             </div>
 
-            <h2 className="settings__section-title">{t('title')}</h2>
+            <Button
+              className="settings__actions mb-4"
+              onClick={() => load(true)}
+              disabled={loading || refreshing}
+            >
+              <RefreshCw
+                className={`mr-2 h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`}
+              />
+              {refreshing ? t('button.refreshing') : t('button.text')}
+            </Button>
           </div>
 
-          <p className="settings__section-description">{t('description')}</p>
-        </div>
+          {error && (
+            <div className="border-error/20 bg-error/5 text-error mb-6 rounded-lg border px-4 py-3 text-sm">
+              {error}
+            </div>
+          )}
 
-        <Button
-          className="settings__actions mb-4"
-          onClick={() => load(true)}
-          disabled={loading || refreshing}
-        >
-          <RefreshCw
-            className={`mr-2 h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`}
-          />
-          {refreshing ? t('button.refreshing') : t('button.text')}
-        </Button>
+          <div className="mb-6 grid gap-3 sm:grid-cols-3">
+            <Stat
+              label={t('summaryCard.broken')}
+              value={brokenLinks}
+              danger
+              loading={loading}
+            />
+
+            <Stat
+              label={t('summaryCard.missing')}
+              value={missingPages}
+              loading={loading}
+            />
+
+            <Stat
+              label={t('summaryCard.affected')}
+              value={affectedPages}
+              loading={loading}
+            />
+          </div>
+
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="settings__section-title text-sm">{t('heading')}</h2>
+
+            <span className="text-muted text-xs">{t('sortLabel')}</span>
+          </div>
+
+          {loading ? (
+            <div className="border-border text-muted flex items-center justify-center rounded-lg border py-16 text-sm">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Loading broken links…
+            </div>
+          ) : groups.length === 0 ? (
+            <EmptyState />
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              {groups.map((group) => (
+                <BrokenLinkGroupCard key={group.to_path} group={group} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-
-      {error && (
-        <div className="border-error/20 bg-error/5 text-error mb-6 rounded-lg border px-4 py-3 text-sm">
-          {error}
-        </div>
-      )}
-
-      <div className="mb-6 grid gap-3 sm:grid-cols-3">
-        <Stat
-          label={t('summaryCard.broken')}
-          value={brokenLinks}
-          danger
-          loading={loading}
-        />
-
-        <Stat
-          label={t('summaryCard.missing')}
-          value={missingPages}
-          loading={loading}
-        />
-
-        <Stat
-          label={t('summaryCard.affected')}
-          value={affectedPages}
-          loading={loading}
-        />
-      </div>
-
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="settings__section-title text-sm">{t('heading')}</h2>
-
-        <span className="text-muted text-xs">{t('sortLabel')}</span>
-      </div>
-
-      {loading ? (
-        <div className="border-border text-muted flex items-center justify-center rounded-lg border py-16 text-sm">
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Loading broken links…
-        </div>
-      ) : groups.length === 0 ? (
-        <EmptyState />
-      ) : (
-        <div className="flex flex-col gap-2.5">
-          {groups.map((group) => (
-            <BrokenLinkGroupCard key={group.to_path} group={group} />
-          ))}
-        </div>
-      )}
-    </div>
+    </>
   )
 }
 

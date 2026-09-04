@@ -42,6 +42,11 @@ export const UserManagement = lazy(() =>
     default: m.UserManagement,
   })),
 )
+export const BrokenLinks = lazy(() =>
+  import('../settings/adminSections').then((m) => ({
+    default: m.BrokenLinks,
+  })),
+)
 
 export const LoginForm = lazy(() => import('../auth/LoginForm'))
 export const ForgotPasswordForm = lazy(

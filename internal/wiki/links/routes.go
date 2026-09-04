@@ -37,6 +37,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	// authenticated-only and public without a restart (see APIReadGroup).
 	readGroup := ctx.APIReadGroup(r.authService)
 	readGroup.GET("/pages/:id/links", r.handleGetLinkStatus)
+	readGroup.GET("/links/broken", r.handleGetBrokenLinks)
 }
 
 // ─── Handlers ───────────────────────────────────────────────────────────────
