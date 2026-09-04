@@ -25,7 +25,7 @@ function getParagraph(tree: Root): Paragraph {
   return node
 }
 
-function imageWithSize(value: string, imageData?: object) {
+function imageWithWidth(value: string, imageData?: object) {
   return transform([
     {
       type: 'paragraph',
@@ -48,8 +48,8 @@ function imageWithSize(value: string, imageData?: object) {
 describe('remarkImageSize', () => {
   it.each(['1%', '50%', '75%', '100%', '12.5%'])(
     'sets the image width to %s',
-    (size) => {
-      const tree = imageWithSize(`{size=${size}}`)
+    (width) => {
+      const tree = imageWithWidth(`{width=${width}}`)
       const paragraph = getParagraph(tree)
 
       expect(paragraph).toMatchObject({
@@ -59,7 +59,7 @@ describe('remarkImageSize', () => {
             type: 'image',
             data: {
               hProperties: {
-                width: size,
+                width: width,
               },
             },
           },
@@ -68,8 +68,8 @@ describe('remarkImageSize', () => {
     },
   )
 
-  it('removes the size marker when it is the only following text', () => {
-    const tree = imageWithSize('{size=75%}')
+  it('removes the width marker when it is the only following text', () => {
+    const tree = imageWithWidth('{width=75%}')
     const paragraph = getParagraph(tree)
 
     expect(paragraph.children).toHaveLength(1)
@@ -78,8 +78,8 @@ describe('remarkImageSize', () => {
     })
   })
 
-  it('preserves text following the size marker', () => {
-    const tree = imageWithSize('{size=75%} caption')
+  it('preserves text following the width marker', () => {
+    const tree = imageWithWidth('{width=75%} caption')
     const paragraph = getParagraph(tree)
 
     expect(paragraph.children).toHaveLength(2)
@@ -89,8 +89,8 @@ describe('remarkImageSize', () => {
     })
   })
 
-  it('allows whitespace before the size marker', () => {
-    const tree = imageWithSize('   {size=75%}')
+  it('allows whitespace before the width marker', () => {
+    const tree = imageWithWidth('   {width=75%}')
 
     expect(tree.children[0]).toMatchObject({
       children: [
@@ -106,10 +106,10 @@ describe('remarkImageSize', () => {
     })
   })
 
-  it.each(['{size=0%}', '{size=101%}', '{size=200%}'])(
-    'ignores out-of-range size %s',
-    (size) => {
-      const tree = imageWithSize(size)
+  it.each(['{width=0%}', '{width=101%}', '{width=200%}'])(
+    'ignores out-of-range width %s',
+    (width) => {
+      const tree = imageWithWidth(width)
       const paragraph = getParagraph(tree)
       const image = paragraph.children[0]
 
@@ -119,15 +119,15 @@ describe('remarkImageSize', () => {
       expect(image).not.toHaveProperty('data')
       expect(paragraph.children[1]).toMatchObject({
         type: 'text',
-        value: size,
+        value: '',
       })
     },
   )
 
-  it.each(['{size=-1%}', '{size=abc%}', '{size=75}', '{size=75%%}'])(
-    'ignores invalid size syntax %s',
-    (size) => {
-      const tree = imageWithSize(size)
+  it.each(['{width=-1%}', '{width=abc%}', '{width=75}', '{width=75%%}'])(
+    'ignores invalid width syntax %s',
+    (width) => {
+      const tree = imageWithWidth(width)
       const paragraph = getParagraph(tree)
       const image = paragraph.children[0]
 
@@ -137,7 +137,7 @@ describe('remarkImageSize', () => {
       expect(image).not.toHaveProperty('data')
       expect(paragraph.children[1]).toMatchObject({
         type: 'text',
-        value: size,
+        value: width,
       })
     },
   )
@@ -154,7 +154,7 @@ describe('remarkImageSize', () => {
           },
           {
             type: 'strong',
-            children: [{ type: 'text', value: '{size=75%}' }],
+            children: [{ type: 'text', value: '{width=75%}' }],
           },
         ],
       },
@@ -173,7 +173,7 @@ describe('remarkImageSize', () => {
   })
 
   it('preserves existing image properties', () => {
-    const tree = imageWithSize('{size=75%}', {
+    const tree = imageWithWidth('{width=75%}', {
       hProperties: {
         className: ['custom-image'],
       },
