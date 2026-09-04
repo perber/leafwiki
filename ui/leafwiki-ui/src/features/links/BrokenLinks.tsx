@@ -107,7 +107,9 @@ export default function BrokenLinks() {
                 <h2 className="settings__section-title">{t('title')}</h2>
               </div>
 
-              <p className="settings__section-description">{t('description')}</p>
+              <p className="settings__section-description">
+                {t('description')}
+              </p>
             </div>
 
             <Button
