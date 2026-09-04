@@ -22,26 +22,17 @@ import {
   Loader2,
   Trash2,
 } from 'lucide-react'
+import { useDateTimeFormat } from '@/lib/useDateTimeFormat'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useSnapshotStore } from '@/stores/snapshot'
 import { useRestoreStore } from '@/stores/restore'
 import { useSetTitle } from '../viewer/setTitle'
-import { useToolbarActions } from './useToolbarActions'
-
-function formatDate(value: string | null, fallback: string): string {
-  if (!value) return fallback
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return fallback
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date)
-}
 
 export default function SnapshotSettings() {
   const { t } = useTranslation('snapshot')
+  const { formatDateTime } = useDateTimeFormat()
   const { t: tRestore } = useTranslation('restore')
   const {
     enabled,
@@ -78,7 +69,6 @@ export default function SnapshotSettings() {
   const [isRestoringUpload, setIsRestoringUpload] = useState(false)
   const uploadInputRef = useRef<HTMLInputElement>(null)
 
-  useToolbarActions()
   useSetTitle({ title: t('pageTitle') })
 
   useEffect(() => {
@@ -294,7 +284,7 @@ export default function SnapshotSettings() {
                     {t('running')}
                   </span>
                 ) : (
-                  formatDate(lastSnapshotAt, t('never'))
+                  formatDateTime(lastSnapshotAt ?? undefined) || t('never')
                 )}
               </span>
             </div>
@@ -361,7 +351,7 @@ export default function SnapshotSettings() {
                   <div key={snap.id} className="settings__preview">
                     <div className="flex flex-col">
                       <span className="text-interface-text text-sm font-medium">
-                        {formatDate(snap.createdAt, snap.id)}
+                        {formatDateTime(snap.createdAt) || snap.id}
                       </span>
                       <span className="text-muted text-xs">
                         {formatBytes(snap.sizeBytes)}

@@ -9,44 +9,63 @@ import (
 
 const errUserNotAuthenticated = "User not authenticated"
 
+// sessionOutcome is the result of resolving the caller's identity for a
+// request: either a user, or the HTTP status + body a strict gate would abort
+// with. resolveSession never writes to the response, so callers can decide
+// whether a failure is fatal (RequireAuth) or may fall through to anonymous
+// access (RequireAuthOrPublicRead).
+type sessionOutcome struct {
+	user   *auth.User
+	status int   // 0 when user != nil
+	body   gin.H // nil when user != nil
+}
+
+func denied(status int, message string) sessionOutcome {
+	return sessionOutcome{status: status, body: gin.H{"error": message}}
+}
+
+// resolveSession applies the standard identity resolution: a user already put
+// in context by a trusted upstream (proxy header / API key) wins; otherwise
+// the access-token cookie is validated. On success the user is stored in the
+// context. It is the single implementation shared by RequireAuth and
+// RequireAuthOrPublicRead.
+func resolveSession(c *gin.Context, authService *auth.AuthService, authCookies *AuthCookies, authDisabled bool) sessionOutcome {
+	if userValue, exists := c.Get("user"); exists {
+		user, ok := userValue.(*auth.User)
+		if !ok || user == nil {
+			return denied(http.StatusInternalServerError, "Invalid user context")
+		}
+		return sessionOutcome{user: user}
+	}
+
+	if authDisabled {
+		return denied(http.StatusUnauthorized, "User not authenticated and auth is disabled")
+	}
+
+	token, err := authCookies.ReadAccess(c)
+	if err != nil || token == "" {
+		return denied(http.StatusUnauthorized, "Missing or invalid access token")
+	}
+
+	if authService == nil {
+		return denied(http.StatusInternalServerError, "Authentication service unavailable")
+	}
+
+	user, err := authService.ValidateToken(token)
+	if err != nil {
+		return denied(http.StatusUnauthorized, "Invalid or expired token")
+	}
+
+	c.Set("user", user)
+	return sessionOutcome{user: user}
+}
+
 func RequireAuth(authService *auth.AuthService, authCookies *AuthCookies, authDisabled bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Short-circuit only when a trusted upstream already stored a valid user.
-		if userValue, exists := c.Get("user"); exists {
-			user, ok := userValue.(*auth.User)
-			if !ok || user == nil {
-				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Invalid user context"})
-				return
-			}
-
-			c.Next()
+		if r := resolveSession(c, authService, authCookies, authDisabled); r.user == nil {
+			c.AbortWithStatusJSON(r.status, r.body)
 			return
 		}
-
-		if authDisabled {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated and auth is disabled"})
-			return
-		}
-
-		token, err := authCookies.ReadAccess(c)
-		if err != nil || token == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Missing or invalid access token"})
-			return
-		}
-
-		if authService == nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Authentication service unavailable"})
-			return
-		}
-
-		user, err := authService.ValidateToken(token)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
-			return
-		}
-
-		// Store the user in context for later use
-		c.Set("user", user)
 		c.Next()
 	}
 }

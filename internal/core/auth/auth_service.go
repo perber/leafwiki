@@ -68,6 +68,9 @@ func (a *AuthService) ReplaceUserStore(storageDir string) error {
 
 	a.mu.Lock()
 	old := a.userService
+	// Preserve the plan's editor limit across the swap — a restore changes
+	// user data, not which plan tier this instance is running under.
+	newUserService.SetEditorLimit(old.editorLimit)
 	a.userService = newUserService
 	a.mu.Unlock()
 
@@ -204,6 +207,23 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 
 	a.attempts.reset(user.ID)
 	a.log.Info("login succeeded", "userID", user.ID)
+	return a.sessions.IssueSession(user)
+}
+
+// IssueSessionForUser issues a fresh access/refresh token pair for userID
+// without a password check — used when a caller has already established
+// trust some other way. Currently only the invite-accept flow does this (see
+// wiki/auth's ConfirmInviteUseCase): a freshly invited user has just proven
+// control of their invite link and set a password, so a second login
+// immediately afterward would be redundant. Mirrors Login's final step,
+// skipping credential verification and any TOTP challenge (an invited user
+// has neither TOTP nor a failed-attempt history yet).
+func (a *AuthService) IssueSessionForUser(userID string) (*AuthToken, error) {
+	user, err := a.users().GetUserByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	user.Password = ""
 	return a.sessions.IssueSession(user)
 }
 

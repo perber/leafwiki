@@ -1,0 +1,256 @@
+{
+  "layout": {
+    "toggleSidebar": "Seitenleiste umschalten",
+    "resizeSidebar": "Seitenleiste anpassen",
+    "closeSidebar": "Seitenleiste schließen"
+  },
+  "breadcrumbs": {
+    "navAriaLabel": "Breadcrumb"
+  },
+  "section": {
+    "overviewTitle": "Übersicht von „{{title}}“",
+    "overviewDescriptionBase": "Diese Seite ist die Standardübersicht des Bereichs und listet dessen Seiten und Unterbereiche auf.",
+    "overviewDescriptionEditorHint": "Beim Bearbeiten dieser Seite können Sie eine benutzerdefinierte Startseite für den Bereich festlegen.",
+    "overviewDescriptionReadOnly": "Diese Seite ist eine automatisch generierte Übersicht des Bereichs.",
+    "emptyTitle": "Dieser Bereich ist leer.",
+    "emptyDescriptionEditor": "Der Bereich {{title}} enthält noch keine Seiten oder Unterbereiche. Fügen Sie eine neue Seite hinzu oder erstellen Sie einen neuen Bereich.",
+    "emptyDescriptionReadOnly": "Der Bereich {{title}} enthält noch keine Seiten oder Unterbereiche.",
+    "addPage": "Seite hinzufügen",
+    "addSection": "Bereich hinzufügen",
+    "subpagesAriaLabel": "Unterseiten von {{title}}",
+    "sectionSuffix": "(Bereich)",
+    "updatedByLabel": "Aktualisiert von {{editor}} · {{time}}",
+    "updatedLabel": "Aktualisiert {{time}}"
+  },
+  "markdownPreview": {
+    "renderError": "Diese Seite enthält Markdown, das nicht sicher gerendert werden konnte.",
+    "brokenLinkTooltip": "Diese Seite existiert noch nicht."
+  },
+  "mermaid": {
+    "renderError": "Mermaid-Diagramm konnte nicht gerendert werden.",
+    "noSvgOutput": "Kein SVG-Element in der Mermaid-Ausgabe"
+  },
+  "headline": {
+    "linkToSection": "Link zum Abschnitt"
+  },
+  "backlinks": {
+    "errorPrefix": "Fehler: {{error}}",
+    "pageIdRequired": "Seiten-ID ist erforderlich",
+    "fetchFailedFallback": "Link-Status konnte nicht abgerufen werden",
+    "referencedBy": "Verwiesen von",
+    "loading": "Wird geladen…",
+    "noReferences": "Keine Seite verweist auf diese Seite.",
+    "brokenLinks": "Defekte Links",
+    "noBrokenLinks": "Keine defekten Links.",
+    "brokenOutgoingsTitle": "Diese Seite verweist auf fehlende Ziele",
+    "brokenIncomingTitle": "Seiten, die auf einen alten Pfad verweisen"
+  },
+  "pinned": {
+    "sectionTitle": "Angeheftet",
+    "pagesSectionTitle": "Seiten",
+    "pinPage": "Anheften",
+    "unpinPage": "Lösen",
+    "pinSuccess": "Seite angeheftet",
+    "unpinSuccess": "Seite gelöst",
+    "pinError": "Anheftstatus konnte nicht aktualisiert werden",
+    "togglePinnedSection": "Bereich „Angeheftet“ umschalten",
+    "togglePagesSection": "Seitenbereich umschalten",
+    "unpinPageAriaLabel": "Seite lösen"
+  },
+  "favorites": {
+    "sectionTitle": "Favoriten",
+    "addFavorite": "Zu Favoriten hinzufügen",
+    "removeFavorite": "Aus Favoriten entfernen",
+    "addSuccess": "Zu Favoriten hinzugefügt",
+    "removeSuccess": "Aus Favoriten entfernt",
+    "favoriteError": "Favoriten konnten nicht aktualisiert werden",
+    "toggleFavoritesSection": "Favoritenbereich umschalten"
+  },
+  "toc": {
+    "title": "Inhaltsverzeichnis",
+    "onThisPage": "Auf dieser Seite",
+    "downloads": "Angehängte Medien",
+    "collapse": "Inhaltsverzeichnis einklappen",
+    "expand": "Inhaltsverzeichnis ausklappen"
+  },
+  "toolbar": {
+    "moreActions": "Weitere Aktionen",
+    "expandAll": "Alle ausklappen",
+    "collapseAll": "Alle einklappen",
+    "sortPages": "Seiten sortieren",
+    "refresh": "Explorer aktualisieren",
+    "refreshSuccess": "Explorer aktualisiert",
+    "refreshError": "Aktualisierung fehlgeschlagen",
+    "refreshAlreadyRunning": "Aktualisierung läuft bereits",
+    "refreshPullFailed": "Abrufen der Remote-Änderungen fehlgeschlagen",
+    "syncJobLostFallback": "Sync-Job verloren — Server wurde möglicherweise neu gestartet"
+  },
+  "pageToolbar": {
+    "itemPage": "Seite",
+    "itemSection": "Bereich",
+    "editButton": "{{item}} bearbeiten",
+    "shareButton": "{{item}} teilen",
+    "printButton": "{{item}} drucken",
+    "copyButton": "{{item}} kopieren",
+    "deleteButton": "{{item}} löschen",
+    "historyButton": "{{item}}-Verlauf"
+  },
+  "treeActions": {
+    "loading": "Wird geladen...",
+    "loadErrorPrefix": "Fehler: {{error}}",
+    "createNewPageTooltip": "Neue Seite erstellen",
+    "createNewSectionTooltip": "Neuen Bereich erstellen",
+    "untitledPage": "Unbenannte Seite",
+    "convertedToast": "Seite erfolgreich konvertiert",
+    "conflictRetryMessage": "Diese Seite wurde von einem anderen Benutzer geändert. Bitte versuchen Sie es erneut.",
+    "convertErrorFallback": "Seite konnte nicht konvertiert werden",
+    "renameEditingWarning": "{{item}} wird gerade bearbeitet. Verwenden Sie zum Umbenennen die Titelleiste des Editors.",
+    "renamedToast": "{{item}} erfolgreich umbenannt",
+    "renameErrorFallback": "Seite konnte nicht umbenannt werden",
+    "deleteEditingWarning": "{{item}} wird gerade bearbeitet. Schließen Sie den Editor, bevor Sie ihn löschen.",
+    "menuAddPage": "Seite hinzufügen",
+    "menuAddSection": "Bereich hinzufügen",
+    "menuEdit": "{{item}} bearbeiten",
+    "menuRename": "{{item}} umbenennen",
+    "menuCopyPage": "Seite kopieren",
+    "menuSortChildren": "{{item}}-Unterelemente sortieren",
+    "menuMove": "{{item}} verschieben",
+    "menuConvertToPage": "In Seite umwandeln",
+    "menuDelete": "{{item}} löschen",
+    "emptySectionToast": "„{{title}}“ ist jetzt ein leerer Bereich",
+    "convertBackAction": "Zurück in Seite umwandeln",
+    "convertedBackToast": "„{{title}}“ ist wieder eine Seite",
+    "convertBackErrorFallback": "Bereich konnte nicht zurück in eine Seite umgewandelt werden",
+    "reorderErrorFallback": "Seiten konnten nicht neu angeordnet werden",
+    "moveErrorFallback": "Seite konnte nicht verschoben werden"
+  },
+  "codeBlock": {
+    "copyErrorToast": "Code konnte nicht kopiert werden",
+    "copiedToast": "Code kopiert",
+    "copyTooltip": "Code kopieren",
+    "copiedTooltip": "Kopiert",
+    "copyAriaLabel": "Code kopieren",
+    "copiedAriaLabel": "Code kopiert"
+  },
+  "designToggle": {
+    "switchToLight": "Zum hellen Modus wechseln",
+    "switchToDark": "Zum dunklen Modus wechseln"
+  },
+  "imagePreview": {
+    "openInNewTab": "In neuem Tab öffnen"
+  },
+  "pageSwitcher": {
+    "trigger": "Zu Seite wechseln",
+    "triggerWithHotkey": "Zu Seite wechseln ({{hotkey}})",
+    "dialogTitle": "Zu Seite wechseln",
+    "dialogDescription": "Durchsuchen Sie vorhandene Seiten nach Titel, Pfad oder Breadcrumb.",
+    "searchPlaceholder": "Seitentitel eingeben…",
+    "searchAriaLabel": "Seiten durchsuchen",
+    "noMatch": "Keine passende Seite gefunden.",
+    "matchingPagesAriaLabel": "Passende Seiten"
+  },
+  "metadata": {
+    "propertiesToggle": "Eigenschaften ({{count}})"
+  },
+  "shortcutsHelp": {
+    "menuItem": "Tastaturkürzel",
+    "title": "Verfügbare Tastaturkürzel",
+    "description": "Ein schneller Überblick über die Tastenkombinationen des aktuellen Seitenmodus.",
+    "currentMode": "Aktueller Seitenmodus: {{mode}}",
+    "dialogHint": "Solange dieser Dialog geöffnet ist, sind auch dessen Tastenkombinationen enthalten.",
+    "closeButton": "Schließen",
+    "categories": {
+      "navigation": "Navigation",
+      "editing": "Bearbeiten",
+      "viewing": "Ansicht",
+      "dialogs": "Dialoge"
+    },
+    "modes": {
+      "view": "Ansicht",
+      "edit": "Bearbeiten",
+      "history": "Verlauf",
+      "settings": "Einstellungen",
+      "dialog": "Dialog"
+    },
+    "items": {
+      "goToPage": {
+        "action": "Zu Seite wechseln"
+      },
+      "openShortcutsHelp": {
+        "action": "Tastaturkürzel öffnen"
+      },
+      "editPage": {
+        "action": "Seite bearbeiten"
+      },
+      "sharePage": {
+        "action": "Seite teilen"
+      },
+      "printPage": {
+        "action": "Seite drucken"
+      },
+      "copyPage": {
+        "action": "Seite kopieren"
+      },
+      "deletePage": {
+        "action": "Seite löschen"
+      },
+      "pageHistory": {
+        "action": "Seitenverlauf"
+      },
+      "toggleToc": {
+        "action": "Inhaltsverzeichnis umschalten"
+      },
+      "openExplorer": {
+        "action": "Explorer öffnen"
+      },
+      "openSearch": {
+        "action": "Suche öffnen"
+      },
+      "savePage": {
+        "action": "Seite speichern"
+      },
+      "closeEditor": {
+        "action": "Editor schließen"
+      },
+      "formatBold": {
+        "action": "Fett formatieren"
+      },
+      "formatItalic": {
+        "action": "Kursiv formatieren"
+      },
+      "insertHeadingOne": {
+        "action": "Überschrift 1 einfügen"
+      },
+      "insertHeadingTwo": {
+        "action": "Überschrift 2 einfügen"
+      },
+      "insertHeadingThree": {
+        "action": "Überschrift 3 einfügen"
+      },
+      "formatInlineCode": {
+        "action": "Inline-Code formatieren"
+      },
+      "insertLink": {
+        "action": "Link einfügen"
+      },
+      "backToPage": {
+        "action": "Zurück zur Seite"
+      },
+      "exitSettings": {
+        "action": "Einstellungen verlassen"
+      },
+      "closeDialog": {
+        "action": "Dialog schließen"
+      },
+      "confirmDialog": {
+        "action": "Standardaktion des Dialogs"
+      },
+      "confirmRename": {
+        "action": "Umbenennen bestätigen"
+      },
+      "cancelRename": {
+        "action": "Umbenennen abbrechen"
+      }
+    }
+  }
+}

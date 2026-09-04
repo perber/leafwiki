@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -231,6 +232,16 @@ func NewHTTPMetrics(version string) *HTTPMetrics {
 			Help:      "Total number of TOTP enrollment changes by event type.",
 		},
 		[]string{"event"},
+	)
+
+	// Standard Go runtime and process collectors, so the endpoint also carries
+	// the baseline ops signals (goroutines, heap, GC pauses, open FDs, RSS,
+	// CPU seconds) under their conventional go_* / process_* names. The process
+	// collector reads /proc and is a silent no-op on Windows; the Go collector
+	// works everywhere.
+	registry.MustRegister(
+		collectors.NewGoCollector(),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 	)
 
 	registry.MustRegister(

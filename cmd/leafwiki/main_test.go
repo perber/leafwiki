@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"io"
 	"log/slog"
 	"net"
@@ -13,19 +12,46 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/urfave/cli/v3"
+
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 )
 
-func TestWriteUsage_UsesLongFlags(t *testing.T) {
+// runRootCommand parses args through the real command tree and hands the
+// resolved config to inspect, instead of running the server.
+func runRootCommand(t *testing.T, args []string, inspect func(cfg *serverConfig)) {
+	t.Helper()
+
+	cfg := &serverConfig{}
+	cmd := newRootCommandWithConfig(cfg)
+	cmd.Writer = io.Discard
+	cmd.ErrWriter = io.Discard
+	cmd.Action = func(_ context.Context, _ *cli.Command) error {
+		inspect(cfg)
+		return nil
+	}
+
+	if err := cmd.Run(context.Background(), append([]string{"leafwiki"}, args...)); err != nil {
+		t.Fatalf("cmd.Run(%q) error = %v", args, err)
+	}
+}
+
+func TestRootCommandHelp_DocumentsFlagsAndEnvVars(t *testing.T) {
 	var buf bytes.Buffer
 
-	writeUsage(&buf)
+	cmd := newRootCommand()
+	cmd.Writer = &buf
+	cmd.ErrWriter = &buf
+	if err := cmd.Run(context.Background(), []string{"leafwiki", "--help"}); err != nil {
+		t.Fatalf("cmd.Run(--help) error = %v", err)
+	}
 
 	output := buf.String()
 	for _, expected := range []string{
@@ -47,6 +73,8 @@ func TestWriteUsage_UsesLongFlags(t *testing.T) {
 		"LEAFWIKI_ENABLE_METRICS",
 		"LEAFWIKI_METRICS_HOST",
 		"LEAFWIKI_METRICS_PORT",
+		"reset-admin-password",
+		"restore-snapshot",
 	} {
 		if !strings.Contains(output, expected) {
 			t.Fatalf("expected usage output to contain %q, got %q", expected, output)
@@ -54,13 +82,8 @@ func TestWriteUsage_UsesLongFlags(t *testing.T) {
 	}
 }
 
-func TestRegisterFlags_AcceptsSingleDashLongFlags(t *testing.T) {
-	fs := flag.NewFlagSet("leafwiki", flag.ContinueOnError)
-	var errOut bytes.Buffer
-	fs.SetOutput(&errOut)
-	flags := registerFlags(fs)
-
-	err := fs.Parse([]string{
+func TestRootCommand_AcceptsSingleDashLongFlags(t *testing.T) {
+	runRootCommand(t, []string{
 		"-jwt-secret=test-secret",
 		"-admin-password=test-password",
 		"-admin-username=test-admin",
@@ -70,38 +93,31 @@ func TestRegisterFlags_AcceptsSingleDashLongFlags(t *testing.T) {
 		"-metrics-host=127.0.0.2",
 		"-metrics-port=9100",
 		"-unix-socket=/tmp/leafwiki.sock",
+	}, func(cfg *serverConfig) {
+		for _, tc := range []struct {
+			flag string
+			got  string
+			want string
+		}{
+			{"jwt-secret", cfg.auth.jwtSecret, "test-secret"},
+			{"admin-password", cfg.auth.adminPassword, "test-password"},
+			{"admin-username", cfg.auth.adminUsername, "test-admin"},
+			{"admin-email", cfg.auth.adminEmail, "test-admin@example.com"},
+			{"metrics-host", cfg.metrics.metricsHost, "127.0.0.2"},
+			{"metrics-port", cfg.metrics.metricsPort, "9100"},
+			{"unix-socket", cfg.server.unixSocket, "/tmp/leafwiki.sock"},
+		} {
+			if tc.got != tc.want {
+				t.Fatalf("expected --%s %q, got %q", tc.flag, tc.want, tc.got)
+			}
+		}
+		if !cfg.server.allowInsecure {
+			t.Fatal("expected --allow-insecure to be true")
+		}
+		if !cfg.metrics.enableMetrics {
+			t.Fatal("expected --enable-metrics to be true")
+		}
 	})
-	if err != nil {
-		t.Fatalf("expected single-dash long flags to parse, got %v (%s)", err, errOut.String())
-	}
-
-	if got := *flags.jwtSecret; got != "test-secret" {
-		t.Fatalf("expected jwt secret %q, got %q", "test-secret", got)
-	}
-	if got := *flags.adminPassword; got != "test-password" {
-		t.Fatalf("expected admin password %q, got %q", "test-password", got)
-	}
-	if got := *flags.adminUsername; got != "test-admin" {
-		t.Fatalf("expected admin username %q, got %q", "test-admin", got)
-	}
-	if got := *flags.adminEmail; got != "test-admin@example.com" {
-		t.Fatalf("expected admin email %q, got %q", "test-admin@example.com", got)
-	}
-	if !*flags.allowInsecure {
-		t.Fatalf("expected allow-insecure to be true")
-	}
-	if !*flags.enableMetrics {
-		t.Fatalf("expected enable-metrics to be true")
-	}
-	if got := *flags.metricsHost; got != "127.0.0.2" {
-		t.Fatalf("expected metrics host %q, got %q", "127.0.0.2", got)
-	}
-	if got := *flags.metricsPort; got != "9100" {
-		t.Fatalf("expected metrics port %q, got %q", "9100", got)
-	}
-	if got := *flags.unixSocket; got != "/tmp/leafwiki.sock" {
-		t.Fatalf("expected unix socket %q, got %q", "/tmp/leafwiki.sock", got)
-	}
 }
 
 func TestValidateHTTPRemoteUserConfig(t *testing.T) {
@@ -213,7 +229,6 @@ func TestResolveLogoutURL(t *testing.T) {
 		name               string
 		logoutURL          string
 		deprecatedFlagVal  string
-		visited            map[string]bool
 		wantResolved       string
 		wantUsedDeprecated bool
 	}{
@@ -225,7 +240,6 @@ func TestResolveLogoutURL(t *testing.T) {
 		{
 			name:               "only deprecated flag set",
 			deprecatedFlagVal:  "https://idp.example.com/logout",
-			visited:            map[string]bool{"http-remote-user-logout-url": true},
 			wantResolved:       "https://idp.example.com/logout",
 			wantUsedDeprecated: true,
 		},
@@ -236,11 +250,7 @@ func TestResolveLogoutURL(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			visited := tc.visited
-			if visited == nil {
-				visited = map[string]bool{}
-			}
-			resolved, usedDeprecated := resolveLogoutURL(tc.logoutURL, tc.deprecatedFlagVal, visited, "LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL")
+			resolved, usedDeprecated := resolveLogoutURL(tc.logoutURL, tc.deprecatedFlagVal)
 			if resolved != tc.wantResolved {
 				t.Fatalf("resolveLogoutURL() resolved = %q, want %q", resolved, tc.wantResolved)
 			}
@@ -251,19 +261,169 @@ func TestResolveLogoutURL(t *testing.T) {
 	}
 }
 
-func TestResolveString_TrimsCLIFlagValue(t *testing.T) {
-	visited := map[string]bool{"login-url": true}
-	got := resolveString("login-url", " https://idp.example.com/login ", visited, "LEAFWIKI_LOGIN_URL", "")
-	if want := "https://idp.example.com/login"; got != want {
-		t.Fatalf("resolveString() = %q, want %q", got, want)
+func TestRootCommand_TrimsStringFlagValue(t *testing.T) {
+	runRootCommand(t, []string{"--login-url= https://idp.example.com/login "}, func(cfg *serverConfig) {
+		if got, want := cfg.proxy.loginURL, "https://idp.example.com/login"; got != want {
+			t.Fatalf("login-url = %q, want %q", got, want)
+		}
+	})
+}
+
+func TestRootCommand_ResolutionPrecedence(t *testing.T) {
+	t.Run("environment variable overrides the default", func(t *testing.T) {
+		t.Setenv("LEAFWIKI_HOST", "0.0.0.0")
+		runRootCommand(t, nil, func(cfg *serverConfig) {
+			if got, want := cfg.server.host, "0.0.0.0"; got != want {
+				t.Fatalf("host = %q, want %q", got, want)
+			}
+		})
+	})
+
+	t.Run("flag overrides the environment variable", func(t *testing.T) {
+		t.Setenv("LEAFWIKI_HOST", "0.0.0.0")
+		runRootCommand(t, []string{"--host=192.168.0.1"}, func(cfg *serverConfig) {
+			if got, want := cfg.server.host, "192.168.0.1"; got != want {
+				t.Fatalf("host = %q, want %q", got, want)
+			}
+		})
+	})
+
+	t.Run("environment variable values are trimmed", func(t *testing.T) {
+		t.Setenv("LEAFWIKI_DATA_DIR", "  /srv/leafwiki  ")
+		runRootCommand(t, nil, func(cfg *serverConfig) {
+			if got, want := cfg.server.dataDir, "/srv/leafwiki"; got != want {
+				t.Fatalf("data-dir = %q, want %q", got, want)
+			}
+		})
+	})
+}
+
+// An environment variable that is declared without a value must not override a
+// default: compose and .env files do that routinely, and taking an empty
+// LEAFWIKI_HOST literally would bind the server to every interface.
+func TestRootCommand_EmptyEnvVarIsUnset(t *testing.T) {
+	t.Setenv("LEAFWIKI_HOST", "")
+	t.Setenv("LEAFWIKI_PORT", "   ")
+	t.Setenv("LEAFWIKI_SNAPSHOT", "")
+
+	runRootCommand(t, nil, func(cfg *serverConfig) {
+		if got, want := cfg.server.host, "127.0.0.1"; got != want {
+			t.Fatalf("host = %q, want %q", got, want)
+		}
+		if got, want := cfg.server.port, "8080"; got != want {
+			t.Fatalf("port = %q, want %q", got, want)
+		}
+		if !cfg.backup.snapshot {
+			t.Fatal("snapshot = false, want the default true")
+		}
+	})
+}
+
+func TestRootCommand_BoolEnvVarSpellings(t *testing.T) {
+	for _, tc := range []struct {
+		env  string
+		want bool
+	}{
+		{"true", true},
+		{"1", true},
+		{"yes", true},
+		{"ON", true},
+		{"y", true},
+		{"false", false},
+		{"0", false},
+		{"no", false},
+		{"off", false},
+		{"n", false},
+	} {
+		t.Run(tc.env, func(t *testing.T) {
+			t.Setenv("LEAFWIKI_PUBLIC_ACCESS", tc.env)
+			runRootCommand(t, nil, func(cfg *serverConfig) {
+				if got := cfg.auth.publicAccess; got != tc.want {
+					t.Fatalf("public-access with LEAFWIKI_PUBLIC_ACCESS=%q = %v, want %v", tc.env, got, tc.want)
+				}
+			})
+		})
 	}
 }
 
-func TestResolveLogFormat_Precedence(t *testing.T) {
+func TestRootCommand_InvalidEnvVarValueFailsFast(t *testing.T) {
+	for _, tc := range []struct{ envVar, value string }{
+		{"LEAFWIKI_PUBLIC_ACCESS", "maybe"},
+		{"LEAFWIKI_SNAPSHOT_RETENTION", "many"},
+		{"LEAFWIKI_SNAPSHOT_INTERVAL", "sometimes"},
+		{"LEAFWIKI_LOG_FORMAT", "yaml"},
+		{"LEAFWIKI_MAX_ASSET_UPLOAD_SIZE", "50 bananas"},
+		{"LEAFWIKI_RESTORE_UPLOAD_MAX_SIZE", "0"},
+		{"LEAFWIKI_LOGIN_URL", "javascript:alert(1)"},
+		{"LEAFWIKI_TOTP_ENCRYPTION_KEY", "too-short"},
+	} {
+		t.Run(tc.envVar, func(t *testing.T) {
+			t.Setenv(tc.envVar, tc.value)
+
+			cmd := newRootCommand()
+			cmd.Writer = io.Discard
+			cmd.ErrWriter = io.Discard
+			cmd.Action = func(_ context.Context, _ *cli.Command) error {
+				t.Fatalf("expected %s=%q to be rejected before the action runs", tc.envVar, tc.value)
+				return nil
+			}
+
+			if err := cmd.Run(context.Background(), []string{"leafwiki"}); err == nil {
+				t.Fatalf("expected an error for %s=%q, got nil", tc.envVar, tc.value)
+			}
+		})
+	}
+}
+
+func TestRootCommand_UsageErrorIsReportedOnce(t *testing.T) {
+	var out bytes.Buffer
+
+	cmd := newRootCommand()
+	cmd.Writer = &out
+	cmd.ErrWriter = &out
+
+	err := cmd.Run(context.Background(), []string{"leafwiki", "--hosts=1.2.3.4"})
+	if !errors.Is(err, errReported) {
+		t.Fatalf("cmd.Run() error = %v, want errReported so main stays quiet", err)
+	}
+	if got := strings.Count(out.String(), "not defined"); got != 1 {
+		t.Fatalf("expected the usage error to be printed exactly once, got %d times in %q", got, out.String())
+	}
+	if !strings.Contains(out.String(), `Did you mean "--host"?`) {
+		t.Fatalf("expected a suggestion for the mistyped flag, got %q", out.String())
+	}
+}
+
+func TestRootCommand_UnknownCommandIsRejected(t *testing.T) {
+	var out bytes.Buffer
+
+	cmd := newRootCommand()
+	cmd.Writer = &out
+	cmd.ErrWriter = &out
+	// The default handler for a cli.ExitCoder calls os.Exit, which would take
+	// the test binary down with it.
+	cmd.ExitErrHandler = func(context.Context, *cli.Command, error) {}
+
+	err := cmd.Run(context.Background(), []string{"leafwiki", "reset-admin-passwort"})
+	if err == nil {
+		t.Fatal("expected an error for an unknown command, got nil")
+	}
+	var exitErr cli.ExitCoder
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected a cli.ExitCoder, got %T: %v", err, err)
+	}
+	if exitErr.ExitCode() != 1 {
+		t.Fatalf("exit code = %d, want 1", exitErr.ExitCode())
+	}
+	if !strings.Contains(err.Error(), "reset-admin-passwort") {
+		t.Fatalf("expected the error to name the unknown command, got %q", err.Error())
+	}
+}
+
+func TestParseLogFormat_Precedence(t *testing.T) {
 	tests := []struct {
 		name     string
-		flagVal  string
-		visited  bool
+		args     []string
 		envVal   string
 		wantForm string
 	}{
@@ -283,8 +443,7 @@ func TestResolveLogFormat_Precedence(t *testing.T) {
 		},
 		{
 			name:     "cli flag overrides env var",
-			flagVal:  "text",
-			visited:  true,
+			args:     []string{"--log-format=text"},
 			envVal:   "json",
 			wantForm: "text",
 		},
@@ -292,14 +451,15 @@ func TestResolveLogFormat_Precedence(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("LEAFWIKI_LOG_FORMAT", tc.envVal)
-			visited := map[string]bool{}
-			if tc.visited {
-				visited["log-format"] = true
-			}
-			got := resolveLogFormat("log-format", tc.flagVal, visited, "LEAFWIKI_LOG_FORMAT", "text")
-			if got != tc.wantForm {
-				t.Fatalf("resolveLogFormat() = %q, want %q", got, tc.wantForm)
-			}
+			runRootCommand(t, tc.args, func(cfg *serverConfig) {
+				got, ok := parseLogFormat(cfg.server.logFormat)
+				if !ok {
+					t.Fatalf("parseLogFormat(%q) reported an invalid format", cfg.server.logFormat)
+				}
+				if got != tc.wantForm {
+					t.Fatalf("parseLogFormat() = %q, want %q", got, tc.wantForm)
+				}
+			})
 		})
 	}
 }
@@ -330,7 +490,7 @@ func TestSetupLogger_SelectsHandlerByFormat(t *testing.T) {
 }
 
 func TestRunRestoreSnapshotCommand_MissingArg_ReturnsUsageError(t *testing.T) {
-	err := runRestoreSnapshotCommand(t.TempDir(), []string{"restore-snapshot"})
+	err := runRestoreSnapshotCommand(t.TempDir(), "")
 	if !errors.Is(err, errRestoreSnapshotUsage) {
 		t.Fatalf("runRestoreSnapshotCommand() error = %v, want errRestoreSnapshotUsage", err)
 	}
@@ -340,7 +500,7 @@ func TestRunRestoreSnapshotCommand_InvalidZipPath_PropagatesError(t *testing.T) 
 	dataDir := t.TempDir()
 	zipPath := filepath.Join(dataDir, "does-not-exist.zip")
 
-	err := runRestoreSnapshotCommand(dataDir, []string{"restore-snapshot", zipPath})
+	err := runRestoreSnapshotCommand(dataDir, zipPath)
 	if err == nil {
 		t.Fatal("runRestoreSnapshotCommand() expected an error for a non-existent snapshot zip, got nil")
 	}
@@ -349,62 +509,107 @@ func TestRunRestoreSnapshotCommand_InvalidZipPath_PropagatesError(t *testing.T) 
 	}
 }
 
+func TestValidateGitBackupRemote(t *testing.T) {
+	const (
+		sshKey   = "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n"
+		keyPath  = "/etc/leafwiki/id_ed25519"
+		user     = "jochumdev"
+		password = "github_pat_secret"
+	)
+	tests := []struct {
+		name         string
+		remote       string
+		sshKey       string
+		sshKeyPath   string
+		httpUsername string
+		httpPassword string
+		wantErr      bool
+	}{
+		{name: "no remote is local-only and needs no credentials"},
+
+		{name: "ssh remote with inline key", remote: "git@github.com:user/repo.git", sshKey: sshKey},
+		{name: "ssh remote with key path", remote: "git@github.com:user/repo.git", sshKeyPath: keyPath},
+		{name: "ssh url with key", remote: "ssh://git@github.com/user/repo.git", sshKey: sshKey},
+		{name: "ssh remote without key", remote: "git@github.com:user/repo.git", wantErr: true},
+		{name: "ssh remote with only http credentials", remote: "git@github.com:user/repo.git", httpUsername: user, httpPassword: password, wantErr: true},
+
+		{name: "https remote with username and password", remote: "https://github.com/user/repo.git", httpUsername: user, httpPassword: password},
+		{name: "http remote with username and password", remote: "http://gitea.internal/user/repo.git", httpUsername: user, httpPassword: password},
+		{name: "uppercase https scheme", remote: "HTTPS://github.com/user/repo.git", httpUsername: user, httpPassword: password},
+		{name: "https remote with credentials embedded in the URL", remote: "https://jochumdev:github_pat_secret@github.com/user/repo.git"},
+		{name: "https remote without any credentials", remote: "https://github.com/user/repo.git", wantErr: true},
+		{name: "https remote with username only", remote: "https://github.com/user/repo.git", httpUsername: user, wantErr: true},
+		{name: "https remote with password only", remote: "https://github.com/user/repo.git", httpPassword: password, wantErr: true},
+		// An SSH key is not a substitute for HTTP credentials.
+		{name: "https remote with only an ssh key", remote: "https://github.com/user/repo.git", sshKey: sshKey, wantErr: true},
+
+		{name: "file remote is not supported", remote: "file:///srv/backup.git", sshKey: sshKey, wantErr: true},
+		{name: "bare path is not supported", remote: "/srv/backup.git", sshKey: sshKey, wantErr: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateGitBackupRemote(tc.remote, tc.sshKey, tc.sshKeyPath, tc.httpUsername, tc.httpPassword)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("validateGitBackupRemote(%q, ...) error = %v, wantErr %v", tc.remote, err, tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestValidateListenConfig(t *testing.T) {
 	tests := []struct {
 		name       string
 		unixSocket string
-		visited    map[string]bool
+		hostSet    bool
+		portSet    bool
 		wantErr    bool
 	}{
 		{
 			name:       "tcp only is allowed",
 			unixSocket: "",
-			visited:    map[string]bool{"host": true, "port": true},
+			hostSet:    true,
+			portSet:    true,
 			wantErr:    false,
 		},
 		{
 			name:       "unix socket only is allowed",
 			unixSocket: "/tmp/leafwiki.sock",
-			visited:    map[string]bool{},
-			wantErr:    false,
+
+			wantErr: false,
 		},
 		{
 			name:       "unix socket with host is rejected",
 			unixSocket: "/tmp/leafwiki.sock",
-			visited:    map[string]bool{"host": true},
+			hostSet:    true,
 			wantErr:    true,
 		},
 		{
 			name:       "unix socket with port is rejected",
 			unixSocket: "/tmp/leafwiki.sock",
-			visited:    map[string]bool{"port": true},
+			portSet:    true,
 			wantErr:    true,
 		},
 		{
 			name:       "unix socket with host and port is rejected",
 			unixSocket: "/tmp/leafwiki.sock",
-			visited:    map[string]bool{"host": true, "port": true},
+			hostSet:    true,
+			portSet:    true,
 			wantErr:    true,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateListenConfig(tc.unixSocket, tc.visited)
+			err := validateListenConfig(tc.unixSocket, tc.hostSet, tc.portSet)
 			if (err != nil) != tc.wantErr {
-				t.Fatalf("validateListenConfig(%q, %v) error = %v, wantErr %v", tc.unixSocket, tc.visited, err, tc.wantErr)
+				t.Fatalf("validateListenConfig(%q, host=%v, port=%v) error = %v, wantErr %v", tc.unixSocket, tc.hostSet, tc.portSet, err, tc.wantErr)
 			}
 		})
 	}
 }
 
-func TestRegisterFlags_AcceptsDoubleDashLongFlags(t *testing.T) {
-	fs := flag.NewFlagSet("leafwiki", flag.ContinueOnError)
-	var errOut bytes.Buffer
-	fs.SetOutput(&errOut)
-	flags := registerFlags(fs)
-
-	err := fs.Parse([]string{
+func TestRootCommand_AcceptsDoubleDashLongFlags(t *testing.T) {
+	runRootCommand(t, []string{
 		"--jwt-secret=test-secret",
 		"--admin-password=test-password",
 		"--admin-username=test-admin",
@@ -414,38 +619,31 @@ func TestRegisterFlags_AcceptsDoubleDashLongFlags(t *testing.T) {
 		"--metrics-host=127.0.0.2",
 		"--metrics-port=9100",
 		"--unix-socket=/tmp/leafwiki.sock",
+	}, func(cfg *serverConfig) {
+		for _, tc := range []struct {
+			flag string
+			got  string
+			want string
+		}{
+			{"jwt-secret", cfg.auth.jwtSecret, "test-secret"},
+			{"admin-password", cfg.auth.adminPassword, "test-password"},
+			{"admin-username", cfg.auth.adminUsername, "test-admin"},
+			{"admin-email", cfg.auth.adminEmail, "test-admin@example.com"},
+			{"metrics-host", cfg.metrics.metricsHost, "127.0.0.2"},
+			{"metrics-port", cfg.metrics.metricsPort, "9100"},
+			{"unix-socket", cfg.server.unixSocket, "/tmp/leafwiki.sock"},
+		} {
+			if tc.got != tc.want {
+				t.Fatalf("expected --%s %q, got %q", tc.flag, tc.want, tc.got)
+			}
+		}
+		if !cfg.server.allowInsecure {
+			t.Fatal("expected --allow-insecure to be true")
+		}
+		if !cfg.metrics.enableMetrics {
+			t.Fatal("expected --enable-metrics to be true")
+		}
 	})
-	if err != nil {
-		t.Fatalf("expected double-dash long flags to parse, got %v (%s)", err, errOut.String())
-	}
-
-	if got := *flags.jwtSecret; got != "test-secret" {
-		t.Fatalf("expected jwt secret %q, got %q", "test-secret", got)
-	}
-	if got := *flags.adminPassword; got != "test-password" {
-		t.Fatalf("expected admin password %q, got %q", "test-password", got)
-	}
-	if got := *flags.adminUsername; got != "test-admin" {
-		t.Fatalf("expected admin username %q, got %q", "test-admin", got)
-	}
-	if got := *flags.adminEmail; got != "test-admin@example.com" {
-		t.Fatalf("expected admin email %q, got %q", "test-admin@example.com", got)
-	}
-	if !*flags.allowInsecure {
-		t.Fatalf("expected allow-insecure to be true")
-	}
-	if !*flags.enableMetrics {
-		t.Fatalf("expected enable-metrics to be true")
-	}
-	if got := *flags.metricsHost; got != "127.0.0.2" {
-		t.Fatalf("expected metrics host %q, got %q", "127.0.0.2", got)
-	}
-	if got := *flags.metricsPort; got != "9100" {
-		t.Fatalf("expected metrics port %q, got %q", "9100", got)
-	}
-	if got := *flags.unixSocket; got != "/tmp/leafwiki.sock" {
-		t.Fatalf("expected unix socket %q, got %q", "/tmp/leafwiki.sock", got)
-	}
 }
 
 func TestStartMetricsServer_ServesOnlyMetricsEndpoint(t *testing.T) {
@@ -902,6 +1100,72 @@ func TestDockerfileBuilder_GoBuildLdflags_InjectsAppVersion(t *testing.T) {
 	}
 }
 
+// dockerBuildStageDeclaresArg checks that the multi-stage Docker build
+// stage containing marker (e.g. the `go build` line) is preceded by its own
+// `ARG argName` declaration *within that stage*. Docker scopes ARG per
+// build stage: an ARG declared in an earlier stage does not carry into a
+// later one, even though `${argName}` still substitutes silently as an
+// empty string there instead of failing the build.
+func dockerBuildStageDeclaresArg(t *testing.T, dockerfilePath, marker, argName string) bool {
+	t.Helper()
+
+	content, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		t.Fatalf("failed to read %s: %v", dockerfilePath, err)
+	}
+
+	lines := strings.Split(string(content), "\n")
+
+	markerIdx := -1
+	for i, line := range lines {
+		if strings.Contains(line, marker) {
+			markerIdx = i
+			break
+		}
+	}
+	if markerIdx == -1 {
+		t.Fatalf("no line containing %q found in %s", marker, dockerfilePath)
+	}
+
+	stageStart := 0
+	for i := markerIdx; i >= 0; i-- {
+		if strings.HasPrefix(strings.TrimSpace(lines[i]), "FROM ") {
+			stageStart = i
+			break
+		}
+	}
+
+	for _, line := range lines[stageStart:markerIdx] {
+		if strings.TrimSpace(line) == "ARG "+argName {
+			return true
+		}
+	}
+	return false
+}
+
+// TestDockerfile_GoBuildStage_DeclaresAppVersionArg pins the bug where
+// Dockerfile's backend-build stage used ${APP_VERSION} in its go build
+// -ldflags without re-declaring `ARG APP_VERSION` in that stage (it was
+// only declared in the earlier frontend-build stage). Docker scopes ARG per
+// stage, so the ldflags line silently baked in an empty version string
+// instead of failing the build — every v0.12.x release image/binary shipped
+// main.Version="" (visible in the leafwiki_build_info metric and in the
+// snapshot/restore version-mismatch check, which silently no-ops when
+// WikiVersion is empty).
+func TestDockerfile_GoBuildStage_DeclaresAppVersionArg(t *testing.T) {
+	if !dockerBuildStageDeclaresArg(t, filepath.Join("..", "..", "Dockerfile"), "go build", "APP_VERSION") {
+		t.Fatal("Dockerfile's go build stage uses ${APP_VERSION} without declaring ARG APP_VERSION in that stage")
+	}
+}
+
+// TestDockerfileBuilder_GoBuildStage_DeclaresAppVersionArg is the same
+// regression check for Dockerfile.builder's builder stage.
+func TestDockerfileBuilder_GoBuildStage_DeclaresAppVersionArg(t *testing.T) {
+	if !dockerBuildStageDeclaresArg(t, filepath.Join("..", "..", "Dockerfile.builder"), "go build", "APP_VERSION") {
+		t.Fatal("Dockerfile.builder's builder stage uses ${APP_VERSION} without declaring ARG APP_VERSION in that stage")
+	}
+}
+
 // TestResolveVersionScript_AppVersionEnvOverride_ReturnsEnvValue exercises
 // the deterministic branch of scripts/resolve-version.sh (the shared
 // algorithm used by both `make build`/`make run` and vite.config.ts). The
@@ -928,27 +1192,55 @@ func TestResolveVersionScript_AppVersionEnvOverride_ReturnsEnvValue(t *testing.T
 // release/Docker targets do, instead of leaving local builds on the "dev"
 // default silently.
 func TestMakefile_BuildAndRunTargets_InjectVersionLdflags(t *testing.T) {
-	content, err := os.ReadFile(filepath.Join("..", "..", "Makefile"))
+	raw, err := os.ReadFile(filepath.Join("..", "..", "Makefile"))
 	if err != nil {
 		t.Fatalf("failed to read Makefile: %v", err)
 	}
+	content := string(raw)
 
 	for _, target := range []string{"build:", "run:"} {
-		idx := strings.Index(string(content), target)
+		idx := strings.Index(content, target)
 		if idx == -1 {
 			t.Fatalf("Makefile target %q not found", target)
 		}
 
-		recipeEnd := strings.Index(string(content)[idx:], "\n\n")
+		recipeEnd := strings.Index(content[idx:], "\n\n")
 		if recipeEnd == -1 {
 			recipeEnd = len(content) - idx
 		}
-		recipe := string(content)[idx : idx+recipeEnd]
+		recipe := content[idx : idx+recipeEnd]
 
-		if !strings.Contains(recipe, "-X main.Version=$(VERSION)") {
+		if !strings.Contains(resolveMakeVars(content, recipe), "-X main.Version=$(VERSION)") {
 			t.Fatalf("expected Makefile %q recipe to inject main.Version from $(VERSION), got: %s", target, recipe)
 		}
 	}
+}
+
+var makeVarAssignment = regexp.MustCompile(`(?m)^([A-Za-z_][A-Za-z0-9_]*)\s*(?::=|\?=|=)\s*(.*)$`)
+
+// resolveMakeVars expands $(NAME) references in s using NAME's assignment
+// elsewhere in the Makefile, so the check above still works when a recipe
+// builds its ldflags from a variable (e.g. $(LDFLAGS)) instead of a literal
+// string. $(VERSION) itself is left unresolved since the test asserts on
+// that exact reference.
+func resolveMakeVars(content, s string) string {
+	assignments := map[string]string{}
+	for _, m := range makeVarAssignment.FindAllStringSubmatch(content, -1) {
+		assignments[m[1]] = m[2]
+	}
+	delete(assignments, "VERSION")
+
+	for changed := true; changed; {
+		changed = false
+		for name, value := range assignments {
+			token := "$(" + name + ")"
+			if strings.Contains(s, token) {
+				s = strings.ReplaceAll(s, token, value)
+				changed = true
+			}
+		}
+	}
+	return s
 }
 
 // TestViteConfig_ResolvesVersionViaSharedScript pins that the frontend

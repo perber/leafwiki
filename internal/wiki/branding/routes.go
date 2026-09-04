@@ -1,6 +1,7 @@
 package branding
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -13,7 +14,6 @@ import (
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	httpinternal "github.com/perber/wiki/internal/http"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
-	"github.com/perber/wiki/internal/http/middleware/security"
 )
 
 // Routes is the RouteRegistrar for the branding domain.
@@ -71,12 +71,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	base.GET("/favicon.ico", r.handleServeCurrentFavicon)
 
 	// Auth-gated branding mutations (admin only).
-	authGroup := base.Group("/api")
-	authGroup.Use(
-		authmw.InjectPublicEditor(opts.AuthDisabled),
-		authmw.RequireAuth(r.authService, ctx.AuthCookies, opts.AuthDisabled),
-		security.CSRFMiddleware(ctx.CSRFCookie),
-	)
+	authGroup := ctx.APIAuthGroup(r.authService)
 	authGroup.PUT("/branding", authmw.RequireAdmin(opts.AuthDisabled), r.handleUpdateBranding)
 	authGroup.POST("/branding/logo", authmw.RequireAdmin(opts.AuthDisabled), r.handleUploadLogo)
 	authGroup.POST("/branding/favicon", authmw.RequireAdmin(opts.AuthDisabled), r.handleUploadFavicon)
@@ -118,14 +113,13 @@ func (r *Routes) handleUploadLogo(c *gin.Context) {
 		return
 	}
 	maxSize := constraints.BrandingConstraints.MaxLogoSize
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxSize)
-	if err := c.Request.ParseMultipartForm(maxSize); err != nil {
-		respondWithBrandingStatusError(c, http.StatusRequestEntityTooLarge, ErrCodeBrandingLogoTooLarge, "File too large", "file too large")
-		return
-	}
-	file, header, err := c.Request.FormFile("file")
+	file, header, err := httpinternal.ParseUploadedFile(c, maxSize, "file")
 	if err != nil {
-		respondWithBrandingStatusError(c, http.StatusBadRequest, ErrCodeBrandingLogoMissing, "Missing file", "missing file")
+		if errors.Is(err, httpinternal.ErrUploadTooLarge) {
+			respondWithBrandingStatusError(c, http.StatusRequestEntityTooLarge, ErrCodeBrandingLogoTooLarge, "File too large", "file too large")
+		} else {
+			respondWithBrandingStatusError(c, http.StatusBadRequest, ErrCodeBrandingLogoMissing, "Missing file", "missing file")
+		}
 		return
 	}
 	defer func() {
@@ -157,14 +151,13 @@ func (r *Routes) handleUploadFavicon(c *gin.Context) {
 		return
 	}
 	maxSize := constraints.BrandingConstraints.MaxFaviconSize
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxSize)
-	if err := c.Request.ParseMultipartForm(maxSize); err != nil {
-		respondWithBrandingStatusError(c, http.StatusRequestEntityTooLarge, ErrCodeBrandingFaviconTooLarge, "File too large", "file too large")
-		return
-	}
-	file, header, err := c.Request.FormFile("file")
+	file, header, err := httpinternal.ParseUploadedFile(c, maxSize, "file")
 	if err != nil {
-		respondWithBrandingStatusError(c, http.StatusBadRequest, ErrCodeBrandingFaviconMissing, "Missing file", "missing file")
+		if errors.Is(err, httpinternal.ErrUploadTooLarge) {
+			respondWithBrandingStatusError(c, http.StatusRequestEntityTooLarge, ErrCodeBrandingFaviconTooLarge, "File too large", "file too large")
+		} else {
+			respondWithBrandingStatusError(c, http.StatusBadRequest, ErrCodeBrandingFaviconMissing, "Missing file", "missing file")
+		}
 		return
 	}
 	defer func() {

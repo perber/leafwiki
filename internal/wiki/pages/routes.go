@@ -13,7 +13,6 @@ import (
 	httpinternal "github.com/perber/wiki/internal/http"
 	"github.com/perber/wiki/internal/http/dto"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
-	"github.com/perber/wiki/internal/http/middleware/security"
 )
 
 const (
@@ -109,31 +108,19 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	opts := ctx.Opts
 
-	if opts.PublicAccess {
-		pub := ctx.Base.Group("/api")
-		pub.GET("/tree", r.handleGetTree)
-		pub.GET("/pages/by-path", r.handleGetByPath)
-		pub.GET("/pages/by-title", r.handleFindByTitle)
-		pub.GET("/pages/lookup", r.handleLookupPath)
-		pub.GET("/pages/permalink/:id", r.handleResolvePermalink)
-		pub.GET(pagesIdRoutePath, r.handleGetPage)
-	}
+	// Read routes registered once, gated per request so they can flip between
+	// authenticated-only and public without a restart (see APIReadGroup).
+	readGroup := ctx.APIReadGroup(r.authService)
+	readGroup.GET("/tree", r.handleGetTree)
+	readGroup.GET(pagesIdRoutePath, r.handleGetPage)
+	readGroup.GET("/pages/lookup", r.handleLookupPath)
+	readGroup.GET("/pages/by-path", r.handleGetByPath)
+	readGroup.GET("/pages/by-title", r.handleFindByTitle)
+	readGroup.GET("/pages/permalink/:id", r.handleResolvePermalink)
 
-	authGroup := ctx.Base.Group("/api")
-	authGroup.Use(
-		authmw.InjectPublicEditor(opts.AuthDisabled),
-		authmw.RequireAuth(r.authService, ctx.AuthCookies, opts.AuthDisabled),
-		security.CSRFMiddleware(ctx.CSRFCookie),
-	)
-
-	if !opts.PublicAccess {
-		authGroup.GET("/tree", r.handleGetTree)
-		authGroup.GET(pagesIdRoutePath, r.handleGetPage)
-		authGroup.GET("/pages/lookup", r.handleLookupPath)
-		authGroup.GET("/pages/by-path", r.handleGetByPath)
-		authGroup.GET("/pages/by-title", r.handleFindByTitle)
-		authGroup.GET("/pages/permalink/:id", r.handleResolvePermalink)
-	}
+	// Everything below needs a real authenticated user regardless of public
+	// mode (writes, editor-gated reads, per-user favorites).
+	authGroup := ctx.APIAuthGroup(r.authService)
 
 	authGroup.GET("/pages/slug-suggestion", authmw.RequireEditorOrAdmin(), r.handleSuggestSlug)
 	authGroup.POST("/pages", authmw.RequireEditorOrAdmin(), r.handleCreate)
@@ -564,6 +551,7 @@ func (r *Routes) handleRefactorApply(c *gin.Context) {
 		Content      *string `json:"content"`
 		NewParentID  *string `json:"parentId"`
 		RewriteLinks bool    `json:"rewriteLinks"`
+		Position     *int    `json:"position"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
@@ -581,6 +569,7 @@ func (r *Routes) handleRefactorApply(c *gin.Context) {
 			Content: req.Content, NewParentID: req.NewParentID,
 		},
 		RewriteLinks: req.RewriteLinks,
+		Position:     req.Position,
 	})
 	if err != nil {
 		respondWithPageError(c, err)

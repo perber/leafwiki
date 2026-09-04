@@ -1,0 +1,124 @@
+{
+  "pageTitle": "Benutzerverwaltung",
+  "loading": "Benutzer werden geladen...",
+  "loadErrorFallback": "Fehler beim Laden der Benutzer",
+  "noUsersFound": "Keine Benutzer gefunden.",
+  "columns": {
+    "username": "Benutzername",
+    "email": "E-Mail",
+    "role": "Rolle",
+    "actions": "Aktionen"
+  },
+  "actions": {
+    "edit": "Bearbeiten",
+    "new": "Neuer Benutzer",
+    "changePassword": "Passwort ändern",
+    "delete": "Löschen"
+  },
+  "invite": {
+    "pendingPill": "Einladung ausstehend",
+    "resendAction": "Einladung erneut senden",
+    "resending": "Wird erneut gesendet...",
+    "resendSuccessToast": "Einladungs-E-Mail erneut gesendet",
+    "resendErrorFallback": "Fehler beim erneuten Senden der Einladung",
+    "emailNotSentWarning": "Benutzer erstellt, aber die Einladungs-E-Mail konnte nicht gesendet werden. Verwenden Sie „Einladung erneut senden“, um es erneut zu versuchen."
+  },
+  "validation": {
+    "passwordTooShort": "Das Passwort muss mindestens 8 Zeichen lang sein",
+    "passwordsDoNotMatch": "Passwörter stimmen nicht überein"
+  },
+  "changePasswordDialog": {
+    "title": "Passwort für {{username}} ändern",
+    "description": "Legen Sie ein neues Passwort für den Benutzer fest.",
+    "cancel": "Abbrechen",
+    "update": "Passwort aktualisieren",
+    "updating": "Wird aktualisiert...",
+    "newPasswordLabel": "Neues Passwort",
+    "confirmPasswordLabel": "Passwort bestätigen",
+    "successToast": "Passwort erfolgreich geändert",
+    "errorFallback": "Fehler beim Aktualisieren des Passworts"
+  },
+  "userForm": {
+    "editTitle": "Benutzer bearbeiten",
+    "newTitle": "Neuer Benutzer",
+    "editDescription": "Benutzerdetails bearbeiten",
+    "newDescription": "Neuen Benutzer erstellen",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "successToast": "Benutzer erfolgreich gespeichert",
+    "errorFallback": "Fehler beim Speichern des Benutzers",
+    "usernameLabel": "Benutzername",
+    "usernamePlaceholder": "Benutzername",
+    "emailLabel": "E-Mail",
+    "emailPlaceholder": "E-Mail",
+    "passwordLabel": "Passwort",
+    "passwordPlaceholder": "Passwort",
+    "rolePlaceholder": "Rolle auswählen",
+    "roleViewer": "Betrachter",
+    "roleEditor": "Bearbeiter",
+    "roleAdmin": "Administrator",
+    "modeSetPassword": "Passwort jetzt festlegen",
+    "modeInvite": "Einladungs-E-Mail senden",
+    "inviteSuccessToast": "Einladung erfolgreich gesendet"
+  },
+  "deleteUser": {
+    "title": "Benutzer löschen?",
+    "description": "Möchten Sie diesen Benutzer wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "cancel": "Abbrechen",
+    "deleting": "Wird gelöscht...",
+    "delete": "Löschen",
+    "successToast": "Benutzer erfolgreich gelöscht",
+    "errorFallback": "Benutzer konnte nicht gelöscht werden. Bitte erneut versuchen.",
+    "body": "Der Benutzer <strong>{{username}}</strong> wird dauerhaft aus dem System entfernt."
+  },
+  "changeOwnPassword": {
+    "title": "Eigenes Passwort ändern",
+    "description": "Ändern Sie Ihr Passwort. Merken Sie es sich gut!",
+    "cancel": "Abbrechen",
+    "saving": "Wird gespeichert...",
+    "save": "Speichern",
+    "successToast": "Passwort erfolgreich geändert",
+    "errorFallback": "Fehler beim Aktualisieren des Passworts",
+    "oldPasswordLabel": "Altes Passwort",
+    "newPasswordLabel": "Neues Passwort",
+    "confirmPasswordLabel": "Passwort bestätigen"
+  },
+  "totp": {
+    "column": "2FA",
+    "enabled": "Aktiviert",
+    "disabled": "Deaktiviert",
+    "menuEnable": "Zwei-Faktor-Authentifizierung aktivieren",
+    "menuDisable": "Zwei-Faktor-Authentifizierung deaktivieren",
+    "cancel": "Abbrechen",
+    "setup": {
+      "passwordStepTitle": "Zwei-Faktor-Authentifizierung aktivieren",
+      "passwordStepDescription": "Bestätigen Sie Ihr aktuelles Passwort, um die Einrichtung zu starten.",
+      "passwordPlaceholder": "Aktuelles Passwort",
+      "continue": "Weiter",
+      "continuing": "Wird geprüft...",
+      "verifyStepTitle": "QR-Code scannen",
+      "verifyStepDescription": "Scannen Sie diesen QR-Code mit Ihrer Authenticator-App, oder geben Sie den Schlüssel manuell ein. Geben Sie anschließend den angezeigten 6-stelligen Code ein.",
+      "manualKeyLabel": "Schlüssel für manuelle Eingabe",
+      "codePlaceholder": "6-stelliger Code",
+      "enable": "Aktivieren",
+      "enabling": "Wird geprüft...",
+      "recoveryStepTitle": "Wiederherstellungscodes speichern",
+      "recoveryStepDescription": "Bewahren Sie diese Codes an einem sicheren Ort auf. Jeder Code kann einmal verwendet werden, um sich anzumelden, falls Sie den Zugriff auf Ihre Authenticator-App verlieren. Sie werden nicht erneut angezeigt.",
+      "copyRecoveryCodes": "Codes kopieren",
+      "recoveryCodesCopied": "Wiederherstellungscodes in die Zwischenablage kopiert",
+      "done": "Fertig",
+      "successToast": "Zwei-Faktor-Authentifizierung aktiviert",
+      "errorFallback": "Zwei-Faktor-Authentifizierung konnte nicht aktiviert werden"
+    },
+    "disable": {
+      "title": "Zwei-Faktor-Authentifizierung deaktivieren",
+      "description": "Bestätigen Sie Ihr aktuelles Passwort und einen Code aus Ihrer Authenticator-App oder einen Wiederherstellungscode.",
+      "passwordPlaceholder": "Aktuelles Passwort",
+      "codePlaceholder": "Code oder Wiederherstellungscode",
+      "confirm": "Deaktivieren",
+      "disabling": "Wird deaktiviert...",
+      "successToast": "Zwei-Faktor-Authentifizierung deaktiviert",
+      "errorFallback": "Zwei-Faktor-Authentifizierung konnte nicht deaktiviert werden"
+    }
+  }
+}

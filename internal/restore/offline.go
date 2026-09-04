@@ -28,15 +28,18 @@ func RestoreOffline(dataDir, zipPath string) error {
 	// No live connection exists in this offline path (the server hasn't
 	// started yet), so any leftover -wal/-shm here is from a prior unclean
 	// shutdown, not in-flight state — see removeStaleWALSidecars for why
-	// this still needs cleaning up before the swap.
-	if err := removeStaleWALSidecars(filepath.Join(dataDir, "users.db")); err != nil {
-		return fmt.Errorf("failed to clean up stale users.db WAL files before swap: %w", err)
-	}
-	// api_keys.db runs in WAL mode too (internal/core/auth/apikey_store.go) —
-	// same stale-sidecar risk as users.db once it's part of swapNames, same
-	// fix.
-	if err := removeStaleWALSidecars(filepath.Join(dataDir, "api_keys.db")); err != nil {
-		return fmt.Errorf("failed to clean up stale api_keys.db WAL files before swap: %w", err)
+	// this still needs cleaning up before the swap. Only a database this
+	// snapshot actually staged gets its live sidecars cleaned. A database
+	// SwapAll will leave untouched (see newSwapper's doc comment) may have a
+	// live WAL holding real committed-but-uncheckpointed data, which
+	// deleting the sidecar would discard for good.
+	for _, name := range walSidecarDBNames {
+		if _, err := os.Stat(filepath.Join(stagingDir, name)); err != nil {
+			continue
+		}
+		if err := removeStaleWALSidecars(filepath.Join(dataDir, name)); err != nil {
+			return fmt.Errorf("failed to clean up stale %s WAL files before swap: %w", name, err)
+		}
 	}
 
 	sw := newSwapper(dataDir, stagingDir)

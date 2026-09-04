@@ -1,0 +1,52 @@
+{
+  "exit": "Exit settings",
+  "nav": {
+    "title": "Settings",
+    "account": "Account"
+  },
+  "account": {
+    "pageTitle": "Account",
+    "avatar": {
+      "sectionTitle": "Profile Picture",
+      "sectionDescription": "Upload a picture to personalize your account.",
+      "currentLabel": "Current picture:",
+      "uploadButton": "Upload picture",
+      "deleteButton": "Remove picture",
+      "hint": "Allowed formats: {{exts}}. Max size: {{size}}.",
+      "uploadSuccess": "Profile picture uploaded",
+      "uploadFailed": "Could not upload profile picture",
+      "deleteSuccess": "Profile picture removed",
+      "deleteFailed": "Could not remove profile picture"
+    },
+    "passwordSectionTitle": "Password",
+    "passwordSectionDescription": "Change your password. Make sure to remember it!",
+    "twoFactorSectionTitle": "Two-Factor Authentication",
+    "twoFactorSectionDescription": "Add an extra layer of security to your account.",
+    "preferences": {
+      "sectionTitle": "Preferences",
+      "sectionDescription": "Editing preferences, synced across your devices.",
+      "autoSaveLabel": "Enable auto-save",
+      "autoSaveDescription": "Automatically save your changes while editing a page.",
+      "savedToast": "Preference saved",
+      "autoSaveToggleError": "Could not update auto-save setting",
+      "languageLabel": "Language",
+      "languageChangeError": "Could not update language setting",
+      "dateFormatLabel": "Date format",
+      "dateFormatChangeError": "Could not update date format setting",
+      "timeFormatLabel": "Time format",
+      "timeFormatChangeError": "Could not update time format setting",
+      "dateFormat": {
+        "locale": "Follow language",
+        "iso": "2026-08-27",
+        "dmyDot": "27.08.2026",
+        "mdySlash": "08/27/2026",
+        "dmySlash": "27/08/2026"
+      },
+      "timeFormat": {
+        "locale": "Follow language",
+        "h24": "24-hour (14:30)",
+        "h12": "12-hour (2:30 PM)"
+      }
+    }
+  }
+}

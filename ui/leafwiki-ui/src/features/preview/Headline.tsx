@@ -66,7 +66,7 @@ export default function Headline({
             aria-label={sectionLinkLabel}
             title={sectionLinkLabel}
           >
-            <span>
+            <span className="headline-anchor__icon">
               <Paperclip size={18} />
             </span>
           </a>
@@ -74,7 +74,7 @@ export default function Headline({
       ) : (
         <a className="headline-anchor headline-anchor--full" href={`#${id}`}>
           {children}
-          <span>
+          <span className="headline-anchor__icon">
             <Paperclip size={18} />
           </span>
         </a>

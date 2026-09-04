@@ -1,24 +1,37 @@
 import { getConfig } from '@/lib/api/config'
-import { DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES } from '@/lib/config'
-import i18next from '@/lib/i18n'
+import { setPublicAccess as setPublicAccessApi } from '@/lib/api/instanceSettings'
+import {
+  DEFAULT_AVATAR_ALLOWED_EXTS,
+  DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES,
+  DEFAULT_MAX_AVATAR_UPLOAD_SIZE_BYTES,
+} from '@/lib/config'
+import i18next, { getAvailableLanguages } from '@/lib/i18n'
 import { sleep } from '@/lib/sleep'
 import { create } from 'zustand'
 
 type ConfigStore = {
   publicAccess: boolean
+  publicAccessEnvManaged: boolean
+  editorLimit: number
   hideLinkMetadataSection: boolean
   authDisabled: boolean
   maxAssetUploadSizeBytes: number
+  maxAvatarUploadSizeBytes: number
+  avatarAllowedExts: string[]
   enableRevision: boolean
   enableLinkRefactor: boolean
   enableApiKeyManagement: boolean
   gitBackupEnabled: boolean
+  gitBackupEnvManaged: boolean
+  gitBackupConfigured: boolean
   snapshotEnabled: boolean
+  smtpEnabled: boolean
   totpAvailable: boolean
   httpRemoteUserEnabled: boolean
   loginUrl: string
   logoutUrl: string
   userManagementUrl: string
+  defaultLanguage: string
   error: string | null
   loading: boolean
   hasLoaded: boolean
@@ -33,6 +46,11 @@ type ConfigStore = {
   // header-auth session (see lib/api/auth.ts's fetchWithAuth).
   configLoadSucceeded: boolean
   loadConfig: () => Promise<void>
+  // Runtime toggle of public mode (admin only, settings-managed instances).
+  // Updates the store in place on success — no reload needed for this tab;
+  // other open tabs / anonymous visitors pick it up on their next
+  // /api/config load.
+  setPublicAccess: (enabled: boolean) => Promise<void>
 }
 
 // A single failed attempt would otherwise leave configLoadSucceeded false —
@@ -44,19 +62,27 @@ const CONFIG_LOAD_RETRY_DELAYS_MS = [500, 1000]
 
 export const useConfigStore = create<ConfigStore>((set) => ({
   publicAccess: false,
+  publicAccessEnvManaged: false,
+  editorLimit: 0,
   hideLinkMetadataSection: false,
   authDisabled: false,
   maxAssetUploadSizeBytes: DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES,
+  maxAvatarUploadSizeBytes: DEFAULT_MAX_AVATAR_UPLOAD_SIZE_BYTES,
+  avatarAllowedExts: DEFAULT_AVATAR_ALLOWED_EXTS,
   enableRevision: false,
   enableLinkRefactor: false,
   enableApiKeyManagement: false,
   gitBackupEnabled: false,
+  gitBackupEnvManaged: false,
+  gitBackupConfigured: false,
   snapshotEnabled: false,
+  smtpEnabled: false,
   totpAvailable: false,
   httpRemoteUserEnabled: false,
   loginUrl: '',
   logoutUrl: '',
   userManagementUrl: '',
+  defaultLanguage: '',
   error: null,
   loading: false,
   hasLoaded: false,
@@ -73,27 +99,58 @@ export const useConfigStore = create<ConfigStore>((set) => ({
         )
           ? config.maxAssetUploadSizeBytes
           : DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES
+        const maxAvatarUploadSizeBytes = Number.isFinite(
+          config.maxAvatarUploadSizeBytes,
+        )
+          ? config.maxAvatarUploadSizeBytes
+          : DEFAULT_MAX_AVATAR_UPLOAD_SIZE_BYTES
+        const avatarAllowedExts =
+          Array.isArray(config.avatarAllowedExts) &&
+          config.avatarAllowedExts.length > 0
+            ? config.avatarAllowedExts
+            : DEFAULT_AVATAR_ALLOWED_EXTS
 
         set({
           publicAccess: config.publicAccess,
+          publicAccessEnvManaged: config.publicAccessEnvManaged ?? false,
+          editorLimit: config.editorLimit ?? 0,
           hideLinkMetadataSection: config.hideLinkMetadataSection,
           authDisabled: config.authDisabled,
           maxAssetUploadSizeBytes,
+          maxAvatarUploadSizeBytes,
+          avatarAllowedExts,
           enableRevision: config.enableRevision ?? false,
           enableLinkRefactor: config.enableLinkRefactor ?? false,
           enableApiKeyManagement: config.enableApiKeyManagement ?? false,
           gitBackupEnabled: config.gitBackupEnabled ?? false,
+          gitBackupEnvManaged: config.gitBackupEnvManaged ?? false,
+          gitBackupConfigured: config.gitBackupConfigured ?? false,
           snapshotEnabled: config.snapshotEnabled ?? false,
+          smtpEnabled: config.smtpEnabled ?? false,
           totpAvailable: config.totpAvailable ?? false,
           httpRemoteUserEnabled: config.httpRemoteUserEnabled ?? false,
           loginUrl: config.loginUrl ?? '',
           logoutUrl: config.logoutUrl ?? '',
           userManagementUrl: config.userManagementUrl ?? '',
+          defaultLanguage: config.defaultLanguage ?? '',
           error: null,
           hasLoaded: true,
           configLoadSucceeded: true,
           loading: false,
         })
+
+        if (config.defaultLanguage) {
+          const isKnownLanguage = getAvailableLanguages().some(
+            (language) => language.code === config.defaultLanguage,
+          )
+          if (isKnownLanguage) {
+            void i18next.changeLanguage(config.defaultLanguage)
+          } else {
+            console.warn(
+              `Configured default language "${config.defaultLanguage}" is not shipped with the frontend, ignoring`,
+            )
+          }
+        }
         return
       } catch (error) {
         if (attempt === CONFIG_LOAD_MAX_ATTEMPTS) {
@@ -119,5 +176,10 @@ export const useConfigStore = create<ConfigStore>((set) => ({
         await sleep(CONFIG_LOAD_RETRY_DELAYS_MS[attempt - 1])
       }
     }
+  },
+
+  setPublicAccess: async (enabled: boolean) => {
+    const res = await setPublicAccessApi(enabled)
+    set({ publicAccess: res.enabled })
   },
 }))

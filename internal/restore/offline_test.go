@@ -40,6 +40,36 @@ func TestRestoreOffline_SwapsFilesWithoutAnyLiveMachinery(t *testing.T) {
 	}
 }
 
+// TestRestoreOffline_LeavesWALSidecarsUntouchedForDatabaseNotInSnapshot is
+// the regression test for a real bug found in review: the WAL-sidecar
+// cleanup that runs before SwapAll used to remove every known database's
+// stale -wal/-shm files unconditionally, even for a database SwapAll would
+// then leave untouched because the snapshot never captured it (see
+// newSwapper's doc comment) — buildFixtureSnapshot's snapshot has no
+// favorites.db (FavoritesDBPath unset). Deleting that WAL sidecar first
+// would discard any committed-but-uncheckpointed data it holds, for a
+// database the restore was never even going to touch.
+func TestRestoreOffline_LeavesWALSidecarsUntouchedForDatabaseNotInSnapshot(t *testing.T) {
+	zipPath := buildFixtureSnapshot(t, "v1.0.0")
+
+	dataDir := t.TempDir()
+	createTestUsersDB(t, filepath.Join(dataDir, "users.db"), "live-admin@example.com")
+	test_utils.WriteFile(t, dataDir, "favorites.db", "live favorites content")
+	test_utils.WriteFile(t, dataDir, "favorites.db-wal", "live favorites WAL content, must survive")
+
+	if err := RestoreOffline(dataDir, zipPath); err != nil {
+		t.Fatalf("RestoreOffline failed: %v", err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(dataDir, "favorites.db-wal"))
+	if err != nil {
+		t.Fatalf("expected favorites.db-wal to survive (not part of the restored snapshot): %v", err)
+	}
+	if string(got) != "live favorites WAL content, must survive" {
+		t.Errorf("favorites.db-wal content changed: got %q", got)
+	}
+}
+
 func TestRestoreOffline_InvalidZip_LeavesDataDirUntouched(t *testing.T) {
 	dataDir := t.TempDir()
 	test_utils.WriteFile(t, dataDir, "root/live-page.md", "# Live content\n")

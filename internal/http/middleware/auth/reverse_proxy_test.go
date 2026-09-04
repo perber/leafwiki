@@ -36,7 +36,7 @@ func createProxyFixture(t *testing.T) *proxyFixture {
 	}
 
 	userService := coreauth.NewUserService(userStore)
-	if err := userService.InitDefaultAdmin("", "", "admin"); err != nil {
+	if err := userService.InitDefaultAdmin("", "", "adminpassword"); err != nil {
 		_ = userStore.Close()
 		t.Fatalf("init default admin: %v", err)
 	}

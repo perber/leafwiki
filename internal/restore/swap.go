@@ -25,9 +25,9 @@ type backupMeta struct {
 }
 
 // requiredZipEntries are the only entries createSnapshot always writes
-// unconditionally (root/, assets/, branding/, branding.json, and schema.json
-// are all skipped by the writer when the corresponding source is empty or
-// missing, so their absence in a given ZIP isn't itself invalid).
+// unconditionally (root/, assets/, branding/, avatars/, branding.json, and
+// schema.json are all skipped by the writer when the corresponding source is
+// empty or missing, so their absence in a given ZIP isn't itself invalid).
 var requiredZipEntries = []string{"backup-meta.json", "users.db"}
 
 // extractAndValidate opens zipPath, verifies the required entries exist,
@@ -80,9 +80,32 @@ func extractAndValidateWithLimits(zipPath, dataDir string, limits shared.Extract
 		return "", backupMeta{}, fmt.Errorf("failed to parse backup-meta.json: %w", err)
 	}
 
-	if err := sanityCheckUsersDB(filepath.Join(stagingDir, "users.db")); err != nil {
+	if err := sanityCheckSQLiteDB(filepath.Join(stagingDir, "users.db"), "users", usersRequiredColumns); err != nil {
 		_ = os.RemoveAll(stagingDir)
 		return "", backupMeta{}, fmt.Errorf("staged users.db failed sanity check: %w", err)
+	}
+
+	// api_keys.db, favorites.db, and usersettings.db are all optional (API
+	// key management is off by default; an older snapshot may predate the
+	// favorites/usersettings feature), so only sanity-check them when the
+	// snapshot actually staged one — same presence guard SwapAll itself uses.
+	if _, err := os.Stat(filepath.Join(stagingDir, "api_keys.db")); err == nil {
+		if err := sanityCheckSQLiteDB(filepath.Join(stagingDir, "api_keys.db"), "api_keys", apiKeysRequiredColumns); err != nil {
+			_ = os.RemoveAll(stagingDir)
+			return "", backupMeta{}, fmt.Errorf("staged api_keys.db failed sanity check: %w", err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(stagingDir, "favorites.db")); err == nil {
+		if err := sanityCheckSQLiteDB(filepath.Join(stagingDir, "favorites.db"), "favorites", favoritesRequiredColumns); err != nil {
+			_ = os.RemoveAll(stagingDir)
+			return "", backupMeta{}, fmt.Errorf("staged favorites.db failed sanity check: %w", err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(stagingDir, "usersettings.db")); err == nil {
+		if err := sanityCheckSQLiteDB(filepath.Join(stagingDir, "usersettings.db"), "user_settings", userSettingsRequiredColumns); err != nil {
+			_ = os.RemoveAll(stagingDir)
+			return "", backupMeta{}, fmt.Errorf("staged usersettings.db failed sanity check: %w", err)
+		}
 	}
 
 	return stagingDir, meta, nil
@@ -127,16 +150,64 @@ func extractZipEntry(f *zip.File, destDir string, limits shared.ExtractionLimits
 	return nil
 }
 
-func sanityCheckUsersDB(path string) error {
+// usersRequiredColumns, apiKeysRequiredColumns, favoritesRequiredColumns,
+// and userSettingsRequiredColumns are the columns sanityCheckSQLiteDB probes
+// for each staged database. usersRequiredColumns deliberately lists only the
+// columns present in users.db's original schema, not ones an additive
+// migration adds later (totp_secret_encrypted/totp_enabled/
+// totp_recovery_codes_json/totp_enabled_at/totp_last_reset_at, added by
+// UserStore.ensureTOTPColumns; must_set_password, added by
+// ensureMustSetPasswordColumn) — an older snapshot predating one of those
+// migrations is still legitimately restorable (Replace's fresh UserStore
+// reopen re-runs the migration against it afterward), and requiring those
+// columns here would reject it before it ever gets that chance. api_keys.db,
+// favorites.db, and usersettings.db have no such migration history (each is
+// created by a single CREATE TABLE IF NOT EXISTS with no later ALTER TABLE),
+// so their lists are simply their full current schemas.
+var (
+	usersRequiredColumns        = []string{"id", "username", "password", "email", "role", "created_at"}
+	apiKeysRequiredColumns      = []string{"id", "name", "user_id", "prefix", "key_hash", "role", "expires_at", "created_by", "created_at", "last_used_at", "revoked_at"}
+	favoritesRequiredColumns    = []string{"user_id", "page_id", "created_at"}
+	userSettingsRequiredColumns = []string{"user_id", "language", "autosave", "updated_at"}
+)
+
+// sanityCheckSQLiteDB opens path, runs PRAGMA integrity_check, and probes
+// table for columns — proving the staged file is both a structurally sound
+// SQLite database (catching a corrupt page or index that a bare
+// table-existence query can't see) and one whose table actually has the
+// shape this restore expects (catching a same-named table with different or
+// missing columns, which a plain "SELECT count(*)" can't tell apart from the
+// real thing). Without this, a corrupt or wrong-shaped file would get
+// swapped in and, for favorites.db/usersettings.db specifically,
+// RetryOnCorruption (see NewFavoritesStore/NewUserSettingsStore) would then
+// silently delete and recreate it empty the moment it's reopened — with the
+// restore still reporting success either way.
+func sanityCheckSQLiteDB(path, table string, columns []string) error {
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = db.Close() }()
 
-	var count int
-	if err := db.QueryRow("SELECT count(*) FROM users").Scan(&count); err != nil {
-		return fmt.Errorf("failed to query users table: %w", err)
+	var integrity string
+	if err := db.QueryRow("PRAGMA integrity_check").Scan(&integrity); err != nil {
+		return fmt.Errorf("failed to run integrity check: %w", err)
+	}
+	if integrity != "ok" {
+		return fmt.Errorf("integrity check failed: %s", integrity)
+	}
+
+	// LIMIT 0 fetches no rows but still forces SQLite to resolve every named
+	// column against the table's actual schema, so a missing table or a
+	// missing/renamed column fails the query the same way — no rows need to
+	// exist in the table for this to work.
+	rows, err := db.Query(fmt.Sprintf("SELECT %s FROM %s LIMIT 0", strings.Join(columns, ", "), table))
+	if err != nil {
+		return fmt.Errorf("failed to query %s schema: %w", table, err)
+	}
+	defer func() { _ = rows.Close() }()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to query %s schema: %w", table, err)
 	}
 	return nil
 }
@@ -146,8 +217,26 @@ func sanityCheckUsersDB(path string) error {
 // newSwapper's doc comment. sessions.db is deliberately absent: it's never
 // part of the snapshot (session state is ephemeral, tied to the running
 // process) — see AuthService.InvalidateAllSessions, called post-swap instead
-// of being restored.
-var swapNames = []string{"root", "assets", "branding", "branding.json", "schema.json", "users.db", "api_keys.db"}
+// of being restored. "avatars" is a plain per-user-avatar asset directory
+// (like "assets"/"branding") — no hot-swappable service owns it, so it
+// carries no reload/rollback step of its own.
+var swapNames = []string{"root", "assets", "branding", "avatars", "branding.json", "schema.json", "users.db", "api_keys.db", "favorites.db", "usersettings.db"}
+
+// walSidecarDBNames lists every WAL-mode database whose stale -wal/-shm
+// sidecars may need cleaning up before a swap — derived from swapNames
+// itself (every entry that's a .db file; the non-DB entries —
+// root/assets/branding/schema.json — never run in WAL mode) so the two
+// lists can't drift apart when a future store gets added. Shared by
+// manager.go and offline.go.
+var walSidecarDBNames = func() []string {
+	names := make([]string, 0, len(swapNames))
+	for _, name := range swapNames {
+		if strings.HasSuffix(name, ".db") {
+			names = append(names, name)
+		}
+	}
+	return names
+}()
 
 // removeStaleWALSidecars deletes dbPath's -wal and -shm sidecar files, if
 // present, without touching dbPath itself. Missing files are not an error.

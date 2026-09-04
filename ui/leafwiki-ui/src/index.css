@@ -696,32 +696,32 @@
     @apply bg-primary/10 border-primary/30 text-interface-text rounded border px-2 py-1 text-xs shadow-sm;
   }
 
-  /* UserToolbar Component */
-  .user-toolbar {
+  /* UserMenu Component */
+  .user-menu {
     @apply ml-auto flex items-center gap-4;
   }
 
-  .user-toolbar__avatar {
+  .user-menu__avatar {
     @apply h-5 w-5 max-sm:h-7 max-sm:w-7;
   }
 
-  .user-toolbar__avatar > span {
+  .user-menu__avatar > span {
     @apply bg-avatar-bg! text-avatar-foreground!;
   }
 
-  .user-toolbar__avatar-fallback {
+  .user-menu__avatar-fallback {
     @apply text-muted-foreground font-medium;
   }
 
-  .user-toolbar__not-logged-in {
+  .user-menu__not-logged-in {
     @apply text-error text-sm;
   }
 
-  .user-toolbar__menu-item {
+  .user-menu__menu-item {
     @apply text-interface-text hover:bg-surface-alt cursor-pointer;
   }
 
-  .user-toolbar-dropdown-trigger {
+  .user-menu__dropdown-trigger {
     @apply flex items-center space-x-2 focus:outline-hidden;
   }
 
@@ -869,6 +869,10 @@
 
   .login__totp-back {
     @apply mt-2 w-full;
+  }
+
+  .login__forgot-password {
+    @apply text-muted-foreground hover:text-interface-text mb-4 block text-sm underline-offset-2 hover:underline;
   }
 
   /* TOTP setup dialog */
@@ -1795,7 +1799,7 @@
      lines as the pane narrows during the collapse transition, which reads as
      jumbled reflow rather than a clean shrink. */
   .page-viewer__toc-panel-entry {
-    @apply text-interface-text/70 hover:text-interface-text block w-full cursor-pointer overflow-hidden py-0.5 pr-3 text-left text-sm leading-snug text-ellipsis whitespace-nowrap transition-colors;
+    @apply text-interface-text/70 hover:text-interface-text block w-full cursor-pointer overflow-hidden py-0.5 pr-3 text-left text-sm leading-snug text-ellipsis whitespace-nowrap no-underline transition-colors;
     background: none;
     border: none;
   }
@@ -2302,7 +2306,7 @@
   }
 
   .table-wrapper table {
-    @apply w-full border-collapse;
+    @apply w-fit max-w-full border-collapse;
   }
 
   .table-wrapper tbody tr:nth-child(odd) {
@@ -2867,16 +2871,25 @@
     @apply mx-auto w-full max-w-4xl px-4 pt-4 pb-4 sm:px-8 sm:pt-8;
   }
 
-  .settings-nav {
-    @apply border-surface-border mb-6 flex flex-wrap gap-1 border-b pb-3;
+  .settings-nav .list-view__header {
+    @apply border-b-surface-border bg-surface h-12 min-h-0 border-b px-2;
   }
 
-  .settings-nav__link {
-    @apply text-muted-foreground hover:text-foreground rounded-md px-3 py-1.5 text-sm no-underline transition-colors;
+  .settings-nav .list-view__title {
+    @apply text-brand inline-flex items-center gap-1 px-3 py-1.5 text-sm font-normal;
   }
 
-  .settings-nav__link--active {
-    @apply bg-accent text-foreground font-medium;
+  .settings-nav .list-view__content {
+    @apply p-2;
+  }
+
+  .settings-nav .list-view__item {
+    @apply flex items-center gap-2.5 rounded-none text-sm;
+  }
+
+  .settings-nav .list-view__item--active {
+    @apply border-surface-border/0 bg-surface-alt text-brand;
+    box-shadow: inset 3px 0 0 hsl(var(--brand));
   }
 
   .settings__title {
@@ -2897,6 +2910,14 @@
 
   .settings__field {
     @apply mb-4;
+  }
+
+  .settings__checkbox-label {
+    @apply flex items-center gap-2;
+  }
+
+  .settings__field-label {
+    @apply text-interface-text mb-2 block text-sm font-medium;
   }
 
   .settings__preview {
@@ -2925,6 +2946,18 @@
 
   .settings__hint {
     @apply text-muted mt-1 text-xs;
+  }
+
+  .settings__status-line {
+    @apply text-interface-text mb-3 flex items-center gap-2 text-sm;
+  }
+
+  .settings__status-icon {
+    @apply text-muted h-4 w-4 shrink-0;
+  }
+
+  .settings__notice {
+    @apply border-surface-border bg-surface-alt text-muted flex flex-col gap-1 rounded-md border p-3 text-sm;
   }
 
   .settings__actions {
@@ -3520,7 +3553,7 @@
     position: relative;
   }
 
-  main article .anchor .headline-anchor span svg {
+  main article .anchor .headline-anchor .headline-anchor__icon svg {
     @apply text-headline-anchor-icon;
   }
 
@@ -3534,15 +3567,19 @@
     @apply relative no-underline;
   }
 
-  #markdown-preview-container .anchor .headline-anchor span svg {
+  #markdown-preview-container
+    .anchor
+    .headline-anchor
+    .headline-anchor__icon
+    svg {
     @apply hidden;
   }
 
-  main article .anchor .headline-anchor span {
+  main article .anchor .headline-anchor .headline-anchor__icon {
     @apply absolute top-1/2 -left-7 -translate-y-1/2 opacity-0 transition-opacity duration-200;
   }
 
-  main article .anchor .headline-anchor:hover span {
+  main article .anchor .headline-anchor:hover .headline-anchor__icon {
     @apply opacity-100;
   }
 }

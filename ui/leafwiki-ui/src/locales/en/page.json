@@ -80,11 +80,13 @@
     "copyErrorToast": "Could not copy permalink",
     "copiedToast": "Permalink copied",
     "title": "Share page",
-    "description": "Shareable URL for {{title}}",
+    "description": "Permanent link to {{title}}",
     "close": "Close",
-    "urlLabel": "Shareable URL",
+    "urlLabel": "Permanent link",
     "copyLink": "Copy link",
-    "openLink": "Open link"
+    "openLink": "Open link",
+    "purposeNote": "This is a permanent internal link. It keeps working even after the page is renamed or moved, so it's safe to bookmark or reference from other pages.",
+    "accessNote": "It is not a public link. Anyone you send it to still needs to sign in to this wiki to open it, unless the whole wiki is set to public access. LeafWiki can't make a single page public while the rest stays private."
   },
   "createByPathDialog": {
     "createdToast": "Page created successfully",

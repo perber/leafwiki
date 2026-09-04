@@ -233,6 +233,7 @@ export async function applyPageRefactor(
         version: string
         parentId: string | null
         rewriteLinks: boolean
+        position?: number
       },
 ): Promise<Page | null> {
   return (await fetchWithAuth(`/api/pages/${id}/refactor/apply`, {

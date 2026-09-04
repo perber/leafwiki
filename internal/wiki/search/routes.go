@@ -8,8 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	httpinternal "github.com/perber/wiki/internal/http"
-	authmw "github.com/perber/wiki/internal/http/middleware/auth"
-	"github.com/perber/wiki/internal/http/middleware/security"
 )
 
 // Routes is the RouteRegistrar for the search domain.
@@ -37,25 +35,11 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 
 // RegisterRoutes implements RouteRegistrar.
 func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
-	opts := ctx.Opts
-
-	if opts.PublicAccess {
-		pub := ctx.Base.Group("/api")
-		pub.GET("/search/status", r.handleGetIndexingStatus)
-		pub.GET("/search", r.handleSearch)
-	}
-
-	authGroup := ctx.Base.Group("/api")
-	authGroup.Use(
-		authmw.InjectPublicEditor(opts.AuthDisabled),
-		authmw.RequireAuth(r.authService, ctx.AuthCookies, opts.AuthDisabled),
-		security.CSRFMiddleware(ctx.CSRFCookie),
-	)
-
-	if !opts.PublicAccess {
-		authGroup.GET("/search/status", r.handleGetIndexingStatus)
-		authGroup.GET("/search", r.handleSearch)
-	}
+	// Registered once, gated per request so these reads can flip between
+	// authenticated-only and public without a restart (see APIReadGroup).
+	readGroup := ctx.APIReadGroup(r.authService)
+	readGroup.GET("/search/status", r.handleGetIndexingStatus)
+	readGroup.GET("/search", r.handleSearch)
 }
 
 // ─── Handlers ───────────────────────────────────────────────────────────────

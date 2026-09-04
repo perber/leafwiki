@@ -2,8 +2,7 @@
 import { stripBasePath } from '@/lib/routePath'
 import { useLocation } from 'react-router'
 
-export type AppMode =
-  'edit' | 'history' | 'view' | 'dialog' | 'user-management' | 'settings'
+export type AppMode = 'edit' | 'history' | 'view' | 'dialog' | 'settings'
 
 // based on the current route it will return the app mode
 export function useAppMode(): AppMode {
@@ -20,10 +19,6 @@ export function useAppMode(): AppMode {
     pathname.startsWith('/history/')
   ) {
     return 'history'
-  }
-
-  if (pathname.startsWith('/users')) {
-    return 'user-management'
   }
 
   if (pathname.startsWith('/settings')) {

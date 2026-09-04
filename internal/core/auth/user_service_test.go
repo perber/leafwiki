@@ -155,7 +155,7 @@ func TestUserService_InitDefaultAdmin(t *testing.T) {
 	store, _ := NewUserStore(t.TempDir())
 	service := NewUserService(store)
 
-	err := service.InitDefaultAdmin("", "", "")
+	err := service.InitDefaultAdmin("", "", "password123")
 	if err != nil {
 		t.Errorf("InitDefaultAdmin failed: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestUserService_InitDefaultAdmin_UsesGivenUsernameAndEmail(t *testing.T) {
 	store, _ := NewUserStore(t.TempDir())
 	service := NewUserService(store)
 
-	err := service.InitDefaultAdmin("root", "root@example.com", "")
+	err := service.InitDefaultAdmin("root", "root@example.com", "password123")
 	if err != nil {
 		t.Errorf("InitDefaultAdmin failed: %v", err)
 	}
@@ -178,6 +178,21 @@ func TestUserService_InitDefaultAdmin_UsesGivenUsernameAndEmail(t *testing.T) {
 	users, err := service.GetUsers()
 	if err != nil || len(users) != 1 || users[0].Username != "root" || users[0].Email != "root@example.com" {
 		t.Errorf("Expected admin user with custom username/email, got: %+v", users)
+	}
+}
+
+func TestUserService_InitDefaultAdmin_PasswordTooShort_ReturnsError(t *testing.T) {
+	store, _ := NewUserStore(t.TempDir())
+	service := NewUserService(store)
+
+	err := service.InitDefaultAdmin("root", "root@example.com", "short")
+	if !errors.Is(err, ErrPasswordTooShort) {
+		t.Fatalf("InitDefaultAdmin() error = %v, want ErrPasswordTooShort", err)
+	}
+
+	users, err := service.GetUsers()
+	if err != nil || len(users) != 0 {
+		t.Errorf("Expected no admin user to be created, got: %+v", users)
 	}
 }
 
@@ -608,5 +623,100 @@ func TestUserService_GetOrCreateRemoteUser_ConcurrentCallsCreateExactlyOneUser(t
 	}
 	if graceCount != 1 {
 		t.Errorf("expected exactly one 'grace' user to have been created, got %d", graceCount)
+	}
+}
+
+func setupTestUserServiceWithEditorLimit(t *testing.T, limit int) *UserService {
+	t.Helper()
+	store, err := NewUserStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("Failed to setup user store: %v", err)
+	}
+	service := NewUserService(store)
+	service.SetEditorLimit(limit)
+	return service
+}
+
+func TestUserService_CreateUser_BootstrapFirstAdminUnderLimitOne_Succeeds(t *testing.T) {
+	service := setupTestUserServiceWithEditorLimit(t, 1)
+
+	if err := service.InitDefaultAdmin("", "", "password123"); err != nil {
+		t.Fatalf("InitDefaultAdmin failed under editor limit 1: %v", err)
+	}
+}
+
+func TestUserService_CreateUser_EditorLimitReached_ReturnsError(t *testing.T) {
+	service := setupTestUserServiceWithEditorLimit(t, 1)
+
+	if _, err := service.CreateUser("admin", "admin@example.com", "secure123", RoleAdmin); err != nil {
+		t.Fatalf("CreateUser (first editor) failed: %v", err)
+	}
+
+	if _, err := service.CreateUser("bob", "bob@example.com", "secure123", RoleEditor); !errors.Is(err, ErrEditorLimitReached) {
+		t.Errorf("Expected ErrEditorLimitReached for second editor under limit 1, got: %v", err)
+	}
+}
+
+func TestUserService_CreateUser_ViewerRoleNeverBlockedByLimit(t *testing.T) {
+	service := setupTestUserServiceWithEditorLimit(t, 1)
+
+	if _, err := service.CreateUser("admin", "admin@example.com", "secure123", RoleAdmin); err != nil {
+		t.Fatalf("CreateUser (admin) failed: %v", err)
+	}
+
+	if _, err := service.CreateUser("viewer1", "viewer1@example.com", "secure123", RoleViewer); err != nil {
+		t.Errorf("Expected viewer creation to succeed regardless of editor limit, got: %v", err)
+	}
+	if _, err := service.CreateUser("viewer2", "viewer2@example.com", "secure123", RoleViewer); err != nil {
+		t.Errorf("Expected a second viewer creation to succeed regardless of editor limit, got: %v", err)
+	}
+}
+
+func TestUserService_CreateUser_UnlimitedByDefault(t *testing.T) {
+	service := setupTestUserService(t)
+
+	for i, username := range []string{"admin", "editor1", "editor2"} {
+		role := RoleAdmin
+		if i > 0 {
+			role = RoleEditor
+		}
+		if _, err := service.CreateUser(username, username+"@example.com", "secure123", role); err != nil {
+			t.Fatalf("CreateUser(%q) failed with default (unlimited) editor limit: %v", username, err)
+		}
+	}
+}
+
+func TestUserService_UpdateUser_PromoteViewerToEditor_EditorLimitReached_ReturnsError(t *testing.T) {
+	service := setupTestUserServiceWithEditorLimit(t, 1)
+
+	if _, err := service.CreateUser("admin", "admin@example.com", "secure123", RoleAdmin); err != nil {
+		t.Fatalf("CreateUser (admin) failed: %v", err)
+	}
+	viewer, err := service.CreateUser("viewer", "viewer@example.com", "secure123", RoleViewer)
+	if err != nil {
+		t.Fatalf("CreateUser (viewer) failed: %v", err)
+	}
+
+	if _, err := service.UpdateUser(viewer.ID, viewer.Username, viewer.Email, "", RoleEditor); !errors.Is(err, ErrEditorLimitReached) {
+		t.Errorf("Expected ErrEditorLimitReached when promoting viewer to editor beyond limit 1, got: %v", err)
+	}
+}
+
+func TestUserService_UpdateUser_EditorToAdmin_NotBlockedByLimit(t *testing.T) {
+	service := setupTestUserServiceWithEditorLimit(t, 2)
+
+	if _, err := service.CreateUser("admin", "admin@example.com", "secure123", RoleAdmin); err != nil {
+		t.Fatalf("CreateUser (admin) failed: %v", err)
+	}
+	editor, err := service.CreateUser("editor", "editor@example.com", "secure123", RoleEditor)
+	if err != nil {
+		t.Fatalf("CreateUser (editor) failed: %v", err)
+	}
+
+	// Both editor slots are taken (admin+editor); promoting the existing
+	// editor to admin must stay neutral (2 editors before, 2 after), not be
+	// blocked as if it were a third new editor.
+	if _, err := service.UpdateUser(editor.ID, editor.Username, editor.Email, "", RoleAdmin); err != nil {
+		t.Errorf("Expected editor->admin role change to stay neutral under the editor limit, got: %v", err)
 	}
 }

@@ -10,10 +10,9 @@ import {
   type RevisionComparison,
   type RevisionSnapshot,
 } from '@/lib/api/revisions'
-import { formatRelativeTime } from '@/lib/formatDate'
-import i18next from '@/lib/i18n'
 import { createNavigationVisitState } from '@/lib/navigationVisit'
 import { buildHistoryUrl, withBasePath } from '@/lib/routePath'
+import { useDateTimeFormat } from '@/lib/useDateTimeFormat'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useTreeStore } from '@/stores/tree'
 import {
@@ -25,6 +24,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import {
@@ -45,9 +45,6 @@ import {
   reloadPageHistory,
   usePageHistoryStore,
 } from './pageHistory'
-
-const t = (key: string, opts?: Record<string, unknown>) =>
-  i18next.t(key, { ...opts, ns: 'history' })
 
 export type PageHistoryContentProps = {
   pageId: string
@@ -75,54 +72,15 @@ function getInitialHistoryListWidth() {
 }
 
 // --- Revision list types and helpers ---
+// Helpers that need translation or the user's date-format preference are
+// defined inside PageHistoryContent (or the relevant detail sub-component)
+// via useTranslation() / useDateTimeFormat(), so they stay reactive to a
+// language or format change while the view is mounted. Only preference-free
+// pure helpers live at module scope.
 
 type RevisionGroup = {
   label: string
   revisions: Revision[]
-}
-
-function groupLabel(value?: string) {
-  if (!value) return t('common.unknown')
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return t('common.unknown')
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-  }).format(date)
-}
-
-function groupRevisions(revisions: Revision[]): RevisionGroup[] {
-  const groups: RevisionGroup[] = []
-
-  revisions.forEach((revision) => {
-    const label = groupLabel(revision.createdAt)
-    const existingGroup = groups[groups.length - 1]
-
-    if (!existingGroup || existingGroup.label !== label) {
-      groups.push({ label, revisions: [revision] })
-      return
-    }
-
-    existingGroup.revisions.push(revision)
-  })
-
-  return groups
-}
-
-function revisionTitle(revision: Revision) {
-  if (!revision.createdAt) return t('common.unknownTime')
-
-  const date = new Date(revision.createdAt)
-  if (Number.isNaN(date.getTime())) return revision.createdAt
-
-  return new Intl.DateTimeFormat(undefined, {
-    timeStyle: 'short',
-  }).format(date)
-}
-
-function revisionMeta(revision: Revision) {
-  return revision.author?.username || revision.authorId || t('common.unknown')
 }
 
 function getPathLeaf(path: string) {
@@ -142,52 +100,6 @@ type DiffLine = {
 type DiffSummary = {
   addedLines: number
   removedLines: number
-}
-
-function revisionTriggerLabel(type: string) {
-  switch (type) {
-    case 'content_update':
-      return t('trigger.contentUpdate')
-    case 'asset_update':
-      return t('trigger.assetUpdate')
-    case 'structure_update':
-      return t('trigger.structureUpdate')
-    case 'restore':
-      return t('trigger.restore')
-    case 'delete':
-      return t('trigger.delete')
-    default:
-      return t('trigger.generic', { type })
-  }
-}
-
-function assetChangeLabel(status: RevisionAssetChange['status']) {
-  switch (status) {
-    case 'added':
-      return t('assetChange.added')
-    case 'removed':
-      return t('assetChange.removed')
-    case 'modified':
-      return t('assetChange.replaced')
-    default:
-      return status
-  }
-}
-
-function displayAuthor(revision: Revision) {
-  return revision.author?.username || revision.authorId || t('common.unknown')
-}
-
-function formatTimestamp(value?: string) {
-  if (!value) return ''
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date)
 }
 
 function buildLineDiff(
@@ -377,6 +289,7 @@ function SummaryStat({
 }
 
 function DiffView({ comparison }: { comparison: RevisionComparison }) {
+  const { t } = useTranslation('history')
   const diff = useMemo(
     () => buildLineDiff(comparison.base.content, comparison.target.content),
     [comparison.base.content, comparison.target.content],
@@ -416,6 +329,21 @@ function DiffView({ comparison }: { comparison: RevisionComparison }) {
 }
 
 function ChangesPanel({ comparison }: { comparison: RevisionComparison }) {
+  const { t } = useTranslation('history')
+
+  const assetChangeLabel = (status: RevisionAssetChange['status']) => {
+    switch (status) {
+      case 'added':
+        return t('assetChange.added')
+      case 'removed':
+        return t('assetChange.removed')
+      case 'modified':
+        return t('assetChange.replaced')
+      default:
+        return status
+    }
+  }
+
   const diff = useMemo(
     () => buildLineDiff(comparison.base.content, comparison.target.content),
     [comparison.base.content, comparison.target.content],
@@ -546,6 +474,7 @@ function PreviewPanel({ snapshot }: { snapshot: RevisionSnapshot }) {
 }
 
 function RawTextPanel({ snapshot }: { snapshot: RevisionSnapshot }) {
+  const { t } = useTranslation('history')
   return (
     <div className="page-history__detail-stack">
       <section className="page-history__section">
@@ -571,6 +500,7 @@ function HistoryAssetItem({
   pageId: string
   revisionId: string
 }) {
+  const { t } = useTranslation('history')
   const assetUrl = withBasePath(
     buildRevisionAssetUrl(pageId, revisionId, asset.name),
   )
@@ -638,6 +568,7 @@ function HistoryAssetItem({
 }
 
 function AssetsPanel({ snapshot }: { snapshot: RevisionSnapshot }) {
+  const { t } = useTranslation('history')
   return (
     <div className="page-history__detail-stack">
       <section className="page-history__section">
@@ -671,6 +602,9 @@ export function PageHistoryContent({
   pageSlug,
   testidPrefix = 'page-history',
 }: PageHistoryContentProps) {
+  const { t } = useTranslation('history')
+  const { formatDateOnly, formatTimeOnly, formatDateTime, formatRelativeTime } =
+    useDateTimeFormat()
   const navigate = useNavigate()
   const isMobile = useIsMobile()
   const revisions = usePageHistoryStore((state) => state.revisions)
@@ -703,12 +637,57 @@ export function PageHistoryContent({
     onMouseUp: () => void
   } | null>(null)
 
+  const revisionTriggerLabel = useCallback(
+    (type: string) => {
+      switch (type) {
+        case 'content_update':
+          return t('trigger.contentUpdate')
+        case 'asset_update':
+          return t('trigger.assetUpdate')
+        case 'structure_update':
+          return t('trigger.structureUpdate')
+        case 'restore':
+          return t('trigger.restore')
+        case 'delete':
+          return t('trigger.delete')
+        default:
+          return t('trigger.generic', { type })
+      }
+    },
+    [t],
+  )
+
+  const revisionTitle = (revision: Revision) =>
+    !revision.createdAt
+      ? t('common.unknownTime')
+      : formatTimeOnly(revision.createdAt) || revision.createdAt
+
+  const authorLabel = (revision: Revision) =>
+    revision.author?.username || revision.authorId || t('common.unknown')
+
+  const formatTimestamp = (value?: string) =>
+    value ? formatDateTime(value) || value : ''
+
   const selectedRevision = useMemo(
     () => revisions.find((item) => item.id === selectedRevisionId) ?? null,
     [revisions, selectedRevisionId],
   )
 
-  const groupedRevisions = useMemo(() => groupRevisions(revisions), [revisions])
+  const groupedRevisions = useMemo(() => {
+    const groups: RevisionGroup[] = []
+    revisions.forEach((revision) => {
+      const label = revision.createdAt
+        ? formatDateOnly(revision.createdAt) || t('common.unknown')
+        : t('common.unknown')
+      const lastGroup = groups[groups.length - 1]
+      if (!lastGroup || lastGroup.label !== label) {
+        groups.push({ label, revisions: [revision] })
+        return
+      }
+      lastGroup.revisions.push(revision)
+    })
+    return groups
+  }, [revisions, t, formatDateOnly])
   const isSelectedRevisionLatest =
     !!selectedRevision && selectedRevision.id === latestRevisionId
 
@@ -734,7 +713,14 @@ export function PageHistoryContent({
     }
 
     return result
-  }, [comparison, pageSlug, selectedRevision, snapshot])
+  }, [
+    comparison,
+    pageSlug,
+    selectedRevision,
+    snapshot,
+    t,
+    revisionTriggerLabel,
+  ])
 
   const structureChanges = useMemo(() => {
     if (!comparison) return []
@@ -758,7 +744,7 @@ export function PageHistoryContent({
     }
 
     return changes
-  }, [comparison])
+  }, [comparison, t])
 
   // Preview is first and the default active tab so users immediately see the
   // rendered content of the selected revision without an extra click.
@@ -1039,7 +1025,7 @@ export function PageHistoryContent({
                     ) : null}
                   </div>
                   <div className="history-sidebar__item-meta">
-                    {revisionMeta(revision)}
+                    {authorLabel(revision)}
                   </div>
                 </ListViewItem>
               )
@@ -1163,7 +1149,7 @@ export function PageHistoryContent({
               {selectedRevision ? (
                 <div className="page-history__header-subtitle">
                   {t('header.revisionBy', {
-                    author: displayAuthor(selectedRevision),
+                    author: authorLabel(selectedRevision),
                     time:
                       formatRelativeTime(selectedRevision.createdAt) ||
                       formatTimestamp(selectedRevision.createdAt),

@@ -1,0 +1,61 @@
+{
+  "menu": {
+    "title": "API-Schlüssel"
+  },
+  "page": {
+    "title": "API-Schlüssel",
+    "heading": "API-Schlüssel",
+    "loadErrorFallback": "Fehler beim Laden der API-Schlüssel"
+  },
+  "table": {
+    "name": "Name",
+    "owner": "Besitzer",
+    "role": "Rolle",
+    "expires": "Läuft ab",
+    "lastUsed": "Zuletzt verwendet",
+    "actions": "Aktionen",
+    "loading": "API-Schlüssel werden geladen...",
+    "empty": "Keine API-Schlüssel gefunden.",
+    "revoked": "Widerrufen"
+  },
+  "role": {
+    "admin": "Administrator",
+    "editor": "Bearbeiter",
+    "viewer": "Betrachter"
+  },
+  "create": {
+    "button": "Neuer API-Schlüssel",
+    "title": "Neuer API-Schlüssel",
+    "description": "Erstellen Sie einen neuen API-Schlüssel für Automatisierung oder Agentenzugriff.",
+    "nameLabel": "Name",
+    "namePlaceholder": "z. B. research-agent",
+    "userPlaceholder": "Besitzenden Benutzer auswählen",
+    "expiresLabel": "Läuft ab am (optional)",
+    "roleHelper": "Neue Schlüssel sind vorerst Betrachter (nur Lesezugriff).",
+    "cancel": "Abbrechen",
+    "submit": "Erstellen",
+    "successToast": "API-Schlüssel erfolgreich erstellt",
+    "errorFallback": "Fehler beim Erstellen des API-Schlüssels"
+  },
+  "secret": {
+    "title": "API-Schlüssel erstellt",
+    "description": "Kopieren Sie diesen Schlüssel jetzt — er wird nicht erneut angezeigt.",
+    "label": "Geheimnis",
+    "copy": "Kopieren",
+    "copiedToast": "In die Zwischenablage kopiert",
+    "copyErrorToast": "Konnte nicht in die Zwischenablage kopiert werden",
+    "helper": "Dies ist das einzige Mal, dass der vollständige Schlüssel angezeigt wird. Bewahren Sie ihn sicher auf.",
+    "done": "Fertig"
+  },
+  "delete": {
+    "button": "Widerrufen",
+    "title": "API-Schlüssel widerrufen?",
+    "description": "Möchten Sie diesen API-Schlüssel wirklich widerrufen? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "body": "Der API-Schlüssel <strong>{{name}}</strong> funktioniert sofort nicht mehr. Agenten oder Automatisierungen, die ihn verwenden, verlieren den Zugriff.",
+    "cancel": "Abbrechen",
+    "confirm": "Widerrufen",
+    "confirming": "Wird widerrufen...",
+    "successToast": "API-Schlüssel erfolgreich widerrufen",
+    "errorFallback": "API-Schlüssel konnte nicht widerrufen werden. Bitte erneut versuchen."
+  }
+}

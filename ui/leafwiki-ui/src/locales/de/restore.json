@@ -1,0 +1,44 @@
+{
+  "restoreButton": "Wiederherstellen",
+  "restoreConfirmTitle": "Diese Sicherung wiederherstellen?",
+  "restoreConfirmDescription": "Dies überschreibt alle Live-Inhalte, Benutzer und Einstellungen mit dem Inhalt dieser Sicherung und meldet sofort alle ab — auch Sie. Alle müssen sich erneut anmelden. Während der Wiederherstellung sind Schreibvorgänge vorübergehend deaktiviert. Dies kann nicht rückgängig gemacht werden.",
+  "restoreConfirmCancel": "Abbrechen",
+  "restoreConfirmAction": "Wiederherstellen",
+  "restoring": "Wird wiederhergestellt…",
+  "uploadSectionTitle": "Aus hochgeladener Sicherung wiederherstellen",
+  "uploadSectionDescription": "Stellen Sie aus einem ZIP-Sicherungsarchiv von anderswo wieder her — zum Beispiel eines, das zuvor heruntergeladen oder von einer anderen Instanz kopiert wurde.",
+  "uploadSelectButton": "ZIP-Datei auswählen",
+  "currentFileLabel": "Aktuelles ZIP:",
+  "noFileSelected": "Keine ZIP-Datei ausgewählt",
+  "uploadConfirmTitle": "Diese hochgeladene Sicherung wiederherstellen?",
+  "uploadConfirmDescription": "Dies überschreibt alle Live-Inhalte, Benutzer und Einstellungen mit dem Inhalt der hochgeladenen Sicherung und meldet sofort alle ab — auch Sie. Alle müssen sich erneut anmelden. Während der Wiederherstellung sind Schreibvorgänge vorübergehend deaktiviert. Dies kann nicht rückgängig gemacht werden.",
+  "uploadConfirmCancel": "Abbrechen",
+  "uploadConfirmAction": "Wiederherstellen",
+  "progressLabel": "Aktuelle Phase",
+  "resyncTailLabel": "Wiederherstellung abgeschlossen — Suchindex wird vor dem Neuladen neu aufgebaut",
+  "progress": {
+    "validating": "Sicherung wird geprüft",
+    "swapping": "Dateien werden ausgetauscht",
+    "reopening_auth": "Benutzerdatenbank wird neu geöffnet",
+    "invalidating_sessions": "Sitzungen werden invalidiert",
+    "reloading_branding": "Branding wird neu geladen",
+    "tree": "Seitenbaum wird neu aufgebaut",
+    "links": "Links werden indexiert",
+    "tags": "Schlagwörter & Eigenschaften werden neu aufgebaut",
+    "search": "Suche wird indexiert"
+  },
+  "versionWarningLabel": "Versionskonflikt",
+  "needsInterventionTitle": "Wiederherstellung erfordert Aufmerksamkeit",
+  "needsInterventionDescription": "Die Wiederherstellung konnte nicht sauber abgeschlossen werden, und diese Instanz befindet sich möglicherweise in einem teilweise wiederhergestellten Zustand. Schreibvorgänge bleiben deaktiviert, bis dies behoben ist. Ein Neustart des Servers lädt jetzt den tatsächlichen Stand von der Festplatte neu — dies ist der unterstützte Weg zurück zu einem konsistenten Zustand.",
+  "selfRestartButton": "Server jetzt neu starten",
+  "selfRestarting": "Server wird neu gestartet… diese Seite lädt in wenigen Sekunden automatisch neu.",
+  "toast": {
+    "restoreAlreadyRunning": "Eine Wiederherstellung läuft bereits",
+    "restoreFailed": "Wiederherstellung fehlgeschlagen",
+    "restoreSucceeded": "Wiederherstellung abgeschlossen. Wird neu geladen…",
+    "restoreSucceededResyncUnconfirmed": "Wiederherstellung abgeschlossen, aber der Abschluss des Suchindex-Neuaufbaus konnte nicht bestätigt werden. Wird neu geladen — klicken Sie bei veraltet wirkenden Suchergebnissen auf den Aktualisieren-Button im Explorer."
+  },
+  "errors": {
+    "jobLost": "Wiederherstellungsauftrag verloren — der Server wurde möglicherweise neu gestartet"
+  }
+}

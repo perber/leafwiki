@@ -1,0 +1,52 @@
+{
+  "exit": "Einstellungen verlassen",
+  "nav": {
+    "title": "Einstellungen",
+    "account": "Konto"
+  },
+  "account": {
+    "pageTitle": "Konto",
+    "avatar": {
+      "sectionTitle": "Profilbild",
+      "sectionDescription": "Laden Sie ein Bild hoch, um Ihr Konto zu personalisieren.",
+      "currentLabel": "Aktuelles Bild:",
+      "uploadButton": "Bild hochladen",
+      "deleteButton": "Bild entfernen",
+      "hint": "Erlaubte Formate: {{exts}}. Maximale Größe: {{size}}.",
+      "uploadSuccess": "Profilbild hochgeladen",
+      "uploadFailed": "Profilbild konnte nicht hochgeladen werden",
+      "deleteSuccess": "Profilbild entfernt",
+      "deleteFailed": "Profilbild konnte nicht entfernt werden"
+    },
+    "passwordSectionTitle": "Passwort",
+    "passwordSectionDescription": "Ändern Sie Ihr Passwort. Merken Sie es sich gut!",
+    "twoFactorSectionTitle": "Zwei-Faktor-Authentifizierung",
+    "twoFactorSectionDescription": "Fügen Sie Ihrem Konto eine zusätzliche Sicherheitsebene hinzu.",
+    "preferences": {
+      "sectionTitle": "Voreinstellungen",
+      "sectionDescription": "Bearbeitungseinstellungen, geräteübergreifend synchronisiert.",
+      "autoSaveLabel": "Automatisches Speichern aktivieren",
+      "autoSaveDescription": "Änderungen beim Bearbeiten einer Seite automatisch speichern.",
+      "savedToast": "Einstellung gespeichert",
+      "autoSaveToggleError": "Einstellung für automatisches Speichern konnte nicht aktualisiert werden",
+      "languageLabel": "Sprache",
+      "languageChangeError": "Spracheinstellung konnte nicht aktualisiert werden",
+      "dateFormatLabel": "Datumsformat",
+      "dateFormatChangeError": "Datumsformat-Einstellung konnte nicht aktualisiert werden",
+      "timeFormatLabel": "Uhrzeitformat",
+      "timeFormatChangeError": "Uhrzeitformat-Einstellung konnte nicht aktualisiert werden",
+      "dateFormat": {
+        "locale": "Sprache folgen",
+        "iso": "2026-08-27",
+        "dmyDot": "27.08.2026",
+        "mdySlash": "08/27/2026",
+        "dmySlash": "27/08/2026"
+      },
+      "timeFormat": {
+        "locale": "Sprache folgen",
+        "h24": "24-Stunden (14:30)",
+        "h12": "12-Stunden (2:30 PM)"
+      }
+    }
+  }
+}

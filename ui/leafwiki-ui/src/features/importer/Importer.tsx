@@ -1,12 +1,12 @@
 import { Button } from '@/components/ui/button'
 import i18next from '@/lib/i18n'
+import { useDateTimeFormat } from '@/lib/useDateTimeFormat'
 import { useImportStore } from '@/stores/import'
 import { FileUp, Loader2, PlayIcon, UploadIcon, XIcon } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Trans } from 'react-i18next'
 import { useNavigate } from 'react-router'
 import { useSetTitle } from '../viewer/setTitle'
-import { useToolbarActions } from './useToolbarActions'
 
 type ResultFilter = 'all' | 'created' | 'skipped' | 'failed'
 
@@ -74,9 +74,8 @@ function getResultActionClass(
 }
 
 export default function Importer() {
-  // reset toolbar actions on mount
-  useToolbarActions()
   useSetTitle({ title: t('title') })
+  const { formatDateTime } = useDateTimeFormat()
   const navigate = useNavigate()
   const zipRef = useRef<HTMLInputElement>(null)
   const [zipFileName, setZipFileName] = useState('')
@@ -533,9 +532,7 @@ export default function Importer() {
                         <th className="settings__table-header-cell">
                           {t('plan.startedAtLabel')}
                         </th>
-                        <td>
-                          {new Date(importPlan.started_at).toLocaleString()}
-                        </td>
+                        <td>{formatDateTime(importPlan.started_at)}</td>
                       </tr>
                     )}
                     {importPlan.finished_at && (
@@ -543,9 +540,7 @@ export default function Importer() {
                         <th className="settings__table-header-cell">
                           {t('plan.finishedAtLabel')}
                         </th>
-                        <td>
-                          {new Date(importPlan.finished_at).toLocaleString()}
-                        </td>
+                        <td>{formatDateTime(importPlan.finished_at)}</td>
                       </tr>
                     )}
                   </tbody>
@@ -894,7 +889,7 @@ export default function Importer() {
                       setResultFilter(filter)
                     }}
                   >
-                    {filter}
+                    {t(`resultItems.filter.${filter}`)}
                   </button>
                 ))}
               </div>

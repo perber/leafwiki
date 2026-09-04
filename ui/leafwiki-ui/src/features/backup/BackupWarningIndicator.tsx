@@ -15,7 +15,7 @@ const ALERT_POLL_INTERVAL_MS = 30_000
 
 export function BackupWarningIndicator() {
   const { t } = useTranslation('backup')
-  const gitBackupEnabled = useConfigStore((s) => s.gitBackupEnabled)
+  const gitBackupConfigured = useConfigStore((s) => s.gitBackupConfigured)
   const user = useSessionStore((s) => s.user)
   const navigate = useNavigate()
   const [needsIntervention, setNeedsIntervention] = useState(false)
@@ -25,7 +25,7 @@ export function BackupWarningIndicator() {
   const isEditorOrAdmin = user?.role === 'admin' || user?.role === 'editor'
 
   useEffect(() => {
-    if (!gitBackupEnabled || !isEditorOrAdmin) return
+    if (!gitBackupConfigured || !isEditorOrAdmin) return
 
     const check = () => {
       fetchBackupAlert()
@@ -39,12 +39,13 @@ export function BackupWarningIndicator() {
     check()
     const id = setInterval(check, ALERT_POLL_INTERVAL_MS)
     return () => clearInterval(id)
-  }, [gitBackupEnabled, isEditorOrAdmin])
+  }, [gitBackupConfigured, isEditorOrAdmin])
 
   // Admins see the indicator for any backup error (transient or conflict).
   // Editors only see it for NeedsIntervention (persistent conflict), not transient errors.
   const shouldShowIndicator = isAdmin ? hasError : needsIntervention
-  if (!gitBackupEnabled || !shouldShowIndicator || !isEditorOrAdmin) return null
+  if (!gitBackupConfigured || !shouldShowIndicator || !isEditorOrAdmin)
+    return null
 
   const tooltipText = isAdmin
     ? needsIntervention

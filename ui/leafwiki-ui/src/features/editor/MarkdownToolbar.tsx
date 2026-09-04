@@ -35,6 +35,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useEditorStore } from '@/stores/editor'
+import { useUserSettingsStore } from '@/stores/userSettings'
 import { MarkdownEditorRef } from './MarkdownEditor'
 
 type Props = {
@@ -60,8 +61,8 @@ export default function MarkdownToolbar({
   const openDialog = useDialogsStore((state) => state.openDialog)
   const lineWrap = useEditorStore((s) => s.lineWrap)
   const toggleLineWrap = useEditorStore((s) => s.toggleLineWrap)
-  const autoSave = useEditorStore((s) => s.autoSave)
-  const toggleAutoSave = useEditorStore((s) => s.toggleAutoSave)
+  const autoSave = useUserSettingsStore((s) => s.autoSave)
+  const toggleAutoSave = useUserSettingsStore((s) => s.toggleAutoSave)
   const autoSaveStatus = useEditorStore((s) => s.autoSaveStatus)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)

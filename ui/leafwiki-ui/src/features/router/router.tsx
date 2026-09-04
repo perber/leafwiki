@@ -1,20 +1,20 @@
 import { createBrowserRouter, Navigate, RouteObject } from 'react-router'
 import {
-  ApiKeysManagement,
-  BackupSettings,
-  BrandingSettings,
-  Importer,
+  AcceptInvitePage,
+  ForgotPasswordForm,
   LoginForm,
-  MaintenanceSettings,
   PageEditor,
   PageHistoryPage,
   PageViewer,
   PermalinkRedirect,
+  ResetPasswordPage,
   RootRedirect,
-  SnapshotSettings,
-  UserManagement,
 } from './lazy-routes'
+import { settingsSections } from '@/lib/registries/settingsSectionRegistry'
 import ExternalRedirect from '../auth/ExternalRedirect'
+import SettingsIndexRedirect from '../settings/SettingsIndexRedirect'
+import SettingsLayout from '../settings/SettingsLayout'
+import SettingsSectionGuard from '../settings/SettingsSectionGuard'
 import AuthWrapper from './RouterAuthWrapper'
 import ReadOnlyWrapper from './RouterReadOnlyWrapper'
 
@@ -22,9 +22,8 @@ export const createLeafWikiRouter = (
   isReadOnlyViewer: boolean,
   authDisabled: boolean,
   enableRevision: boolean,
-  enableApiKeyManagement: boolean,
-  userManagementUrl: string,
   loginUrl: string,
+  smtpEnabled: boolean,
   basename?: string,
 ) =>
   createBrowserRouter(
@@ -39,6 +38,39 @@ export const createLeafWikiRouter = (
           <LoginForm />
         ),
       },
+      // Local-account password-reset/invite pages only make sense with real
+      // accounts and SMTP configured — gated the same way as /login (auth
+      // disabled or an external login URL both mean "no built-in login form",
+      // so these can't be reached meaningfully either), plus smtpEnabled
+      // specifically since the backend use cases return ErrEmailDisabled
+      // otherwise.
+      {
+        path: '/forgot-password',
+        element:
+          authDisabled || loginUrl || !smtpEnabled ? (
+            <Navigate to="/login" replace />
+          ) : (
+            <ForgotPasswordForm />
+          ),
+      },
+      {
+        path: '/reset-password',
+        element:
+          authDisabled || loginUrl || !smtpEnabled ? (
+            <Navigate to="/login" replace />
+          ) : (
+            <ResetPasswordPage />
+          ),
+      },
+      {
+        path: '/accept-invite',
+        element:
+          authDisabled || loginUrl || !smtpEnabled ? (
+            <Navigate to="/login" replace />
+          ) : (
+            <AcceptInvitePage />
+          ),
+      },
       {
         path: '/',
         element: isReadOnlyViewer ? (
@@ -52,85 +84,32 @@ export const createLeafWikiRouter = (
         ),
       },
       {
+        // Compat redirect — user management now lives at /settings/users;
+        // SettingsSectionGuard there preserves the external userManagementUrl
+        // special case and the admin-role gate.
         path: '/users',
-        element:
-          isReadOnlyViewer || authDisabled || userManagementUrl ? (
-            <Navigate to="/" />
-          ) : (
-            <AuthWrapper>
-              <UserManagement />
-            </AuthWrapper>
-          ),
-      },
-      {
-        path: '/settings/branding',
-        element: isReadOnlyViewer ? (
-          <Navigate to="/" />
-        ) : (
-          <AuthWrapper>
-            <BrandingSettings />
-          </AuthWrapper>
-        ),
-      },
-      {
-        path: '/settings/api-keys',
-        element: !enableApiKeyManagement ? (
-          <Navigate to="/" replace />
-        ) : isReadOnlyViewer ? (
-          <Navigate to="/" />
-        ) : (
-          <AuthWrapper>
-            <ApiKeysManagement />
-          </AuthWrapper>
-        ),
-      },
-      {
-        path: '/settings/backup',
-        element: isReadOnlyViewer ? (
-          <Navigate to="/" />
-        ) : (
-          <AuthWrapper>
-            <BackupSettings />
-          </AuthWrapper>
-        ),
-      },
-      {
-        path: '/settings/snapshots',
-        element: isReadOnlyViewer ? (
-          <Navigate to="/" />
-        ) : (
-          <AuthWrapper>
-            <SnapshotSettings />
-          </AuthWrapper>
-        ),
-      },
-      {
-        path: '/settings/importer',
-        element: isReadOnlyViewer ? (
-          <Navigate to="/" />
-        ) : (
-          <AuthWrapper>
-            <Importer />
-          </AuthWrapper>
-        ),
-      },
-      {
-        path: '/settings/maintenance',
-        element: isReadOnlyViewer ? (
-          <Navigate to="/" />
-        ) : (
-          <AuthWrapper>
-            <MaintenanceSettings />
-          </AuthWrapper>
-        ),
+        element: <Navigate to="/settings/users" replace />,
       },
       {
         path: '/settings',
         element: isReadOnlyViewer ? (
           <Navigate to="/" replace />
         ) : (
-          <Navigate to="/settings/branding" replace />
+          <AuthWrapper>
+            <SettingsLayout />
+          </AuthWrapper>
         ),
+        children: [
+          { index: true, element: <SettingsIndexRedirect /> },
+          ...settingsSections.map((section) => ({
+            path: section.path,
+            element: (
+              <SettingsSectionGuard section={section}>
+                <section.Component />
+              </SettingsSectionGuard>
+            ),
+          })),
+        ],
       },
       {
         path: '/e/*',

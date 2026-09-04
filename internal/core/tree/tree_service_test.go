@@ -3401,3 +3401,34 @@ func TestTreeService_GetPage_RawContent_NotSerializedToJSON(t *testing.T) {
 		t.Errorf("RawContent must not appear in JSON output, got: %s", s)
 	}
 }
+
+func TestTreeService_NodeCounts_TalliesPagesAndSectionsSeparately(t *testing.T) {
+	svc, tmpDir := newLoadedService(t)
+
+	if pages, sections := svc.NodeCounts(); pages != 0 || sections != 0 {
+		t.Fatalf("empty tree: expected 0 pages / 0 sections, got %d / %d", pages, sections)
+	}
+
+	if _, err := svc.CreateNode("system", nil, "Alpha", "alpha", ptrKind(NodeKindPage)); err != nil {
+		t.Fatalf("CreateNode Alpha failed: %v", err)
+	}
+	if _, err := svc.CreateNode("system", nil, "Beta", "beta", ptrKind(NodeKindPage)); err != nil {
+		t.Fatalf("CreateNode Beta failed: %v", err)
+	}
+	if _, err := svc.CreateNode("system", nil, "Docs", "docs", ptrKind(NodeKindSection)); err != nil {
+		t.Fatalf("CreateNode Docs failed: %v", err)
+	}
+
+	if pages, sections := svc.NodeCounts(); pages != 2 || sections != 1 {
+		t.Fatalf("expected 2 pages / 1 section, got %d / %d", pages, sections)
+	}
+
+	// Counts must survive a reload from disk (index rebuilt in LoadTree).
+	reloaded := NewTreeService(tmpDir)
+	if err := reloaded.LoadTree(); err != nil {
+		t.Fatalf("LoadTree failed: %v", err)
+	}
+	if pages, sections := reloaded.NodeCounts(); pages != 2 || sections != 1 {
+		t.Fatalf("after reload: expected 2 pages / 1 section, got %d / %d", pages, sections)
+	}
+}

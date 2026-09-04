@@ -1,0 +1,171 @@
+{
+  "title": "Import",
+  "toast": {
+    "planCreatedSuccess": "Importplan erfolgreich erstellt",
+    "createPlanErrorFallback": "Importplan konnte nicht erstellt werden",
+    "loadPlanErrorFallback": "Importplan konnte nicht geladen werden",
+    "noPlanToExecute": "Kein Importplan zum Ausführen",
+    "executeSuccess": "Import erfolgreich abgeschlossen",
+    "canceledSuccess": "Import abgebrochen",
+    "executionFailedFallback": "Importausführung fehlgeschlagen",
+    "executeErrorFallback": "Importplan konnte nicht ausgeführt werden",
+    "noPlanToClear": "Kein Importplan zum Löschen",
+    "canceledBeforeCompletion": "Der Import wurde vor dem Abschluss des Abbruchs beendet",
+    "planClearedSuccess": "Importplan gelöscht",
+    "cancelOrClearErrorFallback": "Importplan konnte nicht abgebrochen oder gelöscht werden",
+    "unexpectedCancelResponse": "Unerwartete Antwort beim Abbrechen des Imports"
+  },
+  "planActions": {
+    "create": "Seite erstellen",
+    "update": "Seite aktualisieren",
+    "skip": "Element überspringen"
+  },
+  "resultActions": {
+    "needsAttention": "Erfordert Aufmerksamkeit",
+    "created": "Erstellt",
+    "updated": "Aktualisiert",
+    "skipped": "Übersprungen",
+    "conflicted": "Konflikt"
+  },
+  "steps": {
+    "selectZip": {
+      "title": "ZIP auswählen",
+      "description": "Wählen Sie das Paket aus, das Sie importieren möchten."
+    },
+    "reviewPlan": {
+      "title": "Plan prüfen",
+      "description": "Überprüfen Sie die generierten Seiten und Pfade."
+    },
+    "runImport": {
+      "title": "Import ausführen",
+      "description": "Verfolgen Sie den Fortschritt, während der Import läuft."
+    },
+    "reviewResult": {
+      "title": "Ergebnis prüfen",
+      "description": "Überprüfen Sie importierte, übersprungene oder fehlgeschlagene Elemente."
+    }
+  },
+  "nextAction": {
+    "chooseZip": "Wählen Sie eine ZIP-Datei aus und erstellen Sie einen Importplan.",
+    "reviewThenStart": "Überprüfen Sie die generierten Elemente und starten Sie dann den Import.",
+    "cancellationRequested": "Der Abbruch wurde angefordert. Der Import stoppt nach Abschluss des aktuellen Elements.",
+    "running": "Der Import läuft. Sie können auf dieser Seite bleiben und den Fortschritt verfolgen.",
+    "completed": "Der Import wurde erfolgreich abgeschlossen. Überprüfen Sie das Ergebnis unten, oder starten Sie einen neuen Import mit einem anderen ZIP-Paket.",
+    "failed": "Der Import wurde mit einem Fehler abgebrochen. Überprüfen Sie die Meldung und die Ergebniselemente unten.",
+    "canceled": "Der Import wurde abgebrochen. Abgeschlossene Arbeit wurde beibehalten und ist unten dargestellt.",
+    "selectZipToBegin": "Wählen Sie eine ZIP-Datei aus, um zu beginnen."
+  },
+  "beforeYouStart": {
+    "title": "Bevor Sie beginnen",
+    "description": "Importieren Sie ein ZIP-Archiv mit Markdown-Dateien. LeafWiki erstellt zunächst einen Prüfplan und importiert Seiten erst, nachdem Sie den Ausführungsschritt explizit gestartet haben.",
+    "whatHappensNext": "Was passiert als Nächstes?",
+    "stepPrefix": "Schritt {{number}}",
+    "safeReviewTitle": "Erst sicher prüfen",
+    "safeReviewText": "Das Erstellen des Plans importiert noch keine Seiten.",
+    "linksAssetsTitle": "Links und Dateien",
+    "linksAssetsText": "Interne Links und eingebettete Dateien werden während des Imports umgeschrieben.",
+    "alphaTitle": "Noch in der Alphaphase",
+    "alphaText": "Manche Markdown-Varianten benötigen möglicherweise anschließend eine manuelle Nachbearbeitung."
+  },
+  "flow": {
+    "title": "Importablauf"
+  },
+  "package": {
+    "title": "Importpaket auswählen",
+    "description": "Wählen Sie ein ZIP-Archiv mit Markdown-Dateien aus. Anschließend erstellen wir einen Vorschauplan, damit Sie Pfade, Aktionen und Hinweise vor dem Import prüfen können.",
+    "issueHint": "Falls Sie auf Probleme, unerwartete Ergebnisse oder nicht unterstützte Sonderfälle stoßen, erstellen Sie bitte ein Issue in unserem <link>GitHub-Repository</link>.",
+    "currentZip": "Aktuelles ZIP:",
+    "noZipSelected": "Keine ZIP-Datei ausgewählt",
+    "selectZipFile": "ZIP-Datei auswählen",
+    "supportedInputHint": "Unterstützte Eingabe: ein einzelnes `.zip`-Archiv mit Ihrer Markdown-Wissensdatenbank.",
+    "importFromZip": "Aus ZIP importieren",
+    "planOnlyHint": "Dies erstellt nur den Prüfplan. Es werden keine Seiten importiert, bis Sie auf „Importplan ausführen“ klicken."
+  },
+  "plan": {
+    "title": "Importplan",
+    "description": "Überprüfen Sie, was LeafWiki vor dem Start des Imports erstellen, aktualisieren oder überspringen wird.",
+    "currentStatus": "Aktueller Status",
+    "planId": "Plan-ID: {{id}}",
+    "progress": "Fortschritt: {{progress}}",
+    "percentComplete": "{{percent}}% abgeschlossen",
+    "willCreate": "Wird erstellt",
+    "willUpdate": "Wird aktualisiert",
+    "willSkip": "Wird übersprungen",
+    "runningCancelRequested": "Der Abbruch wurde angefordert. Der Import stoppt nach Abschluss des aktuellen Elements.",
+    "runningInBackground": "Der Import läuft im Hintergrund. Sie können auf dieser Seite bleiben, um den Fortschritt zu verfolgen.",
+    "currentlyProcessing": " Verarbeitet derzeit {{path}}.",
+    "canceledNotice": "Der Import wurde abgebrochen. Abgeschlossene Elemente wurden beibehalten, und das Teilergebnis wird unten angezeigt.",
+    "idLabel": "ID:",
+    "treeHashLabel": "Baum-Hash:",
+    "progressLabel": "Fortschritt:",
+    "startedAtLabel": "Gestartet am:",
+    "finishedAtLabel": "Beendet am:",
+    "startNewImport": "Neuen Import starten",
+    "closeAndClear": "Schließen und löschen"
+  },
+  "plannedItems": {
+    "title": "Geplante Elemente ({{count}})",
+    "description": "Dies sind die einzelnen Dateien, die LeafWiki im Paket erkannt hat, und wie sie auf Zielseiten abgebildet werden.",
+    "importFile": "Importdatei",
+    "targetPage": "Zielseite",
+    "titleColumn": "Titel",
+    "type": "Typ",
+    "plannedAction": "Geplante Aktion",
+    "notesForReview": "Hinweise zur Prüfung",
+    "noSpecialNotes": "Keine besonderen Hinweise"
+  },
+  "run": {
+    "title": "Import ausführen",
+    "descriptionPlan": "Starten Sie den Import, sobald der Plan korrekt aussieht. Sie können den aktuellen Plan auch löschen und mit einem anderen Paket neu beginnen.",
+    "descriptionRunning": "Der Import arbeitet derzeit den generierten Plan ab. Sie können auf dieser Seite bleiben, um den Fortschritt zu beobachten oder einen Abbruch anzufordern.",
+    "currentStatus": "Aktueller Status",
+    "importRunning": "Import läuft",
+    "executeImportPlan": "Importplan ausführen",
+    "cancelRequested": "Abbruch angefordert",
+    "cancelImport": "Import abbrechen",
+    "clearImportPlan": "Importplan löschen"
+  },
+  "result": {
+    "title": "Importergebnis",
+    "description": "Dies ist das Endergebnis des Imports. Übersprungene Elemente erfordern meist eine manuelle Prüfung, während fehlgeschlagene Elemente vor einem erneuten Versuch Aufmerksamkeit benötigen.",
+    "wantAnotherTitle": "Möchten Sie ein weiteres Paket importieren?",
+    "wantAnotherBody": "Starten Sie einen neuen Import, um dieses Ergebnis zu löschen und eine andere ZIP-Datei auszuwählen.",
+    "created": "Erstellt",
+    "skipped": "Übersprungen",
+    "failed": "Fehlgeschlagen",
+    "treeUpdated": "Baum aktualisiert",
+    "yes": "Ja",
+    "no": "Nein",
+    "importedCount": "Anzahl importiert:",
+    "updatedCount": "Anzahl aktualisiert:",
+    "skippedCount": "Anzahl übersprungen:"
+  },
+  "resultItems": {
+    "title": "Ergebniselemente ({{filtered}}/{{total}})",
+    "description": "Verwenden Sie die Filter, um sich auf erfolgreiche Importe, übersprungene Elemente oder Fehler zu konzentrieren.",
+    "filterPlaceholder": "Nach Pfad, Aktion oder Fehler filtern",
+    "importedFile": "Importierte Datei",
+    "resultingPage": "Resultierende Seite",
+    "outcome": "Ergebnis",
+    "details": "Details",
+    "detailImported": "Erfolgreich importiert",
+    "detailUpdated": "Bestehende Seite wurde aktualisiert",
+    "detailSkipped": "Ohne Fehler übersprungen",
+    "detailNone": "Keine weiteren Details",
+    "noItemsMatch": "Keine Elemente entsprechen dem aktuellen Filter.",
+    "filter": {
+      "all": "Alle",
+      "created": "Erstellt",
+      "skipped": "Übersprungen",
+      "failed": "Fehlgeschlagen"
+    }
+  },
+  "status": {
+    "running": "Läuft",
+    "completed": "Abgeschlossen",
+    "canceled": "Abgebrochen",
+    "failed": "Fehlgeschlagen",
+    "planned": "Geplant",
+    "idle": "Inaktiv"
+  }
+}

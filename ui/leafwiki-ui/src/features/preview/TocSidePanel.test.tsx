@@ -10,6 +10,7 @@ vi.mock('react-i18next', () => ({
       const map: Record<string, string> = {
         'toc.title': 'Table of contents',
         'toc.onThisPage': 'On this page',
+        'toc.downloads': 'Attached Media',
         'toc.collapse': 'Collapse table of contents',
         'toc.expand': 'Expand table of contents',
       }
@@ -291,6 +292,22 @@ describe('TocSidePanel — collapse/expand', () => {
 
     expect(screen.getByTestId('toc-side-panel').className).toMatch(
       /page-viewer__toc-panel--collapsed/,
+    )
+  })
+})
+
+describe('TocSidePanel — downloads', () => {
+  it('lists non-image files below the TOC', () => {
+    render(
+      <TocSidePanel
+        entries={entries}
+        downloads={[{ name: 'notes.pdf', url: '/assets/p1/notes.pdf' }]}
+      />,
+    )
+    expect(screen.getByText('Attached Media')).toBeInTheDocument()
+    expect(screen.getByTestId('toc-download-notes.pdf')).toHaveAttribute(
+      'href',
+      '/assets/p1/notes.pdf',
     )
   })
 })

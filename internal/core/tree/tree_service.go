@@ -814,6 +814,23 @@ func (t *TreeService) HasPages() bool {
 	return t.tree != nil && len(t.tree.Children) > 0
 }
 
+// NodeCounts returns how many page and section nodes the tree currently holds,
+// excluding the synthetic root. It reads the in-memory id index under the read
+// lock and allocates nothing, so it is cheap enough to call on every metrics
+// scrape. A node whose kind is unset is counted as a page.
+func (t *TreeService) NodeCounts() (pages, sections int) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	for _, node := range t.nodesByID {
+		if node.Kind == NodeKindSection {
+			sections++
+			continue
+		}
+		pages++
+	}
+	return pages, sections
+}
+
 // WalkNodes calls fn with the ID of every non-root node (pages and sections)
 // in depth-first order. The read lock is held only while collecting IDs; fn
 // is called without any lock held so it may safely call other TreeService

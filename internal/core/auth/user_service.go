@@ -14,11 +14,23 @@ import (
 const (
 	defaultAdminUsername = "admin"
 	defaultAdminEmail    = "admin@localhost"
+
+	// MinPasswordLength is the minimum accepted length for user-chosen
+	// passwords, enforced consistently across every password entry point:
+	// user creation, password change/reset, invites, and the initial admin
+	// bootstrap password.
+	MinPasswordLength = 8
 )
 
 type UserService struct {
 	store *UserStore
 	log   *slog.Logger
+	// editorLimit caps how many admin+editor users may exist at once; 0
+	// (the default) means unlimited, matching today's self-hosted behavior.
+	// Set via SetEditorLimit rather than a constructor parameter so the
+	// dozens of existing NewUserService(store) call sites (production and
+	// tests) stay untouched — only wiki.WikiOptions.EditorLimit opts in.
+	editorLimit int
 }
 
 func NewUserService(store *UserStore) *UserService {
@@ -28,12 +40,39 @@ func NewUserService(store *UserStore) *UserService {
 	}
 }
 
+// SetEditorLimit sets the max number of admin+editor users CreateUser/
+// UpdateUser will allow; 0 means unlimited. See the editorLimit field doc.
+func (s *UserService) SetEditorLimit(limit int) {
+	s.editorLimit = limit
+}
+
+// checkEditorLimit returns ErrEditorLimitReached if creating/promoting a
+// user into role would exceed editorLimit. Viewers are always allowed
+// (they never count against the limit), and a limit <= 0 means unlimited.
+func (s *UserService) checkEditorLimit(role string) error {
+	if s.editorLimit <= 0 || (role != RoleAdmin && role != RoleEditor) {
+		return nil
+	}
+	count, err := s.store.CountEditorUsers()
+	if err != nil {
+		return err
+	}
+	if count >= s.editorLimit {
+		return ErrEditorLimitReached
+	}
+	return nil
+}
+
 func (s *UserService) InitDefaultAdmin(username, email, newPassword string) error {
 	// Check if admin user already exists
 
 	if _, err := s.store.GetAdminUser(); err == nil {
 		// Admin user already exists, no need to create a new one
 		return nil
+	}
+
+	if len(newPassword) < MinPasswordLength {
+		return fmt.Errorf("%w: initial admin password must be at least %d characters long", ErrPasswordTooShort, MinPasswordLength)
 	}
 
 	username = defaultIfEmpty(username, defaultAdminUsername)
@@ -71,6 +110,10 @@ func (s *UserService) CreateUser(username, email, password, role string) (*User,
 	// Validate role
 	if !IsValidRole(role) {
 		return nil, ErrUserInvalidRole
+	}
+
+	if err := s.checkEditorLimit(role); err != nil {
+		return nil, err
 	}
 
 	// hash password
@@ -161,6 +204,17 @@ func (s *UserService) UpdateUser(id, username, email, password, role string) (*U
 		}
 		if count <= 1 {
 			return nil, ErrLastAdminCannotBeDemoted
+		}
+	}
+
+	// Only a promotion into admin/editor from a role that wasn't already
+	// counted (viewer) claims a new editor slot — reassigning someone who
+	// was already admin/editor (e.g. admin->editor) stays neutral and must
+	// not be blocked as if it were a third new editor.
+	wasCounted := user.Role == RoleAdmin || user.Role == RoleEditor
+	if !wasCounted {
+		if err := s.checkEditorLimit(role); err != nil {
+			return nil, err
 		}
 	}
 
@@ -418,6 +472,45 @@ func (s *UserService) ResetAdminUserPassword(username, email string) (*User, err
 
 	s.log.Info("admin password reset", "userID", adminUser.ID)
 	return adminUser, nil
+}
+
+// InviteUser creates a new user with a random, bcrypt-hashed password that is
+// never returned or logged, and marks MustSetPassword so the admin UI can
+// show an "Invitation pending" state. The account exists and is fully usable
+// (listable, assignable API keys, etc.) but cannot meaningfully log in until
+// CompleteInvite sets a real password.
+func (s *UserService) InviteUser(username, email, role string) (*User, error) {
+	password, err := shared.GenerateRandomPassword(32)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := s.CreateUser(username, email, password, role)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.store.SetMustSetPassword(user.ID, true); err != nil {
+		return nil, err
+	}
+	user.MustSetPassword = true
+
+	s.log.Info("user invited", "userID", user.ID, "role", user.Role)
+	return user, nil
+}
+
+// CompleteInvite sets id's real password and clears MustSetPassword. Called
+// once an invite token is confirmed (see auth.EmailTokenService.ConfirmInvite).
+func (s *UserService) CompleteInvite(id, password string) error {
+	if err := s.UpdatePassword(id, password); err != nil {
+		return err
+	}
+	if err := s.store.SetMustSetPassword(id, false); err != nil {
+		return err
+	}
+
+	s.log.Info("invite accepted", "userID", id)
+	return nil
 }
 
 // ConsumeRecoveryCodeHash atomically replaces oldHashes with newHashes for id

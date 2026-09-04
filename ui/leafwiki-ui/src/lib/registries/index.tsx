@@ -8,7 +8,6 @@ import {
   AddPageDialog,
   ApiKeyFormDialog,
   AssetManagerDialog,
-  ChangeOwnPasswordDialog,
   ChangePasswordDialog,
   CopyPageDialog,
   CreatePageByPathDialog,
@@ -26,8 +25,6 @@ import {
   Search,
   ShortcutsDialog,
   SortPagesDialog,
-  TOTPDisableDialog,
-  TOTPSetupDialog,
   UnsavedChangesDialog,
   UserFormDialog,
   WikiLinkDisambiguationDialog,
@@ -43,9 +40,9 @@ export const SIDEBAR_SEARCH_PANEL_ID = 'search'
 
 panelItemRegistry.register({
   id: SIDEBAR_TREE_PANEL_ID,
-  label: i18next.t('sidebar.explorerTab', { ns: 'common' }),
+  label: () => i18next.t('sidebar.explorerTab', { ns: 'common' }),
   hotkey: getShortcutDefinition('sidebar.explorer.open').keyCombo,
-  modes: ['view', 'edit', 'history', 'settings', 'user-management'],
+  modes: ['view', 'edit', 'history', 'settings'],
   icon: () => <FolderTree size={16} />,
   render: () => {
     return <TreeView />
@@ -54,9 +51,9 @@ panelItemRegistry.register({
 
 panelItemRegistry.register({
   id: SIDEBAR_SEARCH_PANEL_ID,
-  label: i18next.t('sidebar.searchTab', { ns: 'common' }),
+  label: () => i18next.t('sidebar.searchTab', { ns: 'common' }),
   hotkey: getShortcutDefinition('sidebar.search.open').keyCombo,
-  modes: ['view', 'edit', 'history', 'settings', 'user-management'],
+  modes: ['view', 'edit', 'history', 'settings'],
   icon: () => <SearchIcon size={16} />,
   render: (props: unknown) => {
     const SearchProps = props as React.ComponentProps<typeof Search>
@@ -74,9 +71,6 @@ export const DIALOG_COPY_PAGE = 'copy-page'
 export const DIALOG_EDIT_PAGE_METADATA = 'edit-page-metadata'
 export const DIALOG_ASSET_MANAGER = 'asset-manager'
 export const DIALOG_DELETE_PAGE_CONFIRMATION = 'delete-page-confirmation'
-export const DIALOG_CHANGE_OWN_PASSWORD = 'change-own-password'
-export const DIALOG_TOTP_SETUP = 'totp-setup'
-export const DIALOG_TOTP_DISABLE = 'totp-disable'
 export const DIALOG_USER_FORM = 'user-form'
 export const DIALOG_CHANGE_USER_PASSWORD = 'change-user-password'
 export const DIALOG_DELETE_USER_CONFIRMATION = 'delete-user-confirmation'
@@ -186,27 +180,6 @@ dialogRegistry.register({
         {...(props as React.ComponentProps<typeof DeletePageDialog>)}
       />
     )
-  },
-})
-
-dialogRegistry.register({
-  type: DIALOG_CHANGE_OWN_PASSWORD,
-  render: () => {
-    return <ChangeOwnPasswordDialog key={DIALOG_CHANGE_OWN_PASSWORD} />
-  },
-})
-
-dialogRegistry.register({
-  type: DIALOG_TOTP_SETUP,
-  render: () => {
-    return <TOTPSetupDialog key={DIALOG_TOTP_SETUP} />
-  },
-})
-
-dialogRegistry.register({
-  type: DIALOG_TOTP_DISABLE,
-  render: () => {
-    return <TOTPDisableDialog key={DIALOG_TOTP_DISABLE} />
   },
 })
 

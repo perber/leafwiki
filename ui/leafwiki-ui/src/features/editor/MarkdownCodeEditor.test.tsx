@@ -47,7 +47,12 @@ vi.mock('@codemirror/commands', () => ({
   defaultKeymap: [],
   history: () => ({}),
   historyKeymap: [],
-  indentWithTab: {},
+  indentLess: () => true,
+  insertTab: () => true,
+}))
+
+vi.mock('@codemirror/language', () => ({
+  indentUnit: { of: () => ({}) },
 }))
 
 vi.mock('@codemirror/lang-markdown', () => ({ markdown: () => ({}) }))

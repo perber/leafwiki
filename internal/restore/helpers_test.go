@@ -8,12 +8,14 @@ import (
 	"time"
 
 	"github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/favorites"
 	snapshotSvc "github.com/perber/wiki/internal/snapshot"
 	"github.com/perber/wiki/internal/test_utils"
+	"github.com/perber/wiki/internal/usersettings"
 	_ "modernc.org/sqlite" // Import SQLite driver
 )
 
-// fixtureSnapshot builds a real snapshot ZIP (root/assets/branding/
+// fixtureSnapshot builds a real snapshot ZIP (root/assets/branding/avatars/
 // branding.json/schema.json/users.db) from a fresh source layout — a
 // separate temp dir from whatever "live" dataDir a test then restores into —
 // and returns the returned snapshot.Manager (for SnapshotZipPath / List) and
@@ -34,10 +36,12 @@ func fixtureSnapshotWithBranding(t *testing.T, wikiVersion, brandingJSON string)
 	rootDir := filepath.Join(src, "root")
 	assetsDir := filepath.Join(src, "assets")
 	brandingDir := filepath.Join(src, "branding")
+	avatarsDir := filepath.Join(src, "avatars")
 
 	test_utils.WriteFile(t, rootDir, "welcome.md", "# Snapshot content\n")
 	test_utils.WriteFile(t, assetsDir, "logo.png", "fake-asset-bytes")
 	test_utils.WriteFile(t, brandingDir, "logo.png", "fake-logo-bytes")
+	test_utils.WriteFile(t, avatarsDir, "snapshot-user.png", "fake-avatar-bytes")
 	brandingConfigFile := test_utils.WriteFile(t, src, "branding.json", brandingJSON)
 	schemaFile := test_utils.WriteFile(t, src, "schema.json", `{"version":5}`)
 
@@ -49,6 +53,7 @@ func fixtureSnapshotWithBranding(t *testing.T, wikiVersion, brandingJSON string)
 		RootDir:            rootDir,
 		AssetsDir:          assetsDir,
 		BrandingDir:        brandingDir,
+		AvatarsDir:         avatarsDir,
 		BrandingConfigFile: brandingConfigFile,
 		SchemaFile:         schemaFile,
 		UsersDBPath:        usersDBPath,
@@ -139,6 +144,40 @@ func createRealAPIKeysDB(t *testing.T, dataDir, ownerUserID, keyName string) str
 	return token
 }
 
+// createRealFavoritesDB creates dataDir/favorites.db via the real
+// favorites.FavoritesStore and adds a single favorite for userID/pageID.
+func createRealFavoritesDB(t *testing.T, dataDir, userID, pageID string) {
+	t.Helper()
+	store, err := favorites.NewFavoritesStore(dataDir, nil)
+	if err != nil {
+		t.Fatalf("NewFavoritesStore failed: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
+
+	if err := store.Add(userID, pageID); err != nil {
+		t.Fatalf("Add favorite failed: %v", err)
+	}
+}
+
+// createRealUserSettingsDB creates dataDir/usersettings.db via the real
+// usersettings.UserSettingsStore and saves language for userID.
+func createRealUserSettingsDB(t *testing.T, dataDir, userID, language string) {
+	t.Helper()
+	store, err := usersettings.NewUserSettingsStore(dataDir, nil)
+	if err != nil {
+		t.Fatalf("NewUserSettingsStore failed: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
+
+	if err := store.Upsert(&usersettings.UserSettings{UserID: userID, Language: language, AutoSave: true, UpdatedAt: time.Now().UTC()}); err != nil {
+		t.Fatalf("Upsert user settings failed: %v", err)
+	}
+}
+
+// createTestUsersDB creates a minimal users.db with just usersRequiredColumns
+// (swap.go) — enough to pass sanityCheckSQLiteDB's schema probe wherever a
+// test needs "a users.db that validates" without the real auth.UserStore
+// schema/migrations (see createRealUsersDB for that).
 func createTestUsersDB(t *testing.T, path, email string) {
 	t.Helper()
 	db, err := sql.Open("sqlite", path)
@@ -147,10 +186,18 @@ func createTestUsersDB(t *testing.T, path, email string) {
 	}
 	defer test_utils.WrapCloseWithErrorCheck(db.Close, t)
 
-	if _, err := db.Exec("CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT)"); err != nil {
+	if _, err := db.Exec(`CREATE TABLE users (
+		id TEXT PRIMARY KEY,
+		username TEXT NOT NULL UNIQUE,
+		password TEXT NOT NULL,
+		email TEXT NOT NULL UNIQUE,
+		role TEXT NOT NULL,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	)`); err != nil {
 		t.Fatalf("failed to create users table: %v", err)
 	}
-	if _, err := db.Exec("INSERT INTO users (email) VALUES (?)", email); err != nil {
+	if _, err := db.Exec("INSERT INTO users (id, username, password, email, role) VALUES (?, ?, ?, ?, ?)",
+		"test-user-id", "test-user", "test-password-hash", email, "admin"); err != nil {
 		t.Fatalf("failed to seed users table: %v", err)
 	}
 }

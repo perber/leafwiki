@@ -31,5 +31,13 @@
   "configLoad": {
     "fetchErrorFallback": "Could not load config: {{status}} {{statusText}}",
     "errorFallback": "Could not load configuration"
+  },
+  "language": {
+    "selfName": "English"
+  },
+  "pagination": {
+    "prev": "← Prev",
+    "next": "Next →",
+    "pageOf": "Page {{page}} of {{total}}"
   }
 }

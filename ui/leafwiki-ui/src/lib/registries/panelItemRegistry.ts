@@ -6,7 +6,11 @@ import { JSX } from 'react'
 
 export interface PanelItem {
   id: string
-  label: string
+  // A function rather than a resolved string: this registry is populated at
+  // module-load time, before the app-wide default language (set via server
+  // config) has been applied, so the label must be re-evaluated at render
+  // time to reflect the active language.
+  label: () => string
   hotkey?: string
   modes?: AppMode[]
   isEnabled?: () => boolean

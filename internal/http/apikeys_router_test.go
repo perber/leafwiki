@@ -11,6 +11,7 @@ import (
 	"github.com/perber/wiki/internal/core/assets"
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	httpinternal "github.com/perber/wiki/internal/http"
+	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/wiki"
 )
@@ -25,7 +26,7 @@ func newAPIKeyRouterTest(t *testing.T) (*wiki.Wiki, http.Handler) {
 	t.Helper()
 	w, err := wiki.NewWiki(&wiki.WikiOptions{
 		StorageDir:             t.TempDir(),
-		AdminPassword:          "admin",
+		AdminPassword:          "adminpassword",
 		JWTSecret:              "secretkey",
 		AccessTokenTimeout:     15 * time.Minute,
 		RefreshTokenTimeout:    7 * 24 * time.Hour,
@@ -37,7 +38,7 @@ func newAPIKeyRouterTest(t *testing.T) (*wiki.Wiki, http.Handler) {
 	}
 	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(w.Close, t) })
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            false,
+		PublicAccess:            publicaccess.NewEnvManaged(false),
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,
 		RefreshTokenTimeout:     7 * 24 * time.Hour,
