@@ -569,8 +569,9 @@ func (w *Wiki) buildSearchRoutes() *wikisearch.Routes {
 
 func (w *Wiki) buildLinksRoutes() *wikilinks.Routes {
 	return wikilinks.NewRoutes(wikilinks.RoutesConfig{
-		GetLinkStatus: wikilinks.NewGetLinkStatusUseCase(w.links, w.tree),
-		AuthService:   w.auth,
+		GetLinkStatus:  wikilinks.NewGetLinkStatusUseCase(w.links, w.tree),
+		GetBrokenLinks: wikilinks.NewGetBrokenLinksUseCase(w.links),
+		AuthService:    w.auth,
 	})
 }
 

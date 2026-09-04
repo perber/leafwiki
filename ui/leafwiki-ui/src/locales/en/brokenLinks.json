@@ -1,0 +1,29 @@
+{
+  "menuLabel": "Broken Links",
+  "pageTitle": "Broken Links",
+  "title": "Broken Links",
+  "description": "Find pages that link to missing wiki pages.",
+  "heading": "Missing pages",
+  "sortLabel": "Sorted alphabetically",
+  "linksTo": "links to",
+  "button": {
+    "text": "Refresh",
+    "refreshing": "Refreshing…"
+  },
+  "summaryCard": {
+    "broken": "Broken links",
+    "missing": "Missing pages",
+    "affected": "Affected pages"
+  },
+  "groupCard": {
+    "reference": "reference",
+    "references": "references"
+  },
+  "empty": {
+    "title": "No broken links",
+    "description": "All links in the wiki point to existing pages."
+  },
+  "error": {
+    "loadFailed": "Failed to load broken links."
+  }
+}

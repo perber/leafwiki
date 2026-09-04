@@ -1,0 +1,29 @@
+{
+  "menuLabel": "Defekte Links",
+  "pageTitle": "Defekte Links",
+  "title": "Defekte Links",
+  "description": "Finde Seiten, die auf fehlende Wiki-Seiten verweisen.",
+  "heading": "Fehlende Seiten",
+  "sortLabel": "Alphabetisch sortiert",
+  "linksTo": "verweist auf",
+  "button": {
+    "text": "Aktualisieren",
+    "refreshing": "Wird aktualisiert…"
+  },
+  "summaryCard": {
+    "broken": "Defekte Links",
+    "missing": "Fehlende Seiten",
+    "affected": "Betroffene Seiten"
+  },
+  "groupCard": {
+    "reference": "Verweis",
+    "references": "Verweise"
+  },
+  "empty": {
+    "title": "Keine defekten Links",
+    "description": "Alle Links im Wiki verweisen auf vorhandene Seiten."
+  },
+  "error": {
+    "loadFailed": "Defekte Links konnten nicht geladen werden."
+  }
+}

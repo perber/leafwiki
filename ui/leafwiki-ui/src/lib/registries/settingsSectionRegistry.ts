@@ -14,6 +14,7 @@ import {
   PublicAccessSettings,
   SnapshotSettings,
   UserManagement,
+  BrokenLinks,
 } from '@/features/router/lazy-routes'
 import { useConfigStore } from '@/stores/config'
 import { useSessionStore } from '@/stores/session'
@@ -26,6 +27,7 @@ import {
   Upload,
   User,
   Users,
+  Link2Off,
   type LucideIcon,
 } from 'lucide-react'
 import type { ComponentType, LazyExoticComponent } from 'react'
@@ -157,6 +159,15 @@ export const settingsSections: SettingsSection[] = [
     icon: Upload,
     roles: ['admin'],
     Component: Importer,
+  },
+  {
+    id: 'brokenLinks',
+    path: 'brokenLinks',
+    labelKey: 'menuLabel',
+    ns: 'brokenLinks',
+    icon: Link2Off,
+    roles: ['admin'],
+    Component: BrokenLinks,
   },
 ]
 

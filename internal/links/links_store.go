@@ -33,6 +33,13 @@ type PageLinkUpdate struct {
 	Targets    []TargetLink
 }
 
+type BrokenLink struct {
+	FromPageID string `json:"from_page_id"`
+	FromTitle  string `json:"from_title"`
+	FromPath   string `json:"from_path"`
+	ToPath     string `json:"to_path"`
+}
+
 func linksDatabasePath(storageDir string, filename string) string {
 	normalizedStorageDir := filepath.FromSlash(strings.ReplaceAll(storageDir, `\`, `/`))
 	return filepath.Join(normalizedStorageDir, filename)
@@ -613,6 +620,46 @@ func (s *LinksStore) HealWikiLinksForTitle(title string, pageID string) error {
 	`, pageID, strings.ToLower(wikilinkSentinelPrefix+title))
 
 	return err
+}
+
+func (s *LinksStore) GetBrokenLinks() ([]BrokenLink, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	rows, err := s.db.Query(`
+        SELECT from_page_id, from_title, to_path
+        FROM links
+        WHERE broken = 1
+        ORDER BY to_path, from_title
+    `)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var result []BrokenLink
+
+	for rows.Next() {
+		var link BrokenLink
+
+		if err := rows.Scan(
+			&link.FromPageID,
+			&link.FromTitle,
+			&link.ToPath,
+		); err != nil {
+			return nil, err
+		}
+
+		result = append(result, link)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 func (s *LinksStore) Clear() error {
