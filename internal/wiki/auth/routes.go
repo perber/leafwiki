@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	coreavatar "github.com/perber/wiki/internal/avatar"
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	httpinternal "github.com/perber/wiki/internal/http"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
@@ -134,12 +135,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	)
 	meGroup.GET("/auth/me", r.handleMe)
 
-	authGroup := ctx.Base.Group("/api")
-	authGroup.Use(
-		authmw.InjectPublicEditor(opts.AuthDisabled),
-		authmw.RequireAuth(r.authService, ctx.AuthCookies, opts.AuthDisabled),
-		security.CSRFMiddleware(ctx.CSRFCookie),
-	)
+	authGroup := ctx.APIAuthGroup(r.authService)
 
 	authGroup.POST("/auth/logout", r.handleLogout(ctx))
 
@@ -205,24 +201,33 @@ func (r *Routes) handleConfig(ctx httpinternal.RouterContext) gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
-			"publicAccess":            opts.PublicAccess,
+			"publicAccess":            opts.PublicAccess.Enabled(),
+			"publicAccessEnvManaged":  opts.PublicAccess.EnvManaged(),
 			"editorLimit":             opts.EditorLimit,
 			"hideLinkMetadataSection": opts.HideLinkMetadataSection,
 			"authDisabled":            opts.AuthDisabled,
 			"basePath":                opts.BasePath,
 			"maxAssetUploadSizeBytes": opts.MaxAssetUploadSizeBytes,
-			"enableRevision":          opts.EnableRevision,
-			"enableLinkRefactor":      opts.EnableLinkRefactor,
-			"enableApiKeyManagement":  opts.EnableAPIKeyManagement,
-			"gitBackupEnabled":        opts.GitBackupEnabled,
-			"snapshotEnabled":         opts.SnapshotEnabled,
-			"smtpEnabled":             opts.SMTPEnabled,
-			"totpAvailable":           opts.TOTPAvailable,
-			"httpRemoteUserEnabled":   opts.HTTPRemoteUser.Enabled,
-			"loginUrl":                opts.LoginURL,
-			"logoutUrl":               opts.LogoutURL,
-			"userManagementUrl":       opts.UserManagementURL,
-			"defaultLanguage":         opts.DefaultLanguage,
+			// Avatar constraints are fixed feature constants (internal/avatar),
+			// not a configurable RouterOptions field like MaxAssetUploadSizeBytes
+			// above — read straight from the package rather than plumbed through
+			// Opts, since there's no flag/env var that could ever override them.
+			"maxAvatarUploadSizeBytes": coreavatar.MaxUploadSize,
+			"avatarAllowedExts":        coreavatar.AllowedExts(),
+			"enableRevision":           opts.EnableRevision,
+			"enableLinkRefactor":       opts.EnableLinkRefactor,
+			"enableApiKeyManagement":   opts.EnableAPIKeyManagement,
+			"gitBackupEnabled":         opts.GitBackupEnabled,
+			"gitBackupEnvManaged":      opts.GitBackupEnvManaged,
+			"gitBackupConfigured":      opts.GitBackupConfigured,
+			"snapshotEnabled":          opts.SnapshotEnabled,
+			"smtpEnabled":              opts.SMTPEnabled,
+			"totpAvailable":            opts.TOTPAvailable,
+			"httpRemoteUserEnabled":    opts.HTTPRemoteUser.Enabled,
+			"loginUrl":                 opts.LoginURL,
+			"logoutUrl":                opts.LogoutURL,
+			"userManagementUrl":        opts.UserManagementURL,
+			"defaultLanguage":          opts.DefaultLanguage,
 		})
 	}
 }

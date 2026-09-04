@@ -1,27 +1,22 @@
 import { Button } from '@/components/ui/button'
+import { useDateTimeFormat } from '@/lib/useDateTimeFormat'
+import { useBackupStore } from '@/stores/backup'
 import { CloudUpload, GitMerge, Loader2, TriangleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { useBackupStore } from '@/stores/backup'
 import { useSetTitle } from '../viewer/setTitle'
+import BackupConfigForm from './BackupConfigForm'
 
 const POLL_INTERVAL_MS = 5000
 
-function formatDate(value: string | null, fallback: string): string {
-  if (!value) return fallback
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return fallback
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date)
-}
-
 export default function BackupSettings() {
   const { t } = useTranslation('backup')
+  const { formatDateTime } = useDateTimeFormat()
   const {
     enabled,
+    envManaged,
+    bootError,
     lastBackupAt,
     lastError,
     needsIntervention,
@@ -34,6 +29,7 @@ export default function BackupSettings() {
     triggerPush,
     forcePush,
     stopPolling,
+    loadConfig,
   } = useBackupStore()
 
   const [isForcePushing, setIsForcePushing] = useState(false)
@@ -42,7 +38,8 @@ export default function BackupSettings() {
 
   useEffect(() => {
     loadStatus()
-  }, [loadStatus])
+    loadConfig()
+  }, [loadStatus, loadConfig])
 
   useEffect(() => {
     if (!isPolling) return
@@ -50,7 +47,6 @@ export default function BackupSettings() {
     return () => clearInterval(interval)
   }, [isPolling, loadStatus])
 
-  // Stop polling when lastBackupAt advances beyond the pre-push baseline or an error occurs
   useEffect(() => {
     if (!isPolling) return
     const hasNewBackup = lastBackupAt !== null && pollingFromAt !== lastBackupAt
@@ -65,26 +61,26 @@ export default function BackupSettings() {
     }
   }, [lastBackupAt, lastError, isPolling, pollingFromAt, stopPolling, t])
 
-  const handlePush = async () => {
-    try {
-      await triggerPush()
-      toast.success(t('toast.backupTriggered'))
-    } catch {
-      toast.error(t('toast.backupTriggerFailed'))
-    }
-  }
-
   const handleForcePush = async () => {
     setIsForcePushing(true)
     try {
       await forcePush()
       toast.success(t('toast.forcePushSuccess'))
     } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : t('toast.forcePushFailed')
-      toast.error(msg)
+      toast.error(
+        err instanceof Error ? err.message : t('toast.forcePushFailed'),
+      )
     } finally {
       setIsForcePushing(false)
+    }
+  }
+
+  const handlePush = async () => {
+    try {
+      await triggerPush()
+      toast.success(t('toast.backupTriggered'))
+    } catch {
+      toast.error(t('toast.backupTriggerFailed'))
     }
   }
 
@@ -99,11 +95,9 @@ export default function BackupSettings() {
         </div>
       )}
 
+      {/* Status */}
       <div className="settings__section">
         <h2 className="settings__section-title">{t('sectionTitle')}</h2>
-        <p className="settings__section-description">
-          {t('sectionDescription')}
-        </p>
 
         <div className="settings__preview">
           <span className="settings__preview-label">{t('statusLabel')}</span>
@@ -121,74 +115,81 @@ export default function BackupSettings() {
         </div>
 
         {(isLoading || enabled) && (
-          <>
-            <div className="settings__preview">
-              <span className="settings__preview-label">
-                {t('lastBackupLabel')}
-              </span>
-              <span className="text-interface-text text-sm">
-                {isLoading || isPolling ? (
-                  <span className="text-muted flex items-center gap-2">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    {isPolling ? t('waitingForBackup') : t('loading')}
-                  </span>
-                ) : (
-                  formatDate(lastBackupAt, t('never'))
-                )}
-              </span>
-            </div>
-
-            {!isLoading && lastError && !needsIntervention && (
-              <div className="settings__preview border-error/20 bg-error/5">
-                <span className="settings__preview-label flex items-center gap-1.5">
-                  <TriangleAlert className="text-error h-3.5 w-3.5" />
-                  {t('lastErrorLabel')}
+          <div className="settings__preview">
+            <span className="settings__preview-label">
+              {t('lastBackupLabel')}
+            </span>
+            <span className="text-interface-text text-sm">
+              {isLoading || isPolling ? (
+                <span className="text-muted flex items-center gap-2">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  {isPolling ? t('waitingForBackup') : t('loading')}
                 </span>
-                <span className="text-error text-sm">{lastError}</span>
-              </div>
-            )}
-
-            {!isLoading && needsIntervention && (
-              <div className="settings__preview border-warning/20 bg-warning/5">
-                <span className="settings__preview-label flex items-center gap-1.5">
-                  <GitMerge className="text-warning h-3.5 w-3.5" />
-                  {t('conflictTitle')}
-                </span>
-                <div className="flex flex-col gap-2">
-                  <span className="text-warning text-sm font-medium">
-                    {t('conflictDescription')}
-                  </span>
-                  <span className="text-muted text-xs">{conflictDetails}</span>
-                  <span className="text-muted text-xs">
-                    {t('conflictWarning')}
-                  </span>
-                  <div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleForcePush}
-                      disabled={isForcePushing}
-                      className="border-warning/40 text-warning hover:bg-warning/10 mt-1"
-                    >
-                      {isForcePushing ? (
-                        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <GitMerge className="mr-2 h-3.5 w-3.5" />
-                      )}
-                      {isForcePushing ? t('pushing') : t('forcePushButton')}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
+              ) : (
+                formatDateTime(lastBackupAt ?? undefined) || t('never')
+              )}
+            </span>
+          </div>
         )}
 
-        {!isLoading && !enabled && (
-          <p className="settings__hint">{t('hintDisabled')}</p>
+        {!isLoading && bootError && (
+          <div className="settings__preview border-error/20 bg-error/5">
+            <span className="settings__preview-label flex items-center gap-1.5">
+              <TriangleAlert className="text-error h-3.5 w-3.5" />
+              {t('config.bootErrorLabel')}
+            </span>
+            <span className="text-error text-sm">{bootError}</span>
+          </div>
+        )}
+
+        {!isLoading && lastError && !needsIntervention && (
+          <div className="settings__preview border-error/20 bg-error/5">
+            <span className="settings__preview-label flex items-center gap-1.5">
+              <TriangleAlert className="text-error h-3.5 w-3.5" />
+              {t('lastErrorLabel')}
+            </span>
+            <span className="text-error text-sm">{lastError}</span>
+          </div>
+        )}
+
+        {!isLoading && needsIntervention && (
+          <div className="settings__preview border-warning/20 bg-warning/5">
+            <span className="settings__preview-label flex items-center gap-1.5">
+              <GitMerge className="text-warning h-3.5 w-3.5" />
+              {t('conflictTitle')}
+            </span>
+            <div className="flex flex-col gap-2">
+              <span className="text-warning text-sm font-medium">
+                {t('conflictDescription')}
+              </span>
+              <span className="text-muted text-xs">{conflictDetails}</span>
+              <span className="text-muted text-xs">{t('conflictWarning')}</span>
+              <div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleForcePush}
+                  disabled={isForcePushing}
+                  className="border-warning/40 text-warning hover:bg-warning/10 mt-1"
+                >
+                  {isForcePushing ? (
+                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <GitMerge className="mr-2 h-3.5 w-3.5" />
+                  )}
+                  {isForcePushing ? t('pushing') : t('forcePushButton')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {envManaged && (
+          <p className="settings__hint">{t('config.envManagedHint')}</p>
         )}
       </div>
 
+      {/* Manual sync (when running) */}
       {!isLoading && enabled && (
         <div className="settings__section">
           <h2 className="settings__section-title">{t('manualSectionTitle')}</h2>
@@ -210,6 +211,9 @@ export default function BackupSettings() {
           </div>
         </div>
       )}
+
+      {/* Configuration form (settings-managed only) */}
+      {!envManaged && <BackupConfigForm />}
     </div>
   )
 }

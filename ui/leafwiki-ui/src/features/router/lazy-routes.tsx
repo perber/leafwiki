@@ -4,7 +4,7 @@ export const AccountSettings = lazy(
   () => import('../settings/account/AccountSettings'),
 )
 
-// The 7 admin-only settings sections share one dynamic-import specifier
+// The 6 admin-only settings sections share one dynamic-import specifier
 // (../settings/adminSections) so the bundler collapses them into a single
 // chunk, loaded once when an admin opens any one of them — see
 // pleaf/root/AI-Gen-Infos/plans/open/features/
@@ -27,9 +27,9 @@ export const BrandingSettings = lazy(() =>
 export const Importer = lazy(() =>
   import('../settings/adminSections').then((m) => ({ default: m.Importer })),
 )
-export const MaintenanceSettings = lazy(() =>
+export const PublicAccessSettings = lazy(() =>
   import('../settings/adminSections').then((m) => ({
-    default: m.MaintenanceSettings,
+    default: m.PublicAccessSettings,
   })),
 )
 export const SnapshotSettings = lazy(() =>

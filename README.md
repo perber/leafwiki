@@ -364,13 +364,11 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--snapshot-dir`                 | Directory to store snapshot ZIPs in                                     | `<data-dir>/snapshots` | v0.12.0 |
 | `--restore-upload-max-size`      | Max size for an uploaded backup ZIP to restore from                    | `500MiB`      | v0.12.0 |
 | `--git-backup`                   | ⚗️ Enable git backup to a remote repository                             | `false`       | v0.11.3 |
-| `--git-backup-remote`            | ⚗️ SSH or HTTP(S) remote URL for git backup (e.g. `git@github.com:user/repo.git`, `https://github.com/user/repo.git`) | `""` | v0.11.3 |
+| `--git-backup-remote`            | ⚗️ SSH remote URL for git backup (e.g. `git@github.com:user/repo.git`) | `""` | v0.11.3 |
 | `--git-backup-branch`            | ⚗️ Branch to push to                                                    | `main`        | v0.11.3 |
 | `--git-backup-ssh-key`           | ⚗️ Raw SSH private key (prefer env var)                                 | `""`          | v0.11.3 |
 | `--git-backup-ssh-key-path`      | ⚗️ Path to SSH private key file                                         | `""`          | v0.11.3 |
 | `--git-backup-ssh-known-hosts`   | ⚗️ Path to `known_hosts` for MITM protection                            | `""`          | v0.11.3 |
-| `--git-backup-http-username`     | ⚗️ Username for HTTP(S) basic auth                                      | `""`          | v0.12.2 |
-| `--git-backup-http-password`     | ⚗️ Password or access token for HTTP(S) basic auth (prefer env var)     | `""`          | v0.12.2 |
 | `--git-backup-author-name`       | ⚗️ Git commit author name                                               | `LeafWiki Backup` | v0.11.3 |
 | `--git-backup-author-email`      | ⚗️ Git commit author email                                              | `backup@leafwiki.local` | v0.11.3 |
 | `--git-backup-interval`          | ⚗️ Backup interval (e.g. `60m`, `2h`); `0` = manual-only               | `60m`         | v0.11.3 |
@@ -425,13 +423,11 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_SNAPSHOT_DIR`                 | Directory to store snapshot ZIPs in                  | `<data-dir>/snapshots` | v0.12.0 |
 | `LEAFWIKI_RESTORE_UPLOAD_MAX_SIZE`      | Max size for an uploaded backup ZIP to restore from  | `500MiB`      | v0.12.0 |
 | `LEAFWIKI_GIT_BACKUP`                   | ⚗️ Enable git backup                                | `false`       | v0.11.3 |
-| `LEAFWIKI_GIT_BACKUP_REMOTE`            | ⚗️ SSH or HTTP(S) remote URL                        | `""`          | v0.11.3 |
+| `LEAFWIKI_GIT_BACKUP_REMOTE`            | ⚗️ SSH remote URL                                   | `""`          | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_BRANCH`            | ⚗️ Branch to push to                                | `main`        | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_SSH_KEY`           | ⚗️ Raw SSH private key (preferred over path)        | `""`          | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH`      | ⚗️ Path to SSH private key file                     | `""`          | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS`   | ⚗️ Path to `known_hosts` file                       | `""`          | v0.11.3 |
-| `LEAFWIKI_GIT_BACKUP_HTTP_USERNAME`     | ⚗️ Username for HTTP(S) basic auth                  | `""`          | v0.12.2 |
-| `LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD`     | ⚗️ Password or access token for HTTP(S) basic auth  | `""`          | v0.12.2 |
 | `LEAFWIKI_GIT_BACKUP_AUTHOR_NAME`       | ⚗️ Git commit author name                           | `LeafWiki Backup` | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_AUTHOR_EMAIL`      | ⚗️ Git commit author email                          | `backup@leafwiki.local` | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_INTERVAL`          | ⚗️ Backup interval (e.g. `60m`); `0` = manual-only | `60m`         | v0.11.3 |
@@ -519,9 +515,7 @@ Use `--unix-socket` when LeafWiki should listen on a local unix domain socket in
 
 > **Experimental** — This feature is new and may change in future releases. Test it thoroughly before relying on it for critical data.
 
-Git Backup pushes wiki **content** to a remote Git repository on a configurable interval, either via **SSH** or via **HTTP(S) with username + password** (v0.12.2+). It covers the `root/` (pages) and `assets/` directories. Database files (`.db`, `.db-wal`, etc.) and runtime files are excluded via `.gitignore`.
-
-Which transport you use is derived from the remote URL: `git@...` / `ssh://...` authenticate with an SSH key, `https://...` / `http://...` with a username and password. On GitHub, GitLab and friends the "password" is an access token — which is often the more practical option, because a fine-grained token can be scoped to a **single repository**, whereas an SSH key added to your account grants access to everything that account can reach.
+Git Backup pushes wiki **content** to a remote Git repository on a configurable interval, either via **SSH**. It covers the `root/` (pages) and `assets/` directories. Database files (`.db`, `.db-wal`, etc.) and runtime files are excluded via `.gitignore`.
 
 Backups run automatically on a configurable interval and can also be triggered manually from the **Git Content Backup** page.
 
@@ -654,20 +648,24 @@ LeafWiki resolves relative page links with **page-as-folder** semantics: the cur
 
 A trailing `.md` suffix in a link target is ignored for page lookup (for example `setup.md` → `setup`), which matches common filesystem / Obsidian-style Markdown.
 
-This differs from plain filesystem tools that treat the current file''s directory as the base. A broader sibling-folder model is discussed in #1236.
-
 ## External Edits & Resync
 
-If you edit Markdown files directly on disk — a text editor, Git, a script, a bulk import — LeafWiki won't pick up the changes on its own. Trigger a resync one of two ways:
+LeafWiki is intended to be the primary writer for a workspace. However, Markdown files may still be changed outside LeafWiki — for example through a text editor, Git, a script, or a bulk import.
 
-- **Admin UI:** trigger it manually from the maintenance/admin settings page, with live progress across four phases (tree, links, tags, search).
-- **OS signal:** send `SIGUSR1` or `SIGHUP` to the running process (e.g., from a git post-receive hook or a cron job) — no restart needed.
+LeafWiki does not continuously watch the filesystem for these changes. To make externally modified files visible to LeafWiki, trigger a resync in one of two ways:
 
-Both paths share the same resync job, so either way you get the same consistent result. This is separate from `.leafwikiignore` changes, which are only read at startup.
+* **Admin UI:** trigger it manually from the maintenance/admin settings page, with live progress across four phases (tree, links, tags, search).
+* **OS signal:** send `SIGUSR1` or `SIGHUP` to the running process — no restart required. This can be useful when an external workflow needs to explicitly tell LeafWiki that files have changed.
 
-The maintenance page also provides a **Broken Links** view for administrators. It lists links whose target pages no longer exist, including the page containing the broken link and the missing target path.
+Both paths run the same resync job and produce the same result. A resync should be considered an explicit reconciliation of the workspace rather than continuous bidirectional filesystem synchronization.
 
-**New files without a `leafwiki_id`:** every page's identity lives in a `leafwiki_id` field in its own frontmatter, not in its filename or path — that's what lets pages survive renames and moves without losing their identity. If you add a `.md` file yourself (not created through the app) and it has no `leafwiki_id` yet, the next resync generates one and **writes it back into the file on disk**. This is automatic and requires no action from you, but it does mean the file changes on disk after the resync — worth knowing if you manage `root/` with your own separate Git workflow (outside LeafWiki's built-in [Git Backup](#git-backup-v0113-experimental)), since that ID write-back will show up as an extra diff you didn't make yourself.
+Changes to `.leafwikiignore` are separate and are only read at startup.
+
+**New files without a `leafwiki_id`:** LeafWiki stores the identity of a page in the `leafwiki_id` field in its frontmatter rather than deriving it from the filename or path. This allows LeafWiki to retain the identity of a document when it is renamed or moved.
+
+If a Markdown file created outside LeafWiki does not yet contain a `leafwiki_id`, the next resync generates one and writes it back to the file. No manual action is required, but the file will therefore change on disk during the resync.
+
+If `root/` is managed by a separate Git workflow outside LeafWiki's built-in [Git Backup](#git-backup-v0113-experimental), this generated ID will appear as an additional diff.
 
 ---
 

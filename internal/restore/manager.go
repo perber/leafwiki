@@ -396,6 +396,16 @@ func (m *Manager) runFromZipPath(zipPath string, limits coreshared.ExtractionLim
 		return
 	}
 
+	// Public-access flag rides the same phase — it's another small
+	// in-memory reload from a data-dir JSON file. No-op for env-managed
+	// instances (they have no public-access.json).
+	if m.cfg.PublicAccess != nil {
+		if err := m.cfg.PublicAccess.Reload(); err != nil {
+			m.rollbackOrIntervene(sw, fmt.Errorf("failed to reload public-access config: %w", err))
+			return
+		}
+	}
+
 	sw.CommitAll()
 	m.cfg.WriteGate.Disengage()
 	if m.cfg.TriggerResync != nil {

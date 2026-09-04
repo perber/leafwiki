@@ -18,9 +18,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
 	"github.com/go-git/go-git/v5/plumbing/transport"
-	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
-	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
-	sshcrypto "golang.org/x/crypto/ssh"
 )
 
 // gcLooseThreshold is the number of loose objects that triggers a gc() run.
@@ -461,6 +458,43 @@ func hasStagedChanges(status gogit.Status) bool {
 	return false
 }
 
+// Pull fetches from the remote and fast-forward merges any new commits,
+// independent of a full backup cycle. Same error/conflict semantics as
+// pullBeforeBackup: conflicts and diverged history set r.status.NeedsIntervention,
+// transient errors set r.status.LastError. A no-op (nil error) if no remote is
+// configured. Fails fast (rather than blocking) if a backup cycle is already
+// running, mirroring ForcePush — RunBackup can hold the lock for minutes across
+// its own network pull/push, which would otherwise stall the HTTP request.
+func (r *Repository) Pull() error {
+	if !r.mu.TryLock() {
+		return fmt.Errorf("backup is currently running — try again in a moment")
+	}
+	defer r.mu.Unlock()
+
+	if r.cfg.RemoteURL == "" {
+		return nil
+	}
+
+	wt, err := r.repo.Worktree()
+	if err != nil {
+		errMsg := fmt.Errorf("failed to get worktree: %w", err).Error()
+		slog.Debug("Pull: failed to get worktree", "error", errMsg)
+		r.status.SetError(errMsg)
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	if err := r.pullBeforeBackup(wt); err != nil {
+		return err
+	}
+
+	// A successful pull resolves any stale error/conflict state from a prior
+	// cycle (e.g. the file conflict that caused it no longer exists on disk).
+	// Unlike SetSuccess, this must not touch LastBackupAt — a pull is not a
+	// backup, so it shouldn't be reported as one.
+	r.status.ClearIntervention()
+	return nil
+}
+
 // RunBackup pulls from the remote (fast-forward only) to integrate any external
 // commits, then stages all changes in root/ and assets/, commits if anything
 // changed, and pushes to the configured remote.
@@ -851,13 +885,6 @@ func (r *Repository) push(force bool) error {
 	return nil
 }
 
-// isHTTPRemote reports whether the remote URL is fetched/pushed over HTTP(S)
-// rather than SSH.
-func isHTTPRemote(remoteURL string) bool {
-	lower := strings.ToLower(remoteURL)
-	return strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://")
-}
-
 // redactRemote masks credentials embedded in a remote URL
 // (https://user:token@host/repo.git) so the token never reaches a log line or a
 // status message shown in the UI. Non-URL remotes (git@host:path) are returned
@@ -876,112 +903,11 @@ func (r *Repository) remoteForLog() string {
 	return redactRemote(r.cfg.RemoteURL)
 }
 
-// buildAuth builds the transport authentication for the configured remote:
-// HTTP(S) remotes use basic auth (username + password/token), everything else
-// (git@..., ssh://...) uses the SSH private key.
+// buildAuth builds the transport authentication for the configured remote.
+// The implementation lives in auth.go as package functions so TestRemote can
+// reuse it; this method just binds it to the repository's own config.
 func (r *Repository) buildAuth() (transport.AuthMethod, error) {
-	if isHTTPRemote(r.cfg.RemoteURL) {
-		return r.buildHTTPAuth()
-	}
-	return r.buildSSHAuth()
-}
-
-// buildHTTPAuth builds HTTP basic auth from config. On GitHub and friends the
-// password is a personal access token, which is exactly the point of this auth
-// mode: a fine-grained token can be scoped to a single repository, whereas an
-// SSH key is bound to the whole account.
-func (r *Repository) buildHTTPAuth() (transport.AuthMethod, error) {
-	if r.cfg.HTTPUsername == "" && r.cfg.HTTPPassword == "" {
-		// No explicit credentials: the remote URL may already embed them, or the
-		// repository may be publicly writable (self-hosted setups behind a VPN).
-		slog.Debug("buildHTTPAuth: no HTTP credentials configured, connecting without basic auth")
-		return nil, nil
-	}
-	if r.cfg.HTTPUsername == "" || r.cfg.HTTPPassword == "" {
-		return nil, fmt.Errorf("HTTP basic auth requires both a username and a password/token")
-	}
-	slog.Debug("buildHTTPAuth: using HTTP basic auth", "username", r.cfg.HTTPUsername)
-	return &githttp.BasicAuth{
-		Username: r.cfg.HTTPUsername,
-		Password: r.cfg.HTTPPassword,
-	}, nil
-}
-
-// buildSSHAuth builds SSH authentication from config.
-func (r *Repository) buildSSHAuth() (ssh.AuthMethod, error) {
-	var privateKey []byte
-	var err error
-
-	// Try SSHKey string first
-	switch {
-	case r.cfg.SSHKey != "":
-		slog.Debug("buildSSHAuth: using inline SSH key")
-		privateKey = []byte(r.cfg.SSHKey)
-	case r.cfg.SSHKeyPath != "":
-		slog.Debug("buildSSHAuth: reading SSH key from file", "path", r.cfg.SSHKeyPath)
-		privateKey, err = os.ReadFile(r.cfg.SSHKeyPath)
-		if err != nil {
-			slog.Debug("buildSSHAuth: failed to read SSH key file", "path", r.cfg.SSHKeyPath, "error", err)
-			return nil, fmt.Errorf("failed to read SSH key: %w", err)
-		}
-		slog.Debug("buildSSHAuth: SSH key file read successfully", "path", r.cfg.SSHKeyPath, "size", len(privateKey))
-	default:
-		slog.Debug("buildSSHAuth: no SSH key configured (neither inline nor path)")
-		return nil, fmt.Errorf("no SSH key provided")
-	}
-
-	// Parse the private key using x/crypto/ssh
-	signer, err := sshcrypto.ParsePrivateKey(privateKey)
-	if err != nil {
-		slog.Error("failed to parse SSH key", "error", err, "path", r.cfg.SSHKeyPath)
-		return nil, fmt.Errorf("failed to parse SSH key: %w", err)
-	}
-	slog.Debug("buildSSHAuth: SSH key parsed successfully", "keyType", signer.PublicKey().Type())
-
-	auth := &ssh.PublicKeys{
-		User:   "git",
-		Signer: signer,
-	}
-
-	// Use known hosts file for MITM protection.
-	// Priority: explicit config path → ~/.ssh/known_hosts → InsecureIgnoreHostKey (warn).
-	// If the configured path is unreadable we fail hard rather than silently downgrading.
-	if r.cfg.SSHKnownHostsPath != "" {
-		cb, err := ssh.NewKnownHostsCallback(r.cfg.SSHKnownHostsPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load known_hosts file %q: %w", r.cfg.SSHKnownHostsPath, err)
-		}
-		auth.HostKeyCallback = cb
-		slog.Debug("buildSSHAuth: using configured known_hosts", "path", r.cfg.SSHKnownHostsPath)
-	} else if defaultPath, ok := defaultKnownHostsPath(); ok {
-		cb, err := ssh.NewKnownHostsCallback(defaultPath)
-		if err != nil {
-			slog.Warn("buildSSHAuth: default known_hosts found but could not be loaded; SSH host key verification disabled (MITM risk)",
-				"path", defaultPath, "error", err)
-			auth.HostKeyCallback = sshcrypto.InsecureIgnoreHostKey()
-		} else {
-			auth.HostKeyCallback = cb
-			slog.Info("buildSSHAuth: using default known_hosts for SSH host key verification", "path", defaultPath)
-		}
-	} else {
-		slog.Warn("buildSSHAuth: no known_hosts file configured or found at ~/.ssh/known_hosts; SSH connections will not verify host keys (MITM risk) — set --git-backup-ssh-known-hosts to fix")
-		auth.HostKeyCallback = sshcrypto.InsecureIgnoreHostKey()
-	}
-	return auth, nil
-}
-
-// defaultKnownHostsPath returns the path to the user's default known_hosts file
-// and whether it actually exists on disk.
-func defaultKnownHostsPath() (string, bool) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", false
-	}
-	p := filepath.Join(home, ".ssh", "known_hosts")
-	if _, err := os.Stat(p); err != nil {
-		return "", false
-	}
-	return p, true
+	return buildAuth(r.cfg)
 }
 
 // ForcePush overwrites the remote branch with the current local HEAD.

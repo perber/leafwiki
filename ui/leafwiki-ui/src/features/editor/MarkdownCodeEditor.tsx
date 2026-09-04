@@ -3,12 +3,7 @@ import {
   closeCompletion,
   completionStatus,
 } from '@codemirror/autocomplete'
-import {
-  defaultKeymap,
-  history,
-  historyKeymap,
-  indentWithTab,
-} from '@codemirror/commands'
+import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { openSearchPanel, search, searchKeymap } from '@codemirror/search'
 import { Compartment, EditorState } from '@codemirror/state'
@@ -17,7 +12,12 @@ import { EditorView, keymap } from '@codemirror/view'
 import { githubLight } from '@fsegurai/codemirror-theme-github-light'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useDesignModeStore } from '../designtoggle/designmode'
-import { insertHeadingAtStart, insertWrappedText } from './editorCommands'
+import {
+  insertHeadingAtStart,
+  insertWrappedText,
+  tabIndentKeyBinding,
+  tabIndentUnit,
+} from './editorCommands'
 import type { InternalLinkCompletion } from './internalLinkCompletion'
 import {
   internalLinkCompletionSource,
@@ -211,6 +211,7 @@ export default function MarkdownCodeEditor({
         themeCompartment.of(designMode === 'light' ? githubLight : oneDark),
         lineWrapCompartment.of(lineWrap ? wrapExtensions : noWrapExtensions),
         markdown(),
+        tabIndentUnit,
         search({
           top: true,
         }),
@@ -235,7 +236,7 @@ export default function MarkdownCodeEditor({
         keymap.of([
           ...customShortcuts,
           ...searchKeymap,
-          indentWithTab,
+          tabIndentKeyBinding,
           ...historyKeymap,
           ...defaultKeymap,
         ]),

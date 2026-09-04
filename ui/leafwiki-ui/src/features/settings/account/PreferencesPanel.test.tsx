@@ -18,15 +18,21 @@ beforeEach(() => {
 describe('PreferencesPanel', () => {
   const setLanguage = vi.fn()
   const toggleAutoSave = vi.fn()
+  const setDateFormat = vi.fn()
+  const setTimeFormat = vi.fn()
 
   beforeEach(() => {
     vi.clearAllMocks()
     useUserSettingsStore.setState({
       autoSave: true,
       language: 'en',
+      dateFormat: 'locale',
+      timeFormat: 'locale',
       loaded: true,
       setLanguage,
       toggleAutoSave,
+      setDateFormat,
+      setTimeFormat,
     })
   })
 
@@ -44,5 +50,52 @@ describe('PreferencesPanel', () => {
     await user.click(await screen.findByText('Deutsch'))
 
     expect(setLanguage).toHaveBeenCalledWith('de')
+  })
+
+  it('renders the date and time format pickers', () => {
+    render(<PreferencesPanel />)
+
+    expect(
+      screen.getByTestId('preferences-dateformat-select'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByTestId('preferences-timeformat-select'),
+    ).toBeInTheDocument()
+  })
+
+  it('associates each format picker with its visible label', () => {
+    render(<PreferencesPanel />)
+
+    // Accessible name comes from the label via aria-labelledby, not the
+    // selected value — so the two pickers are distinguishable to AT.
+    expect(
+      screen.getByRole('combobox', { name: 'Language' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('combobox', { name: 'Date format' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('combobox', { name: 'Time format' }),
+    ).toBeInTheDocument()
+  })
+
+  it('lets the user pick a date format', async () => {
+    const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 })
+    render(<PreferencesPanel />)
+
+    await user.click(screen.getByTestId('preferences-dateformat-select'))
+    await user.click(await screen.findByText('27.08.2026'))
+
+    expect(setDateFormat).toHaveBeenCalledWith('dmy_dot')
+  })
+
+  it('lets the user pick a time format', async () => {
+    const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 })
+    render(<PreferencesPanel />)
+
+    await user.click(screen.getByTestId('preferences-timeformat-select'))
+    await user.click(await screen.findByText('24-hour (14:30)'))
+
+    expect(setTimeFormat).toHaveBeenCalledWith('24h')
   })
 })

@@ -80,11 +80,13 @@
     "copyErrorToast": "Permalink konnte nicht kopiert werden",
     "copiedToast": "Permalink kopiert",
     "title": "Seite teilen",
-    "description": "Teilbare URL für {{title}}",
+    "description": "Permanenter Link zu {{title}}",
     "close": "Schließen",
-    "urlLabel": "Teilbare URL",
+    "urlLabel": "Permanenter Link",
     "copyLink": "Link kopieren",
-    "openLink": "Link öffnen"
+    "openLink": "Link öffnen",
+    "purposeNote": "Dies ist ein permanenter interner Link. Er funktioniert auch nach dem Umbenennen oder Verschieben der Seite weiter und eignet sich daher für Lesezeichen oder Verweise von anderen Seiten.",
+    "accessNote": "Es ist kein öffentlicher Link. Wer ihn erhält, muss sich weiterhin in diesem Wiki anmelden, um ihn zu öffnen – es sei denn, das gesamte Wiki ist auf öffentlichen Zugriff gestellt. LeafWiki kann keine einzelne Seite öffentlich machen, während der Rest privat bleibt."
   },
   "createByPathDialog": {
     "createdToast": "Seite erfolgreich erstellt",

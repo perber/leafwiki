@@ -1,4 +1,25 @@
-import { EditorView } from '@codemirror/view'
+import { indentLess, insertTab } from '@codemirror/commands'
+import { indentUnit } from '@codemirror/language'
+import { Extension } from '@codemirror/state'
+import { EditorView, KeyBinding } from '@codemirror/view'
+
+// Tab inserts a single indentation character at the cursor, and only falls back
+// to indenting whole lines when the selection actually spans them (that's what
+// `insertTab` does). This replaces CodeMirror's `indentWithTab`, which always
+// ran `indentMore` — indenting the entire current line even for a collapsed
+// cursor, so pressing Tab mid-line shifted the whole line instead of inserting
+// at the caret. Shift-Tab still dedents via `indentLess`.
+export const tabIndentKeyBinding: KeyBinding = {
+  key: 'Tab',
+  run: insertTab,
+  shift: indentLess,
+}
+
+// Use a real tab as the indent unit so `insertTab` (caret), `indentMore`
+// (selection) and `indentLess` (Shift-Tab) all stay consistent — without this
+// the selection/dedent paths would use CodeMirror's 2-space default while a
+// collapsed-caret Tab inserts "\t".
+export const tabIndentUnit: Extension = indentUnit.of('\t')
 
 export function insertWrappedText(
   view: EditorView,

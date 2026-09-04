@@ -11,6 +11,7 @@ import {
 } from '@/lib/registries'
 import { buildHistoryUrl } from '@/lib/routePath'
 import { FavoriteToggleButton } from '@/features/favorites/FavoriteToggleButton'
+import { getPageAttachments, type PageAttachment } from '@/lib/api/assets'
 import { pinPage } from '@/lib/api/pages'
 import { createHotkeyDefinition } from '@/lib/shortcuts/shortcutCatalog'
 import { useScrollRestoration } from '@/lib/useScrollRestoration'
@@ -25,7 +26,7 @@ import { useHotKeysStore } from '@/stores/hotkeys'
 import { useSessionStore } from '@/stores/session'
 import { useTocPanelStore } from '@/stores/tocPanel'
 import { useTreeStore } from '@/stores/tree'
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { createPortal } from 'react-dom'
@@ -143,8 +144,30 @@ export default function PageViewer() {
     () => (page ? extractTocEntries(page.content) : []),
     [page],
   )
+  const [attachments, setAttachments] = useState<PageAttachment[]>([])
+
+  useEffect(() => {
+    if (!page?.id) {
+      setAttachments([])
+      return
+    }
+
+    let cancelled = false
+    getPageAttachments(page.id)
+      .then((files) => {
+        if (!cancelled) setAttachments(files)
+      })
+      .catch(() => {
+        if (!cancelled) setAttachments([])
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [page?.id])
 
   const showTocButton = tocEntries.length > 3
+  const showRightPane = showTocButton || attachments.length > 0
   // Single scroll spy for both the dropdown and the side panel.
   const tocActiveId = useTocScrollSpy(showTocButton ? tocEntries : [])
 
@@ -152,7 +175,7 @@ export default function PageViewer() {
   const tocCollapsed = useTocPanelStore((state) => state.collapsed)
 
   useEffect(() => {
-    if (!showTocButton) return
+    if (!showRightPane) return
 
     const tocToggleHotkey = createHotkeyDefinition(
       'viewer.toc.toggle',
@@ -161,7 +184,7 @@ export default function PageViewer() {
     registerHotkey(tocToggleHotkey)
 
     return () => unregisterHotkey(tocToggleHotkey.keyCombo)
-  }, [showTocButton, toggleTocCollapsed, registerHotkey, unregisterHotkey])
+  }, [showRightPane, toggleTocCollapsed, registerHotkey, unregisterHotkey])
 
   const editorName = displayUser(page?.metadata?.lastAuthor)
   const updatedRelative = formatRelativeTime(page?.metadata?.updatedAt)
@@ -175,7 +198,7 @@ export default function PageViewer() {
           <div
             className={cn(
               'page-viewer__subheader print:hidden',
-              showTocButton &&
+              showRightPane &&
                 (tocCollapsed
                   ? 'page-viewer__subheader--toc-reserved-collapsed'
                   : 'page-viewer__subheader--toc-reserved'),
@@ -188,10 +211,14 @@ export default function PageViewer() {
                   {showUpdated && (
                     <div className="page-viewer__metadata">
                       <span className="page-viewer__metadata-item">
-                        Updated{' '}
                         {editorName
-                          ? `by ${editorName} · ${updatedRelative}`
-                          : updatedRelative}
+                          ? t('section.updatedByLabel', {
+                              editor: editorName,
+                              time: updatedRelative,
+                            })
+                          : t('section.updatedLabel', {
+                              time: updatedRelative,
+                            })}
                       </span>
                     </div>
                   )}
@@ -220,9 +247,13 @@ export default function PageViewer() {
       : null
 
   const tocPane =
-    showTocButton && page && !error && tocPaneRoot
+    showRightPane && page && !error && tocPaneRoot
       ? createPortal(
-          <TocSidePanel entries={tocEntries} activeId={tocActiveId} />,
+          <TocSidePanel
+            entries={showTocButton ? tocEntries : []}
+            activeId={tocActiveId}
+            downloads={attachments}
+          />,
           tocPaneRoot,
         )
       : null

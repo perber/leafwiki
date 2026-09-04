@@ -36,7 +36,7 @@
     "restoreAlreadyRunning": "Eine Wiederherstellung läuft bereits",
     "restoreFailed": "Wiederherstellung fehlgeschlagen",
     "restoreSucceeded": "Wiederherstellung abgeschlossen. Wird neu geladen…",
-    "restoreSucceededResyncUnconfirmed": "Wiederherstellung abgeschlossen, aber der Abschluss des Suchindex-Neuaufbaus konnte nicht bestätigt werden. Wird neu geladen — lösen Sie bei veraltet wirkenden Suchergebnissen eine manuelle Synchronisierung über „Wartung“ aus."
+    "restoreSucceededResyncUnconfirmed": "Wiederherstellung abgeschlossen, aber der Abschluss des Suchindex-Neuaufbaus konnte nicht bestätigt werden. Wird neu geladen — klicken Sie bei veraltet wirkenden Suchergebnissen auf den Aktualisieren-Button im Explorer."
   },
   "errors": {
     "jobLost": "Wiederherstellungsauftrag verloren — der Server wurde möglicherweise neu gestartet"

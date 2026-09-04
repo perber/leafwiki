@@ -9,6 +9,12 @@
     "role": "Rolle",
     "actions": "Aktionen"
   },
+  "actions": {
+    "edit": "Bearbeiten",
+    "new": "Neuer Benutzer",
+    "changePassword": "Passwort ändern",
+    "delete": "Löschen"
+  },
   "invite": {
     "pendingPill": "Einladung ausstehend",
     "resendAction": "Einladung erneut senden",

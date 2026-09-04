@@ -69,13 +69,21 @@
   "toc": {
     "title": "Inhaltsverzeichnis",
     "onThisPage": "Auf dieser Seite",
+    "downloads": "Angehängte Medien",
     "collapse": "Inhaltsverzeichnis einklappen",
     "expand": "Inhaltsverzeichnis ausklappen"
   },
   "toolbar": {
     "moreActions": "Weitere Aktionen",
     "expandAll": "Alle ausklappen",
-    "collapseAll": "Alle einklappen"
+    "collapseAll": "Alle einklappen",
+    "sortPages": "Seiten sortieren",
+    "refresh": "Explorer aktualisieren",
+    "refreshSuccess": "Explorer aktualisiert",
+    "refreshError": "Aktualisierung fehlgeschlagen",
+    "refreshAlreadyRunning": "Aktualisierung läuft bereits",
+    "refreshPullFailed": "Abrufen der Remote-Änderungen fehlgeschlagen",
+    "syncJobLostFallback": "Sync-Job verloren — Server wurde möglicherweise neu gestartet"
   },
   "pageToolbar": {
     "itemPage": "Seite",
@@ -140,6 +148,9 @@
     "searchAriaLabel": "Seiten durchsuchen",
     "noMatch": "Keine passende Seite gefunden.",
     "matchingPagesAriaLabel": "Passende Seiten"
+  },
+  "metadata": {
+    "propertiesToggle": "Eigenschaften ({{count}})"
   },
   "shortcutsHelp": {
     "menuItem": "Tastaturkürzel",

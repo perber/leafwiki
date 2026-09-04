@@ -25,9 +25,9 @@ type backupMeta struct {
 }
 
 // requiredZipEntries are the only entries createSnapshot always writes
-// unconditionally (root/, assets/, branding/, branding.json, and schema.json
-// are all skipped by the writer when the corresponding source is empty or
-// missing, so their absence in a given ZIP isn't itself invalid).
+// unconditionally (root/, assets/, branding/, avatars/, branding.json, and
+// schema.json are all skipped by the writer when the corresponding source is
+// empty or missing, so their absence in a given ZIP isn't itself invalid).
 var requiredZipEntries = []string{"backup-meta.json", "users.db"}
 
 // extractAndValidate opens zipPath, verifies the required entries exist,
@@ -217,8 +217,10 @@ func sanityCheckSQLiteDB(path, table string, columns []string) error {
 // newSwapper's doc comment. sessions.db is deliberately absent: it's never
 // part of the snapshot (session state is ephemeral, tied to the running
 // process) — see AuthService.InvalidateAllSessions, called post-swap instead
-// of being restored.
-var swapNames = []string{"root", "assets", "branding", "branding.json", "schema.json", "users.db", "api_keys.db", "favorites.db", "usersettings.db"}
+// of being restored. "avatars" is a plain per-user-avatar asset directory
+// (like "assets"/"branding") — no hot-swappable service owns it, so it
+// carries no reload/rollback step of its own.
+var swapNames = []string{"root", "assets", "branding", "avatars", "branding.json", "schema.json", "users.db", "api_keys.db", "favorites.db", "usersettings.db"}
 
 // walSidecarDBNames lists every WAL-mode database whose stale -wal/-shm
 // sidecars may need cleaning up before a swap — derived from swapNames

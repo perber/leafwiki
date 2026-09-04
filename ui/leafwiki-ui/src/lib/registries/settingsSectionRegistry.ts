@@ -11,7 +11,7 @@ import {
   BackupSettings,
   BrandingSettings,
   Importer,
-  MaintenanceSettings,
+  PublicAccessSettings,
   SnapshotSettings,
   UserManagement,
 } from '@/features/router/lazy-routes'
@@ -20,12 +20,12 @@ import { useSessionStore } from '@/stores/session'
 import {
   Camera,
   GitBranch,
+  Globe,
   KeyRound,
   Palette,
   Upload,
   User,
   Users,
-  Wrench,
   type LucideIcon,
 } from 'lucide-react'
 import type { ComponentType, LazyExoticComponent } from 'react'
@@ -34,6 +34,7 @@ export interface SettingsSectionContext {
   role: string | undefined
   authDisabled: boolean
   gitBackupEnabled: boolean
+  gitBackupEnvManaged: boolean
   snapshotEnabled: boolean
   enableApiKeyManagement: boolean
   totpAvailable: boolean
@@ -91,6 +92,17 @@ export const settingsSections: SettingsSection[] = [
     Component: BrandingSettings,
   },
   {
+    id: 'public-access',
+    path: 'public-access',
+    labelKey: 'menuLabel',
+    ns: 'publicAccess',
+    icon: Globe,
+    roles: ['admin'],
+    // Always visible to admins; env-managed instances render a status-only
+    // view inside the component rather than being hidden.
+    Component: PublicAccessSettings,
+  },
+  {
     id: 'users',
     path: 'users',
     labelKey: 'userMenu.userManagement',
@@ -123,7 +135,8 @@ export const settingsSections: SettingsSection[] = [
     ns: 'backup',
     icon: GitBranch,
     roles: ['admin'],
-    isEnabled: (ctx) => ctx.gitBackupEnabled,
+    // Always visible to admins: when git backup is env-managed the section is
+    // status-only, otherwise it hosts the configuration form.
     Component: BackupSettings,
   },
   {
@@ -145,21 +158,13 @@ export const settingsSections: SettingsSection[] = [
     roles: ['admin'],
     Component: Importer,
   },
-  {
-    id: 'maintenance',
-    path: 'maintenance',
-    labelKey: 'userMenu.maintenance',
-    ns: 'auth',
-    icon: Wrench,
-    roles: ['admin'],
-    Component: MaintenanceSettings,
-  },
 ]
 
 export function useSettingsSectionContext(): SettingsSectionContext {
   const role = useSessionStore((s) => s.user?.role)
   const authDisabled = useConfigStore((s) => s.authDisabled)
   const gitBackupEnabled = useConfigStore((s) => s.gitBackupEnabled)
+  const gitBackupEnvManaged = useConfigStore((s) => s.gitBackupEnvManaged)
   const snapshotEnabled = useConfigStore((s) => s.snapshotEnabled)
   const enableApiKeyManagement = useConfigStore((s) => s.enableApiKeyManagement)
   const totpAvailable = useConfigStore((s) => s.totpAvailable)
@@ -170,6 +175,7 @@ export function useSettingsSectionContext(): SettingsSectionContext {
     role,
     authDisabled,
     gitBackupEnabled,
+    gitBackupEnvManaged,
     snapshotEnabled,
     enableApiKeyManagement,
     totpAvailable,

@@ -152,7 +152,13 @@
     "detailUpdated": "Existing page was updated",
     "detailSkipped": "Skipped without error",
     "detailNone": "No extra details",
-    "noItemsMatch": "No items match the current filter."
+    "noItemsMatch": "No items match the current filter.",
+    "filter": {
+      "all": "All",
+      "created": "Created",
+      "skipped": "Skipped",
+      "failed": "Failed"
+    }
   },
   "status": {
     "running": "Running",

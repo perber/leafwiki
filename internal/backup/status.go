@@ -38,6 +38,17 @@ func (s *Status) SetNeedsIntervention(details string) {
 	s.LastError = details
 }
 
+// ClearIntervention clears any stale error/conflict state, without touching
+// LastBackupAt (unlike SetSuccess — a pull is not a backup, so it must not be
+// reported as one).
+func (s *Status) ClearIntervention() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.LastError = ""
+	s.NeedsIntervention = false
+	s.ConflictDetails = ""
+}
+
 func (s *Status) Snapshot() StatusSnapshot {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

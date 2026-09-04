@@ -6,8 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	httpinternal "github.com/perber/wiki/internal/http"
-	authmw "github.com/perber/wiki/internal/http/middleware/auth"
-	"github.com/perber/wiki/internal/http/middleware/security"
 )
 
 // Routes is the RouteRegistrar for the links domain.
@@ -35,24 +33,10 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 
 // RegisterRoutes implements RouteRegistrar.
 func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
-	opts := ctx.Opts
-
-	if opts.PublicAccess {
-		pub := ctx.Base.Group("/api")
-		pub.GET("/pages/:id/links", r.handleGetLinkStatus)
-	}
-
-	authGroup := ctx.Base.Group("/api")
-	authGroup.Use(
-		authmw.InjectPublicEditor(opts.AuthDisabled),
-		authmw.RequireAuth(r.authService, ctx.AuthCookies, opts.AuthDisabled),
-		security.CSRFMiddleware(ctx.CSRFCookie),
-	)
-
-	if !opts.PublicAccess {
-		authGroup.GET("/pages/:id/links", r.handleGetLinkStatus)
-		authGroup.GET("/links/broken", r.handleGetBrokenLinks)
-	}
+	// Registered once, gated per request so this read can flip between
+	// authenticated-only and public without a restart (see APIReadGroup).
+	readGroup := ctx.APIReadGroup(r.authService)
+	readGroup.GET("/pages/:id/links", r.handleGetLinkStatus)
 }
 
 // ─── Handlers ───────────────────────────────────────────────────────────────

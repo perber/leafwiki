@@ -81,6 +81,12 @@ vi.mock('@codemirror/commands', () => ({
   historyField: {},
   redo: vi.fn(() => false),
   undo: vi.fn(() => false),
+  indentLess: vi.fn(() => true),
+  insertTab: vi.fn(() => true),
+}))
+
+vi.mock('@codemirror/language', () => ({
+  indentUnit: { of: () => ({}) },
 }))
 
 vi.mock('@codemirror/view', () => ({

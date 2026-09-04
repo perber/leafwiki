@@ -2,6 +2,7 @@ import { useConfigStore } from '@/stores/config'
 import { useSessionStore } from '@/stores/session'
 import { useTranslation } from 'react-i18next'
 import { useSetTitle } from '../../viewer/setTitle'
+import { AvatarPanel } from './AvatarPanel'
 import { ChangeOwnPasswordPanel } from './ChangeOwnPasswordPanel'
 import { PreferencesPanel } from './PreferencesPanel'
 import { TotpPanel } from './TotpPanel'
@@ -16,6 +17,16 @@ export default function AccountSettings() {
   return (
     <div className="settings">
       <h1 className="settings__title">{t('account.pageTitle')}</h1>
+      <div className="settings__section">
+        <h2 className="settings__section-title">
+          {t('account.avatar.sectionTitle')}
+        </h2>
+        <p className="settings__section-description">
+          {t('account.avatar.sectionDescription')}
+        </p>
+        <AvatarPanel />
+      </div>
+
       <div className="settings__section">
         <h2 className="settings__section-title">
           {t('account.passwordSectionTitle')}

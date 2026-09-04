@@ -17,6 +17,7 @@ vi.mock('@/lib/api/config', () => ({
 
 const baseConfig = {
   publicAccess: false,
+  publicAccessEnvManaged: false,
   hideLinkMetadataSection: false,
   authDisabled: false,
   maxAssetUploadSizeBytes: 1000,

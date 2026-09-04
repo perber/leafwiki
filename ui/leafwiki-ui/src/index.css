@@ -1799,7 +1799,7 @@
      lines as the pane narrows during the collapse transition, which reads as
      jumbled reflow rather than a clean shrink. */
   .page-viewer__toc-panel-entry {
-    @apply text-interface-text/70 hover:text-interface-text block w-full cursor-pointer overflow-hidden py-0.5 pr-3 text-left text-sm leading-snug text-ellipsis whitespace-nowrap transition-colors;
+    @apply text-interface-text/70 hover:text-interface-text block w-full cursor-pointer overflow-hidden py-0.5 pr-3 text-left text-sm leading-snug text-ellipsis whitespace-nowrap no-underline transition-colors;
     background: none;
     border: none;
   }
@@ -2306,7 +2306,7 @@
   }
 
   .table-wrapper table {
-    @apply w-full border-collapse;
+    @apply w-fit max-w-full border-collapse;
   }
 
   .table-wrapper tbody tr:nth-child(odd) {
@@ -2948,6 +2948,18 @@
     @apply text-muted mt-1 text-xs;
   }
 
+  .settings__status-line {
+    @apply text-interface-text mb-3 flex items-center gap-2 text-sm;
+  }
+
+  .settings__status-icon {
+    @apply text-muted h-4 w-4 shrink-0;
+  }
+
+  .settings__notice {
+    @apply border-surface-border bg-surface-alt text-muted flex flex-col gap-1 rounded-md border p-3 text-sm;
+  }
+
   .settings__actions {
     @apply flex justify-end gap-2;
   }
@@ -3541,7 +3553,7 @@
     position: relative;
   }
 
-  main article .anchor .headline-anchor span svg {
+  main article .anchor .headline-anchor .headline-anchor__icon svg {
     @apply text-headline-anchor-icon;
   }
 
@@ -3555,15 +3567,19 @@
     @apply relative no-underline;
   }
 
-  #markdown-preview-container .anchor .headline-anchor span svg {
+  #markdown-preview-container
+    .anchor
+    .headline-anchor
+    .headline-anchor__icon
+    svg {
     @apply hidden;
   }
 
-  main article .anchor .headline-anchor span {
+  main article .anchor .headline-anchor .headline-anchor__icon {
     @apply absolute top-1/2 -left-7 -translate-y-1/2 opacity-0 transition-opacity duration-200;
   }
 
-  main article .anchor .headline-anchor:hover span {
+  main article .anchor .headline-anchor:hover .headline-anchor__icon {
     @apply opacity-100;
   }
 }

@@ -1250,6 +1250,50 @@ test.describe('Authenticated', () => {
       .toEqual(desiredOrder);
   });
 
+  test('section-title-toggles-only-on-an-active-unmodified-click', async ({ page }) => {
+    const stamp = Date.now();
+    const sectionTitle = `Section Title Toggle ${stamp}`;
+    const sectionSlug = `section-title-toggle-${stamp}`;
+
+    await createTopLevelNode(page, {
+      title: sectionTitle,
+      slug: sectionSlug,
+      kind: 'section',
+    });
+    await page.reload();
+    await createChildPagesByPath(page, {
+      parentPath: sectionSlug,
+      titles: [`Section Child ${stamp}`],
+    });
+    await page.reload();
+
+    const treeView = new TreeView(page);
+    await treeView.expectNodeExpanded(sectionTitle, false);
+
+    // Navigation to an inactive section still uses PageViewer's automatic openNode.
+    await treeView.clickNodeTitle(sectionTitle);
+    await expect(page).toHaveURL(new RegExp(`/${sectionSlug}$`));
+    await treeView.expectNodeExpanded(sectionTitle, true);
+
+    await treeView.clickNodeTitle(sectionTitle);
+    await treeView.expectNodeExpanded(sectionTitle, false);
+
+    await treeView.clickNodeChevron(sectionTitle);
+    await treeView.expectNodeExpanded(sectionTitle, true);
+    await treeView.clickNodeChevron(sectionTitle);
+    await treeView.expectNodeExpanded(sectionTitle, false);
+    await treeView.clickNodeTitle(sectionTitle);
+    await treeView.expectNodeExpanded(sectionTitle, true);
+
+    for (const modifier of ['Control', 'Meta', 'Shift', 'Alt'] as const) {
+      await treeView.clickNodeTitle(sectionTitle, { modifiers: [modifier] });
+      await treeView.expectNodeExpanded(sectionTitle, true);
+    }
+
+    await treeView.clickNodeTitle(sectionTitle, { button: 'middle' });
+    await treeView.expectNodeExpanded(sectionTitle, true);
+  });
+
   test('copy-markdown-code-block', async ({ page }) => {
     const title = `Copy Code Block ${Date.now()}`;
     const viewPage = await createPageAndOpenViewer(page, title);
@@ -1495,6 +1539,35 @@ Target content`;
         timeout: 5000,
       })
       .toBe('#你好-世界');
+  });
+
+  test('inline code inside a heading stays visible in the viewer', async ({ page }) => {
+    const timestamp = Date.now();
+    const slug = `heading-inline-code-${timestamp}`;
+    const title = `Heading Inline Code ${timestamp}`;
+    const content = `## Config for \`server.port\` value
+
+Body text.`;
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    const headingCode = page.locator('article h2 code.inline-code');
+    await headingCode.waitFor({ state: 'visible' });
+    await test.expect(headingCode).toHaveText('server.port');
+
+    // Regression: an over-broad `.headline-anchor span` rule used to pull the
+    // inline-code wrapper out of flow (position: absolute; opacity: 0) so the
+    // code only flashed into view — mispositioned — while hovering the heading.
+    const styles = await headingCode.evaluate((el) => {
+      const wrapper = el.closest('.markdown-inline-code') as HTMLElement;
+      const computed = window.getComputedStyle(wrapper);
+      return { opacity: computed.opacity, position: computed.position };
+    });
+    test.expect(styles.opacity).toBe('1');
+    test.expect(styles.position).not.toBe('absolute');
   });
 
   test('headline hash navigation keeps target below sticky toc', async ({ page }) => {

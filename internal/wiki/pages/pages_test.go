@@ -3274,6 +3274,64 @@ func TestApplyPageRefactorUseCase_Move_RewritesLinksInSubPages(t *testing.T) {
 	}
 }
 
+func TestApplyPageRefactorUseCase_Move_HonorsRequestedPosition(t *testing.T) {
+	deps := newTestDeps(t)
+	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default(), nil)
+	applyUC := pages.NewApplyPageRefactorUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default(), nil)
+
+	// Structure:
+	//   /target        (destination parent, already has two children)
+	//   /target/alpha
+	//   /target/beta
+	//   /moved         (page to be dropped between alpha and beta)
+	target, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Target", Slug: "target", Kind: pageKind(),
+	})
+	_, _ = createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", ParentID: &target.Page.ID, Title: "Alpha", Slug: "alpha", Kind: pageKind(),
+	})
+	_, _ = createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", ParentID: &target.Page.ID, Title: "Beta", Slug: "beta", Kind: pageKind(),
+	})
+	moved, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+		UserID: "system", Title: "Moved", Slug: "moved", Kind: pageKind(),
+	})
+
+	// Drop /moved at index 1, i.e. between alpha (0) and beta (1).
+	position := 1
+	_, err := applyUC.Execute(context.Background(), pages.RefactorApplyInput{
+		UserID:  "system",
+		Version: moved.Page.Version(),
+		RefactorPreviewInput: pages.RefactorPreviewInput{
+			PageID:      moved.Page.ID,
+			Kind:        pages.RefactorKindMove,
+			NewParentID: &target.Page.ID,
+		},
+		Position: &position,
+	})
+	if err != nil {
+		t.Fatalf("ApplyPageRefactor(move with position) failed: %v", err)
+	}
+
+	targetNode, err := deps.tree.FindPageByID(target.Page.ID)
+	if err != nil {
+		t.Fatalf("FindPageByID(target) failed: %v", err)
+	}
+	var order []string
+	for _, child := range targetNode.Children {
+		order = append(order, child.Slug)
+	}
+	want := []string{"alpha", "moved", "beta"}
+	if len(order) != len(want) {
+		t.Fatalf("children order = %v, want %v", order, want)
+	}
+	for i := range want {
+		if order[i] != want[i] {
+			t.Fatalf("children order = %v, want %v", order, want)
+		}
+	}
+}
+
 func TestUpdatePageUseCase_EmitsSuccessMetrics(t *testing.T) {
 	deps := newTestDeps(t)
 	metrics := httpmetrics.NewHTTPMetrics("test")

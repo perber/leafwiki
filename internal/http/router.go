@@ -18,6 +18,7 @@ import (
 	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/http/middleware/maintenance"
 	"github.com/perber/wiki/internal/http/middleware/security"
+	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/restore"
 )
 
@@ -90,7 +91,10 @@ type HTTPRemoteUserConfig struct {
 
 // RouterOptions holds global HTTP server configuration shared across all domains.
 type RouterOptions struct {
-	PublicAccess            bool                     // Whether the wiki allows public read access
+	// PublicAccess is the current "public mode" state (anonymous read access to
+	// every page), read per request so it can be toggled at runtime with no
+	// restart. nil is treated as a fixed-false provider. See internal/publicaccess.
+	PublicAccess            publicaccess.Provider
 	EditorLimit             int                      // Max admin+editor users allowed; 0 = unlimited
 	InjectCodeInHeader      string                   // Raw HTML/JS code to inject into the <head> tag
 	CustomStylesheet        string                   // Path to a custom CSS file (resolved by wiki before passing)
@@ -105,7 +109,9 @@ type RouterOptions struct {
 	EnableLinkRefactor      bool                     // Whether the link refactoring feature is enabled in the frontend
 	EnableAPIKeyManagement  bool                     // Whether the experimental API key management feature is enabled
 	Metrics                 *httpmetrics.HTTPMetrics // Optional Prometheus HTTP metrics collector; nil disables request instrumentation
-	GitBackupEnabled        bool                     // Whether git backup is enabled (surfaced to admin UI via /api/config)
+	GitBackupEnabled        bool                     // Whether git backup is currently running (surfaced to admin UI via /api/config)
+	GitBackupEnvManaged     bool                     // Whether git backup is configured via flags/env (settings UI is status-only); surfaced via /api/config
+	GitBackupConfigured     bool                     // Whether git backup is set up at all (running, env-managed, booting, or boot-failed); drives the header health indicator
 	SnapshotEnabled         bool                     // Whether full-backup (snapshot) is enabled (surfaced to admin UI via /api/config)
 	SMTPEnabled             bool                     // Whether SMTP (password reset / user invite email) is configured (surfaced to UI via /api/config)
 	TOTPAvailable           bool                     // Whether a TOTP encryption key is configured, i.e. TOTP self-service can be offered (surfaced to UI via /api/config)
@@ -137,6 +143,10 @@ type FrontendConfig struct {
 func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts RouterOptions) *gin.Engine {
 	if opts.MaxAssetUploadSizeBytes <= 0 {
 		opts.MaxAssetUploadSizeBytes = assets.DefaultMaxUploadSizeBytes
+	}
+
+	if opts.PublicAccess == nil {
+		opts.PublicAccess = publicaccess.Fixed(false)
 	}
 
 	if Environment == "production" {

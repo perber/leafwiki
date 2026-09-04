@@ -11,8 +11,10 @@ import (
 // UserSettingsPatch carries only the fields a caller wants to change —
 // nil fields are left untouched by Update.
 type UserSettingsPatch struct {
-	Language *string
-	AutoSave *bool
+	Language   *string
+	AutoSave   *bool
+	DateFormat *string
+	TimeFormat *string
 }
 
 type UserSettingsService struct {
@@ -53,9 +55,17 @@ func (s *UserSettingsService) Get(userID string) (*UserSettings, error) {
 // so two concurrent updates for the same user can't race and silently drop
 // one of the two changes.
 func (s *UserSettingsService) Update(userID string, patch UserSettingsPatch) (*UserSettings, error) {
+	ve := sharederrors.NewValidationErrors()
 	if patch.Language != nil && !IsAllowedLanguage(*patch.Language) {
-		ve := sharederrors.NewValidationErrors()
 		ve.Add("language", fmt.Sprintf("Language must be one of: %s", strings.Join(AllowedLanguages(), ", ")))
+	}
+	if patch.DateFormat != nil && !IsAllowedDateFormat(*patch.DateFormat) {
+		ve.Add("dateFormat", fmt.Sprintf("Date format must be one of: %s", strings.Join(AllowedDateFormats(), ", ")))
+	}
+	if patch.TimeFormat != nil && !IsAllowedTimeFormat(*patch.TimeFormat) {
+		ve.Add("timeFormat", fmt.Sprintf("Time format must be one of: %s", strings.Join(AllowedTimeFormats(), ", ")))
+	}
+	if ve.HasErrors() {
 		return nil, ve
 	}
 
@@ -65,6 +75,12 @@ func (s *UserSettingsService) Update(userID string, patch UserSettingsPatch) (*U
 		}
 		if patch.AutoSave != nil {
 			current.AutoSave = *patch.AutoSave
+		}
+		if patch.DateFormat != nil {
+			current.DateFormat = *patch.DateFormat
+		}
+		if patch.TimeFormat != nil {
+			current.TimeFormat = *patch.TimeFormat
 		}
 		current.UpdatedAt = time.Now().UTC()
 	})

@@ -8,14 +8,18 @@ import {
 import { FavoritesSection } from '@/features/favorites/FavoritesSection'
 import { SidebarAccordionSection } from '@/features/sidebar/SidebarAccordionSection'
 import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
+import { ApiLocalizedError, mapApiError } from '@/lib/api/errors'
+import { triggerPull } from '@/lib/api/backup'
 import { NODE_KIND_PAGE, NODE_KIND_SECTION } from '@/lib/api/pages'
 import { DIALOG_ADD_PAGE, DIALOG_SORT_PAGES } from '@/lib/registries'
 import { buildViewUrl } from '@/lib/routePath'
 import { useAppMode } from '@/lib/useAppMode'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
 import { toWikiLookupPath } from '@/lib/wikiPath'
+import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useFavoritesStore } from '@/stores/favorites'
+import { useResyncStore } from '@/stores/resync'
 import { useSessionStore } from '@/stores/session'
 import { useSidebarPanelsStore } from '@/stores/sidebarPanels'
 import { useTreeStore } from '@/stores/tree'
@@ -25,13 +29,16 @@ import {
   FilePlus,
   FolderPlus,
   List,
+  Loader2,
   MoreHorizontal,
   Pin,
+  RefreshCw,
   Star,
 } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router'
+import { toast } from 'sonner'
 import { usePageEditorStore } from '../editor/pageEditorStore'
 import { PinnedSection } from './PinnedSection'
 import { TreeDndProvider } from './TreeDnd'
@@ -59,12 +66,16 @@ export default function TreeView() {
   const pinnedPages = useTreeStore((s) => s.pinnedPages)
   const hasPinned = pinnedPages.length > 0
   const favoritePageIds = useFavoritesStore((s) => s.favoritePageIds)
-  const isLoggedIn = useSessionStore((s) => s.user !== null)
+  const user = useSessionStore((s) => s.user)
+  const isLoggedIn = user !== null
+  const isAdmin = user?.role === 'admin'
+  const gitBackupEnabled = useConfigStore((s) => s.gitBackupEnabled)
   const hasFavorites = isLoggedIn && favoritePageIds.size > 0
   const openDialog = useDialogsStore((state) => state.openDialog)
   const readOnlyMode = useIsReadOnly()
   const openSections = useSidebarPanelsStore((s) => s.openSections)
   const setOpenSections = useSidebarPanelsStore((s) => s.setOpenSections)
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     if (!tree || !currentPath) return
@@ -100,6 +111,46 @@ export default function TreeView() {
       reloadTree()
     }
   }, [tree, reloadTree])
+
+  const handleRefresh = async () => {
+    if (!isAdmin) {
+      await reloadTree()
+      return
+    }
+
+    setRefreshing(true)
+    try {
+      if (gitBackupEnabled) {
+        try {
+          await triggerPull()
+        } catch (err) {
+          toast.error(mapApiError(err, t('toolbar.refreshPullFailed')).message)
+        }
+      }
+
+      await useResyncStore.getState().trigger()
+      await reloadTree()
+      // reloadTree() catches its own fetch failures and only records them in
+      // useTreeStore's error state — it never rejects — so a failed final
+      // reload must be detected here rather than via this try's catch.
+      if (useTreeStore.getState().error) {
+        toast.error(t('toolbar.refreshError'))
+      } else {
+        toast.success(t('toolbar.refreshSuccess'))
+      }
+    } catch (err) {
+      if (
+        err instanceof ApiLocalizedError &&
+        err.code === 'resync_already_running'
+      ) {
+        toast.info(t('toolbar.refreshAlreadyRunning'))
+      } else {
+        toast.error(mapApiError(err, t('toolbar.refreshError')).message)
+      }
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   if (loading)
     return (
@@ -153,6 +204,22 @@ export default function TreeView() {
           />
         </>
       )}
+      <TreeViewActionButton
+        actionName="refresh"
+        icon={
+          refreshing ? (
+            <Loader2
+              className="tree-view__action-icon animate-spin"
+              size={18}
+            />
+          ) : (
+            <RefreshCw className="tree-view__action-icon" size={18} />
+          )
+        }
+        tooltip={t('toolbar.refresh')}
+        onClick={handleRefresh}
+        disabled={refreshing}
+      />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <TreeViewActionButton
@@ -187,7 +254,7 @@ export default function TreeView() {
               data-testid="tree-view-action-button-sort"
             >
               <List size={15} />
-              Sort pages
+              {t('toolbar.sortPages')}
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>

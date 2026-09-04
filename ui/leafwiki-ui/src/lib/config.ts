@@ -22,6 +22,18 @@ export const API_BASE_URL = (BASE_PATH ? `${BASE_PATH}` : '').replace(
 
 export const DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024
 
+// Mirrors internal/avatar.MaxUploadSize / AllowedExts() — used only until
+// /api/config's maxAvatarUploadSizeBytes/avatarAllowedExts load, or if that
+// fetch fails.
+export const DEFAULT_MAX_AVATAR_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
+export const DEFAULT_AVATAR_ALLOWED_EXTS = [
+  '.gif',
+  '.jpeg',
+  '.jpg',
+  '.png',
+  '.webp',
+]
+
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) {
     return `${bytes} B`

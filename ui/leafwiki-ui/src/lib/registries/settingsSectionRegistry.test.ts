@@ -10,6 +10,7 @@ const baseCtx: SettingsSectionContext = {
   role: 'admin',
   authDisabled: false,
   gitBackupEnabled: false,
+  gitBackupEnvManaged: false,
   snapshotEnabled: false,
   enableApiKeyManagement: false,
   totpAvailable: false,
@@ -116,13 +117,17 @@ describe('isSectionVisible', () => {
 })
 
 describe('settingsSections gating (regression for the pre-registry backup/snapshots URL-bypass gap)', () => {
-  it('gates backup behind gitBackupEnabled', () => {
+  it('shows backup to admins whether or not a backup is configured (form vs. status-only is decided inside the section)', () => {
     const backup = settingsSections.find((s) => s.id === 'backup')!
     expect(
       isSectionVisible(backup, { ...baseCtx, gitBackupEnabled: false }),
-    ).toBe(false)
+    ).toBe(true)
     expect(
-      isSectionVisible(backup, { ...baseCtx, gitBackupEnabled: true }),
+      isSectionVisible(backup, {
+        ...baseCtx,
+        gitBackupEnabled: true,
+        gitBackupEnvManaged: true,
+      }),
     ).toBe(true)
   })
 
@@ -134,6 +139,17 @@ describe('settingsSections gating (regression for the pre-registry backup/snapsh
     expect(
       isSectionVisible(snapshots, { ...baseCtx, snapshotEnabled: true }),
     ).toBe(true)
+  })
+
+  it('shows public-access to admins and hides it from editors, with no feature flag gate', () => {
+    const publicAccess = settingsSections.find((s) => s.id === 'public-access')!
+    expect(publicAccess.isEnabled).toBeUndefined()
+    expect(isSectionVisible(publicAccess, { ...baseCtx, role: 'admin' })).toBe(
+      true,
+    )
+    expect(isSectionVisible(publicAccess, { ...baseCtx, role: 'editor' })).toBe(
+      false,
+    )
   })
 
   it('gates api-keys behind enableApiKeyManagement', () => {
@@ -172,7 +188,6 @@ describe('settingsSections gating (regression for the pre-registry backup/snapsh
       'backup',
       'snapshots',
       'importer',
-      'maintenance',
     ]
     for (const id of adminOnlyIds) {
       const s = settingsSections.find((sec) => sec.id === id)!

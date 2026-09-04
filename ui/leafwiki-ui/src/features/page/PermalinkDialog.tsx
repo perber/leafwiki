@@ -5,7 +5,7 @@ import type { Page } from '@/lib/api/pages'
 import { DIALOG_PAGE_PERMALINK } from '@/lib/registries'
 import { buildPermalinkPath, withBasePath } from '@/lib/routePath'
 import copy from 'copy-to-clipboard'
-import { Copy, ExternalLink } from 'lucide-react'
+import { Copy, ExternalLink, Lock } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -80,6 +80,19 @@ export function PermalinkDialog({ page }: PermalinkDialogProps) {
               {t('permalinkDialog.openLink')}
             </a>
           </Button>
+        </div>
+        <p
+          className="text-muted-foreground text-sm"
+          data-testid="permalink-dialog-purpose-note"
+        >
+          {t('permalinkDialog.purposeNote')}
+        </p>
+        <div
+          className="flex items-start gap-2 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+          data-testid="permalink-dialog-access-note"
+        >
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{t('permalinkDialog.accessNote')}</span>
         </div>
       </div>
     </BaseDialog>

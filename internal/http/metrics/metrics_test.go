@@ -3,6 +3,7 @@ package metrics
 import (
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -62,6 +63,27 @@ func TestHTTPMetrics_ExportsBuildInfoWithVersionLabel(t *testing.T) {
 	expected := `leafwiki_build_info{version="v0.12.0"} 1`
 	if !strings.Contains(body, expected) {
 		t.Fatalf("expected metrics output to contain %q, got: %s", expected, body)
+	}
+}
+
+func TestHTTPMetrics_ExportsGoRuntimeAndProcessMetrics(t *testing.T) {
+	metrics := NewHTTPMetrics("test")
+
+	body := getMetricsBody(t, metrics.HTTPHandler())
+
+	for _, want := range []string{"go_goroutines", "go_gc_duration_seconds", "go_memstats_alloc_bytes"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected Go runtime metric %q in /metrics output, got: %s", want, body)
+		}
+	}
+
+	// The process collector reads /proc and only emits on Linux.
+	if runtime.GOOS == "linux" {
+		for _, want := range []string{"process_resident_memory_bytes", "process_cpu_seconds_total", "process_open_fds"} {
+			if !strings.Contains(body, want) {
+				t.Fatalf("expected process metric %q in /metrics output, got: %s", want, body)
+			}
+		}
 	}
 }
 

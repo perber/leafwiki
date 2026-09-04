@@ -168,6 +168,34 @@ func TestWiki_TriggerResyncAsync_EmitsMetrics(t *testing.T) {
 	}
 }
 
+func TestWiki_Metrics_ExposesPageAndUserGauges(t *testing.T) {
+	metrics := httpmetrics.NewHTTPMetrics("test")
+	w := createWikiTestInstanceWithMetrics(t, metrics)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	body := metricsBody(t, metrics)
+	// Fresh instance: the seeded admin plus the auto-created welcome page.
+	if !strings.Contains(body, `leafwiki_users{role="admin"} 1`) {
+		t.Fatalf("expected one admin user gauge, got: %s", body)
+	}
+	if !strings.Contains(body, `leafwiki_users{role="editor"} 0`) {
+		t.Fatalf("expected editor role series seeded at zero, got: %s", body)
+	}
+	if !strings.Contains(body, `leafwiki_users_with_totp 0`) {
+		t.Fatalf("expected totp gauge at zero, got: %s", body)
+	}
+	if !strings.Contains(body, `leafwiki_pages{kind="page"} 1`) {
+		t.Fatalf("expected one page (welcome) gauge, got: %s", body)
+	}
+
+	createPageForTest(t, w, "system", nil, "Second", "second", pageNodeKind())
+
+	body = metricsBody(t, metrics)
+	if !strings.Contains(body, `leafwiki_pages{kind="page"} 2`) {
+		t.Fatalf("expected page gauge to reflect the new page, got: %s", body)
+	}
+}
+
 func TestWiki_DeletePage_PurgesRevisionData(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
