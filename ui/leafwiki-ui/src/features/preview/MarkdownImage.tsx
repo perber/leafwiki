@@ -35,7 +35,7 @@ export function MarkdownImage({
   src = '',
   style,
   alt,
-  node,
+  width,
   resolveAssetUrl,
   ...rest
 }: MarkdownImageProps) {
@@ -47,11 +47,6 @@ export function MarkdownImage({
   const [versionedSrc, setVersionedSrc] = useState(() =>
     normalizeImageSrc(resolvedSrc),
   )
-
-  const imageWidth =
-    typeof node?.properties?.width === 'string'
-      ? node.properties.width
-      : undefined
 
   useEffect(() => {
     if (
@@ -81,9 +76,9 @@ export function MarkdownImage({
       style={{
         ...style,
         cursor: 'zoom-in',
-        ...(imageWidth
+        ...(width
           ? {
-              width: imageWidth,
+              width,
               height: 'auto',
             }
           : {}),

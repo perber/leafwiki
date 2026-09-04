@@ -188,9 +188,9 @@ echo two
     expect(container.querySelector('code')?.textContent).toContain('==')
   })
 
-  it('resizes images using the size syntax', () => {
+  it('resizes images using the width syntax', () => {
     const { container } = renderPreview(
-      '![Resizable image](https://example.com/image.png){size=75%}',
+      '![Resizable image](https://example.com/image.png){width=75%}',
     )
 
     const image = container.querySelector('img')
@@ -204,7 +204,7 @@ echo two
 
   it('supports decimal image sizes', () => {
     const { container } = renderPreview(
-      '![Resizable image](https://example.com/image.png){size=37.5%}',
+      '![Resizable image](https://example.com/image.png){width=37.5%}',
     )
 
     const image = container.querySelector('img')
@@ -216,7 +216,7 @@ echo two
     })
   })
 
-  it('does not resize images without a size', () => {
+  it('does not resize images without the width syntax', () => {
     const { container } = renderPreview(
       '![Normal image](https://example.com/image.png)',
     )
@@ -227,59 +227,9 @@ echo two
     expect(image).not.toHaveStyle({ width: '75%' })
   })
 
-  it('does not resize images with an invalid size', () => {
+  it('does not resize images with an invalid width', () => {
     const { container } = renderPreview(
-      '![Image](https://example.com/image.png){size=101%}',
-    )
-
-    const image = container.querySelector('img')
-
-    expect(image).not.toBeNull()
-    expect(image).not.toHaveStyle({ width: '101%' })
-  })
-
-  it('resizes images using the size syntax', () => {
-    const { container } = renderPreview(
-      '![Resizable image](https://example.com/image.png){size=75%}',
-    )
-
-    const image = container.querySelector('img')
-
-    expect(image).not.toBeNull()
-    expect(image).toHaveStyle({
-      width: '75%',
-      height: 'auto',
-    })
-  })
-
-  it('supports decimal image sizes', () => {
-    const { container } = renderPreview(
-      '![Resizable image](https://example.com/image.png){size=37.5%}',
-    )
-
-    const image = container.querySelector('img')
-
-    expect(image).not.toBeNull()
-    expect(image).toHaveStyle({
-      width: '37.5%',
-      height: 'auto',
-    })
-  })
-
-  it('does not resize images without a size', () => {
-    const { container } = renderPreview(
-      '![Normal image](https://example.com/image.png)',
-    )
-
-    const image = container.querySelector('img')
-
-    expect(image).not.toBeNull()
-    expect(image).not.toHaveStyle({ width: '75%' })
-  })
-
-  it('does not resize images with an invalid size', () => {
-    const { container } = renderPreview(
-      '![Image](https://example.com/image.png){size=101%}',
+      '![Image](https://example.com/image.png){width=101%}',
     )
 
     const image = container.querySelector('img')
