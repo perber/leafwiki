@@ -1,0 +1,131 @@
+{
+  "wikiLinkDisambiguation": {
+    "title": "Se encontraron varias páginas",
+    "descriptionPrefix": "Coinciden varias páginas",
+    "descriptionSuffix": ". Elige la que querías."
+  },
+  "slugInput": {
+    "label": "Slug",
+    "placeholder": "Slug de la página",
+    "generateErrorFallback": "Error al generar el slug"
+  },
+  "addPageDialog": {
+    "dateTitleTooltip": "Establecer el título con la fecha de hoy"
+  },
+  "editPageMetadataDialog": {
+    "dialogTitle": "Editar los metadatos de {{item}}",
+    "dialogDescription": "Cambiar los metadatos de {{item}}",
+    "titleLabel": "Título",
+    "titlePlaceholder": "Título de {{item}}",
+    "pathPrefix": "Ruta:",
+    "cancelButton": "Cancelar",
+    "saveButton": "Cambiar",
+    "dateTitleTooltip": "Establecer el título con la fecha de hoy"
+  },
+  "toolbar": {
+    "closeEditorButton": "Cerrar editor",
+    "savePageButton": "Guardar página",
+    "boldTooltip": "Negrita (Ctrl+B)",
+    "italicTooltip": "Cursiva (Ctrl+I)",
+    "strikethroughTooltip": "Tachado",
+    "highlightTooltip": "Resaltado",
+    "linkTooltip": "Enlace (Ctrl+K)",
+    "heading1Tooltip": "Encabezado 1 (Ctrl+Alt+1)",
+    "heading2Tooltip": "Encabezado 2 (Ctrl+Alt+2)",
+    "heading3Tooltip": "Encabezado 3 (Ctrl+Alt+3)",
+    "tableTooltip": "Tabla",
+    "tableSizeSelect": "Seleccionar tamaño",
+    "tableSizeLabel": "{{col}} × {{row}}",
+    "tableInsertAriaLabel": "Insertar tabla de {{col}} x {{row}}",
+    "codeBlockTooltip": "Bloque de Código",
+    "inlineCodeTooltip": "Código en Línea (Ctrl+`)",
+    "imageTooltip": "Imagen / Archivo",
+    "undoTooltip": "Deshacer",
+    "redoTooltip": "Rehacer",
+    "lineWrapEnableTooltip": "Activar ajuste de línea",
+    "lineWrapDisableTooltip": "Desactivar ajuste de línea",
+    "moreOptionsAriaLabel": "Más opciones de formato",
+    "previewSplitTooltip": "Usar vista previa en paralelo",
+    "previewStackedTooltip": "Usar vista previa apilada",
+    "showPreviewTooltip": "Mostrar vista previa",
+    "hidePreviewTooltip": "Ocultar vista previa",
+    "pasteRichTooltip": "Pegar con formato (Ctrl+Shift+V)",
+    "pastePlainTooltip": "Pegar sin formato (Ctrl+V)",
+    "pasteRich": "Pegar con formato",
+    "pastePlain": "Pegar sin formato",
+    "pasteClipboardError": "No se pudo leer el contenido del portapapeles",
+    "strikethrough": "Tachado",
+    "highlight": "Resaltado",
+    "heading1": "Encabezado 1",
+    "heading2": "Encabezado 2",
+    "heading3": "Encabezado 3",
+    "insertTable": "Insertar tabla (3×3)",
+    "lineWrap": "Ajuste de línea",
+    "autoSave": "Autoguardado",
+    "autoSavePaused": "pausado"
+  },
+  "pageEditor": {
+    "savedToast": "Página guardada correctamente",
+    "saveErrorFallback": "Error al guardar la página",
+    "saveAnyway": "Guardar de todos modos",
+    "conflictAgainMessage": "La página se modificó de nuevo mientras se guardaba. Recarga la página y vuelve a aplicar los cambios.",
+    "errorPrefix": "Error: {{error}}",
+    "metadataErrorsBeforeSave": "Corrige los errores de metadatos antes de guardar.",
+    "contentNullFallback": "El contenido actualizado de la página es nulo o indefinido",
+    "unknownErrorFallback": "Se produjo un error desconocido"
+  },
+  "linkInsertDialog": {
+    "dialogTitle": "Insertar Enlace",
+    "displayTextLabel": "Mostrar Texto",
+    "urlLabel": "URL",
+    "textPlaceholder": "Texto del enlace",
+    "urlPlaceholder": "https:// o buscar páginas…",
+    "cancelButton": "Cancelar",
+    "insertButton": "Insertar"
+  },
+  "frontmatterPanel": {
+    "metadataTitle": "Metadatos",
+    "tagsHeading": "Etiquetas",
+    "propertiesHeading": "Propiedades",
+    "removeFieldAriaLabel": "Eliminar campo de frontmatter {{field}}",
+    "addTagPlaceholder": "Añadir etiqueta",
+    "keyPlaceholder": "Clave",
+    "valuePlaceholder": "Valor",
+    "internalFieldsToggle": "Campos internos",
+    "addPropertyButton": "Añadir propiedad",
+    "flatHint": "Por ahora, mantén los campos planos. Si más adelante necesitas metadatos anidados, usa claves con puntos como <code>seo.title</code>.",
+    "unsupportedNotice": "El frontmatter avanzado existente se conserva en segundo plano, pero todavía no se puede editar en esta vista compacta."
+  },
+  "tagInput": {
+    "loading": "Cargando…",
+    "noMatchingTags": "No se encontraron etiquetas coincidentes.",
+    "removeTagAriaLabel": "Eliminar etiqueta {{tag}}"
+  },
+  "markdownEditor": {
+    "editorTab": "Editor",
+    "previewTab": "Vista previa",
+    "resizeAriaLabel": "Cambiar el tamaño de los paneles del editor y la vista previa",
+    "fileTooLarge": "El archivo es demasiado grande. Se permite un máximo de {{maxSize}}.",
+    "uploadedToast": "{{filename}} subido",
+    "uploadErrorFallback": "No se pudo subir {{filename}}"
+  },
+  "autoSave": {
+    "savedToast": "Guardado",
+    "versionConflictToast": "Autoguardado pausado — otro usuario modificó la página. Guarda manualmente para continuar.",
+    "errorFallback": "El autoguardado ha fallado"
+  },
+  "frontmatterValidation": {
+    "tagsWhitespace": "Las etiquetas no deben contener espacios al principio ni al final.",
+    "tagsEmpty": "Las etiquetas no pueden estar vacías.",
+    "tagsUnique": "Las etiquetas deben ser únicas.",
+    "keyEmpty": "La clave de la propiedad no puede estar vacía.",
+    "keyWhitespace": "La clave de la propiedad no debe contener espacios al principio ni al final.",
+    "keyReservedPrefix": "La clave de la propiedad utiliza un prefijo reservado.",
+    "keyReserved": "La clave de la propiedad está reservada.",
+    "keyUnique": "La clave de la propiedad debe ser única.",
+    "valueType": "El valor de la propiedad debe ser una cadena, un número, un valor booleano o una lista plana."
+  },
+  "titleBar": {
+    "dirtyIndicator": "(Cambios)"
+  }
+}
