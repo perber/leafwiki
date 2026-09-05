@@ -1,7 +1,21 @@
 import type { Image, Parent, Root, Text } from 'mdast'
 import { visit } from 'unist-util-visit'
 
-const IMAGE_WIDTH_PATTERN = /^\s*\{width=(\d+(?:\.\d+)?)%\}/
+const IMAGE_WIDTH_PATTERN = /^\s*\{width=([^}]*)\}/
+const IMAGE_WIDTH_VALUE_PATTERN = /^(\d+(?:\.\d+)?)%$/
+
+function consumeTextNode(
+  parent: Parent,
+  index: number,
+  textNode: Text,
+  length: number,
+) {
+  textNode.value = textNode.value.slice(length)
+
+  if (textNode.value.length === 0) {
+    parent.children.splice(index, 1)
+  }
+}
 
 export function remarkImageSize() {
   return (tree: Root) => {
@@ -23,9 +37,15 @@ export function remarkImageSize() {
         return
       }
 
-      textNode.value = textNode.value.slice(match[0].length)
+      consumeTextNode(parent, index + 1, textNode, match[0].length)
 
-      const width = Number(match[1])
+      const widthMatch = match[1].match(IMAGE_WIDTH_VALUE_PATTERN)
+
+      if (!widthMatch) {
+        return
+      }
+
+      const width = Number(widthMatch[1])
 
       if (!Number.isFinite(width) || width <= 0 || width > 100) {
         return
@@ -35,10 +55,6 @@ export function remarkImageSize() {
       node.data.hProperties = {
         ...(node.data.hProperties ?? {}),
         width: `${width}%`,
-      }
-
-      if (textNode.value.length === 0) {
-        parent.children.splice(index + 1, 1)
       }
     })
   }
