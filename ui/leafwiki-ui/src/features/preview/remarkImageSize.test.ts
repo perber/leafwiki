@@ -59,7 +59,7 @@ describe('remarkImageSize', () => {
             type: 'image',
             data: {
               hProperties: {
-                width: width,
+                width,
               },
             },
           },
@@ -107,7 +107,7 @@ describe('remarkImageSize', () => {
   })
 
   it.each(['{width=0%}', '{width=101%}', '{width=200%}'])(
-    'ignores out-of-range width %s',
+    'consumes out-of-range width %s without resizing the image',
     (width) => {
       const tree = imageWithWidth(width)
       const paragraph = getParagraph(tree)
@@ -117,15 +117,12 @@ describe('remarkImageSize', () => {
         type: 'image',
       })
       expect(image).not.toHaveProperty('data')
-      expect(paragraph.children[1]).toMatchObject({
-        type: 'text',
-        value: '',
-      })
+      expect(paragraph.children).toHaveLength(1)
     },
   )
 
   it.each(['{width=-1%}', '{width=abc%}', '{width=75}', '{width=75%%}'])(
-    'ignores invalid width syntax %s',
+    'consumes invalid width syntax %s without resizing the image',
     (width) => {
       const tree = imageWithWidth(width)
       const paragraph = getParagraph(tree)
@@ -135,9 +132,32 @@ describe('remarkImageSize', () => {
         type: 'image',
       })
       expect(image).not.toHaveProperty('data')
+      expect(paragraph.children).toHaveLength(1)
+    },
+  )
+
+  it.each([
+    '{width=0%} caption',
+    '{width=101%} caption',
+    '{width=200%} caption',
+    '{width=-1%} caption',
+    '{width=abc%} caption',
+    '{width=75} caption',
+    '{width=75%%} caption',
+  ])(
+    'consumes an invalid width marker and preserves trailing text: %s',
+    (value) => {
+      const tree = imageWithWidth(value)
+      const paragraph = getParagraph(tree)
+
+      expect(paragraph.children).toHaveLength(2)
+      expect(paragraph.children[0]).toMatchObject({
+        type: 'image',
+      })
+      expect(paragraph.children[0]).not.toHaveProperty('data')
       expect(paragraph.children[1]).toMatchObject({
         type: 'text',
-        value: width,
+        value: ' caption',
       })
     },
   )
