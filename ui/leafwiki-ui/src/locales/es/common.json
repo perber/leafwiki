@@ -1,0 +1,43 @@
+{
+  "sidebar": {
+    "explorerTab": "Explorador",
+    "searchTab": "Buscar"
+  },
+  "errorBoundary": {
+    "heading": "Algo salió mal",
+    "body": "Se produjo un error inesperado. Normalmente, recargar la página lo soluciona.",
+    "reloadButton": "Recargar página",
+    "tryRecoverButton": "Intentar recuperar",
+    "detailsSummary": "Detalles del error"
+  },
+  "page404": {
+    "heading": "Página No Encontrada",
+    "body": "La página que buscas no existe.",
+    "createPrompt": "Crea la página haciendo clic en el botón siguiente.",
+    "createButton": "Crear página"
+  },
+  "unsavedChangesDialog": {
+    "title": "Cambios sin guardar",
+    "description": "Tienes cambios sin guardar. ¿Seguro que quieres salir de esta página? Se perderán los datos sin guardar.",
+    "cancelButton": "Cancelar",
+    "leaveAnywayButton": "Salir de todos modos"
+  },
+  "dialog": {
+    "closeSrOnly": "Cerrar"
+  },
+  "validation": {
+    "failedToast": "La validación ha fallado"
+  },
+  "configLoad": {
+    "fetchErrorFallback": "No se pudo cargar la configuración: {{status}} {{statusText}}",
+    "errorFallback": "No se pudo cargar la configuración"
+  },
+  "language": {
+    "selfName": "Español"
+  },
+  "pagination": {
+    "prev": "← Anterior",
+    "next": "Siguiente →",
+    "pageOf": "Página {{page}} de {{total}}"
+  }
+}

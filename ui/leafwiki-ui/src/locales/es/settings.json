@@ -1,0 +1,52 @@
+{
+  "exit": "Salir de la configuración",
+  "nav": {
+    "title": "Configuración",
+    "account": "Cuenta"
+  },
+  "account": {
+    "pageTitle": "Cuenta",
+    "avatar": {
+      "sectionTitle": "Foto de Perfil",
+      "sectionDescription": "Sube una foto para personalizar tu cuenta.",
+      "currentLabel": "Foto actual:",
+      "uploadButton": "Subir foto",
+      "deleteButton": "Eliminar foto",
+      "hint": "Formatos permitidos: {{exts}}. Tamaño máximo: {{size}}.",
+      "uploadSuccess": "Foto de perfil subida",
+      "uploadFailed": "No se pudo subir la foto de perfil",
+      "deleteSuccess": "Foto de perfil eliminada",
+      "deleteFailed": "No se pudo eliminar la foto de perfil"
+    },
+    "passwordSectionTitle": "Contraseña",
+    "passwordSectionDescription": "Cambia tu contraseña. ¡Asegúrate de recordarla!",
+    "twoFactorSectionTitle": "Autenticación de dos factores",
+    "twoFactorSectionDescription": "Añade una capa adicional de seguridad a tu cuenta.",
+    "preferences": {
+      "sectionTitle": "Preferencias",
+      "sectionDescription": "Preferencias de edición sincronizadas en tus dispositivos.",
+      "autoSaveLabel": "Activar autoguardado",
+      "autoSaveDescription": "Guarda automáticamente tus cambios mientras editas una página.",
+      "savedToast": "Preferencia guardada",
+      "autoSaveToggleError": "No se pudo actualizar el ajuste de autoguardado",
+      "languageLabel": "Idioma",
+      "languageChangeError": "No se pudo actualizar el ajuste de idioma",
+      "dateFormatLabel": "Formato de fecha",
+      "dateFormatChangeError": "No se pudo actualizar el ajuste de formato de fecha",
+      "timeFormatLabel": "Formato de hora",
+      "timeFormatChangeError": "No se pudo actualizar el ajuste de formato de hora",
+      "dateFormat": {
+        "locale": "Seguir el idioma",
+        "iso": "2026-08-27",
+        "dmyDot": "27.08.2026",
+        "mdySlash": "08/27/2026",
+        "dmySlash": "27/08/2026"
+      },
+      "timeFormat": {
+        "locale": "Seguir el idioma",
+        "h24": "24 horas (14:30)",
+        "h12": "12 horas (2:30 p.m.)"
+      }
+    }
+  }
+}

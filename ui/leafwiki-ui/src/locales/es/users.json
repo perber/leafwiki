@@ -1,0 +1,124 @@
+{
+  "pageTitle": "Gestión de Usuarios",
+  "loading": "Cargando usuarios...",
+  "loadErrorFallback": "Error al cargar los usuarios",
+  "noUsersFound": "No se encontraron usuarios.",
+  "columns": {
+    "username": "Nombre de usuario",
+    "email": "Correo electrónico",
+    "role": "Rol",
+    "actions": "Acciones"
+  },
+  "actions": {
+    "edit": "Editar",
+    "new": "Nuevo usuario",
+    "changePassword": "Cambiar contraseña",
+    "delete": "Eliminar"
+  },
+  "invite": {
+    "pendingPill": "Invitación pendiente",
+    "resendAction": "Reenviar invitación",
+    "resending": "Reenviando...",
+    "resendSuccessToast": "Correo de invitación reenviado",
+    "resendErrorFallback": "Error al reenviar la invitación",
+    "emailNotSentWarning": "Usuario creado, pero no se pudo enviar el correo de invitación. Usa \"Reenviar invitación\" para intentarlo de nuevo."
+  },
+  "validation": {
+    "passwordTooShort": "La contraseña debe tener al menos 8 caracteres",
+    "passwordsDoNotMatch": "Las contraseñas no coinciden"
+  },
+  "changePasswordDialog": {
+    "title": "Cambiar contraseña de {{username}}",
+    "description": "Establece una nueva contraseña para el usuario.",
+    "cancel": "Cancelar",
+    "update": "Actualizar Contraseña",
+    "updating": "Actualizando...",
+    "newPasswordLabel": "Nueva Contraseña",
+    "confirmPasswordLabel": "Confirmar Contraseña",
+    "successToast": "Contraseña cambiada correctamente",
+    "errorFallback": "Error al actualizar la contraseña"
+  },
+  "userForm": {
+    "editTitle": "Editar Usuario",
+    "newTitle": "Nuevo Usuario",
+    "editDescription": "Editar los datos del usuario",
+    "newDescription": "Crear un nuevo usuario",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "successToast": "Usuario guardado correctamente",
+    "errorFallback": "Error al guardar el usuario",
+    "usernameLabel": "nombre de usuario",
+    "usernamePlaceholder": "nombre de usuario",
+    "emailLabel": "correo electrónico",
+    "emailPlaceholder": "correo electrónico",
+    "passwordLabel": "contraseña",
+    "passwordPlaceholder": "contraseña",
+    "rolePlaceholder": "Selecciona un rol",
+    "roleViewer": "Lector",
+    "roleEditor": "Editor",
+    "roleAdmin": "Administrador",
+    "modeSetPassword": "Establecer la contraseña ahora",
+    "modeInvite": "Enviar correo de invitación",
+    "inviteSuccessToast": "Invitación enviada correctamente"
+  },
+  "deleteUser": {
+    "title": "¿Eliminar usuario?",
+    "description": "¿Seguro que quieres eliminar este usuario? Esta acción no se puede deshacer.",
+    "cancel": "Cancelar",
+    "deleting": "Eliminando...",
+    "delete": "Eliminar",
+    "successToast": "Usuario eliminado correctamente",
+    "errorFallback": "No se pudo eliminar el usuario. Inténtalo de nuevo.",
+    "body": "El usuario <strong>{{username}}</strong> se eliminará permanentemente del sistema."
+  },
+  "changeOwnPassword": {
+    "title": "Cambiar tu contraseña",
+    "description": "Cambia tu contraseña. ¡Asegúrate de recordarla!",
+    "cancel": "Cancelar",
+    "saving": "Guardando...",
+    "save": "Guardar",
+    "successToast": "Contraseña cambiada correctamente",
+    "errorFallback": "Error al actualizar la contraseña",
+    "oldPasswordLabel": "Contraseña Anterior",
+    "newPasswordLabel": "Nueva Contraseña",
+    "confirmPasswordLabel": "Confirmar Contraseña"
+  },
+  "totp": {
+    "column": "2FA",
+    "enabled": "Activada",
+    "disabled": "Desactivada",
+    "menuEnable": "Activar autenticación de dos factores",
+    "menuDisable": "Desactivar autenticación de dos factores",
+    "cancel": "Cancelar",
+    "setup": {
+      "passwordStepTitle": "Activar autenticación de dos factores",
+      "passwordStepDescription": "Confirma tu contraseña actual para iniciar la configuración.",
+      "passwordPlaceholder": "Contraseña actual",
+      "continue": "Continuar",
+      "continuing": "Comprobando...",
+      "verifyStepTitle": "Escanea el código QR",
+      "verifyStepDescription": "Escanea este código QR con tu aplicación de autenticación o introduce la clave manualmente. Después, introduce el código de 6 dígitos que muestra.",
+      "manualKeyLabel": "Clave para introducir manualmente",
+      "codePlaceholder": "Código de 6 dígitos",
+      "enable": "Activar",
+      "enabling": "Verificando...",
+      "recoveryStepTitle": "Guarda tus códigos de recuperación",
+      "recoveryStepDescription": "Guarda estos códigos en un lugar seguro. Cada uno se puede usar una vez para iniciar sesión si pierdes el acceso a tu aplicación de autenticación. No volverán a mostrarse.",
+      "copyRecoveryCodes": "Copiar códigos",
+      "recoveryCodesCopied": "Códigos de recuperación copiados al portapapeles",
+      "done": "Listo",
+      "successToast": "Autenticación de dos factores activada",
+      "errorFallback": "No se pudo activar la autenticación de dos factores"
+    },
+    "disable": {
+      "title": "Desactivar autenticación de dos factores",
+      "description": "Confirma tu contraseña actual y un código de tu aplicación de autenticación o un código de recuperación.",
+      "passwordPlaceholder": "Contraseña Actual",
+      "codePlaceholder": "Código o código de recuperación",
+      "confirm": "Desactivar",
+      "disabling": "Desactivando...",
+      "successToast": "Autenticación de dos factores desactivada",
+      "errorFallback": "No se pudo desactivar la autenticación de dos factores"
+    }
+  }
+}

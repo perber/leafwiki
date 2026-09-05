@@ -1,0 +1,33 @@
+{
+  "manager": {
+    "title": "Recursos",
+    "fileTooLarge": "El archivo es demasiado grande. Se permite un máximo de {{maxSize}}.",
+    "uploadErrorFallback": "No se pudo subir el recurso",
+    "dropzoneText": "Suelta los archivos aquí o haz clic para subirlos",
+    "maxFileSize": "Tamaño máximo del archivo: {{maxSize}}",
+    "uploading_one": "Subiendo {{count}} archivo…",
+    "uploading_other": "Subiendo {{count}} archivos…",
+    "loading": "Cargando recursos…",
+    "empty": "Aún no hay recursos",
+    "tip": "Consejo: Haz doble clic para insertar la anotación predeterminada. También puedes añadir imágenes como enlaces; el audio y el vídeo tienen un botón para insertar el reproductor."
+  },
+  "item": {
+    "renameSuccess": "Recurso renombrado",
+    "renameErrorFallback": "No se pudo renombrar",
+    "deleteSuccess": "Recurso eliminado",
+    "deleteErrorFallback": "No se pudo eliminar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "insertImageLink": "Insertar enlace de imagen",
+    "insertAudioPlayer": "Insertar reproductor de audio",
+    "insertVideoPlayer": "Insertar reproductor de vídeo",
+    "insertImage": "Insertar imagen",
+    "insertLink": "Insertar enlace",
+    "rename": "Renombrar",
+    "delete": "Eliminar"
+  },
+  "dialog": {
+    "title": "Gestor de Recursos",
+    "description": "Sube o selecciona un recurso para insertarlo en la página."
+  }
+}
