@@ -2,11 +2,12 @@ import { DIALOG_IMAGE_PREVIEW } from '@/lib/registries'
 import { withBasePath } from '@/lib/routePath'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useEffect, useMemo, useState } from 'react'
+import type { ExtraProps } from 'react-markdown'
 
-type Props = React.ImgHTMLAttributes<HTMLImageElement> & { node?: unknown }
-type MarkdownImageProps = Omit<Props, 'node'> & {
-  resolveAssetUrl?: (src: string) => string
-}
+type MarkdownImageProps = React.ImgHTMLAttributes<HTMLImageElement> &
+  ExtraProps & {
+    resolveAssetUrl?: (src: string) => string
+  }
 
 function shouldOpenPreview(e: React.MouseEvent<HTMLImageElement>) {
   if (e.button !== 0) return false
@@ -34,11 +35,10 @@ export function MarkdownImage({
   src = '',
   style,
   alt,
-  node,
+  width,
   resolveAssetUrl,
   ...rest
-}: MarkdownImageProps & { node?: unknown }) {
-  void node
+}: MarkdownImageProps) {
   const openDialog = useDialogsStore((s) => s.openDialog)
   const resolvedSrc = useMemo(
     () => resolveAssetUrl?.(src) ?? src,
@@ -76,6 +76,12 @@ export function MarkdownImage({
       style={{
         ...style,
         cursor: 'zoom-in',
+        ...(width
+          ? {
+              width,
+              height: 'auto',
+            }
+          : {}),
       }}
       draggable={false}
       {...rest}

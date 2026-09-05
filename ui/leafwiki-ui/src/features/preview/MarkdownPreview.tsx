@@ -24,7 +24,10 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react'
-import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
+import ReactMarkdown, {
+  defaultUrlTransform,
+  type ExtraProps,
+} from 'react-markdown'
 import { JSX } from 'react/jsx-runtime'
 import rehypeHighlight from 'rehype-highlight'
 import rehypeKatex from 'rehype-katex'
@@ -48,6 +51,7 @@ import { rehypeLineNumber } from './rehypeLineNumber'
 import { rehypeWhitelistStyles } from './rehypeWhitelistStyles'
 import { syntaxHighlightLanguages } from './syntaxHighlightLanguages'
 import { TocDropdownButton } from './TocDropdownButton'
+import { remarkImageSize } from './remarkImageSize'
 
 const schema = {
   ...defaultSchema,
@@ -111,9 +115,7 @@ const WIKILINK_PROTOCOLS = [
   'wikilink-ambiguous:',
 ] as const
 
-type MarkdownNodeProp = {
-  node?: unknown
-}
+type MarkdownNodeProp = ExtraProps
 
 type SemanticAlertKind = 'info' | 'success' | 'warning' | 'error'
 
@@ -323,15 +325,12 @@ export default function MarkdownPreview({
     () => ({
       a: markdownLink,
       img: ({
-        node,
         ...props
       }: MarkdownNodeProp &
-        JSX.IntrinsicAttributes &
         ClassAttributes<HTMLImageElement> &
-        HTMLAttributes<HTMLImageElement>) => {
-        void node
-        return <MarkdownImage resolveAssetUrl={resolveAssetUrl} {...props} />
-      },
+        HTMLAttributes<HTMLImageElement>) => (
+        <MarkdownImage {...props} resolveAssetUrl={resolveAssetUrl} />
+      ),
       audio: ({
         node,
         ...props
@@ -638,6 +637,7 @@ export default function MarkdownPreview({
               [remarkMath, { singleDollarTextMath: false }],
               remarkGfm,
               remarkFlexibleMarkers,
+              remarkImageSize,
             ]}
             rehypePlugins={[
               rehypeRaw,
