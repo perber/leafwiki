@@ -41,65 +41,70 @@ export default function PublicAccessSettings() {
   }
 
   return (
-    <div data-testid="public-access-settings">
-      <h2 className="settings__section-title">{t('sectionTitle')}</h2>
-      <p className="settings__section-description">{t('sectionDescription')}</p>
-
-      <div className="settings__field">
-        <p className="settings__status-line">
-          {publicAccess ? (
-            <Globe className="settings__status-icon" aria-hidden />
-          ) : (
-            <Lock className="settings__status-icon" aria-hidden />
-          )}
-          {publicAccess ? t('statusOn') : t('statusOff')}
+    <div className="settings" data-testid="public-access-settings">
+      <h1 className="settings__title">{t('pageTitle')}</h1>
+      <div className="settings__section">
+        <h2 className="settings__section-title">{t('sectionTitle')}</h2>
+        <p className="settings__section-description">
+          {t('sectionDescription')}
         </p>
 
-        {envManaged ? (
-          <div
-            className="settings__notice"
-            data-testid="public-access-env-managed"
-          >
-            <strong>{t('envManagedTitle')}</strong>
-            <span>{t('envManagedDescription')}</span>
-          </div>
-        ) : publicAccess ? (
-          <Button
-            variant="outline"
-            disabled={saving}
-            onClick={() => void apply(false)}
-            data-testid="public-access-disable"
-          >
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {t('disableButton')}
-          </Button>
-        ) : (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button disabled={saving} data-testid="public-access-enable">
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {t('enableButton')}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>{t('confirmTitle')}</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {t('confirmDescription')}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => void apply(true)}
-                  data-testid="public-access-confirm"
-                >
-                  {t('confirmAction')}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
+        <div className="settings__field">
+          <p className="settings__status-line">
+            {publicAccess ? (
+              <Globe className="settings__status-icon" aria-hidden />
+            ) : (
+              <Lock className="settings__status-icon" aria-hidden />
+            )}
+            {publicAccess ? t('statusOn') : t('statusOff')}
+          </p>
+
+          {envManaged ? (
+            <div
+              className="settings__notice"
+              data-testid="public-access-env-managed"
+            >
+              <strong>{t('envManagedTitle')}</strong>
+              <span>{t('envManagedDescription')}</span>
+            </div>
+          ) : publicAccess ? (
+            <Button
+              variant="outline"
+              disabled={saving}
+              onClick={() => void apply(false)}
+              data-testid="public-access-disable"
+            >
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {t('disableButton')}
+            </Button>
+          ) : (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button disabled={saving} data-testid="public-access-enable">
+                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {t('enableButton')}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t('confirmTitle')}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t('confirmDescription')}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => void apply(true)}
+                    data-testid="public-access-confirm"
+                  >
+                    {t('confirmAction')}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       </div>
     </div>
   )
