@@ -1,0 +1,30 @@
+{
+  "menuLabel": "Enlaces rotos",
+  "pageTitle": "Enlaces rotos",
+  "title": "Enlaces rotos",
+  "description": "Encuentra páginas que enlazan con páginas del wiki que no existen.",
+  "heading": "Páginas que faltan",
+  "sortLabel": "Ordenado alfabéticamente",
+  "linksTo": "enlaza con",
+  "loading": "Cargando enlaces rotos…",
+  "button": {
+    "text": "Actualizar",
+    "refreshing": "Actualizando…"
+  },
+  "summaryCard": {
+    "broken": "Enlaces rotos",
+    "missing": "Páginas que faltan",
+    "affected": "Páginas afectadas"
+  },
+  "groupCard": {
+    "reference": "referencia",
+    "references": "referencias"
+  },
+  "empty": {
+    "title": "No hay enlaces rotos",
+    "description": "Todos los enlaces del wiki apuntan a páginas existentes."
+  },
+  "error": {
+    "loadFailed": "No se pudieron cargar los enlaces rotos."
+  }
+}
