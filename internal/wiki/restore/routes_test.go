@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/branding"
 	coreauth "github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/core/settings"
 	"github.com/perber/wiki/internal/restore"
 	snapshotSvc "github.com/perber/wiki/internal/snapshot"
 	"github.com/perber/wiki/internal/test_utils"
@@ -76,7 +77,7 @@ func newTestManagerWithMaxUploadSize(t *testing.T, maxUploadSizeBytes int64) *re
 		WikiVersion:        "v0.0.0-test",
 		WriteGate:          restore.NewWriteGate(),
 		AuthService:        authService,
-		BrandingService:    brandingService,
+		Reloadables:        []settings.Reloadable{brandingService},
 		TriggerResync:      func() {},
 		MaxUploadSizeBytes: maxUploadSizeBytes,
 	})

@@ -20,58 +20,51 @@ const (
 )
 
 type BrandingService struct {
-	store          *BrandingStore
-	brandingConfig *BrandingConfig
-	mu             sync.RWMutex
+	store *BrandingStore
+	mu    sync.RWMutex
 }
 
 // NewBrandingService creates a new branding service
 func NewBrandingService(storageDir string) (*BrandingService, error) {
-	store := NewBrandingStore(storageDir)
+	store, err := NewBrandingStore(storageDir)
+	if err != nil {
+		return nil, err
+	}
 
 	// Ensure branding assets directory exists
 	assetsDir := store.brandingAssetsDir()
 	if err := os.MkdirAll(assetsDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create branding assets directory: %w", err)
 	}
-	brandingConfig, err := store.Load()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load branding config: %w", err)
-	}
 
 	return &BrandingService{
-		store:          store,
-		brandingConfig: brandingConfig,
+		store: store,
 	}, nil
 }
 
-// Reload re-reads the branding configuration from disk and replaces the
-// in-memory cache. Used after a restore swaps in a different branding.json —
-// without this, GetBranding/UpdateBranding would keep serving the pre-restore
-// config until the process next restarted.
+// Reload re-reads the branding configuration from disk. Used after a restore
+// swaps in a different branding.json — without this, GetBranding/UpdateBranding
+// would keep serving the pre-restore config until the process next restarted.
 func (s *BrandingService) Reload() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	cfg, err := s.store.Load()
-	if err != nil {
-		return fmt.Errorf("failed to reload branding config: %w", err)
-	}
-	s.brandingConfig = cfg
-	return nil
+	return s.store.Reload()
 }
 
 // GetBranding returns the current branding configuration
 func (s *BrandingService) GetBranding() (*BrandingConfigResponse, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.brandingConfig.ToResponse(), nil
+	return s.store.Load().ToResponse(), nil
 }
 
 // UpdateBranding updates the branding configuration
 func (s *BrandingService) UpdateBranding(siteName string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	cfg := s.store.Load()
 
 	// Validate site name
 	ve := sharederrors.NewValidationErrors()
@@ -80,8 +73,8 @@ func (s *BrandingService) UpdateBranding(siteName string) error {
 	switch {
 	case trimmedSiteName == "":
 		ve.Add("siteName", "Site name must not be empty")
-	case len(trimmedSiteName) > s.brandingConfig.BrandingConstraints.MaxSiteNameLength:
-		ve.Add("siteName", fmt.Sprintf("Site name must not exceed %d characters", s.brandingConfig.BrandingConstraints.MaxSiteNameLength))
+	case len(trimmedSiteName) > cfg.BrandingConstraints.MaxSiteNameLength:
+		ve.Add("siteName", fmt.Sprintf("Site name must not exceed %d characters", cfg.BrandingConstraints.MaxSiteNameLength))
 	case containsControlCharacters(trimmedSiteName):
 		ve.Add("siteName", "Site name contains invalid control characters")
 	}
@@ -90,9 +83,9 @@ func (s *BrandingService) UpdateBranding(siteName string) error {
 		return ve
 	}
 
-	s.brandingConfig.SiteName = trimmedSiteName
+	cfg.SiteName = trimmedSiteName
 
-	if err := s.store.Save(s.brandingConfig); err != nil {
+	if err := s.store.Save(cfg); err != nil {
 		return sharederrors.NewLocalizedError(
 			"branding_update_failed",
 			"Failed to update branding",
@@ -144,8 +137,10 @@ func (s *BrandingService) UploadLogo(file multipart.File, filename string) (stri
 	assetsDir := s.store.brandingAssetsDir()
 	ext := strings.ToLower(filepath.Ext(filename))
 
-	if !s.brandingConfig.IsAllowedLogoExt(filename) {
-		allowedExts := s.brandingConfig.AllowedLogoExtsAsString()
+	cfg := s.store.Load()
+
+	if !cfg.IsAllowedLogoExt(filename) {
+		allowedExts := cfg.AllowedLogoExtsAsString()
 		return "", sharederrors.NewLocalizedError(
 			"branding_logo_invalid_type",
 			"Invalid logo file type",
@@ -159,7 +154,7 @@ func (s *BrandingService) UploadLogo(file multipart.File, filename string) (stri
 	targetPath := filepath.Join(assetsDir, "logo"+ext)
 
 	// Write new logo atomically first
-	if err := shared.WriteStreamAtomic(targetPath, file, s.brandingConfig.BrandingConstraints.MaxLogoSize, 0o644); err != nil {
+	if err := shared.WriteStreamAtomic(targetPath, file, cfg.BrandingConstraints.MaxLogoSize, 0o644); err != nil {
 		return "", sharederrors.NewLocalizedError(
 			"branding_logo_upload_failed",
 			"Failed to save logo file",
@@ -172,8 +167,8 @@ func (s *BrandingService) UploadLogo(file multipart.File, filename string) (stri
 	removeOtherMatches(filepath.Join(assetsDir, "logo.*"), targetPath)
 
 	// Update in-memory config + persist
-	s.brandingConfig.LogoFile = "logo" + ext
-	if err := s.store.Save(s.brandingConfig); err != nil {
+	cfg.LogoFile = "logo" + ext
+	if err := s.store.Save(cfg); err != nil {
 		return "", sharederrors.NewLocalizedError(
 			"branding_logo_upload_failed",
 			"Failed to save logo file",
@@ -182,7 +177,7 @@ func (s *BrandingService) UploadLogo(file multipart.File, filename string) (stri
 		)
 	}
 
-	return s.brandingConfig.LogoFile, nil
+	return cfg.LogoFile, nil
 }
 
 // DeleteLogo removes the custom logo image
@@ -190,11 +185,13 @@ func (s *BrandingService) DeleteLogo() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.brandingConfig.LogoFile == "" {
+	cfg := s.store.Load()
+
+	if cfg.LogoFile == "" {
 		return nil // No logo to delete
 	}
 
-	if containsPathTraversal(s.brandingConfig.LogoFile) {
+	if containsPathTraversal(cfg.LogoFile) {
 		return sharederrors.NewLocalizedError(
 			"branding_logo_delete_failed",
 			errFailedToDeleteLogo,
@@ -203,7 +200,7 @@ func (s *BrandingService) DeleteLogo() error {
 		)
 	}
 
-	logoPath := filepath.Join(s.store.brandingAssetsDir(), s.brandingConfig.LogoFile)
+	logoPath := filepath.Join(s.store.brandingAssetsDir(), cfg.LogoFile)
 	if err := os.Remove(logoPath); err != nil && !os.IsNotExist(err) {
 		return sharederrors.NewLocalizedError(
 			"branding_logo_delete_failed",
@@ -213,8 +210,8 @@ func (s *BrandingService) DeleteLogo() error {
 		)
 	}
 
-	s.brandingConfig.LogoFile = ""
-	if err := s.store.Save(s.brandingConfig); err != nil {
+	cfg.LogoFile = ""
+	if err := s.store.Save(cfg); err != nil {
 		return sharederrors.NewLocalizedError(
 			"branding_logo_delete_failed",
 			errFailedToDeleteLogo,
@@ -234,8 +231,10 @@ func (s *BrandingService) UploadFavicon(file multipart.File, filename string) (s
 	assetsDir := s.store.brandingAssetsDir()
 	ext := strings.ToLower(filepath.Ext(filename))
 
-	if !s.brandingConfig.IsAllowedFaviconExt(filename) {
-		allowedExts := s.brandingConfig.AllowedFaviconExtsAsString()
+	cfg := s.store.Load()
+
+	if !cfg.IsAllowedFaviconExt(filename) {
+		allowedExts := cfg.AllowedFaviconExtsAsString()
 		return "", sharederrors.NewLocalizedError(
 			"branding_favicon_invalid_type",
 			"Invalid favicon file type",
@@ -249,7 +248,7 @@ func (s *BrandingService) UploadFavicon(file multipart.File, filename string) (s
 	targetPath := filepath.Join(assetsDir, "favicon"+ext)
 
 	// Write new favicon atomically first
-	if err := shared.WriteStreamAtomic(targetPath, file, s.brandingConfig.BrandingConstraints.MaxFaviconSize, 0o644); err != nil {
+	if err := shared.WriteStreamAtomic(targetPath, file, cfg.BrandingConstraints.MaxFaviconSize, 0o644); err != nil {
 		return "", sharederrors.NewLocalizedError(
 			"branding_favicon_upload_failed",
 			"Failed to save favicon file",
@@ -262,8 +261,8 @@ func (s *BrandingService) UploadFavicon(file multipart.File, filename string) (s
 	removeOtherMatches(filepath.Join(assetsDir, "favicon.*"), targetPath)
 
 	// Update in-memory config + persist
-	s.brandingConfig.FaviconFile = "favicon" + ext
-	if err := s.store.Save(s.brandingConfig); err != nil {
+	cfg.FaviconFile = "favicon" + ext
+	if err := s.store.Save(cfg); err != nil {
 		return "", sharederrors.NewLocalizedError(
 			"branding_favicon_upload_failed",
 			"Failed to save favicon file",
@@ -272,7 +271,7 @@ func (s *BrandingService) UploadFavicon(file multipart.File, filename string) (s
 		)
 	}
 
-	return s.brandingConfig.FaviconFile, nil
+	return cfg.FaviconFile, nil
 }
 
 // DeleteFavicon removes the custom favicon
@@ -280,11 +279,13 @@ func (s *BrandingService) DeleteFavicon() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.brandingConfig.FaviconFile == "" {
+	cfg := s.store.Load()
+
+	if cfg.FaviconFile == "" {
 		return nil // No favicon to delete
 	}
 
-	if containsPathTraversal(s.brandingConfig.FaviconFile) {
+	if containsPathTraversal(cfg.FaviconFile) {
 		return sharederrors.NewLocalizedError(
 			"branding_favicon_delete_failed",
 			errFailedToDeleteFavicon,
@@ -293,7 +294,7 @@ func (s *BrandingService) DeleteFavicon() error {
 		)
 	}
 
-	faviconPath := filepath.Join(s.store.brandingAssetsDir(), s.brandingConfig.FaviconFile)
+	faviconPath := filepath.Join(s.store.brandingAssetsDir(), cfg.FaviconFile)
 	if err := os.Remove(faviconPath); err != nil && !os.IsNotExist(err) {
 		return sharederrors.NewLocalizedError(
 			"branding_favicon_delete_failed",
@@ -303,8 +304,8 @@ func (s *BrandingService) DeleteFavicon() error {
 		)
 	}
 
-	s.brandingConfig.FaviconFile = ""
-	if err := s.store.Save(s.brandingConfig); err != nil {
+	cfg.FaviconFile = ""
+	if err := s.store.Save(cfg); err != nil {
 		return sharederrors.NewLocalizedError(
 			"branding_favicon_delete_failed",
 			errFailedToDeleteFavicon,

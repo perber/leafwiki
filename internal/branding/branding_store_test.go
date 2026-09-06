@@ -7,15 +7,14 @@ import (
 	"testing"
 )
 
-func TestBrandingStore_Load_WhenConfigMissing_ReturnsDefault(t *testing.T) {
+func TestBrandingStore_New_WhenConfigMissing_ReturnsDefault(t *testing.T) {
 	dir := t.TempDir()
-	store := NewBrandingStore(dir)
-
-	cfg, err := store.Load()
+	store, err := NewBrandingStore(dir)
 	if err != nil {
-		t.Fatalf("Load() error: %v", err)
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
 
+	cfg := store.Load()
 	def := DefaultBrandingConfig()
 
 	if cfg.SiteName != def.SiteName {
@@ -42,9 +41,11 @@ func TestBrandingStore_Load_WhenConfigMissing_ReturnsDefault(t *testing.T) {
 
 func TestBrandingStore_SaveThenLoad_RoundTrip_PersistsFields(t *testing.T) {
 	dir := t.TempDir()
-	store := NewBrandingStore(dir)
+	store, err := NewBrandingStore(dir)
+	if err != nil {
+		t.Fatalf("NewBrandingStore() error: %v", err)
+	}
 
-	// Prepare config to save.
 	cfg := DefaultBrandingConfig()
 	cfg.SiteName = "MyWiki"
 	cfg.LogoFile = "logo.png"
@@ -54,11 +55,7 @@ func TestBrandingStore_SaveThenLoad_RoundTrip_PersistsFields(t *testing.T) {
 		t.Fatalf("Save() error: %v", err)
 	}
 
-	got, err := store.Load()
-	if err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
-
+	got := store.Load()
 	if got.SiteName != "MyWiki" {
 		t.Fatalf("expected SiteName %q, got %q", "MyWiki", got.SiteName)
 	}
@@ -69,7 +66,7 @@ func TestBrandingStore_SaveThenLoad_RoundTrip_PersistsFields(t *testing.T) {
 		t.Fatalf("expected FaviconFile %q, got %q", "favicon.ico", got.FaviconFile)
 	}
 
-	// Runtime-only constraints should be injected on Load, even though they are not persisted.
+	// Runtime-only constraints should still be present after Save.
 	def := DefaultBrandingConfig()
 	if got.BrandingConstraints.MaxLogoSize != def.BrandingConstraints.MaxLogoSize {
 		t.Fatalf("expected injected MaxLogoSize %d, got %d", def.BrandingConstraints.MaxLogoSize, got.BrandingConstraints.MaxLogoSize)
@@ -77,11 +74,23 @@ func TestBrandingStore_SaveThenLoad_RoundTrip_PersistsFields(t *testing.T) {
 	if got.BrandingConstraints.MaxFaviconSize != def.BrandingConstraints.MaxFaviconSize {
 		t.Fatalf("expected injected MaxFaviconSize %d, got %d", def.BrandingConstraints.MaxFaviconSize, got.BrandingConstraints.MaxFaviconSize)
 	}
+
+	// And it survives reopening the store from disk too.
+	reopened, err := NewBrandingStore(dir)
+	if err != nil {
+		t.Fatalf("second NewBrandingStore() error: %v", err)
+	}
+	if got := reopened.Load(); got.SiteName != "MyWiki" {
+		t.Fatalf("expected persisted SiteName %q after reopen, got %q", "MyWiki", got.SiteName)
+	}
 }
 
 func TestBrandingStore_Save_WritesFileToExpectedLocation(t *testing.T) {
 	dir := t.TempDir()
-	store := NewBrandingStore(dir)
+	store, err := NewBrandingStore(dir)
+	if err != nil {
+		t.Fatalf("NewBrandingStore() error: %v", err)
+	}
 
 	cfg := DefaultBrandingConfig()
 	cfg.SiteName = "CheckFile"
@@ -99,7 +108,6 @@ func TestBrandingStore_Save_WritesFileToExpectedLocation(t *testing.T) {
 		t.Fatalf("expected branding.json to be a file, got directory")
 	}
 
-	// Basic sanity: file contains our siteName
 	b, err := os.ReadFile(p)
 	if err != nil {
 		t.Fatalf("ReadFile() error: %v", err)
@@ -109,29 +117,27 @@ func TestBrandingStore_Save_WritesFileToExpectedLocation(t *testing.T) {
 	}
 }
 
-func TestBrandingStore_Load_WhenInvalidJSON_ReturnsError(t *testing.T) {
+func TestBrandingStore_New_WhenInvalidJSON_ReturnsError(t *testing.T) {
 	dir := t.TempDir()
-	store := NewBrandingStore(dir)
 
-	// Write broken JSON
 	if err := os.WriteFile(filepath.Join(dir, "branding.json"), []byte("{not valid json"), 0644); err != nil {
 		t.Fatalf("setup write invalid json: %v", err)
 	}
 
-	_, err := store.Load()
+	_, err := NewBrandingStore(dir)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
-	if !strings.Contains(err.Error(), "failed to parse branding config") {
-		t.Fatalf("expected parse error wrapper, got: %v", err)
+	if !strings.Contains(err.Error(), "failed to load branding config") {
+		t.Fatalf("expected load error wrapper, got: %v", err)
 	}
 }
 
-func TestBrandingStore_Load_InsertsConstraintsEvenIfZeroInFile(t *testing.T) {
+func TestBrandingStore_New_InsertsConstraintsEvenIfZeroInFile(t *testing.T) {
 	dir := t.TempDir()
-	store := NewBrandingStore(dir)
 
-	// Save JSON that includes only persisted fields. BrandingConstraints is json:"-" and should be injected.
+	// Only persisted fields are on disk. BrandingConstraints is json:"-" and
+	// should be injected.
 	raw := `{
   "siteName": "X",
   "logoFile": "logo.webp",
@@ -141,18 +147,43 @@ func TestBrandingStore_Load_InsertsConstraintsEvenIfZeroInFile(t *testing.T) {
 		t.Fatalf("setup write json: %v", err)
 	}
 
-	got, err := store.Load()
+	store, err := NewBrandingStore(dir)
 	if err != nil {
-		t.Fatalf("Load() error: %v", err)
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
+	got := store.Load()
 
 	def := DefaultBrandingConfig()
-
-	// Ensure constraints are injected and usable
 	if got.BrandingConstraints.MaxLogoSize != def.BrandingConstraints.MaxLogoSize {
 		t.Fatalf("expected injected MaxLogoSize %d, got %d", def.BrandingConstraints.MaxLogoSize, got.BrandingConstraints.MaxLogoSize)
 	}
 	if got.BrandingConstraints.LogoExts[".png"] != def.BrandingConstraints.LogoExts[".png"] {
 		t.Fatalf("expected injected LogoExts to match default")
+	}
+}
+
+func TestBrandingStore_Reload_PicksUpExternalFileChange(t *testing.T) {
+	dir := t.TempDir()
+	store, err := NewBrandingStore(dir)
+	if err != nil {
+		t.Fatalf("NewBrandingStore() error: %v", err)
+	}
+
+	// Simulate a restore swapping in a different branding.json out from
+	// under this store, without going through its own Save.
+	raw := `{"siteName":"Restored Site","logoFile":"","faviconFile":""}`
+	if err := os.WriteFile(filepath.Join(dir, "branding.json"), []byte(raw), 0644); err != nil {
+		t.Fatalf("write branding.json: %v", err)
+	}
+
+	if got := store.Load(); got.SiteName == "Restored Site" {
+		t.Fatal("test setup: SiteName should not already reflect the externally written file before Reload")
+	}
+
+	if err := store.Reload(); err != nil {
+		t.Fatalf("Reload() error: %v", err)
+	}
+	if got := store.Load(); got.SiteName != "Restored Site" {
+		t.Fatalf("expected Reload() to pick up %q, got %q", "Restored Site", got.SiteName)
 	}
 }

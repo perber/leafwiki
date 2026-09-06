@@ -27,11 +27,11 @@ func TestBrandingService_DeleteLogo_NoLogo_NoOp(t *testing.T) {
 	svc, dir := newTestBrandingService(t)
 
 	// Ensure config persisted with empty logo
-	store := NewBrandingStore(dir)
-	cfg, err := store.Load()
+	store, err := NewBrandingStore(dir)
 	if err != nil {
-		t.Fatalf("store.Load() error: %v", err)
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
+	cfg := store.Load()
 	if cfg.LogoFile != "" {
 		t.Fatalf("expected initial LogoFile empty, got %q", cfg.LogoFile)
 	}
@@ -41,10 +41,7 @@ func TestBrandingService_DeleteLogo_NoLogo_NoOp(t *testing.T) {
 	}
 
 	// Still empty after delete
-	cfg2, err := store.Load()
-	if err != nil {
-		t.Fatalf("store.Load() error: %v", err)
-	}
+	cfg2 := store.Load()
 	if cfg2.LogoFile != "" {
 		t.Fatalf("expected LogoFile empty after delete, got %q", cfg2.LogoFile)
 	}
@@ -53,11 +50,11 @@ func TestBrandingService_DeleteLogo_NoLogo_NoOp(t *testing.T) {
 func TestBrandingService_DeleteFavicon_NoFavicon_NoOp(t *testing.T) {
 	svc, dir := newTestBrandingService(t)
 
-	store := NewBrandingStore(dir)
-	cfg, err := store.Load()
+	store, err := NewBrandingStore(dir)
 	if err != nil {
-		t.Fatalf("store.Load() error: %v", err)
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
+	cfg := store.Load()
 	if cfg.FaviconFile != "" {
 		t.Fatalf("expected initial FaviconFile empty, got %q", cfg.FaviconFile)
 	}
@@ -66,10 +63,7 @@ func TestBrandingService_DeleteFavicon_NoFavicon_NoOp(t *testing.T) {
 		t.Fatalf("DeleteFavicon() error: %v", err)
 	}
 
-	cfg2, err := store.Load()
-	if err != nil {
-		t.Fatalf("store.Load() error: %v", err)
-	}
+	cfg2 := store.Load()
 	if cfg2.FaviconFile != "" {
 		t.Fatalf("expected FaviconFile empty after delete, got %q", cfg2.FaviconFile)
 	}
@@ -88,8 +82,9 @@ func TestBrandingService_DeleteLogo_RemovesFileAndClearsConfig(t *testing.T) {
 	}
 	// Set config to reference the seeded file
 	svc.mu.Lock()
-	svc.brandingConfig.LogoFile = "logo.png"
-	if err := svc.store.Save(svc.brandingConfig); err != nil {
+	seedCfg := svc.store.Load()
+	seedCfg.LogoFile = "logo.png"
+	if err := svc.store.Save(seedCfg); err != nil {
 		svc.mu.Unlock()
 		t.Fatalf("store.Save() error: %v", err)
 	}
@@ -105,11 +100,11 @@ func TestBrandingService_DeleteLogo_RemovesFileAndClearsConfig(t *testing.T) {
 	}
 
 	// Config should be cleared on disk
-	store := NewBrandingStore(dir)
-	cfg, err := store.Load()
+	store, err := NewBrandingStore(dir)
 	if err != nil {
-		t.Fatalf("store.Load() error: %v", err)
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
+	cfg := store.Load()
 	if cfg.LogoFile != "" {
 		t.Fatalf("expected LogoFile cleared, got %q", cfg.LogoFile)
 	}
@@ -126,8 +121,9 @@ func TestBrandingService_DeleteFavicon_RemovesFileAndClearsConfig(t *testing.T) 
 
 	// Set config to reference the seeded file
 	svc.mu.Lock()
-	svc.brandingConfig.FaviconFile = "favicon.ico"
-	if err := svc.store.Save(svc.brandingConfig); err != nil {
+	seedCfg := svc.store.Load()
+	seedCfg.FaviconFile = "favicon.ico"
+	if err := svc.store.Save(seedCfg); err != nil {
 		svc.mu.Unlock()
 		t.Fatalf("store.Save() error: %v", err)
 	}
@@ -141,11 +137,11 @@ func TestBrandingService_DeleteFavicon_RemovesFileAndClearsConfig(t *testing.T) 
 		t.Fatalf("expected favicon file to be removed")
 	}
 
-	store := NewBrandingStore(dir)
-	cfg, err := store.Load()
+	store, err := NewBrandingStore(dir)
 	if err != nil {
-		t.Fatalf("store.Load() error: %v", err)
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
+	cfg := store.Load()
 	if cfg.FaviconFile != "" {
 		t.Fatalf("expected FaviconFile cleared, got %q", cfg.FaviconFile)
 	}
@@ -156,8 +152,9 @@ func TestBrandingService_DeleteLogo_FileMissingStillClearsConfig(t *testing.T) {
 
 	// Reference a file that doesn't exist
 	svc.mu.Lock()
-	svc.brandingConfig.LogoFile = "logo.png"
-	if err := svc.store.Save(svc.brandingConfig); err != nil {
+	seedCfg := svc.store.Load()
+	seedCfg.LogoFile = "logo.png"
+	if err := svc.store.Save(seedCfg); err != nil {
 		svc.mu.Unlock()
 		t.Fatalf("store.Save() error: %v", err)
 	}
@@ -167,11 +164,11 @@ func TestBrandingService_DeleteLogo_FileMissingStillClearsConfig(t *testing.T) {
 		t.Fatalf("DeleteLogo() error: %v", err)
 	}
 
-	store := NewBrandingStore(dir)
-	cfg, err := store.Load()
+	store, err := NewBrandingStore(dir)
 	if err != nil {
-		t.Fatalf("store.Load() error: %v", err)
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
+	cfg := store.Load()
 	if cfg.LogoFile != "" {
 		t.Fatalf("expected LogoFile cleared even if file missing, got %q", cfg.LogoFile)
 	}
@@ -191,7 +188,10 @@ func TestBrandingService_Reload_PicksUpExternallyWrittenConfig(t *testing.T) {
 	// Simulate a restore: branding.json is replaced on disk out from under
 	// the running BrandingService (e.g. by internal/restore's file swap),
 	// without going through UpdateBranding/store.Save.
-	store := NewBrandingStore(dir)
+	store, err := NewBrandingStore(dir)
+	if err != nil {
+		t.Fatalf("NewBrandingStore() error: %v", err)
+	}
 	newConfig := DefaultBrandingConfig()
 	newConfig.SiteName = "Restored Site"
 	if err := store.Save(newConfig); err != nil {
@@ -219,8 +219,9 @@ func TestBrandingService_DeleteLogo_InvalidPath_ReturnsErrorAndDoesNotDeleteExte
 	}
 
 	svc.mu.Lock()
-	svc.brandingConfig.LogoFile = externalFile
-	if err := svc.store.Save(svc.brandingConfig); err != nil {
+	seedCfg := svc.store.Load()
+	seedCfg.LogoFile = externalFile
+	if err := svc.store.Save(seedCfg); err != nil {
 		svc.mu.Unlock()
 		t.Fatalf("store.Save() error: %v", err)
 	}
@@ -237,11 +238,11 @@ func TestBrandingService_DeleteLogo_InvalidPath_ReturnsErrorAndDoesNotDeleteExte
 		t.Fatalf("expected external logo file to remain, stat error: %v", err)
 	}
 
-	store := NewBrandingStore(svc.store.storageDir)
-	cfg, err := store.Load()
+	store, err := NewBrandingStore(svc.store.storageDir)
 	if err != nil {
-		t.Fatalf("store.Load() error: %v", err)
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
+	cfg := store.Load()
 	if cfg.LogoFile != externalFile {
 		t.Fatalf("expected LogoFile to remain unchanged, got %q", cfg.LogoFile)
 	}
@@ -251,8 +252,9 @@ func TestBrandingService_DeleteFavicon_FileMissingStillClearsConfig(t *testing.T
 	svc, dir := newTestBrandingService(t)
 
 	svc.mu.Lock()
-	svc.brandingConfig.FaviconFile = "favicon.ico"
-	if err := svc.store.Save(svc.brandingConfig); err != nil {
+	seedCfg := svc.store.Load()
+	seedCfg.FaviconFile = "favicon.ico"
+	if err := svc.store.Save(seedCfg); err != nil {
 		svc.mu.Unlock()
 		t.Fatalf("store.Save() error: %v", err)
 	}
@@ -262,11 +264,11 @@ func TestBrandingService_DeleteFavicon_FileMissingStillClearsConfig(t *testing.T
 		t.Fatalf("DeleteFavicon() error: %v", err)
 	}
 
-	store := NewBrandingStore(dir)
-	cfg, err := store.Load()
+	store, err := NewBrandingStore(dir)
 	if err != nil {
-		t.Fatalf("store.Load() error: %v", err)
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
+	cfg := store.Load()
 	if cfg.FaviconFile != "" {
 		t.Fatalf("expected FaviconFile cleared even if file missing, got %q", cfg.FaviconFile)
 	}
@@ -280,8 +282,9 @@ func TestBrandingService_DeleteFavicon_InvalidPath_ReturnsErrorAndDoesNotDeleteE
 	}
 
 	svc.mu.Lock()
-	svc.brandingConfig.FaviconFile = externalFile
-	if err := svc.store.Save(svc.brandingConfig); err != nil {
+	seedCfg := svc.store.Load()
+	seedCfg.FaviconFile = externalFile
+	if err := svc.store.Save(seedCfg); err != nil {
 		svc.mu.Unlock()
 		t.Fatalf("store.Save() error: %v", err)
 	}
@@ -298,11 +301,11 @@ func TestBrandingService_DeleteFavicon_InvalidPath_ReturnsErrorAndDoesNotDeleteE
 		t.Fatalf("expected external favicon file to remain, stat error: %v", err)
 	}
 
-	store := NewBrandingStore(svc.store.storageDir)
-	cfg, err := store.Load()
+	store, err := NewBrandingStore(svc.store.storageDir)
 	if err != nil {
-		t.Fatalf("store.Load() error: %v", err)
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
+	cfg := store.Load()
 	if cfg.FaviconFile != externalFile {
 		t.Fatalf("expected FaviconFile to remain unchanged, got %q", cfg.FaviconFile)
 	}
@@ -359,11 +362,11 @@ func TestBrandingService_UploadThenDeleteLogo_EndToEnd(t *testing.T) {
 		t.Fatalf("expected logo.png to be removed after delete")
 	}
 
-	store := NewBrandingStore(dir)
-	cfg, err := store.Load()
+	store, err := NewBrandingStore(dir)
 	if err != nil {
-		t.Fatalf("store.Load() error: %v", err)
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
+	cfg := store.Load()
 	if cfg.LogoFile != "" {
 		t.Fatalf("expected LogoFile cleared after delete, got %q", cfg.LogoFile)
 	}
@@ -408,11 +411,11 @@ func TestBrandingService_UploadThenDeleteFavicon_EndToEnd(t *testing.T) {
 		t.Fatalf("expected favicon.ico to be removed after delete")
 	}
 
-	store := NewBrandingStore(dir)
-	cfg, err := store.Load()
+	store, err := NewBrandingStore(dir)
 	if err != nil {
-		t.Fatalf("store.Load() error: %v", err)
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
+	cfg := store.Load()
 	if cfg.FaviconFile != "" {
 		t.Fatalf("expected FaviconFile cleared after delete, got %q", cfg.FaviconFile)
 	}
@@ -447,11 +450,11 @@ func TestBrandingService_UpdateBranding_PersistsToDisk(t *testing.T) {
 	}
 
 	// Verify persisted config by reading via store
-	store := NewBrandingStore(dir)
-	cfg, err := store.Load()
+	store, err := NewBrandingStore(dir)
 	if err != nil {
-		t.Fatalf("store.Load() error: %v", err)
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
+	cfg := store.Load()
 	if cfg.SiteName != "My Wiki" {
 		t.Fatalf("expected SiteName %q, got %q", "My Wiki", cfg.SiteName)
 	}
@@ -464,11 +467,11 @@ func TestBrandingService_UpdateBranding_TrimsSiteName(t *testing.T) {
 		t.Fatalf("UpdateBranding() error: %v", err)
 	}
 
-	store := NewBrandingStore(dir)
-	cfg, err := store.Load()
+	store, err := NewBrandingStore(dir)
 	if err != nil {
-		t.Fatalf("store.Load() error: %v", err)
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
+	cfg := store.Load()
 	if cfg.SiteName != "Trimmed Wiki" {
 		t.Fatalf("expected SiteName %q, got %q", "Trimmed Wiki", cfg.SiteName)
 	}
@@ -541,11 +544,11 @@ func TestBrandingService_UpdateBranding_MaxLengthSiteName_Success(t *testing.T) 
 		t.Fatalf("UpdateBranding() error: %v", err)
 	}
 
-	store := NewBrandingStore(dir)
-	cfg, err := store.Load()
+	store, err := NewBrandingStore(dir)
 	if err != nil {
-		t.Fatalf("store.Load() error: %v", err)
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
+	cfg := store.Load()
 	if cfg.SiteName != exactName {
 		t.Fatalf("expected SiteName with length %d, got length %d", len(exactName), len(cfg.SiteName))
 	}
@@ -584,11 +587,11 @@ func TestBrandingService_UpdateBranding_ValidSpecialCharacters_Success(t *testin
 		t.Fatalf("UpdateBranding() error: %v", err)
 	}
 
-	store := NewBrandingStore(dir)
-	cfg, err := store.Load()
+	store, err := NewBrandingStore(dir)
 	if err != nil {
-		t.Fatalf("store.Load() error: %v", err)
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
+	cfg := store.Load()
 	if cfg.SiteName != validName {
 		t.Fatalf("expected SiteName %q, got %q", validName, cfg.SiteName)
 	}
@@ -689,11 +692,11 @@ func TestBrandingService_UploadLogo_WritesFileAndUpdatesConfig(t *testing.T) {
 	}
 
 	// Config should be updated and persisted
-	store := NewBrandingStore(dir)
-	cfg, err := store.Load()
+	store, err := NewBrandingStore(dir)
 	if err != nil {
-		t.Fatalf("store.Load() error: %v", err)
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
+	cfg := store.Load()
 	if cfg.LogoFile != "logo.png" {
 		t.Fatalf("expected cfg.LogoFile %q, got %q", "logo.png", cfg.LogoFile)
 	}
@@ -734,11 +737,11 @@ func TestBrandingService_UploadFavicon_WritesFileAndUpdatesConfig(t *testing.T) 
 		t.Fatalf("expected favicon file to exist at %s: %v", target, err)
 	}
 
-	store := NewBrandingStore(dir)
-	cfg, err := store.Load()
+	store, err := NewBrandingStore(dir)
 	if err != nil {
-		t.Fatalf("store.Load() error: %v", err)
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
+	cfg := store.Load()
 	if cfg.FaviconFile != "favicon.ico" {
 		t.Fatalf("expected cfg.FaviconFile %q, got %q", "favicon.ico", cfg.FaviconFile)
 	}
@@ -843,15 +846,17 @@ func TestBrandingService_UploadFavicon_RemovesOldFaviconVariants(t *testing.T) {
 func TestBrandingService_UploadLogo_TooLarge_ReturnsErrorAndDoesNotUpdateConfig(t *testing.T) {
 	svc, dir := newTestBrandingService(t)
 
-	// Lower max size to make test fast
-	svc.brandingConfig.BrandingConstraints.MaxLogoSize = 10
+	// BrandingConstraints is re-derived from DefaultBrandingConfig() on every
+	// load/save (it's not persisted), so it can't be lowered for the test —
+	// exceed the real default (1 MB) instead.
+	maxLogoSize := DefaultBrandingConfig().BrandingConstraints.MaxLogoSize
 
-	// Create file > 10 bytes
+	// Create file > maxLogoSize bytes
 	tmp, err := os.CreateTemp(t.TempDir(), "logo-big-*.png")
 	if err != nil {
 		t.Fatalf("CreateTemp() error: %v", err)
 	}
-	if _, err := tmp.Write(bytes.Repeat([]byte("x"), 50)); err != nil {
+	if _, err := tmp.Write(bytes.Repeat([]byte("x"), int(maxLogoSize)+1)); err != nil {
 		t.Fatalf("Write() error: %v", err)
 	}
 	if _, err := tmp.Seek(0, 0); err != nil {
@@ -870,11 +875,11 @@ func TestBrandingService_UploadLogo_TooLarge_ReturnsErrorAndDoesNotUpdateConfig(
 	}
 
 	// Should not have updated persisted config
-	store := NewBrandingStore(dir)
-	cfg, err2 := store.Load()
-	if err2 != nil {
-		t.Fatalf("store.Load() error: %v", err2)
+	store, err := NewBrandingStore(dir)
+	if err != nil {
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
+	cfg := store.Load()
 	if cfg.LogoFile != "" {
 		t.Fatalf("expected LogoFile to remain empty, got %q", cfg.LogoFile)
 	}
@@ -883,14 +888,16 @@ func TestBrandingService_UploadLogo_TooLarge_ReturnsErrorAndDoesNotUpdateConfig(
 func TestBrandingService_UploadFavicon_TooLarge_ReturnsErrorAndDoesNotUpdateConfig(t *testing.T) {
 	svc, dir := newTestBrandingService(t)
 
-	// Lower max size to make test fast
-	svc.brandingConfig.BrandingConstraints.MaxFaviconSize = 10
+	// BrandingConstraints is re-derived from DefaultBrandingConfig() on every
+	// load/save (it's not persisted), so it can't be lowered for the test —
+	// exceed the real default (1 MB) instead.
+	maxFaviconSize := DefaultBrandingConfig().BrandingConstraints.MaxFaviconSize
 
 	tmp, err := os.CreateTemp(t.TempDir(), "fav-big-*.ico")
 	if err != nil {
 		t.Fatalf("CreateTemp() error: %v", err)
 	}
-	if _, err := tmp.Write(bytes.Repeat([]byte("y"), 50)); err != nil {
+	if _, err := tmp.Write(bytes.Repeat([]byte("y"), int(maxFaviconSize)+1)); err != nil {
 		t.Fatalf("Write() error: %v", err)
 	}
 	if _, err := tmp.Seek(0, 0); err != nil {
@@ -908,11 +915,11 @@ func TestBrandingService_UploadFavicon_TooLarge_ReturnsErrorAndDoesNotUpdateConf
 		t.Fatalf("expected error, got nil")
 	}
 
-	store := NewBrandingStore(dir)
-	cfg, err2 := store.Load()
-	if err2 != nil {
-		t.Fatalf("store.Load() error: %v", err2)
+	store, err := NewBrandingStore(dir)
+	if err != nil {
+		t.Fatalf("NewBrandingStore() error: %v", err)
 	}
+	cfg := store.Load()
 	if cfg.FaviconFile != "" {
 		t.Fatalf("expected FaviconFile to remain empty, got %q", cfg.FaviconFile)
 	}
