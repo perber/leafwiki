@@ -97,6 +97,32 @@ func TestUserSettingsService_Get_StoreUnavailable_PropagatesOriginalErrorCode(t 
 	}
 }
 
+// TestUserSettingsService_Update_SpanishLanguage_Persists is the regression
+// test for the frontend/backend sync gap: the "feat(i18n): add Spanish
+// translation" contribution shipped ui/leafwiki-ui/src/locales/es/ (so
+// "Español" shows up in the picker) but never extended allowedLanguages, so
+// saving the choice failed validation and the UI snapped back with an error.
+func TestUserSettingsService_Update_SpanishLanguage_Persists(t *testing.T) {
+	svc := newTestService(t)
+
+	lang := "es"
+	updated, err := svc.Update("user-1", UserSettingsPatch{Language: &lang})
+	if err != nil {
+		t.Fatalf("Update (es): %v", err)
+	}
+	if updated.Language != lang {
+		t.Fatalf("expected Language=%q, got %+v", lang, updated)
+	}
+
+	got, err := svc.Get("user-1")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got.Language != lang {
+		t.Fatalf("expected persisted Language=%q, got %+v", lang, got)
+	}
+}
+
 func TestUserSettingsService_Update_InvalidLanguage_ReturnsValidationError(t *testing.T) {
 	svc := newTestService(t)
 

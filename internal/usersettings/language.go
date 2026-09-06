@@ -8,6 +8,7 @@ import "sort"
 var allowedLanguages = map[string]bool{
 	DefaultLanguage: true,
 	"de":            true,
+	"es":            true,
 }
 
 // IsAllowedLanguage reports whether lang is a language UserSettings accepts.
