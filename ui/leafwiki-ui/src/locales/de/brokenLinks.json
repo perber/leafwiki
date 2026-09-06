@@ -6,6 +6,7 @@
   "heading": "Fehlende Seiten",
   "sortLabel": "Alphabetisch sortiert",
   "linksTo": "verweist auf",
+  "loading": "Defekte Links werden geladen…",
   "button": {
     "text": "Aktualisieren",
     "refreshing": "Wird aktualisiert…"

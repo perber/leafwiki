@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	httpinternal "github.com/perber/wiki/internal/http"
+	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 )
 
 // Routes is the RouteRegistrar for the links domain.
@@ -37,7 +38,12 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	// authenticated-only and public without a restart (see APIReadGroup).
 	readGroup := ctx.APIReadGroup(r.authService)
 	readGroup.GET("/pages/:id/links", r.handleGetLinkStatus)
-	readGroup.GET("/links/broken", r.handleGetBrokenLinks)
+
+	// The wiki-wide broken-link audit is an admin maintenance view (the UI
+	// exposes it only to admins), not a per-page read — keep it behind admin
+	// auth even when the instance is in public mode.
+	authGroup := ctx.APIAuthGroup(r.authService)
+	authGroup.GET("/links/broken", authmw.RequireAdmin(ctx.Opts.AuthDisabled), r.handleGetBrokenLinks)
 }
 
 // ─── Handlers ───────────────────────────────────────────────────────────────

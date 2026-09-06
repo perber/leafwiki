@@ -5140,3 +5140,42 @@ func TestBuildCustomStylesheetTag_WhitespacePath(t *testing.T) {
 		t.Fatalf("expected empty tag for whitespace path, got %q", tag)
 	}
 }
+
+func TestBrokenLinksEndpoint_AdminGetsLinksArray(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	rec := authenticatedRequest(t, router, http.MethodGet, "/api/links/broken", nil)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for admin, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp struct {
+		Links []map[string]any `json:"links"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("invalid JSON response: %v", err)
+	}
+	if resp.Links == nil {
+		t.Errorf("expected a (possibly empty) links array, got null")
+	}
+}
+
+func TestBrokenLinksEndpoint_ViewerForbidden(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	// The broken-links audit is admin-only maintenance data — a non-admin
+	// authenticated user must not be able to enumerate it.
+	createUserBody := `{"username": "vieweruser", "email": "viewer@example.com", "password": "viewerpass", "role": "viewer"}`
+	authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(createUserBody))
+
+	rec := authenticatedRequestAs(t, router, "vieweruser", "viewerpass", http.MethodGet, "/api/links/broken", nil)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for viewer, got %d: %s", rec.Code, rec.Body.String())
+	}
+}

@@ -867,6 +867,56 @@ func TestLinksStore_GetBrokenIncomingForPath_ReturnsBrokenLinks(t *testing.T) {
 	}
 }
 
+func TestLinkService_GetBrokenLinks_ReturnsBrokenLinksWithResolvedFromPath(t *testing.T) {
+	svc, ts, _ := setupLinkService(t)
+
+	sectionIDPtr, err := ts.CreateNode("system", nil, "Docs", "docs", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode docs failed: %v", err)
+	}
+	// Creating a child under "docs" auto-converts it to a section.
+	aIDPtr, err := ts.CreateNode("system", sectionIDPtr, "Page A", "a", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode A failed: %v", err)
+	}
+	pageAID := *aIDPtr
+
+	pageA, err := ts.GetPage(pageAID)
+	if err != nil {
+		t.Fatalf("GetPage A failed: %v", err)
+	}
+	linkToMissing := "Link: [Missing](/nonexistent)"
+	if err := ts.UpdateNode("system", pageA.ID, pageA.Title, pageA.Slug, &linkToMissing, tree.VersionUnchecked, nil, nil, false); err != nil {
+		t.Fatalf("UpdateNode A failed: %v", err)
+	}
+
+	if err := svc.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages failed: %v", err)
+	}
+
+	broken, err := svc.GetBrokenLinks()
+	if err != nil {
+		t.Fatalf("GetBrokenLinks failed: %v", err)
+	}
+
+	if len(broken) != 1 {
+		t.Fatalf("expected 1 broken link, got %d: %+v", len(broken), broken)
+	}
+	got := broken[0]
+	if got.FromPageID != pageAID {
+		t.Errorf("FromPageID = %q, want %q", got.FromPageID, pageAID)
+	}
+	if got.FromPath != "/docs/a" {
+		t.Errorf("FromPath = %q, want %q", got.FromPath, "/docs/a")
+	}
+	if got.FromTitle != "Page A" {
+		t.Errorf("FromTitle = %q, want %q", got.FromTitle, "Page A")
+	}
+	if got.ToPath != "/nonexistent" {
+		t.Errorf("ToPath = %q, want %q", got.ToPath, "/nonexistent")
+	}
+}
+
 func TestLinksStore_GetBrokenIncomingForPath_FiltersByPath(t *testing.T) {
 	svc, ts, store := setupLinkService(t)
 

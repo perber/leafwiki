@@ -46,7 +46,6 @@ export type BrokenLink = {
   from_title: string
 
   to_path: string
-  to_title: string
 }
 
 export type BrokenLinksResult = {

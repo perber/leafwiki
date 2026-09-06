@@ -6,6 +6,7 @@
   "heading": "Missing pages",
   "sortLabel": "Sorted alphabetically",
   "linksTo": "links to",
+  "loading": "Loading broken links…",
   "button": {
     "text": "Refresh",
     "refreshing": "Refreshing…"
