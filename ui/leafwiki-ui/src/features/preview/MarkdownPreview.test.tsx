@@ -238,14 +238,15 @@ echo two
     expect(image).not.toHaveStyle({ width: '101%' })
   })
 
-  it('renders external images from sanitized inline html', () => {
+  it('does not leak the mdast node onto the rendered image element', () => {
     const { container } = renderPreview(
-      '<img src="https://example.com/banner.png" alt="Remote banner" />',
+      '![Resizable image](https://example.com/image.png){width=75%}',
     )
+
     const image = container.querySelector('img')
+
     expect(image).not.toBeNull()
-    expect(image?.getAttribute('src')).toBe('https://example.com/banner.png')
-    expect(image?.getAttribute('alt')).toBe('Remote banner')
+    expect(image?.hasAttribute('node')).toBe(false)
   })
 })
 

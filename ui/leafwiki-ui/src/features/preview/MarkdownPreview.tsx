@@ -325,12 +325,14 @@ export default function MarkdownPreview({
     () => ({
       a: markdownLink,
       img: ({
+        node,
         ...props
       }: MarkdownNodeProp &
         ClassAttributes<HTMLImageElement> &
-        HTMLAttributes<HTMLImageElement>) => (
-        <MarkdownImage {...props} resolveAssetUrl={resolveAssetUrl} />
-      ),
+        HTMLAttributes<HTMLImageElement>) => {
+        void node
+        return <MarkdownImage {...props} resolveAssetUrl={resolveAssetUrl} />
+      },
       audio: ({
         node,
         ...props
