@@ -164,7 +164,52 @@ Now LeafWiki is available securely at:
 
 ---
 
-## 6. Auto-Renew SSL Certificates
+## 6. Serve LeafWiki under a URL prefix
+
+To serve the wiki at `https://wiki.example.com/wiki/`, configure both LeafWiki and nginx to use the same prefix.
+
+Set `LEAFWIKI_BASE_PATH=/wiki` in LeafWiki's environment (for the installation above, edit `/etc/leafwiki/.env`) and restart LeafWiki:
+
+```bash
+sudo systemctl restart leafwiki
+```
+
+For Docker, set the same environment variable or pass `--base-path=/wiki` to the container. The base path has a leading slash and no trailing slash.
+
+In the HTTPS `server` block from step 5, replace `location /` with these two locations, keeping the TLS settings and `client_max_body_size`:
+
+```nginx
+location = /wiki {
+    return 301 /wiki/;
+}
+
+location /wiki/ {
+    proxy_pass         http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+
+    proxy_set_header   Host              $host;
+    proxy_set_header   X-Real-IP         $remote_addr;
+    proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header   X-Forwarded-Proto $scheme;
+}
+```
+
+Keep `proxy_pass` without a trailing slash or URI part. For example, `proxy_pass http://127.0.0.1:8080/;` would strip `/wiki/` from the forwarded request. LeafWiki expects that prefix when `--base-path=/wiki` is configured, so requests for assets such as `/wiki/static/...` would return 404.
+
+Do not force `proxy_set_header Accept-Encoding gzip;`. Leave the browser's header unchanged; if desired, configure compression with nginx's `gzip` directives instead.
+
+Validate and reload the configuration:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Open `https://wiki.example.com/wiki/` and confirm that the page and its CSS/JavaScript assets load. Requests to `/wiki` should redirect to `/wiki/`.
+
+---
+
+## 7. Auto-Renew SSL Certificates
 
 Certbot installs a renewal timer automatically.  
 You can test it with:
