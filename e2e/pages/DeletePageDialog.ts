@@ -5,7 +5,7 @@ export default class DeletePageDialog {
 
   dialogText() {
     return this.page.getByText(
-      /Are you sure you want to delete this (page|section)\? This action cannot be undone\./,
+      /Are you sure you want to delete the (page|section) ".*"\? This action cannot be undone\./,
     );
   }
 

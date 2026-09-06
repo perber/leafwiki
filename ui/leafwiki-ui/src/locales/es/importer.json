@@ -1,0 +1,171 @@
+{
+  "title": "Importar",
+  "toast": {
+    "planCreatedSuccess": "Plan de importación creado correctamente",
+    "createPlanErrorFallback": "No se pudo crear el plan de importación",
+    "loadPlanErrorFallback": "No se pudo cargar el plan de importación",
+    "noPlanToExecute": "No hay ningún plan de importación que ejecutar",
+    "executeSuccess": "Importación completada correctamente",
+    "canceledSuccess": "Importación cancelada",
+    "executionFailedFallback": "La ejecución de la importación ha fallado",
+    "executeErrorFallback": "No se pudo ejecutar el plan de importación",
+    "noPlanToClear": "No hay ningún plan de importación que borrar",
+    "canceledBeforeCompletion": "La importación terminó antes de que se completara la cancelación",
+    "planClearedSuccess": "Plan de importación borrado",
+    "cancelOrClearErrorFallback": "No se pudo cancelar ni borrar el plan de importación",
+    "unexpectedCancelResponse": "Respuesta inesperada al cancelar la importación"
+  },
+  "planActions": {
+    "create": "Crear página",
+    "update": "Actualizar página",
+    "skip": "Omitir elemento"
+  },
+  "resultActions": {
+    "needsAttention": "Requiere atención",
+    "created": "Creado",
+    "updated": "Actualizado",
+    "skipped": "Omitido",
+    "conflicted": "En conflicto"
+  },
+  "steps": {
+    "selectZip": {
+      "title": "Seleccionar Zip",
+      "description": "Elige el paquete que quieres importar."
+    },
+    "reviewPlan": {
+      "title": "Revisar plan",
+      "description": "Comprueba las páginas y rutas generadas."
+    },
+    "runImport": {
+      "title": "Ejecutar Importación",
+      "description": "Observa el progreso mientras trabaja el importador."
+    },
+    "reviewResult": {
+      "title": "Revisar Resultado",
+      "description": "Revisa los elementos importados, omitidos o fallidos."
+    }
+  },
+  "nextAction": {
+    "chooseZip": "Elige un archivo ZIP y crea un plan de importación.",
+    "reviewThenStart": "Revisa los elementos generados y, después, inicia la importación.",
+    "cancellationRequested": "Se solicitó la cancelación. El importador se detendrá cuando termine el elemento actual.",
+    "running": "La importación está en curso. Puedes permanecer en esta página y observar cómo se actualiza el progreso.",
+    "completed": "La importación ha terminado correctamente. Revisa el resultado siguiente o inicia una nueva importación con otro paquete Zip.",
+    "failed": "La importación se detuvo debido a un error. Comprueba el mensaje y los elementos del resultado siguientes.",
+    "canceled": "La importación se canceló. El trabajo completado se conservó y se muestra a continuación.",
+    "selectZipToBegin": "Selecciona un archivo Zip para comenzar."
+  },
+  "beforeYouStart": {
+    "title": "Antes de empezar",
+    "description": "Importa un archivo Zip con archivos Markdown. LeafWiki crea primero un plan de revisión y solo importa las páginas después de que inicies explícitamente el paso de ejecución.",
+    "whatHappensNext": "¿Qué ocurre después?",
+    "stepPrefix": "Paso {{number}}",
+    "safeReviewTitle": "Revisión segura primero",
+    "safeReviewText": "Crear el plan todavía no importa las páginas.",
+    "linksAssetsTitle": "Enlaces y recursos",
+    "linksAssetsText": "Los enlaces internos y los recursos incrustados se reescriben durante la importación.",
+    "alphaTitle": "Todavía en fase alfa",
+    "alphaText": "Es posible que algunas variantes de Markdown requieran una limpieza manual posterior."
+  },
+  "flow": {
+    "title": "Flujo de Importación"
+  },
+  "package": {
+    "title": "Elegir Paquete de Importación",
+    "description": "Selecciona un archivo zip que contenga archivos Markdown. Después, crearemos un plan de vista previa para que puedas revisar las rutas, acciones y notas antes de ejecutar la importación.",
+    "issueHint": "Si encuentras problemas, resultados inesperados o casos límite no compatibles, crea una incidencia en nuestro <link>repositorio de GitHub</link>.",
+    "currentZip": "Zip actual:",
+    "noZipSelected": "No se ha seleccionado ningún Archivo Zip",
+    "selectZipFile": "Seleccionar Archivo Zip",
+    "supportedInputHint": "Entrada compatible: un único archivo `.zip` que contenga tu base de conocimiento en Markdown.",
+    "importFromZip": "Importar desde Zip",
+    "planOnlyHint": "Esto solo crea el plan de revisión. No se importarán páginas hasta que hagas clic en `Ejecutar Plan de Importación`."
+  },
+  "plan": {
+    "title": "Plan de Importación",
+    "description": "Revisa lo que LeafWiki está a punto de crear, actualizar u omitir antes de iniciar la importación.",
+    "currentStatus": "Estado actual",
+    "planId": "ID del plan: {{id}}",
+    "progress": "Progreso: {{progress}}",
+    "percentComplete": "{{percent}}% completado",
+    "willCreate": "Se creará",
+    "willUpdate": "Se actualizará",
+    "willSkip": "Se omitirá",
+    "runningCancelRequested": "Se solicitó la cancelación. El importador se detendrá cuando termine el elemento actual.",
+    "runningInBackground": "La importación se está ejecutando en segundo plano. Puedes permanecer en esta página para observar el progreso.",
+    "currentlyProcessing": " Procesando {{path}}.",
+    "canceledNotice": "La importación se canceló. Los elementos completados se conservaron y el resultado parcial se muestra a continuación.",
+    "idLabel": "ID:",
+    "treeHashLabel": "Hash del árbol:",
+    "progressLabel": "Progreso:",
+    "startedAtLabel": "Iniciada el:",
+    "finishedAtLabel": "Finalizada el:",
+    "startNewImport": "Iniciar Nueva Importación",
+    "closeAndClear": "Cerrar y Borrar"
+  },
+  "plannedItems": {
+    "title": "Elementos Planificados ({{count}})",
+    "description": "Estos son los archivos individuales que LeafWiki detectó en el paquete y cómo se asignan a las páginas de destino.",
+    "importFile": "Archivo de Importación",
+    "targetPage": "Página de Destino",
+    "titleColumn": "Título",
+    "type": "Tipo",
+    "plannedAction": "Acción Planificada",
+    "notesForReview": "Notas para Revisar",
+    "noSpecialNotes": "No hay notas especiales"
+  },
+  "run": {
+    "title": "Ejecutar Importación",
+    "descriptionPlan": "Inicia la importación cuando el plan parezca correcto. También puedes borrar el plan actual y volver a empezar con otro paquete.",
+    "descriptionRunning": "El importador está procesando el plan generado. Puedes permanecer en esta página para supervisar el progreso o solicitar la cancelación.",
+    "currentStatus": "Estado actual",
+    "importRunning": "Importación en curso",
+    "executeImportPlan": "Ejecutar Plan de Importación",
+    "cancelRequested": "Cancelación Solicitada",
+    "cancelImport": "Cancelar Importación",
+    "clearImportPlan": "Borrar Plan de Importación"
+  },
+  "result": {
+    "title": "Resultado de la Importación",
+    "description": "Este es el resultado final de la importación. Los elementos omitidos normalmente requieren una revisión manual, mientras que los fallidos necesitan atención antes de volver a intentarlo.",
+    "wantAnotherTitle": "¿Quieres importar otro paquete?",
+    "wantAnotherBody": "Inicia una nueva importación para borrar este resultado y elegir otro archivo zip.",
+    "created": "Creados",
+    "skipped": "Omitidos",
+    "failed": "Fallidos",
+    "treeUpdated": "Árbol Actualizado",
+    "yes": "Sí",
+    "no": "No",
+    "importedCount": "Cantidad Importada:",
+    "updatedCount": "Cantidad Actualizada:",
+    "skippedCount": "Cantidad Omitida:"
+  },
+  "resultItems": {
+    "title": "Elementos del Resultado ({{filtered}}/{{total}})",
+    "description": "Usa los filtros para centrarte en las importaciones correctas, los elementos omitidos o los fallos.",
+    "filterPlaceholder": "Filtrar por ruta, acción o error",
+    "importedFile": "Archivo Importado",
+    "resultingPage": "Página Resultante",
+    "outcome": "Resultado",
+    "details": "Detalles",
+    "detailImported": "Importado correctamente",
+    "detailUpdated": "La página existente se actualizó",
+    "detailSkipped": "Omitido sin errores",
+    "detailNone": "No hay detalles adicionales",
+    "noItemsMatch": "Ningún elemento coincide con el filtro actual.",
+    "filter": {
+      "all": "Todos",
+      "created": "Creados",
+      "skipped": "Omitidos",
+      "failed": "Fallidos"
+    }
+  },
+  "status": {
+    "running": "En curso",
+    "completed": "Completada",
+    "canceled": "Cancelada",
+    "failed": "Fallida",
+    "planned": "Planificada",
+    "idle": "Inactiva"
+  }
+}

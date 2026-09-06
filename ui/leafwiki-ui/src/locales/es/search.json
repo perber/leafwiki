@@ -1,0 +1,32 @@
+{
+  "input": {
+    "placeholder": "Buscar...",
+    "clearButton": "Borrar"
+  },
+  "tags": {
+    "accordionTitle": "Todas las Etiquetas",
+    "available_one": "{{count}} etiqueta disponible",
+    "available_other": "{{count}} etiquetas disponibles",
+    "selected_one": "{{count}} etiqueta seleccionada",
+    "selected_other": "{{count}} etiquetas seleccionadas",
+    "loading": "Cargando etiquetas…",
+    "error": "No se pudieron cargar las etiquetas.",
+    "clearFilter": "Borrar filtro de etiquetas"
+  },
+  "results": {
+    "loading": "Cargando resultados...",
+    "noResults": "No se encontraron resultados.",
+    "resultSummary_one": "Se encontró <bold>{{count}}</bold> resultado para",
+    "resultSummary_other": "Se encontraron <bold>{{count}}</bold> resultados para",
+    "filterQuery": "\"{{query}}\"",
+    "filterQueryWithTags_one": "\"{{query}}\" con {{count}} etiqueta",
+    "filterQueryWithTags_other": "\"{{query}}\" con {{count}} etiquetas",
+    "filterTagged": "con la etiqueta \"{{tag}}\"",
+    "filterTaggedWith_one": "con {{count}} etiqueta",
+    "filterTaggedWith_other": "con {{count}} etiquetas"
+  },
+  "resultCard": {
+    "kindPage": "Página",
+    "kindSection": "Sección"
+  }
+}

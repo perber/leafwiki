@@ -1,0 +1,44 @@
+{
+  "restoreButton": "Restaurar",
+  "restoreConfirmTitle": "¿Restaurar esta copia de seguridad?",
+  "restoreConfirmDescription": "Esto sobrescribirá todo el contenido activo, los usuarios y la configuración con lo incluido en esta copia de seguridad, y cerrará la sesión de todos inmediatamente — incluida la tuya. Todos deberán volver a iniciar sesión. Las escrituras se desactivarán temporalmente mientras se ejecuta la restauración. Esta acción no se puede deshacer.",
+  "restoreConfirmCancel": "Cancelar",
+  "restoreConfirmAction": "Restaurar",
+  "restoring": "Restaurando…",
+  "uploadSectionTitle": "Restaurar desde una copia de seguridad subida",
+  "uploadSectionDescription": "Restaura desde una copia de seguridad ZIP externa — por ejemplo, una descargada anteriormente o copiada desde otra instancia.",
+  "uploadSelectButton": "Seleccionar archivo ZIP",
+  "currentFileLabel": "ZIP actual:",
+  "noFileSelected": "No se ha seleccionado ningún archivo ZIP",
+  "uploadConfirmTitle": "¿Restaurar esta copia de seguridad subida?",
+  "uploadConfirmDescription": "Esto sobrescribirá todo el contenido activo, los usuarios y la configuración con lo incluido en la copia de seguridad subida, y cerrará la sesión de todos inmediatamente — incluida la tuya. Todos deberán volver a iniciar sesión. Las escrituras se desactivarán temporalmente mientras se ejecuta la restauración. Esta acción no se puede deshacer.",
+  "uploadConfirmCancel": "Cancelar",
+  "uploadConfirmAction": "Restaurar",
+  "progressLabel": "Fase actual",
+  "resyncTailLabel": "Restauración completada — reconstruyendo el índice de búsqueda antes de recargar",
+  "progress": {
+    "validating": "Validando la copia de seguridad",
+    "swapping": "Intercambiando archivos",
+    "reopening_auth": "Volviendo a abrir la base de datos de usuarios",
+    "invalidating_sessions": "Invalidando sesiones",
+    "reloading_branding": "Recargando la configuración de marca",
+    "tree": "Reconstruyendo el árbol de páginas",
+    "links": "Indexando enlaces",
+    "tags": "Reconstruyendo etiquetas y propiedades",
+    "search": "Indexando la búsqueda"
+  },
+  "versionWarningLabel": "La versión no coincide",
+  "needsInterventionTitle": "La restauración requiere atención",
+  "needsInterventionDescription": "La restauración no pudo finalizar correctamente y esta instancia podría quedar en un estado parcialmente restaurado. Las escrituras permanecerán desactivadas hasta resolverlo. Reiniciar el servidor ahora vuelve a cargar lo que realmente hay en el disco, que es la forma compatible de recuperar un estado coherente.",
+  "selfRestartButton": "Reiniciar el servidor ahora",
+  "selfRestarting": "Reiniciando el servidor… esta página se recargará automáticamente en unos segundos.",
+  "toast": {
+    "restoreAlreadyRunning": "Ya hay una restauración en curso",
+    "restoreFailed": "La restauración ha fallado",
+    "restoreSucceeded": "Restauración completada. Recargando…",
+    "restoreSucceededResyncUnconfirmed": "La restauración se completó, pero no se pudo confirmar que terminara de reconstruirse el índice de búsqueda. Recargando — haz clic en el botón de actualizar del explorador si los resultados de búsqueda parecen desactualizados."
+  },
+  "errors": {
+    "jobLost": "Se perdió el trabajo de restauración — es posible que el servidor se haya reiniciado"
+  }
+}

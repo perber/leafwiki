@@ -1,0 +1,48 @@
+{
+  "pageTitle": "Configuración de Marca",
+  "storeErrors": {
+    "loadFallback": "No se pudo cargar la configuración de marca",
+    "updateFallback": "No se pudo actualizar la configuración de marca",
+    "uploadLogoFallback": "No se pudo subir el logotipo",
+    "uploadFaviconFallback": "No se pudo subir el favicon",
+    "deleteLogoFallback": "No se pudo eliminar el logotipo",
+    "deleteFaviconFallback": "No se pudo eliminar el favicon"
+  },
+  "siteName": {
+    "title": "Nombre del Sitio",
+    "description": "El nombre que se muestra en el encabezado, los títulos de las páginas y la pantalla de inicio de sesión.",
+    "label": "Nombre del sitio",
+    "placeholder": "LeafWiki"
+  },
+  "logo": {
+    "title": "Logotipo",
+    "description": "El logotipo que se muestra en el encabezado junto al nombre del sitio.",
+    "currentLabel": "Logotipo actual:",
+    "noLogo": "No se ha subido ningún logotipo",
+    "uploadLabel": "Subir Logotipo",
+    "uploadButton": "Subir Imagen",
+    "hint": "Se acepta: {{exts}}; tamaño máximo: {{size}} MB"
+  },
+  "favicon": {
+    "title": "Favicon",
+    "description": "El icono que se muestra en la pestaña del navegador.",
+    "currentLabel": "Favicon actual:",
+    "noFavicon": "Se está utilizando el favicon predeterminado",
+    "uploadLabel": "Subir Favicon",
+    "uploadButton": "Subir Favicon",
+    "hint": "Se acepta: {{exts}}; tamaño máximo: {{size}} MB"
+  },
+  "save": "Guardar Configuración",
+  "toast": {
+    "logoDeleted": "Logotipo eliminado correctamente",
+    "logoDeleteFailed": "No se pudo eliminar el logotipo",
+    "faviconDeleted": "Favicon eliminado correctamente",
+    "faviconDeleteFailed": "No se pudo eliminar el favicon",
+    "brandingSaved": "Configuración de marca guardada",
+    "brandingSaveFailed": "No se pudo guardar la configuración de marca",
+    "logoUploaded": "Logotipo subido correctamente",
+    "logoUploadFailed": "No se pudo subir el logotipo",
+    "faviconUploaded": "Favicon subido correctamente",
+    "faviconUploadFailed": "No se pudo subir el favicon"
+  }
+}

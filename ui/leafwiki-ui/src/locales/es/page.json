@@ -1,0 +1,129 @@
+{
+  "common": {
+    "page": "página",
+    "section": "sección",
+    "pageCapitalized": "Página",
+    "sectionCapitalized": "Sección",
+    "cancel": "Cancelar",
+    "errorPrefix": "Error: {{error}}",
+    "unknownError": "Se produjo un error desconocido"
+  },
+  "addDialog": {
+    "slugNotGenerated": "No se pudo generar el slug. Introdúcelo manualmente.",
+    "slugStillGenerating": "Espera hasta que el slug se haya generado por completo.",
+    "createdToast": "{{item}} creado",
+    "createErrorFallback": "Error al crear {{item}}",
+    "create": "Crear",
+    "createAndEdit": "Crear & Editar {{item}}",
+    "titlePage": "Crear una página nueva",
+    "titleSection": "Crear una sección nueva",
+    "descriptionPage": "Introduce el título de la página nueva",
+    "descriptionSection": "Introduce el título de la sección nueva",
+    "titleLabel": "Título",
+    "titlePlaceholder": "Título de {{item}}",
+    "pathPrefix": "Ruta:"
+  },
+  "moveDialog": {
+    "movedToast": "Página movida correctamente",
+    "moveErrorFallback": "Error al mover {{item}}",
+    "title": "Mover {{item}}",
+    "description": "Selecciona un nuevo elemento principal para esta {{item}}",
+    "move": "Mover"
+  },
+  "deleteDialog": {
+    "loadReferencesErrorFallback": "No se pudieron cargar las referencias de la página",
+    "deletedToast": "{{item}} eliminado correctamente",
+    "deleteErrorFallback": "Error al eliminar {{item}}",
+    "title": "¿Eliminar {{item}}?",
+    "description": "¿Seguro que quieres eliminar {{item}} \"{{name}}\"? Esta acción no se puede deshacer.",
+    "deleting": "Eliminando...",
+    "delete": "Eliminar",
+    "modifiedWarningTitle": "Otro usuario modificó esta página.",
+    "modifiedWarningBody": "La página se ha actualizado. ¿Aún quieres eliminarla?",
+    "backlinksLoading": "Comprobando qué páginas hacen referencia a esta página...",
+    "backlinksError": "No se pudieron cargar las referencias de la página. La eliminación seguirá funcionando, pero no se pudo mostrar el impacto en los enlaces.",
+    "backlinksWarning_one": "Esta página aparece referenciada en {{count}} página.",
+    "backlinksWarning_other": "Esta página aparece referenciada en {{count}} páginas.",
+    "backlinksWarningBody": "Eliminar esta página dejará esos enlaces rotos.",
+    "noBacklinks": "Actualmente ninguna página hace referencia a esta página.",
+    "deleteSubpages": "Eliminar también todas las subpáginas"
+  },
+  "sortDialog": {
+    "dragToReorder": "Arrastra para reordenar",
+    "sortedToast": "Elementos secundarios de {{item}} ordenados correctamente",
+    "sortErrorFallback": "Error al ordenar los elementos secundarios de {{item}}",
+    "title": "Ordenar elementos secundarios de {{item}}",
+    "description": "Arrastra los elementos para reordenarlos, usa las flechas o elige una opción de ordenación. Los cambios se guardan al hacer clic en 'Guardar'.",
+    "save": "Guardar",
+    "sortAlphabetically": "Ordenar alfabéticamente:",
+    "ascending": "A → Z",
+    "descending": "Z → A",
+    "sortSections": "Agrupar secciones:",
+    "sectionsFirst": "Secciones Primero",
+    "sectionsLast": "Secciones al Final"
+  },
+  "copyDialog": {
+    "slugNotGenerated": "No se pudo generar el slug. Introdúcelo manualmente.",
+    "slugStillGenerating": "Espera hasta que el slug se haya generado por completo.",
+    "copiedToast": "{{item}} copiado",
+    "copyErrorFallback": "Error al copiar {{item}}",
+    "copyOfTitle": "Copia de {{title}}",
+    "title": "Copiar {{item}}",
+    "description": "Crear una copia de este {{item}}",
+    "copying": "Copiando...",
+    "copyAndEdit": "Copiar & Editar {{item}}",
+    "titleLabel": "Título",
+    "titlePlaceholder": "Título de {{item}}",
+    "pathPrefix": "Ruta:"
+  },
+  "permalinkDialog": {
+    "copyErrorToast": "No se pudo copiar el enlace permanente",
+    "copiedToast": "Enlace permanente copiado",
+    "title": "Compartir página",
+    "description": "Enlace permanente a {{title}}",
+    "close": "Cerrar",
+    "urlLabel": "Enlace permanente",
+    "copyLink": "Copiar enlace",
+    "openLink": "Abrir enlace",
+    "purposeNote": "Este es un enlace interno permanente. Seguirá funcionando aunque se cambie el nombre o se mueva la página, por lo que es seguro guardarlo en favoritos o usarlo como referencia desde otras páginas.",
+    "accessNote": "No es un enlace público. Las personas a las que lo envíes deberán iniciar sesión en esta wiki para abrirlo, a menos que toda la wiki tenga acceso público. LeafWiki no puede hacer pública una sola página mientras el resto permanece privado."
+  },
+  "createByPathDialog": {
+    "createdToast": "Página creada correctamente",
+    "createErrorFallback": "Error al crear la página",
+    "title": "Crear una página nueva",
+    "description": "Introduce el título",
+    "creating": "Creando...",
+    "create": "Crear",
+    "createAndEdit": "Crear & Editar",
+    "existsAlert": "Ya existe una página en esta ruta.",
+    "lookupResultTitle": "Resultado de la búsqueda de la ruta:",
+    "segmentExists": "existe",
+    "segmentWillBeCreated": "se creará",
+    "titleLabel": "Título",
+    "titlePlaceholder": "Título de la página",
+    "pathLabel": "Ruta",
+    "pathPlaceholder": "Ruta de la página"
+  },
+  "select": {
+    "topLevel": "Nivel Superior",
+    "searchPlaceholder": "Buscar páginas...",
+    "searchAriaLabel": "Buscar páginas",
+    "noPagesFound": "No se encontraron páginas.",
+    "pagesAriaLabel": "Páginas"
+  },
+  "refactorDialog": {
+    "title": "¿Actualizar referencias?",
+    "description": "Este cambio afecta a la ruta de la página. Revisa las páginas afectadas antes de continuar.",
+    "saveWithoutRewrite": "Guardar sin actualizar los enlaces",
+    "continue": "Continuar",
+    "oldPath": "Ruta anterior:",
+    "newPath": "Ruta nueva:",
+    "updateLinksLabel": "Actualizar automáticamente los enlaces en las páginas que hacen referencia",
+    "referencingPages": "Páginas que hacen referencia ({{count}})",
+    "noReferences": "Ninguna página hace referencia a esta ruta."
+  },
+  "historyPage": {
+    "backToPage": "Volver a la Página"
+  }
+}

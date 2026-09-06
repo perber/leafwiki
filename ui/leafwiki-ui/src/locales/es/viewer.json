@@ -1,0 +1,256 @@
+{
+  "layout": {
+    "toggleSidebar": "Mostrar u ocultar barra lateral",
+    "resizeSidebar": "Cambiar tamaño de la barra lateral",
+    "closeSidebar": "Cerrar barra lateral"
+  },
+  "breadcrumbs": {
+    "navAriaLabel": "Ruta de navegación"
+  },
+  "section": {
+    "overviewTitle": "Descripción general de '{{title}}'",
+    "overviewDescriptionBase": "Esta página es la descripción general predeterminada de la sección y muestra sus páginas y secciones.",
+    "overviewDescriptionEditorHint": "Al editar esta página, puedes definir una página de inicio personalizada para la sección.",
+    "overviewDescriptionReadOnly": "Esta página es una descripción general generada automáticamente de la sección.",
+    "emptyTitle": "Esta sección está vacía.",
+    "emptyDescriptionEditor": "La sección {{title}} todavía no contiene páginas ni secciones. Empieza añadiendo una página nueva o crea una sección nueva.",
+    "emptyDescriptionReadOnly": "La sección {{title}} todavía no contiene páginas ni secciones.",
+    "addPage": "Añadir página",
+    "addSection": "Añadir sección",
+    "subpagesAriaLabel": "Subpáginas de {{title}}",
+    "sectionSuffix": "(Sección)",
+    "updatedByLabel": "Actualizada por {{editor}} · {{time}}",
+    "updatedLabel": "Actualizada {{time}}"
+  },
+  "markdownPreview": {
+    "renderError": "Esta página contiene Markdown que no se pudo renderizar de forma segura.",
+    "brokenLinkTooltip": "Esta página todavía no existe."
+  },
+  "mermaid": {
+    "renderError": "No se pudo renderizar el diagrama de Mermaid.",
+    "noSvgOutput": "No hay ningún elemento SVG en la salida de Mermaid"
+  },
+  "headline": {
+    "linkToSection": "Enlace a la sección"
+  },
+  "backlinks": {
+    "errorPrefix": "Error: {{error}}",
+    "pageIdRequired": "Se requiere el ID de la página",
+    "fetchFailedFallback": "No se pudo obtener el estado de los enlaces",
+    "referencedBy": "Referenciada por",
+    "loading": "Cargando…",
+    "noReferences": "Ninguna página hace referencia a esta página.",
+    "brokenLinks": "Enlaces rotos",
+    "noBrokenLinks": "No hay enlaces rotos.",
+    "brokenOutgoingsTitle": "Esta página enlaza con destinos inexistentes",
+    "brokenIncomingTitle": "Páginas que enlazan con una ruta antigua"
+  },
+  "pinned": {
+    "sectionTitle": "Fijadas",
+    "pagesSectionTitle": "Páginas",
+    "pinPage": "Fijar",
+    "unpinPage": "Desfijar",
+    "pinSuccess": "Página fijada",
+    "unpinSuccess": "Página desfijada",
+    "pinError": "No se pudo actualizar el estado de fijación",
+    "togglePinnedSection": "Mostrar u ocultar la sección de páginas fijadas",
+    "togglePagesSection": "Mostrar u ocultar la sección de páginas",
+    "unpinPageAriaLabel": "Desfijar página"
+  },
+  "favorites": {
+    "sectionTitle": "Favoritos",
+    "addFavorite": "Añadir a favoritos",
+    "removeFavorite": "Quitar de favoritos",
+    "addSuccess": "Añadido a favoritos",
+    "removeSuccess": "Quitado de favoritos",
+    "favoriteError": "No se pudieron actualizar los favoritos",
+    "toggleFavoritesSection": "Mostrar u ocultar la sección de favoritos"
+  },
+  "toc": {
+    "title": "Tabla de contenidos",
+    "onThisPage": "En esta página",
+    "downloads": "Multimedia Adjunta",
+    "collapse": "Contraer tabla de contenidos",
+    "expand": "Expandir tabla de contenidos"
+  },
+  "toolbar": {
+    "moreActions": "Más acciones",
+    "expandAll": "Expandir todo",
+    "collapseAll": "Contraer todo",
+    "sortPages": "Ordenar páginas",
+    "refresh": "Actualizar explorador",
+    "refreshSuccess": "Explorador actualizado",
+    "refreshError": "La actualización ha fallado",
+    "refreshAlreadyRunning": "La actualización ya está en curso",
+    "refreshPullFailed": "No se pudieron extraer los cambios remotos",
+    "syncJobLostFallback": "Se perdió el trabajo de sincronización — es posible que el servidor se haya reiniciado"
+  },
+  "pageToolbar": {
+    "itemPage": "Página",
+    "itemSection": "Sección",
+    "editButton": "Editar {{item}}",
+    "shareButton": "Compartir {{item}}",
+    "printButton": "Imprimir {{item}}",
+    "copyButton": "Copiar {{item}}",
+    "deleteButton": "Eliminar {{item}}",
+    "historyButton": "Historial de {{item}}"
+  },
+  "treeActions": {
+    "loading": "Cargando...",
+    "loadErrorPrefix": "Error: {{error}}",
+    "createNewPageTooltip": "Crear página nueva",
+    "createNewSectionTooltip": "Crear sección nueva",
+    "untitledPage": "Página sin título",
+    "convertedToast": "Página convertida correctamente",
+    "conflictRetryMessage": "Otro usuario modificó esta página. Inténtalo de nuevo.",
+    "convertErrorFallback": "No se pudo convertir la página",
+    "renameEditingWarning": "Este {{item}} se está editando. Usa la barra de título del editor para cambiarle el nombre.",
+    "renamedToast": "{{item}} renombrado correctamente",
+    "renameErrorFallback": "No se pudo cambiar el nombre de la página",
+    "deleteEditingWarning": "Este {{item}} se está editando. Cierra el editor antes de eliminarlo.",
+    "menuAddPage": "Añadir página",
+    "menuAddSection": "Añadir sección",
+    "menuEdit": "Editar {{item}}",
+    "menuRename": "Cambiar el nombre de {{item}}",
+    "menuCopyPage": "Copiar página",
+    "menuSortChildren": "Ordenar elementos secundarios de {{item}}",
+    "menuMove": "Mover {{item}}",
+    "menuConvertToPage": "Convertir en página",
+    "menuDelete": "Eliminar {{item}}",
+    "emptySectionToast": "\"{{title}}\" ahora es una sección vacía",
+    "convertBackAction": "Volver a convertir en página",
+    "convertedBackToast": "\"{{title}}\" vuelve a ser una página",
+    "convertBackErrorFallback": "No se pudo volver a convertir la sección en página",
+    "reorderErrorFallback": "No se pudieron reordenar las páginas",
+    "moveErrorFallback": "No se pudo mover la página"
+  },
+  "codeBlock": {
+    "copyErrorToast": "No se pudo copiar el código",
+    "copiedToast": "Código copiado",
+    "copyTooltip": "Copiar código",
+    "copiedTooltip": "Copiado",
+    "copyAriaLabel": "Copiar código",
+    "copiedAriaLabel": "Código copiado"
+  },
+  "designToggle": {
+    "switchToLight": "Cambiar al modo claro",
+    "switchToDark": "Cambiar al modo oscuro"
+  },
+  "imagePreview": {
+    "openInNewTab": "Abrir en una pestaña nueva"
+  },
+  "pageSwitcher": {
+    "trigger": "Ir a la página",
+    "triggerWithHotkey": "Ir a la página ({{hotkey}})",
+    "dialogTitle": "Ir a la página",
+    "dialogDescription": "Busca páginas existentes por título, ruta o ruta de navegación.",
+    "searchPlaceholder": "Escribe el título de una página…",
+    "searchAriaLabel": "Buscar páginas",
+    "noMatch": "No se encontró ninguna página coincidente.",
+    "matchingPagesAriaLabel": "Páginas coincidentes"
+  },
+  "metadata": {
+    "propertiesToggle": "Propiedades ({{count}})"
+  },
+  "shortcutsHelp": {
+    "menuItem": "Atajos de teclado",
+    "title": "Atajos de teclado disponibles",
+    "description": "Resumen rápido de los atajos del modo actual de la página.",
+    "currentMode": "Modo actual de la página: {{mode}}",
+    "dialogHint": "Los atajos de los diálogos también se incluyen mientras este diálogo está abierto.",
+    "closeButton": "Cerrar",
+    "categories": {
+      "navigation": "Navegación",
+      "editing": "Edición",
+      "viewing": "Visualización",
+      "dialogs": "Diálogos"
+    },
+    "modes": {
+      "view": "visualización",
+      "edit": "edición",
+      "history": "historial",
+      "settings": "configuración",
+      "dialog": "diálogo"
+    },
+    "items": {
+      "goToPage": {
+        "action": "Ir a la página"
+      },
+      "openShortcutsHelp": {
+        "action": "Abrir atajos de teclado"
+      },
+      "editPage": {
+        "action": "Editar página"
+      },
+      "sharePage": {
+        "action": "Compartir página"
+      },
+      "printPage": {
+        "action": "Imprimir página"
+      },
+      "copyPage": {
+        "action": "Copiar página"
+      },
+      "deletePage": {
+        "action": "Eliminar página"
+      },
+      "pageHistory": {
+        "action": "Historial de la página"
+      },
+      "toggleToc": {
+        "action": "Mostrar u ocultar la tabla de contenidos"
+      },
+      "openExplorer": {
+        "action": "Abrir explorador"
+      },
+      "openSearch": {
+        "action": "Abrir búsqueda"
+      },
+      "savePage": {
+        "action": "Guardar página"
+      },
+      "closeEditor": {
+        "action": "Cerrar editor"
+      },
+      "formatBold": {
+        "action": "Aplicar formato de negrita"
+      },
+      "formatItalic": {
+        "action": "Aplicar formato de cursiva"
+      },
+      "insertHeadingOne": {
+        "action": "Insertar encabezado 1"
+      },
+      "insertHeadingTwo": {
+        "action": "Insertar encabezado 2"
+      },
+      "insertHeadingThree": {
+        "action": "Insertar encabezado 3"
+      },
+      "formatInlineCode": {
+        "action": "Aplicar formato de código en línea"
+      },
+      "insertLink": {
+        "action": "Insertar enlace"
+      },
+      "backToPage": {
+        "action": "Volver a la página"
+      },
+      "exitSettings": {
+        "action": "Salir de la configuración"
+      },
+      "closeDialog": {
+        "action": "Cerrar diálogo"
+      },
+      "confirmDialog": {
+        "action": "Acción predeterminada del diálogo"
+      },
+      "confirmRename": {
+        "action": "Confirmar cambio de nombre"
+      },
+      "cancelRename": {
+        "action": "Cancelar cambio de nombre"
+      }
+    }
+  }
+}
