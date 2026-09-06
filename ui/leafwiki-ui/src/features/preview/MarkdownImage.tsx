@@ -74,6 +74,11 @@ export function MarkdownImage({
       src={versionedSrc}
       alt={alt}
       style={{
+        // Tailwind's preflight resets images to `display: block`, which forces
+        // a line break between an image and any text that follows it on the
+        // same Markdown line (`![alt](img) text`). Keep Markdown images inline
+        // so trailing/leading text stays on the same line (#1471).
+        display: 'inline-block',
         ...style,
         cursor: 'zoom-in',
       }}

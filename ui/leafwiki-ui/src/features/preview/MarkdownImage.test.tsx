@@ -17,6 +17,12 @@ describe('MarkdownImage', () => {
     expect(useDialogsStore.getState().dialogType).toBe(DIALOG_IMAGE_PREVIEW)
   })
 
+  it('renders inline-block so trailing text stays on the same line (#1471)', () => {
+    render(<MarkdownImage src="/assets/foo.png" alt="foo" />)
+
+    expect(screen.getByAltText('foo')).toHaveStyle({ display: 'inline-block' })
+  })
+
   it('lets the surrounding link handle the click instead of opening the preview', () => {
     render(
       <a href="https://github.com/perber/leafwiki">
