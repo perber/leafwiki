@@ -3616,15 +3616,31 @@
       margin: 1cm;
     }
 
+    /* Neutralise every scroll/clip container between <html> and the article.
+       Chromium treats a box whose `overflow` is not `visible` as monolithic
+       (unbreakable) during pagination, so content crossing a page boundary is
+       clipped instead of flowing onto the next page — see #1531. The flex
+       `min-height`/`height` constraints from the on-screen layout have to go
+       for the same reason. */
     main,
     article,
     #root,
     .app-layout__content-wrapper,
+    .app-layout__main-column,
+    .app-layout__main-content-area,
+    .app-layout__main-content-area-editor,
     .app-layout__content-row,
     .page-viewer,
-    .page-viewer__content {
+    .page-viewer__body,
+    .page-viewer__content,
+    .page-history__preview-body,
+    .markdown-editor__preview,
+    .table-wrapper {
       background: #fff !important;
-      overflow: visible;
+      overflow: visible !important;
+      height: auto !important;
+      max-height: none !important;
+      min-height: 0 !important;
     }
 
     main {
@@ -3633,8 +3649,62 @@
       border: 0 !important;
     }
 
-    .app-layout__content-wrapper {
-      height: auto !important;
+    /* Page-break hygiene for the rendered markdown: keep a heading with the
+       text it introduces, and don't split atomic blocks down the middle. */
+    .page-viewer__content,
+    .page-history__preview-body,
+    .markdown-editor__preview {
+      orphans: 3;
+      widows: 3;
+    }
+
+    .page-viewer__content :where(h1, h2, h3, h4, h5, h6),
+    .page-history__preview-body :where(h1, h2, h3, h4, h5, h6),
+    .markdown-editor__preview :where(h1, h2, h3, h4, h5, h6) {
+      break-after: avoid;
+      break-inside: avoid;
+    }
+
+    .page-viewer__content
+      :where(
+        pre,
+        blockquote,
+        figure,
+        img,
+        tr,
+        thead,
+        .katex-display,
+        .markdown-shoutout
+      ),
+    .page-history__preview-body
+      :where(
+        pre,
+        blockquote,
+        figure,
+        img,
+        tr,
+        thead,
+        .katex-display,
+        .markdown-shoutout
+      ),
+    .markdown-editor__preview
+      :where(
+        pre,
+        blockquote,
+        figure,
+        img,
+        tr,
+        thead,
+        .katex-display,
+        .markdown-shoutout
+      ) {
+      break-inside: avoid;
+    }
+
+    .page-viewer__content :where(img),
+    .page-history__preview-body :where(img),
+    .markdown-editor__preview :where(img) {
+      max-height: 100vh;
     }
 
     html.dark,
@@ -3738,6 +3808,13 @@
     #sidebar-container,
     header,
     .sidebar-wrapper {
+      display: none !important;
+    }
+
+    /* The side TOC pane is navigation chrome, not article content — the
+       in-flow inline TOC is already `print:hidden` for the same reason. */
+    #app-toc-pane-root,
+    .app-layout__toc-pane {
       display: none !important;
     }
 
