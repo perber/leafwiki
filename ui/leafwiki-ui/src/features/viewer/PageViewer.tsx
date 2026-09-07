@@ -49,10 +49,19 @@ function displayUser(label?: { username: string }) {
   return label?.username || null
 }
 
-export default function PageViewer() {
+type PageViewerProps = {
+  /**
+   * Wiki route path to display instead of the one derived from the browser
+   * URL. Used by the site root, which shows the home page without navigating
+   * away from "/" (see RootPage).
+   */
+  routePath?: string
+}
+
+export default function PageViewer({ routePath }: PageViewerProps = {}) {
   const { t } = useTranslation('viewer')
   const location = useLocation()
-  const { pathname } = location
+  const pathname = routePath ?? location.pathname
   const navigate = useNavigate()
   const openDialog = useDialogsStore((state) => state.openDialog)
   const registerHotkey = useHotKeysStore((state) => state.registerHotkey)

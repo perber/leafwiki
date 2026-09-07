@@ -325,7 +325,10 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 				}
 			}
 
-			if c.Request.Method == http.MethodGet &&
+			// HEAD is answered like GET (net/http drops the body): link
+			// checkers, uptime monitors and preview bots probe with HEAD and
+			// would otherwise see every SPA route as a 404.
+			if (c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead) &&
 				!strings.HasPrefix(path, "/api") &&
 				!strings.HasPrefix(path, "/assets") &&
 				!strings.HasPrefix(path, "/static") &&
@@ -376,22 +379,44 @@ func BuildSPADocument(rawHTML string, c *gin.Context, path string, opts RouterOp
 	// Only offered for public wikis so private content is never rendered to
 	// unauthenticated requests (mirrors opts.PublicAccess gating on the
 	// pages API).
+	//
+	// The root serves the home page's content rather than an empty shell, and
+	// the home page's own path canonicalizes back to the root, so the two URLs
+	// that show the same page never compete for indexing.
 	meta := seo.PageMeta{SiteName: siteName}
 	ssrContent := ""
 	pageHead := ""
 	if opts.PublicAccess != nil && opts.PublicAccess.Enabled() && frontendCfg.FindPageByRoutePath != nil {
-		if page, findErr := frontendCfg.FindPageByRoutePath(strings.Trim(path, "/")); findErr == nil && page != nil {
-			if rendered, renderErr := seo.RenderHTML(page.Content); renderErr == nil {
-				canonicalURL := strings.TrimRight(opts.PublicBaseURL, "/")
-				if canonicalURL == "" {
-					canonicalURL = publicOrigin(c, opts)
+		home := ""
+		if frontendCfg.GetTree != nil {
+			home = seo.HomeRoutePath(frontendCfg.GetTree())
+		}
+
+		routePath := strings.Trim(path, "/")
+		if routePath == "" {
+			routePath = home
+		}
+		canonicalPath := path
+		if home != "" && routePath == home {
+			canonicalPath = "/"
+		}
+
+		if routePath != "" {
+			if page, findErr := frontendCfg.FindPageByRoutePath(routePath); findErr == nil && page != nil {
+				if rendered, renderErr := seo.RenderHTML(page.Content); renderErr == nil {
+					canonicalURL := strings.TrimRight(opts.PublicBaseURL, "/")
+					if canonicalURL == "" {
+						canonicalURL = publicOrigin(c, opts)
+					}
+					canonicalURL += opts.BasePath + canonicalPath
+					// RawContent, not Content: the meta description can be set
+					// in the page's frontmatter, which Content has stripped.
+					meta = seo.BuildPageMeta(siteName, page.Title, page.RawContent, canonicalURL)
+					ssrContent = rendered
+					pageHead = meta.HeadTags()
+				} else {
+					slog.Default().Warn("SSR markdown render failed", "path", path, "error", renderErr)
 				}
-				canonicalURL += opts.BasePath + path
-				meta = seo.BuildPageMeta(siteName, page.Title, page.Content, canonicalURL)
-				ssrContent = rendered
-				pageHead = meta.HeadTags()
-			} else {
-				slog.Default().Warn("SSR markdown render failed", "path", path, "error", renderErr)
 			}
 		}
 	}

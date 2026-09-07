@@ -1104,14 +1104,15 @@ func (t *TreeService) FindPageByRoutePath(routePath string) (*Page, error) {
 		parent = node
 	}
 
-	content, err := t.store.ReadPageContent(node)
+	content, raw, err := t.store.ReadPageAndRaw(node)
 	if err != nil {
 		return nil, fmt.Errorf(errGetPageContentFailed, err)
 	}
 
 	return &Page{
-		PageNode: node,
-		Content:  content,
+		PageNode:   node,
+		Content:    content,
+		RawContent: raw,
 	}, nil
 }
 
