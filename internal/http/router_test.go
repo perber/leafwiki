@@ -5368,6 +5368,7 @@ func TestBuildSPADocument_NoPageMatch_FallsBackToSiteNameTitle(t *testing.T) {
 func TestBuildSPADocument_PublicAccessAndPageFound_InjectsSSRContentAndMeta(t *testing.T) {
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest(http.MethodGet, "/docs/intro", nil)
+	c.Request.Header.Set("User-Agent", "Googlebot/2.1 (+http://www.google.com/bot.html)")
 
 	frontendCfg := httpinternal.FrontendConfig{
 		GetSiteName: func() string { return "MyWiki" },
@@ -5442,6 +5443,7 @@ func homeFrontendCfg(t *testing.T, wantRoutePath string) httpinternal.FrontendCo
 func TestBuildSPADocument_Root_ServesHomePageWithRootCanonical(t *testing.T) {
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	c.Request.Header.Set("User-Agent", "Googlebot/2.1 (+http://www.google.com/bot.html)")
 
 	opts := httpinternal.RouterOptions{PublicAccess: publicaccess.NewEnvManaged(true), PublicBaseURL: "https://wiki.example.com"}
 	doc := string(httpinternal.BuildSPADocument(testShellHTML, c, "/", opts, homeFrontendCfg(t, "home"), ""))
@@ -5535,5 +5537,177 @@ func TestBuildSPADocument_PrivateWiki_DoesNotInjectSSRContentEvenIfPageMatches(t
 	}
 	if !strings.Contains(doc, "<title>MyWiki</title>") {
 		t.Fatalf("expected site name title (not page title) for a private wiki, got %q", doc)
+	}
+}
+
+func TestBuildSPADocument_BotUserAgent_InjectsSSRContent(t *testing.T) {
+	botUAs := []string{
+		"Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+		"Mozilla/5.0 (compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)",
+		"curl/8.4.0",
+		"Wget/1.21.4",
+		"HTTPie/3.2.2",
+	}
+
+	frontendCfg := httpinternal.FrontendConfig{
+		GetSiteName: func() string { return "MyWiki" },
+		FindPageByRoutePath: func(routePath string) (*tree.Page, error) {
+			return &tree.Page{
+				PageNode:   &tree.PageNode{Title: "Intro", Slug: "intro", Kind: tree.NodeKindPage},
+				Content:    "# Intro\n\nRendered body for crawler.",
+				RawContent: "# Intro\n\nRendered body for crawler.",
+			}, nil
+		},
+	}
+	opts := httpinternal.RouterOptions{PublicAccess: publicaccess.NewEnvManaged(true), PublicBaseURL: "https://wiki.example.com"}
+
+	for _, ua := range botUAs {
+		t.Run(ua, func(t *testing.T) {
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest(http.MethodGet, "/docs/intro", nil)
+			c.Request.Header.Set("User-Agent", ua)
+
+			doc := string(httpinternal.BuildSPADocument(testShellHTML, c, "/docs/intro", opts, frontendCfg, ""))
+
+			if !strings.Contains(doc, `<div id="root"><h1`) {
+				t.Fatalf("expected SSR content in #root for UA %q, got: %s", ua, doc)
+			}
+			if !strings.Contains(doc, "Rendered body for crawler.") {
+				t.Fatalf("expected rendered markdown body for UA %q, got: %s", ua, doc)
+			}
+		})
+	}
+}
+
+func TestBuildSPADocument_BrowserUserAgent_DoesNotInjectSSRContent(t *testing.T) {
+	browserUAs := []string{
+		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+		"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+		"Mozilla/5.0 (iPhone; CPU iPhone OS 17_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Mobile/15E148 Safari/604.1",
+	}
+
+	frontendCfg := httpinternal.FrontendConfig{
+		GetSiteName: func() string { return "MyWiki" },
+		FindPageByRoutePath: func(routePath string) (*tree.Page, error) {
+			return &tree.Page{
+				PageNode:   &tree.PageNode{Title: "Intro", Slug: "intro", Kind: tree.NodeKindPage},
+				Content:    "# Intro\n\nPage body content that should stay empty in shell.",
+				RawContent: "---\ndescription: Intro description.\n---\n\n# Intro\n\nPage body content that should stay empty in shell.",
+			}, nil
+		},
+	}
+	opts := httpinternal.RouterOptions{PublicAccess: publicaccess.NewEnvManaged(true), PublicBaseURL: "https://wiki.example.com"}
+
+	for _, ua := range browserUAs {
+		t.Run(ua, func(t *testing.T) {
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest(http.MethodGet, "/docs/intro", nil)
+			c.Request.Header.Set("User-Agent", ua)
+
+			doc := string(httpinternal.BuildSPADocument(testShellHTML, c, "/docs/intro", opts, frontendCfg, ""))
+
+			if !strings.Contains(doc, `<div id="root"></div>`) {
+				t.Fatalf("expected empty #root div for browser UA %q, got: %s", ua, doc)
+			}
+			if strings.Contains(doc, "Page body content that should stay empty in shell.") {
+				t.Fatalf("expected no body markdown rendered for browser UA %q, got: %s", ua, doc)
+			}
+			// Title and canonical URL should still be present for browsers.
+			if !strings.Contains(doc, "<title>Intro · MyWiki</title>") {
+				t.Fatalf("expected page title to be populated for browser UA %q, got: %s", ua, doc)
+			}
+			if !strings.Contains(doc, `<link rel="canonical" href="https://wiki.example.com/docs/intro">`) {
+				t.Fatalf("expected canonical link for browser UA %q, got: %s", ua, doc)
+			}
+		})
+	}
+}
+
+func TestBuildSPADocument_SSROverrideQueryParam(t *testing.T) {
+	chromeUA := "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+	botUA := "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
+
+	frontendCfg := httpinternal.FrontendConfig{
+		GetSiteName: func() string { return "MyWiki" },
+		FindPageByRoutePath: func(routePath string) (*tree.Page, error) {
+			return &tree.Page{
+				PageNode:   &tree.PageNode{Title: "Intro", Slug: "intro", Kind: tree.NodeKindPage},
+				Content:    "# Intro\n\nPage markdown content.",
+				RawContent: "# Intro\n\nPage markdown content.",
+			}, nil
+		},
+	}
+	opts := httpinternal.RouterOptions{PublicAccess: publicaccess.NewEnvManaged(true), PublicBaseURL: "https://wiki.example.com"}
+
+	t.Run("ssr=1 forces SSR for browser", func(t *testing.T) {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest(http.MethodGet, "/docs/intro?ssr=1", nil)
+		c.Request.Header.Set("User-Agent", chromeUA)
+
+		doc := string(httpinternal.BuildSPADocument(testShellHTML, c, "/docs/intro", opts, frontendCfg, ""))
+		if !strings.Contains(doc, `<div id="root"><h1`) {
+			t.Fatalf("expected SSR content inside #root with ?ssr=1, got: %s", doc)
+		}
+	})
+
+	t.Run("ssr=true forces SSR for browser", func(t *testing.T) {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest(http.MethodGet, "/docs/intro?ssr=true", nil)
+		c.Request.Header.Set("User-Agent", chromeUA)
+
+		doc := string(httpinternal.BuildSPADocument(testShellHTML, c, "/docs/intro", opts, frontendCfg, ""))
+		if !strings.Contains(doc, `<div id="root"><h1`) {
+			t.Fatalf("expected SSR content inside #root with ?ssr=true, got: %s", doc)
+		}
+	})
+
+	t.Run("ssr=0 disables SSR for bot", func(t *testing.T) {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest(http.MethodGet, "/docs/intro?ssr=0", nil)
+		c.Request.Header.Set("User-Agent", botUA)
+
+		doc := string(httpinternal.BuildSPADocument(testShellHTML, c, "/docs/intro", opts, frontendCfg, ""))
+		if !strings.Contains(doc, `<div id="root"></div>`) {
+			t.Fatalf("expected empty #root div with ?ssr=0 for bot, got: %s", doc)
+		}
+	})
+
+	t.Run("ssr=false disables SSR for bot", func(t *testing.T) {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest(http.MethodGet, "/docs/intro?ssr=false", nil)
+		c.Request.Header.Set("User-Agent", botUA)
+
+		doc := string(httpinternal.BuildSPADocument(testShellHTML, c, "/docs/intro", opts, frontendCfg, ""))
+		if !strings.Contains(doc, `<div id="root"></div>`) {
+			t.Fatalf("expected empty #root div with ?ssr=false for bot, got: %s", doc)
+		}
+	})
+}
+
+func TestBuildSPADocument_PrivateWiki_BotsDoNotReceiveSSRContent(t *testing.T) {
+	frontendCfg := httpinternal.FrontendConfig{
+		GetSiteName: func() string { return "MyWiki" },
+		FindPageByRoutePath: func(routePath string) (*tree.Page, error) {
+			return &tree.Page{
+				PageNode:   &tree.PageNode{Title: "Secret", Slug: "secret", Kind: tree.NodeKindPage},
+				Content:    "# Secret\n\nConfidential notes.",
+				RawContent: "# Secret\n\nConfidential notes.",
+			}, nil
+		},
+	}
+	opts := httpinternal.RouterOptions{PublicAccess: publicaccess.NewEnvManaged(false)}
+
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodGet, "/docs/secret?ssr=1", nil)
+	c.Request.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)")
+
+	doc := string(httpinternal.BuildSPADocument(testShellHTML, c, "/docs/secret", opts, frontendCfg, ""))
+
+	if strings.Contains(doc, "Confidential notes.") {
+		t.Fatalf("expected private wiki content never to leak in SSR, got: %s", doc)
+	}
+	if !strings.Contains(doc, `<div id="root"></div>`) {
+		t.Fatalf("expected empty #root div for private wiki, got: %s", doc)
 	}
 }

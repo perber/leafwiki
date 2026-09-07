@@ -373,15 +373,15 @@ func BuildSPADocument(rawHTML string, c *gin.Context, path string, opts RouterOp
 
 	// Server-render the page's Markdown into the shell for search crawlers,
 	// link-preview bots, and LLM agents that request the page without
-	// executing JavaScript. The SPA still boots and takes over via
-	// createRoot(...).render(), replacing this content exactly as it
-	// replaces the empty shell today - this is not full SPA SSR/hydration.
+	// executing JavaScript. Real web browsers receive the clean SPA shell with
+	// an empty <div id="root"></div>, preventing unnecessary server-side Markdown
+	// rendering and eliminating layout shift / FOUC before React mounts.
 	// Only offered for public wikis so private content is never rendered to
 	// unauthenticated requests (mirrors opts.PublicAccess gating on the
 	// pages API).
 	//
-	// The root serves the home page's content rather than an empty shell, and
-	// the home page's own path canonicalizes back to the root, so the two URLs
+	// The root serves the home page's content rather than an empty shell for bots,
+	// and the home page's own path canonicalizes back to the root, so the two URLs
 	// that show the same page never compete for indexing.
 	meta := seo.PageMeta{SiteName: siteName}
 	ssrContent := ""
@@ -403,19 +403,26 @@ func BuildSPADocument(rawHTML string, c *gin.Context, path string, opts RouterOp
 
 		if routePath != "" {
 			if page, findErr := frontendCfg.FindPageByRoutePath(routePath); findErr == nil && page != nil {
-				if rendered, renderErr := seo.RenderHTML(page.Content); renderErr == nil {
-					canonicalURL := strings.TrimRight(opts.PublicBaseURL, "/")
-					if canonicalURL == "" {
-						canonicalURL = publicOrigin(c, opts)
+				canonicalURL := strings.TrimRight(opts.PublicBaseURL, "/")
+				if canonicalURL == "" {
+					canonicalURL = publicOrigin(c, opts)
+				}
+				canonicalURL += opts.BasePath + canonicalPath
+				// RawContent, not Content: the meta description can be set
+				// in the page's frontmatter, which Content has stripped.
+				meta = seo.BuildPageMeta(siteName, page.Title, page.RawContent, canonicalURL)
+				pageHead = meta.HeadTags()
+
+				var req *http.Request
+				if c != nil {
+					req = c.Request
+				}
+				if seo.ShouldServeSSR(req) {
+					if rendered, renderErr := seo.RenderHTML(page.Content); renderErr == nil {
+						ssrContent = rendered
+					} else {
+						slog.Default().Warn("SSR markdown render failed", "path", path, "error", renderErr)
 					}
-					canonicalURL += opts.BasePath + canonicalPath
-					// RawContent, not Content: the meta description can be set
-					// in the page's frontmatter, which Content has stripped.
-					meta = seo.BuildPageMeta(siteName, page.Title, page.RawContent, canonicalURL)
-					ssrContent = rendered
-					pageHead = meta.HeadTags()
-				} else {
-					slog.Default().Warn("SSR markdown render failed", "path", path, "error", renderErr)
 				}
 			}
 		}
