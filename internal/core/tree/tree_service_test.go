@@ -1352,6 +1352,14 @@ func TestTreeService_FindPageByRoutePath_ReturnsContent(t *testing.T) {
 	if !strings.Contains(page.Content, "Hello") {
 		t.Fatalf("expected content to include Hello, got: %q", page.Content)
 	}
+	// RawContent carries the frontmatter that Content strips; SSR reads the
+	// meta description out of it.
+	if !strings.Contains(page.RawContent, "leafwiki_id:") {
+		t.Fatalf("expected raw content to include frontmatter, got: %q", page.RawContent)
+	}
+	if !strings.Contains(page.RawContent, "Hello") {
+		t.Fatalf("expected raw content to include the body, got: %q", page.RawContent)
+	}
 }
 
 func TestTreeService_FindPageByRoutePath_ReturnsNotFoundForMissingPath(t *testing.T) {
