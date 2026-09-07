@@ -19,17 +19,17 @@ Thanks to @Hugo-Galley for providing this installation script!
 
 During installation, you’ll be prompted for:
 
-- **JWT password:** choose a secure secret  
+- **JWT secret:** choose a secure secret  
 - **Admin password:** for the LeafWiki admin user  
 - **Public read access (y/N):** enter `y` if you want guests to read without login  
-- **Data directory (default /root/data):** press Enter for default or specify a path  
+- **Data directory (default: `$PWD/data`):** press Enter for default or specify a path  
 
 When complete, LeafWiki will be running as a systemd service:
 
 ```
 Host: 127.0.0.1
 Port: 8080
-DataDirectory: /root/data
+DataDirectory: /path/to/data
 Status: active
 ```
 
