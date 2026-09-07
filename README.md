@@ -515,7 +515,7 @@ Use `--unix-socket` when LeafWiki should listen on a local unix domain socket in
 
 > **Experimental** — This feature is new and may change in future releases. Test it thoroughly before relying on it for critical data.
 
-Git Backup pushes wiki **content** to a remote Git repository on a configurable interval, either via **SSH**. It covers the `root/` (pages) and `assets/` directories. Database files (`.db`, `.db-wal`, etc.) and runtime files are excluded via `.gitignore`.
+Git Backup pushes wiki **content** to a remote Git repository on a configurable interval, via **SSH** or **HTTP(S)**. It covers the `root/` (pages) and `assets/` directories. Database files (`.db`, `.db-wal`, etc.) and runtime files are excluded via `.gitignore`.
 
 Backups run automatically on a configurable interval and can also be triggered manually from the **Git Content Backup** page.
 
