@@ -222,7 +222,7 @@ else
         ENABLE_REVISION="true"
 
         while true; do
-            read -p "Would you specify a max revison number ? (default: $MAX_REVISION_HISTORY) : " RESPONSE_MAX_REVISION
+            read -p "Would you specify a max revision number? (default: $MAX_REVISION_HISTORY): " RESPONSE_MAX_REVISION
             if [[ -z "$RESPONSE_MAX_REVISION" ]]; then
                 break
             elif [[ "$RESPONSE_MAX_REVISION" =~ ^[0-9]+$ ]]; then
