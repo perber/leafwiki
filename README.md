@@ -33,6 +33,7 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
   - [Linux installer](#linux-installer)
   - [Binary](#binary)
   - [Reset admin password](#reset-admin-password)
+  - [Restore a snapshot (offline)](#restore-a-snapshot-offline)
 - [Operating Modes](#operating-modes)
 - [Dev Setup](#dev-setup)
 - [Configuration](#configuration)
@@ -42,6 +43,7 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
   - [Reverse-Proxy Authentication](#reverse-proxy-authentication)
   - [Unix Socket (v0.11.3)](#unix-socket-v0113)
   - [Git Backup](#git-backup-v0113-experimental)
+  - [Email (SMTP)](#email-smtp)
   - [Security](#security)
   - [Operations notes](#operations-notes)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
@@ -60,7 +62,7 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
 - Runs on Linux, macOS, Windows, Raspberry Pi (x86_64 and ARM64)
 - Reverse-proxy friendly with `--base-path`
 - Reverse-proxy authentication via trusted HTTP header (v0.10+)
-- API keys for programmatic and agent access, admin-managed, read-only, experimental/opt-in
+- API keys for programmatic and agent access, admin-managed, read-only — in development, not yet ready for use
 - Three access modes: fully internal, public read with login-only editing, or open editing without login (see [Operating Modes](#operating-modes))
 - Roles: admin, editor, viewer
 
@@ -83,6 +85,7 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
 **Opt-in via feature flags:**
 - Revision history (`--enable-revision`)
 - Automatic link rewriting when pages are renamed or moved (`--enable-link-refactor`)
+- Email via SMTP for password reset and user invitations (`--smtp-host`, v0.13.0)
 - Git backup — push wiki content to a remote Git repository via SSH or HTTP(S) (`--git-backup`, v0.11.3, experimental)
 
 **Markdown import:**
@@ -222,7 +225,7 @@ Requires Go and Node.js. `make build` compiles the UI, embeds it, and produces a
 ```bash
 git clone https://github.com/perber/leafwiki.git
 cd leafwiki
-git switch --detach v0.12.1   # or any tag / main
+git switch --detach v0.13.0   # or any tag / main
 make build
 ./leafwiki --disable-auth --host=127.0.0.1 --data-dir ./data --allow-insecure=true
 ```
@@ -234,6 +237,16 @@ For API-only local development with Vite, use `make build-api` (or `make run`) i
 ```bash
 ./leafwiki reset-admin-password
 ```
+
+### Restore a snapshot (offline)
+
+For disaster recovery or migrating to a fresh instance, restore a snapshot ZIP into the data directory while the server is stopped:
+
+```bash
+./leafwiki --data-dir ./data restore-snapshot ./data/snapshots/leafwiki-snapshot-2026-01-01.zip
+```
+
+When `--snapshot` is enabled, a live restore is also available from the admin UI (Settings → Full Backup). Use this offline command when the server can't start or you're seeding a new data directory. The `--snapshot*` flags are in [CLI Flags](#cli-flags).
 
 ---
 
@@ -337,6 +350,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--refresh-token-timeout`        | Refresh token duration (e.g. `168h`)                                    | `168h`        | v0.7.0  |
 | `--max-asset-upload-size`        | Max upload size (e.g. `50MiB`, `52428800`)                              | `50MiB`       | v0.8.5  |
 | `--custom-stylesheet`            | Path to a `.css` file inside the data dir                               | `""`          | v0.8.5  |
+| `--default-language`             | Default UI language code (`en`, `de`, `es`)                             | `""`          | v0.13.0 |
 | `--inject-code-in-header`        | Raw HTML/JS injected into `<head>`                                      | `""`          | v0.6.0  |
 | `--hide-link-metadata-section`   | Hide backlinks and link status panel                                    | `false`       | –       |
 | `--enable-revision`              | Enable revision history                                                 | `false`       | v0.9.0  |
@@ -352,6 +366,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--login-url`                    | Redirect to an external URL instead of the built-in login form          | `""`          | v0.12.0 |
 | `--logout-url`                   | Redirect to an external URL after logout                                | `""`          | v0.12.0 |
 | `--http-remote-user-logout-url`  | ⚠️ Deprecated, use `--logout-url` instead                               | `""`          | v0.10.0 |
+| `--user-management-url`          | Replace the built-in User Management UI with a link to an external page  | `""`          | v0.11.4 |
 | `--disable-request-log`          | Suppress per-request HTTP access log lines                              | `false`       | v0.10.1 |
 | `--log-format`                   | Log output format: `text` or `json`                                     | `text`        | v0.12.0 |
 | `--totp-encryption-key`          | Key to encrypt per-user TOTP secrets at rest (min 32 bytes); required only once a user enables TOTP | `""` | v0.12.0 |
@@ -369,9 +384,21 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--git-backup-ssh-key`           | ⚗️ Raw SSH private key (prefer env var)                                 | `""`          | v0.11.3 |
 | `--git-backup-ssh-key-path`      | ⚗️ Path to SSH private key file                                         | `""`          | v0.11.3 |
 | `--git-backup-ssh-known-hosts`   | ⚗️ Path to `known_hosts` for MITM protection                            | `""`          | v0.11.3 |
+| `--git-backup-http-username`     | ⚗️ Username for HTTP(S) basic auth on `http(s)://` remotes              | `""`          | v0.13.0 |
+| `--git-backup-http-password`     | ⚗️ Password or access token for HTTP(S) basic auth (prefer env var)     | `""`          | v0.13.0 |
 | `--git-backup-author-name`       | ⚗️ Git commit author name                                               | `LeafWiki Backup` | v0.11.3 |
 | `--git-backup-author-email`      | ⚗️ Git commit author email                                              | `backup@leafwiki.local` | v0.11.3 |
 | `--git-backup-interval`          | ⚗️ Backup interval (e.g. `60m`, `2h`); `0` = manual-only               | `60m`         | v0.11.3 |
+| `--smtp-host`                    | SMTP host for password-reset and invite email; unset disables email     | `""`          | v0.13.0 |
+| `--smtp-port`                    | SMTP server port                                                        | `587`         | v0.13.0 |
+| `--smtp-username`                | SMTP auth username                                                      | `""`          | v0.13.0 |
+| `--smtp-password`                | SMTP auth password (prefer env var)                                     | `""`          | v0.13.0 |
+| `--smtp-from`                    | From address for outgoing email (required when `--smtp-host` is set)    | `""`          | v0.13.0 |
+| `--smtp-from-name`               | From display name for outgoing email                                    | `LeafWiki`    | v0.13.0 |
+| `--smtp-security`                | Transport security: `none`, `starttls`, or `tls`                        | `starttls`    | v0.13.0 |
+| `--smtp-insecure-skip-verify`    | Skip TLS certificate verification for SMTP (testing only)               | `false`       | v0.13.0 |
+| `--smtp-timeout`                 | Timeout for a single SMTP send (e.g. `10s`)                             | `10s`         | v0.13.0 |
+| `--public-url`                   | Base URL for links in outgoing email (required when `--smtp-host` is set) | `""`        | v0.13.0 |
 
 > Docker image default: `LEAFWIKI_HOST` is set to `0.0.0.0` automatically by the container entrypoint if neither `--host` nor `LEAFWIKI_HOST` is provided.
 
@@ -395,6 +422,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_REFRESH_TOKEN_TIMEOUT`        | Refresh token duration                               | `168h`        | v0.7.0  |
 | `LEAFWIKI_MAX_ASSET_UPLOAD_SIZE`        | Max upload size                                      | `50MiB`       | v0.8.5  |
 | `LEAFWIKI_CUSTOM_STYLESHEET`            | Path to `.css` file inside data dir                  | `""`          | v0.8.5  |
+| `LEAFWIKI_DEFAULT_LANGUAGE`             | Default UI language code (`en`, `de`, `es`)          | `""`          | v0.13.0 |
 | `LEAFWIKI_INJECT_CODE_IN_HEADER`        | HTML/JS injected into `<head>`                       | `""`          | v0.6.0  |
 | `LEAFWIKI_HIDE_LINK_METADATA_SECTION`   | Hide backlinks and link status panel                 | `false`       | –       |
 | `LEAFWIKI_ENABLE_REVISION`              | Revision history                                     | `false`       | v0.9.0  |
@@ -410,6 +438,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_LOGIN_URL`                    | Redirect to an external URL instead of the login form | `""`          | v0.12.0 |
 | `LEAFWIKI_LOGOUT_URL`                   | Redirect to an external URL after logout             | `""`          | v0.12.0 |
 | `LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL`  | ⚠️ Deprecated, use `LEAFWIKI_LOGOUT_URL` instead     | `""`          | v0.10.0 |
+| `LEAFWIKI_USER_MANAGEMENT_URL`          | Replace the built-in User Management UI with an external link | `""`  | v0.11.4 |
 | `LEAFWIKI_DISABLE_REQUEST_LOG`          | Suppress per-request HTTP access log lines           | `false`       | v0.10.1 |
 | `LEAFWIKI_LOG_FORMAT`                   | Log output format: `text` or `json`                  | `text`        | v0.12.0 |
 | `LEAFWIKI_LOG_LEVEL`                    | Log level: `debug`, `info`, `warn`, `error` (env-var only, no CLI flag) | `info` | v0.8.0  |
@@ -428,9 +457,21 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_GIT_BACKUP_SSH_KEY`           | ⚗️ Raw SSH private key (preferred over path)        | `""`          | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH`      | ⚗️ Path to SSH private key file                     | `""`          | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS`   | ⚗️ Path to `known_hosts` file                       | `""`          | v0.11.3 |
+| `LEAFWIKI_GIT_BACKUP_HTTP_USERNAME`     | ⚗️ Username for HTTP(S) basic auth                  | `""`          | v0.13.0 |
+| `LEAFWIKI_GIT_BACKUP_HTTP_PASSWORD`     | ⚗️ Password or access token for HTTP(S) basic auth  | `""`          | v0.13.0 |
 | `LEAFWIKI_GIT_BACKUP_AUTHOR_NAME`       | ⚗️ Git commit author name                           | `LeafWiki Backup` | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_AUTHOR_EMAIL`      | ⚗️ Git commit author email                          | `backup@leafwiki.local` | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_INTERVAL`          | ⚗️ Backup interval (e.g. `60m`); `0` = manual-only | `60m`         | v0.11.3 |
+| `LEAFWIKI_SMTP_HOST`                    | SMTP host for password-reset/invite email; unset disables email | `""` | v0.13.0 |
+| `LEAFWIKI_SMTP_PORT`                    | SMTP server port                                    | `587`         | v0.13.0 |
+| `LEAFWIKI_SMTP_USERNAME`               | SMTP auth username                                   | `""`          | v0.13.0 |
+| `LEAFWIKI_SMTP_PASSWORD`               | SMTP auth password                                   | `""`          | v0.13.0 |
+| `LEAFWIKI_SMTP_FROM`                    | From address (required with `LEAFWIKI_SMTP_HOST`)   | `""`          | v0.13.0 |
+| `LEAFWIKI_SMTP_FROM_NAME`              | From display name                                    | `LeafWiki`    | v0.13.0 |
+| `LEAFWIKI_SMTP_SECURITY`               | Transport security: `none`, `starttls`, or `tls`    | `starttls`    | v0.13.0 |
+| `LEAFWIKI_SMTP_INSECURE_SKIP_VERIFY`   | Skip TLS certificate verification for SMTP           | `false`       | v0.13.0 |
+| `LEAFWIKI_SMTP_TIMEOUT`                | Timeout for a single SMTP send                       | `10s`         | v0.13.0 |
+| `LEAFWIKI_PUBLIC_URL`                  | Base URL for links in outgoing email (required with `LEAFWIKI_SMTP_HOST`) | `""` | v0.13.0 |
 
 ### Custom Stylesheet
 
@@ -529,8 +570,8 @@ Backups run automatically on a configurable interval and can also be triggered m
 | `--git-backup-ssh-key` | Raw SSH private key (prefer env var) | `""` |
 | `--git-backup-ssh-key-path` | Path to SSH private key file | `""` |
 | `--git-backup-ssh-known-hosts` | Path to `known_hosts` for MITM protection | `""` |
-| `--git-backup-http-username` | Username for HTTP(S) basic auth (v0.12.2+) | `""` |
-| `--git-backup-http-password` | Password or access token for HTTP(S) basic auth (prefer env var, v0.12.2+) | `""` |
+| `--git-backup-http-username` | Username for HTTP(S) basic auth (v0.13.0+) | `""` |
+| `--git-backup-http-password` | Password or access token for HTTP(S) basic auth (prefer env var, v0.13.0+) | `""` |
 | `--git-backup-author-name` | Git commit author name | `LeafWiki Backup` |
 | `--git-backup-author-email` | Git commit author email | `backup@leafwiki.local` |
 | `--git-backup-interval` | Backup interval (e.g. `60m`, `2h`); `0` = manual-only | `60m` |
@@ -562,7 +603,7 @@ environment:
   - LEAFWIKI_GIT_BACKUP_INTERVAL=60m
 ```
 
-**Example — HTTPS with an access token (Docker Compose, v0.12.2+):**
+**Example — HTTPS with an access token (Docker Compose, v0.13.0+):**
 
 ```yaml
 environment:
@@ -585,6 +626,31 @@ On GitHub, create a **fine-grained personal access token** limited to the backup
 - `--git-backup-ssh-known-hosts` is optional but recommended for SSH remotes. If not set, LeafWiki falls back to `~/.ssh/known_hosts`. If that file does not exist either (common in containers), SSH host key verification is **disabled** — leaving connections open to MITM attacks. Set this flag explicitly in production. It has no effect on HTTP(S) remotes, which are verified via TLS.
 - If the remote diverges (e.g. someone pushed directly to the backup branch), LeafWiki will stop auto-pushing and show a **Conflict — remote diverged** warning in the UI. Click **Force Push** in the UI to overwrite the remote with the current local backup history. Your wiki content is never lost — the local backup repo is always authoritative.
 - This backs up **content only** — the SQLite database is not included. For a full backup, use your data directory (`cp -r` with the app stopped).
+
+---
+
+### Email (SMTP)
+
+Available since v0.13.0. Configure an SMTP server to enable the **forgot-password** flow and **email-based user invitations**. Without `--smtp-host`, both features stay off and the login form shows no password-reset link.
+
+```bash
+./leafwiki \
+  --jwt-secret=yoursecret \
+  --admin-password=yourpassword \
+  --smtp-host=smtp.example.com \
+  --smtp-port=587 \
+  --smtp-security=starttls \
+  --smtp-username=leafwiki@example.com \
+  --smtp-password=yourpassword \
+  --smtp-from=leafwiki@example.com \
+  --public-url=https://wiki.example.com
+```
+
+- `--smtp-from` and `--public-url` are **required** once `--smtp-host` is set — the server refuses to start otherwise
+- `--public-url` must be an absolute `http(s)://` URL; it is the base for links in outgoing email
+- `--smtp-security` is one of `none`, `starttls` (default), or `tls`
+- Prefer `LEAFWIKI_SMTP_PASSWORD` over the flag to keep the password out of process listings
+- `--smtp-insecure-skip-verify` disables TLS certificate verification — for testing only
 
 ---
 
