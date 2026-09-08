@@ -72,6 +72,7 @@
   --color-markdown-toolbar-text: hsl(var(--markdown-toolbar-text));
 
   --color-muted: hsl(var(--muted));
+  --color-muted-surface: hsl(var(--muted-surface));
   --color-muted-foreground: hsl(var(--muted-foreground));
   --color-table-header-bg: hsl(var(--table-header-bg));
   --color-table-header-border: hsl(var(--table-header-border));
@@ -153,7 +154,10 @@
     --markdown-toolbar-border: 214 32% 91%;
     --markdown-toolbar-text: 215 25% 27%;
 
-    --muted: 210 40% 96%;
+    /* --muted is a *text/icon* token (consumed via `text-muted`, `border-muted`).
+       `bg-*` surfaces use --muted-surface instead — see theme-tokens.test.ts. */
+    --muted: 215 16% 47%;
+    --muted-surface: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
 
     --headline-anchor-icon: 215 20% 65%;
@@ -230,8 +234,9 @@
     --markdown-toolbar-border: 220 14% 26%;
     --markdown-toolbar-text: 220 8% 78%;
 
-    /* ---- MUTED SURFACE + TEXT / ICONS ---- */
-    --muted: 222 16% 18%;
+    /* ---- MUTED TEXT / ICONS  (surface = --muted-surface) ---- */
+    --muted: 220 10% 60%;
+    --muted-surface: 222 16% 18%;
     --muted-foreground: 220 10% 60%;
 
     --headline-anchor-icon: 220 12% 65%;
@@ -3759,7 +3764,8 @@
       --markdown-toolbar-border: 214 32% 91% !important;
       --markdown-toolbar-text: 215 25% 27% !important;
 
-      --muted: 210 40% 96% !important;
+      --muted: 215 16% 47% !important;
+      --muted-surface: 210 40% 96% !important;
       --muted-foreground: 215 16% 47% !important;
 
       --headline-anchor-icon: 215 20% 65% !important;

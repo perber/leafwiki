@@ -35,7 +35,7 @@ export default memo(function MermaidBlock({
         <p className="text-muted-foreground mt-2 pr-12 text-sm break-words">
           {errorMessage}
         </p>
-        <pre className="bg-muted mt-3 overflow-x-auto rounded-md p-3 text-sm">
+        <pre className="bg-muted-surface mt-3 overflow-x-auto rounded-md p-3 text-sm">
           <code>{code}</code>
         </pre>
       </div>
