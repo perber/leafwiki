@@ -238,6 +238,20 @@ func (s *UserService) UpdateUser(id, username, email, password, role string) (*U
 		return nil, err
 	}
 
+	// An admin setting a real password out-of-band (e.g. via the "Change
+	// Password" dialog) completes an outstanding invite: the account now has a
+	// usable password, so it must stop showing as "invitation pending". This is
+	// the admin-driven equivalent of CompleteInvite, which handles the email
+	// accept flow. must_set_password lives outside UserStore.UpdateUser's
+	// UPDATE, so it has to be cleared explicitly.
+	if password != "" && user.MustSetPassword {
+		if err := s.store.SetMustSetPassword(user.ID, false); err != nil {
+			return nil, err
+		}
+		user.MustSetPassword = false
+		s.log.Info("invite completed via admin password change", "userID", user.ID)
+	}
+
 	if oldRole != user.Role {
 		s.log.Info("user role changed", "userID", user.ID, "oldRole", oldRole, "newRole", user.Role)
 	} else {
