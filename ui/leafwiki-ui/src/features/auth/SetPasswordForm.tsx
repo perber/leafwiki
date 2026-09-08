@@ -1,16 +1,21 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { acceptInvite, confirmPasswordReset } from '@/lib/api/auth'
-import { mapApiError } from '@/lib/api/errors'
+import { handleFieldErrors } from '@/lib/handleFieldErrors'
 import { useBrandingStore } from '@/stores/branding'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
-import { toast } from 'sonner'
 
 type SetPasswordFormProps = {
   mode: 'reset' | 'invite'
 }
+
+// Mirrors coreauth.MinPasswordLength. The backend rejects a shorter password
+// with a `validation_error` body; checking it here first spares the round
+// trip and shows a localized message (the backend's field messages are not
+// translated) — same reasoning as ChangeOwnPasswordPanel.
+const MIN_PASSWORD_LENGTH = 8
 
 // SetPasswordForm backs both /reset-password and /accept-invite: the two
 // flows share everything except which endpoint they call and what happens on
@@ -26,7 +31,7 @@ export function SetPasswordForm({ mode }: SetPasswordFormProps) {
 
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const [resetSucceeded, setResetSucceeded] = useState(false)
 
@@ -38,10 +43,17 @@ export function SetPasswordForm({ mode }: SetPasswordFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
+    setFieldErrors({})
 
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      setFieldErrors({ newPassword: t(`${ns}.passwordTooShort`) })
+      return
+    }
+
+    // The backend only ever sees `newPassword`, so the confirm-match check has
+    // no server-side counterpart and must run here.
     if (newPassword !== confirmPassword) {
-      setError(t(`${ns}.passwordsDoNotMatch`))
+      setFieldErrors({ confirmPassword: t(`${ns}.passwordsDoNotMatch`) })
       return
     }
 
@@ -56,8 +68,10 @@ export function SetPasswordForm({ mode }: SetPasswordFormProps) {
         navigate('/', { replace: true })
       }
     } catch (err) {
-      const mapped = mapApiError(err, t(`${ns}.errorFallback`))
-      toast.error(mapped.message)
+      // Routes a `validation_error` body to per-field messages (e.g. a
+      // password the backend still rejects) and falls back to a toast for
+      // anything else — an invalid/expired token, a network failure.
+      handleFieldErrors(err, setFieldErrors, t(`${ns}.errorFallback`))
     } finally {
       setLoading(false)
     }
@@ -109,6 +123,11 @@ export function SetPasswordForm({ mode }: SetPasswordFormProps) {
               data-testid="set-password-new"
               spellCheck={false}
             />
+            {fieldErrors.newPassword && (
+              <p className="text-error mt-1 text-sm">
+                {fieldErrors.newPassword}
+              </p>
+            )}
           </div>
           <div className="login__field">
             <Input
@@ -122,8 +141,12 @@ export function SetPasswordForm({ mode }: SetPasswordFormProps) {
               data-testid="set-password-confirm"
               spellCheck={false}
             />
+            {fieldErrors.confirmPassword && (
+              <p className="text-error mt-1 text-sm">
+                {fieldErrors.confirmPassword}
+              </p>
+            )}
           </div>
-          {error && <p className="text-error mb-4 text-sm">{error}</p>}
 
           <Button
             type="submit"

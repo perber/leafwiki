@@ -2,7 +2,7 @@ import '@/lib/i18n'
 import { useConfigStore } from '@/stores/config'
 import { useSessionStore } from '@/stores/session'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ensureRefresh, fetchWithAuth } from './auth'
+import { confirmPasswordReset, ensureRefresh, fetchWithAuth } from './auth'
 
 type MockResponseSpec = {
   status: number
@@ -240,5 +240,35 @@ describe('fetchWithAuth', () => {
       calledPaths(fetchMock).some((p) => p.endsWith('/api/auth/logout')),
     ).toBe(true)
     expect(useSessionStore.getState().user).toBeNull()
+  })
+})
+
+describe('confirmPasswordReset', () => {
+  it('re-throws a field-validation body untouched instead of the literal "validation_error"', async () => {
+    const body = {
+      error: 'validation_error',
+      fields: [
+        {
+          field: 'newPassword',
+          message: 'New password must be at least 8 characters long',
+        },
+      ],
+    }
+    const fetchMock = createFetchMock({
+      '/api/auth/password/reset': { status: 400, body },
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const err = await confirmPasswordReset('tok', 'short').then(
+      () => {
+        throw new Error('expected confirmPasswordReset to reject')
+      },
+      (e: unknown) => e,
+    )
+
+    // Regression: it used to arrive as new Error("validation_error"), which
+    // handleFieldErrors cannot route to a field.
+    expect(err).not.toBeInstanceOf(Error)
+    expect(err).toEqual(body)
   })
 })
