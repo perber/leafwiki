@@ -108,6 +108,8 @@ http://localhost:5173
 Before submitting the code execute `npm run format` in the `ui/leafwiki-ui` directory.
 If you change the e2e tests, please also run `npm run format` in the `e2e` directory.
 
+Translating the UI or adding a language? See [docs/i18n.md](docs/i18n.md).
+
 ---
 ## Pull request guidelines
 
