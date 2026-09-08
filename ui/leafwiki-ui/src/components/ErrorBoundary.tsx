@@ -69,7 +69,7 @@ export class ErrorBoundary extends Component<Props, State> {
           </Button>
         </div>
 
-        <details className="border-border bg-muted/40 w-full max-w-xl rounded-md border">
+        <details className="border-border bg-muted-surface/40 w-full max-w-xl rounded-md border">
           <summary className="text-muted-foreground cursor-pointer p-3 text-xs font-medium select-none">
             {i18next.t('errorBoundary.detailsSummary', { ns: 'common' })}
           </summary>

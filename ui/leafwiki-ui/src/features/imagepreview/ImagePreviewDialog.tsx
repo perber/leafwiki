@@ -96,7 +96,7 @@ export function ImagePreviewDialog({ src, alt }: Props) {
               setNatural({ w: img.naturalWidth, h: img.naturalHeight })
             }}
             // Never scale up images beyond their natural size
-            className="bg-muted h-auto max-h-[75vh] w-auto max-w-full rounded-lg object-contain"
+            className="bg-muted-surface h-auto max-h-[75vh] w-auto max-w-full rounded-lg object-contain"
           />
         </div>
       </DialogContent>
