@@ -94,6 +94,18 @@ async function postLoginRequest<T>(path: string, body: object): Promise<T> {
       throw new ApiLocalizedError(errorBody.error)
     }
 
+    // Field-validation errors use their own body shape
+    // ({ error: 'validation_error', fields: [...] }) — re-throw it untouched
+    // so callers can surface per-field messages instead of the literal
+    // string "validation_error". Mirrors fetchWithAuth's handling.
+    if (
+      errorBody &&
+      typeof errorBody === 'object' &&
+      (errorBody as { error?: unknown }).error === 'validation_error'
+    ) {
+      throw errorBody
+    }
+
     if (
       errorBody &&
       typeof errorBody === 'object' &&
