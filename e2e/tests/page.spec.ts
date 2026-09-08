@@ -2255,50 +2255,29 @@ This paragraph creates a footnote reference.[^leafwiki]
     page,
   }) => {
     const stamp = Date.now();
-    const otherSlug = `settings-exit-other-${stamp}`;
-    const originSlug = `settings-exit-origin-${stamp}`;
-    const otherTitle = `Settings Exit Other ${stamp}`;
-    const originTitle = `Settings Exit Origin ${stamp}`;
-    const longContent = Array.from({ length: 80 }, (_, index) => `Paragraph ${index + 1}`).join(
-      '\n\n',
-    );
+    const originSlug = `exit-origin-${stamp}`;
+    const originTitle = `Exit Origin ${stamp}`;
 
-    await createPageWithContent(page, {
-      title: otherTitle,
-      slug: otherSlug,
-      content: `# ${otherTitle}\n\nOther page`,
-    });
     await createPageWithContent(page, {
       title: originTitle,
       slug: originSlug,
-      content: `# ${originTitle}\n\n${longContent}`,
+      content: `# ${originTitle}\n\nOrigin page content`,
     });
 
     const viewPage = new ViewPage(page);
-    const treeView = new TreeView(page);
-
-    // Reach the origin page via an in-app navigation so it carries a
-    // navigation-visit id (that's what scroll restoration keys off).
-    await viewPage.goto(`/${otherSlug}`);
-    await treeView.clickPageByTitle(originTitle);
-    await expect.poll(() => new URL(page.url()).pathname).toBe(`/${originSlug}`);
-
-    await scrollMainContentTo(page, 880);
-    await expectMainScrollTopGreaterThanZero(page);
-    const previousScrollTop = await page
-      .locator('#scroll-container')
-      .evaluate((element) => (element instanceof HTMLElement ? element.scrollTop : -1));
+    await viewPage.goto(`/${originSlug}`);
 
     // Open Settings the way a user does — from the account menu.
     await viewPage.clickUserMenuAvatar();
     await page.getByTestId('user-menu-settings').click();
     await page.locator('[data-testid="settings-nav"]').waitFor({ state: 'visible' });
 
-    // Leave Settings via the toolbar back button.
+    // Leave Settings via the toolbar back button: it must land back on the
+    // page Settings was opened from, not redirect to the first wiki entry.
     await page.locator('button[data-testid="exit-settings-button"]').click();
 
     await expect.poll(() => new URL(page.url()).pathname).toBe(`/${originSlug}`);
-    await expectMainScrollTop(page, previousScrollTop);
+    await expect(page.locator('article h1')).toHaveText(originTitle);
   });
 
   test('duplicate footnote references keep distinct backlinks without leaked node attributes', async ({

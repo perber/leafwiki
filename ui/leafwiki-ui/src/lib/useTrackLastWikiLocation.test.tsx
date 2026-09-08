@@ -16,6 +16,9 @@ function Harness() {
     <div>
       <button onClick={() => navigate('/docs/intro')}>go-intro</button>
       <button onClick={() => navigate('/e/docs/intro')}>go-edit</button>
+      <button onClick={() => navigate('/settings-guide')}>
+        go-settings-slug
+      </button>
       <button
         onClick={() =>
           navigate('/settings/account', { state: { leafwikiVisitId: 'nope' } })
@@ -68,6 +71,17 @@ describe('useTrackLastWikiLocation', () => {
 
     expect(useLastWikiLocationStore.getState().location?.pathname).toBe(
       '/docs/intro',
+    )
+  })
+
+  it('still tracks a normal page whose slug merely starts with "settings"', async () => {
+    const user = userEvent.setup()
+    renderHarness('/docs/getting-started')
+
+    await user.click(screen.getByText('go-settings-slug'))
+
+    expect(useLastWikiLocationStore.getState().location?.pathname).toBe(
+      '/settings-guide',
     )
   })
 })
