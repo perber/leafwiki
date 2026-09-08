@@ -2251,6 +2251,35 @@ This paragraph creates a footnote reference.[^leafwiki]
     await expectMainScrollTop(page, 0);
   });
 
+  test('exiting settings returns to the page it was opened from, not the first wiki page', async ({
+    page,
+  }) => {
+    const stamp = Date.now();
+    const originSlug = `exit-origin-${stamp}`;
+    const originTitle = `Exit Origin ${stamp}`;
+
+    await createPageWithContent(page, {
+      title: originTitle,
+      slug: originSlug,
+      content: `# ${originTitle}\n\nOrigin page content`,
+    });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${originSlug}`);
+
+    // Open Settings the way a user does — from the account menu.
+    await viewPage.clickUserMenuAvatar();
+    await page.getByTestId('user-menu-settings').click();
+    await page.locator('[data-testid="settings-nav"]').waitFor({ state: 'visible' });
+
+    // Leave Settings via the toolbar back button: it must land back on the
+    // page Settings was opened from, not redirect to the first wiki entry.
+    await page.locator('button[data-testid="exit-settings-button"]').click();
+
+    await expect.poll(() => new URL(page.url()).pathname).toBe(`/${originSlug}`);
+    await expect(page.locator('article h1')).toHaveText(originTitle);
+  });
+
   test('duplicate footnote references keep distinct backlinks without leaked node attributes', async ({
     page,
   }) => {
