@@ -60,7 +60,9 @@ export default function SettingsNav() {
             <ListViewItem
               key={section.id}
               active={active}
-              onClick={() => navigate(`/settings/${section.path}`)}
+              onClick={() =>
+                navigate(`/settings/${section.path}`, { replace: true })
+              }
               testId={`settings-nav-item-${section.id}`}
             >
               <Icon size={16} />

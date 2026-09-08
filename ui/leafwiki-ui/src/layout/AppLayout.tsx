@@ -15,6 +15,7 @@ import { withBasePath } from '@/lib/routePath'
 import { useAppMode } from '@/lib/useAppMode'
 import { useAutoCloseSidebarOnMobile } from '@/lib/useAutoCloseSidebarOnMobile'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { useTrackLastWikiLocation } from '@/lib/useTrackLastWikiLocation'
 import { cn } from '@/lib/utils'
 import { useBrandingStore } from '@/stores/branding'
 import {
@@ -34,6 +35,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation('viewer')
   const appMode = useAppMode()
   const [isEditor, setIsEditor] = useState(appMode === 'edit')
+
+  useTrackLastWikiLocation()
 
   // store resize handler in onMouseMove, onMouseUp in useRef
   const resizeHandlerRef = useRef<{
