@@ -79,6 +79,7 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
 - Inject HTML/JS into `<head>` for analytics or custom CSS
 - Branding: logo, favicon, site name
 - Dark mode and mobile-friendly UI
+- Translated UI — ships in English, German, and Spanish; `--default-language` picks the default. Contributions of other languages are very welcome — see [docs/i18n.md](docs/i18n.md)
 
 **Opt-in via feature flags:**
 - Revision history (`--enable-revision`)
@@ -707,3 +708,5 @@ Need help deploying LeafWiki for your team? [Business support & setup →](https
 
 Contributions, discussions, and feedback are welcome.  
 Open an issue or start a discussion on GitHub. Follow the repository to get notified about new releases.
+
+**Translations:** the UI currently ships in English, German, and Spanish. Adding another language is a self-contained contribution — [docs/i18n.md](docs/i18n.md) walks through it.
