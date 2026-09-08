@@ -153,7 +153,7 @@
     --markdown-toolbar-border: 214 32% 91%;
     --markdown-toolbar-text: 215 25% 27%;
 
-    --muted: 215 16% 47%;
+    --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
 
     --headline-anchor-icon: 215 20% 65%;
@@ -230,8 +230,8 @@
     --markdown-toolbar-border: 220 14% 26%;
     --markdown-toolbar-text: 220 8% 78%;
 
-    /* ---- MUTED TEXT / ICONS ---- */
-    --muted: 220 10% 60%;
+    /* ---- MUTED SURFACE + TEXT / ICONS ---- */
+    --muted: 222 16% 18%;
     --muted-foreground: 220 10% 60%;
 
     --headline-anchor-icon: 220 12% 65%;
@@ -3759,7 +3759,7 @@
       --markdown-toolbar-border: 214 32% 91% !important;
       --markdown-toolbar-text: 215 25% 27% !important;
 
-      --muted: 215 16% 47% !important;
+      --muted: 210 40% 96% !important;
       --muted-foreground: 215 16% 47% !important;
 
       --headline-anchor-icon: 215 20% 65% !important;
