@@ -71,7 +71,7 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
 - Manual page ordering — sort order is explicit, not driven by filename (see [Sorting Pages](#sorting-pages))
 - Full-text search across titles and content, with tag-based filtering
 - Tags on pages — searchable and filterable across the wiki
-- Backlinks and link status per page (incoming, outgoing, broken links), with a maintenance view for auditing broken links
+- Backlinks and link status per page (incoming, outgoing, broken links), with a dedicated admin view for auditing broken links
 - Built-in Markdown editor with live preview, keyboard shortcuts, and autocomplete for internal page links
 - Optimistic locking for concurrent edits
 - Markdown: tables, task lists, footnotes, callouts (`:::info` / `:::warning`), collapsible blocks (`:::collapsible` / `:::collapsed`), Mermaid diagrams, KaTeX math blocks (`$$...$$`, inline `$...$` not supported), sanitized inline HTML
@@ -721,7 +721,7 @@ LeafWiki is intended to be the primary writer for a workspace. However, Markdown
 
 LeafWiki does not continuously watch the filesystem for these changes. To make externally modified files visible to LeafWiki, trigger a resync in one of two ways:
 
-* **Admin UI:** trigger it manually from the maintenance/admin settings page, with live progress across four phases (tree, links, tags, search).
+* **Admin UI:** click the **Refresh** button in the page-tree toolbar (admins only). It runs a resync with live progress across four phases (tree, links, tags, search); if HTTP [Git Backup](#git-backup-v0113-experimental) is configured, it first pulls the latest commits from the remote. Non-admin users see the same button, but for them it only re-fetches the current page tree.
 * **OS signal:** send `SIGUSR1` or `SIGHUP` to the running process — no restart required. This can be useful when an external workflow needs to explicitly tell LeafWiki that files have changed.
 
 Both paths run the same resync job and produce the same result. A resync should be considered an explicit reconciliation of the workspace rather than continuous bidirectional filesystem synchronization.
