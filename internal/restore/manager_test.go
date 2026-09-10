@@ -14,6 +14,7 @@ import (
 
 	"github.com/perber/wiki/internal/branding"
 	"github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/core/settings"
 	coreshared "github.com/perber/wiki/internal/core/shared"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/favorites"
@@ -74,7 +75,7 @@ func newManagerFixtureWithBranding(t *testing.T, wikiVersion, brandingJSON strin
 		WikiVersion:     wikiVersion,
 		WriteGate:       NewWriteGate(),
 		AuthService:     authService,
-		BrandingService: brandingService,
+		Reloadables:     []settings.Reloadable{brandingService},
 		TriggerResync:   func() { f.resyncCalls++ },
 	})
 
@@ -188,7 +189,7 @@ func newFullManagerFixtureWithBranding(t *testing.T, brandingJSON string) *fullM
 		APIKeyService:   apiKeyService,
 		Favorites:       favoritesStore,
 		UserSettings:    userSettingsService,
-		BrandingService: brandingService,
+		Reloadables:     []settings.Reloadable{brandingService},
 	})
 	return f
 }
@@ -334,7 +335,7 @@ func TestManager_Restore_ByID_DoesNotEnforceUploadExtractionCaps(t *testing.T) {
 		WikiVersion:     "v1.0.0",
 		WriteGate:       NewWriteGate(),
 		AuthService:     authService,
-		BrandingService: brandingService,
+		Reloadables:     []settings.Reloadable{brandingService},
 		TriggerResync:   func() {},
 	})
 
@@ -1032,7 +1033,7 @@ func TestManager_Restore_HappyPath_PreservesAPIKeys(t *testing.T) {
 		WriteGate:       NewWriteGate(),
 		AuthService:     authService,
 		APIKeyService:   apiKeyService,
-		BrandingService: brandingService,
+		Reloadables:     []settings.Reloadable{brandingService},
 	})
 
 	if err := manager.TriggerRestore(snapshotID); err != nil {
@@ -1128,7 +1129,7 @@ func TestManager_Restore_HappyPath_PreservesFavoritesAndUserSettings(t *testing.
 		AuthService:     authService,
 		Favorites:       favoritesStore,
 		UserSettings:    userSettingsService,
-		BrandingService: brandingService,
+		Reloadables:     []settings.Reloadable{brandingService},
 	})
 
 	if err := manager.TriggerRestore(snapshotID); err != nil {
@@ -1220,7 +1221,7 @@ func TestManager_Restore_HappyPath_ReloadsUserResolverCache(t *testing.T) {
 		WikiVersion:     "v1.0.0",
 		WriteGate:       NewWriteGate(),
 		AuthService:     authService,
-		BrandingService: brandingService,
+		Reloadables:     []settings.Reloadable{brandingService},
 		UserResolver:    userResolver,
 	})
 

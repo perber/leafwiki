@@ -26,6 +26,7 @@ import (
 	"github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/core/email"
 	"github.com/perber/wiki/internal/core/ignore"
+	"github.com/perber/wiki/internal/core/settings"
 	sharedcrypto "github.com/perber/wiki/internal/core/shared/crypto"
 	"github.com/perber/wiki/internal/core/tools"
 	httpinternal "github.com/perber/wiki/internal/http"
@@ -323,8 +324,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 			APIKeyService:      w.APIKeyService(),
 			Favorites:          w.Favorites(),
 			UserSettings:       w.UserSettingsService(),
-			BrandingService:    w.BrandingService(),
-			PublicAccess:       publicAccessService,
+			Reloadables:        []settings.Reloadable{w.BrandingService(), publicAccessService},
 			UserResolver:       w.UserResolver(),
 			TriggerResync:      w.TriggerResyncAsync,
 			MaxUploadSizeBytes: restoreUploadMaxSize,
