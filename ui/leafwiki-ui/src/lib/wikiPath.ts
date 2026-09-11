@@ -69,7 +69,13 @@ export function resolveWikiLinkPath(currentPath: string, href: string): string {
   const base = new URL(folderBase, 'https://leafwiki.local')
   const url = new URL(href, base)
 
-  return normalizeWikiRoutePath(url.pathname)
+  let pathname = url.pathname
+  // Filesystem-style Markdown links often keep a .md suffix; wiki routes do not.
+  if (pathname.toLowerCase().endsWith('.md')) {
+    pathname = pathname.slice(0, -3)
+  }
+
+  return normalizeWikiRoutePath(pathname)
 }
 
 /**
