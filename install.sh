@@ -53,7 +53,7 @@ validate_architecture(){
 
 validate_port(){
     if ! [[ "$PORT" =~ ^[0-9]+$ ]] || [ "$PORT" -lt 1 ] || [ "$PORT" -gt 65535 ]; then
-        echo "Error: --port requires a valid port number (1-65535)."
+        echo "Error: Port (LEAFWIKI_PORT) must be a valid port number (1-65535)."
         usage
         exit 1
     fi
@@ -189,7 +189,7 @@ else
     echo ""
                                     
     echo "========================================"
-    echo "   LeafWiki — Installer"
+    echo "   LeafWiki â€” Installer"
     echo "========================================"
     echo ""
     echo ""
