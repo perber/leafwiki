@@ -5,7 +5,7 @@ Short introduction: this file explains how to install LeafWiki on a Raspberry Pi
 ## Project installation
 To begin, you need to install `LeafWiki`. Here is the "quick install" command:
 ```bash
-curl -sL https://raw.githubusercontent.com/perber/leafwiki/main/install.sh -o install.sh && chmod +x ./install.sh && sudo ./install.sh --arch arm64
+curl -sL https://raw.githubusercontent.com/perber/leafwiki/main/install.sh -o install.sh && chmod +x ./install.sh && sudo ./install.sh
 ```
 
 Thanks to this command, the LeafWiki service is now installed and should be accessible locally at:
@@ -14,7 +14,7 @@ http://localhost:8080/
 
 ## Cloudflare
 
-Great — we have a server where we can run our site. However, for now all of this is only accessible on our local network. In other words, only people connected to our network can access it.
+Great â€” we have a server where we can run our site. However, for now all of this is only accessible on our local network. In other words, only people connected to our network can access it.
 
 To expose the site to the Internet, we could open the ports on the router, but that introduces significant security risks.
 
@@ -46,7 +46,7 @@ Sign up on the [Cloudflare dashboard](https://dash.cloudflare.com/) if needed.
 
 Once your domain is configured on the Cloudflare side, you can create a tunnel.
 
-In the Cloudflare dashboard, go to **Zero Trust**, then **Network → Tunnels**.
+In the Cloudflare dashboard, go to **Zero Trust**, then **Network â†’ Tunnels**.
 
 ![image-3](../assets/install/raspberry/image-3.png)
 
