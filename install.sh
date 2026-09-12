@@ -189,7 +189,7 @@ else
     echo ""
                                     
     echo "========================================"
-    echo "   LeafWiki — Installer"
+    echo "   LeafWiki â€” Installer"
     echo "========================================"
     echo ""
     echo ""
@@ -216,7 +216,7 @@ else
         DATA_DIR="$RESPONSE_DATA_DIR"
     fi
 
-    read -rp "Do you want to enable versioning? (default: n) y/N: " RESPONSE_REVISION
+    read -rp "Do you want to enable revision history? (default: n) y/N: " RESPONSE_REVISION
     if [[ $RESPONSE_REVISION == "y" || $RESPONSE_REVISION == "Y" ]]; then
 
         ENABLE_REVISION="true"
