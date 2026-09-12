@@ -57,5 +57,5 @@ export const AcceptInvitePage = lazy(() => import('../auth/AcceptInvitePage'))
 export const PageEditor = lazy(() => import('../editor/PageEditor'))
 export const PageHistoryPage = lazy(() => import('../page/PageHistoryPage'))
 export const PermalinkRedirect = lazy(() => import('../page/PermalinkRedirect'))
-export const RootRedirect = lazy(() => import('../page/RootRedirect'))
+export const RootPage = lazy(() => import('../page/RootPage'))
 export { default as PageViewer } from '../viewer/PageViewer'
