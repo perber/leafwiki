@@ -11,13 +11,12 @@ Run the installation script:
 ```bash
 curl -sL https://raw.githubusercontent.com/perber/leafwiki/main/install.sh -o install.sh
 chmod +x ./install.sh
-sudo ./install.sh --arch amd64 --port 8080 --host 127.0.0.1
-# Use --arch arm64 on ARM hosts (e.g. some cloud instances / Raspberry Pi).
+sudo ./install.sh
 ```
 
 Thanks to @Hugo-Galley for providing this installation script!
 
-During installation, you’ll be prompted for:
+During installation, youâ€™ll be prompted for:
 
 - **JWT secret:** choose a secure secret  
 - **Admin password:** for the LeafWiki admin user  
@@ -89,7 +88,7 @@ sudo systemctl reload nginx
 ```
 
 Now LeafWiki should be accessible at  
-➡️ `http://wiki.example.com`
+âž¡ï¸ `http://wiki.example.com`
 
 ---
 
@@ -160,7 +159,7 @@ server {
 ```
 
 Now LeafWiki is available securely at:  
-➡️ **https://wiki.example.com**
+âž¡ï¸ **https://wiki.example.com**
 
 ---
 
@@ -220,7 +219,7 @@ sudo certbot renew --dry-run
 
 ---
 
-✅ **Result:**  
+âœ… **Result:**  
 - LeafWiki runs locally on port `8080`  
 - nginx proxies requests from your domain  
-- HTTPS is automatically managed by Let’s Encrypt  
+- HTTPS is automatically managed by Letâ€™s Encrypt  
