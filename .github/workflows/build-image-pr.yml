@@ -1,0 +1,70 @@
+name: Build a test image from a PR code
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  build-images:
+    if: |
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/create-test-image') &&
+      (
+        github.event.comment.author_association == 'OWNER' ||
+        github.event.comment.author_association == 'CONTRIBUTOR' ||
+        github.event.comment.author_association == 'COLLABORATOR' ||
+        github.event.comment.author_association == 'FIRST_TIME_CONTRIBUTOR'
+      )
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write
+      packages: write
+
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+
+      - name: Get Pull Request Information
+        id: pr
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+
+            core.setOutput('sha', pr.data.head.sha);
+            core.setOutput('ref', pr.data.head.ref);
+
+      - name: Checkout PR commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ steps.pr.outputs.sha }}
+
+      - name: Set lowercase image owner
+        id: vars
+        run: |
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push Docker image
+        run: |
+          SHA=$(echo "${{ steps.pr.outputs.sha }}" | cut -c1-7)
+          VERSION=pr-${{ github.event.issue.number }}-$SHA
+
+          echo "Building image version: $VERSION"
+
+          make docker-build-publish \
+            VERSION=$VERSION \
+            REPO_OWNER=${{ steps.vars.outputs.owner }}
