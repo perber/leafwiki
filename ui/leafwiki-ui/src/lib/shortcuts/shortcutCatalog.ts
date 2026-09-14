@@ -88,7 +88,7 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
     keyCombo: 'Mod+Shift+KeyE',
     defaultDisplayLabel: 'Ctrl+Shift+E',
     macDisplayLabel: 'Cmd+Shift+E',
-    modes: ['view', 'edit', 'history', 'settings'],
+    modes: ['view', 'edit', 'history'],
     customizable: true,
   },
   {
@@ -98,7 +98,7 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
     keyCombo: 'Mod+Shift+KeyF',
     defaultDisplayLabel: 'Ctrl+Shift+F',
     macDisplayLabel: 'Cmd+Shift+F',
-    modes: ['view', 'edit', 'history', 'settings'],
+    modes: ['view', 'edit', 'history'],
     customizable: true,
   },
   {
