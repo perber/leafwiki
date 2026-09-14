@@ -382,6 +382,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--git-backup`                   | ⚗️ Enable git backup to a remote repository                             | `false`       | v0.11.3 |
 | `--git-backup-remote`            | ⚗️ SSH remote URL for git backup (e.g. `git@github.com:user/repo.git`) | `""` | v0.11.3 |
 | `--git-backup-branch`            | ⚗️ Branch to push to                                                    | `main`        | v0.11.3 |
+| `--git-backup-path`              | ⚗️ Directory holding `root/` and `assets/` (e.g. `docs` → `docs/root`); empty = top level | `""` | v0.13.0 |
 | `--git-backup-ssh-key`           | ⚗️ Raw SSH private key (prefer env var)                                 | `""`          | v0.11.3 |
 | `--git-backup-ssh-key-path`      | ⚗️ Path to SSH private key file                                         | `""`          | v0.11.3 |
 | `--git-backup-ssh-known-hosts`   | ⚗️ Path to `known_hosts` for MITM protection                            | `""`          | v0.11.3 |
@@ -455,6 +456,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_GIT_BACKUP`                   | ⚗️ Enable git backup                                | `false`       | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_REMOTE`            | ⚗️ SSH remote URL                                   | `""`          | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_BRANCH`            | ⚗️ Branch to push to                                | `main`        | v0.11.3 |
+| `LEAFWIKI_GIT_BACKUP_PATH`              | ⚗️ Directory holding `root/` and `assets/` (e.g. `docs` → `docs/root`); empty = top level | `""` | v0.13.0 |
 | `LEAFWIKI_GIT_BACKUP_SSH_KEY`           | ⚗️ Raw SSH private key (preferred over path)        | `""`          | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH`      | ⚗️ Path to SSH private key file                     | `""`          | v0.11.3 |
 | `LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS`   | ⚗️ Path to `known_hosts` file                       | `""`          | v0.11.3 |
@@ -557,7 +559,7 @@ Use `--unix-socket` when LeafWiki should listen on a local unix domain socket in
 
 > **Experimental** — This feature is new and may change in future releases. Test it thoroughly before relying on it for critical data.
 
-Git Backup pushes wiki **content** to a remote Git repository on a configurable interval, via **SSH** or **HTTP(S)**. It covers the `root/` (pages) and `assets/` directories. Database files (`.db`, `.db-wal`, etc.) and runtime files are excluded via `.gitignore`.
+Git Backup pushes wiki **content** to a remote Git repository on a configurable interval, via **SSH** or **HTTP(S)**. Only the `root/` (pages) and `assets/` directories are committed, so database files (`.db`, `.db-wal`, etc.) and other runtime files are never included; `.gitignore` rules are still honoured. By default the content is committed at the repository top level — set `--git-backup-path` to nest it under a directory (useful for a monorepo).
 
 Backups run automatically on a configurable interval and can also be triggered manually from the **Git Content Backup** page.
 
@@ -568,6 +570,7 @@ Backups run automatically on a configurable interval and can also be triggered m
 | `--git-backup` | Enable git backup | `false` |
 | `--git-backup-remote` | SSH or HTTP(S) remote URL (e.g. `git@github.com:user/repo.git`, `https://github.com/user/repo.git`) | `""` |
 | `--git-backup-branch` | Branch to push to | `main` |
+| `--git-backup-path` | Directory holding `root/` and `assets/`, e.g. `docs` → `docs/root` + `docs/assets`; empty = repository top level (v0.13.0+) | `""` |
 | `--git-backup-ssh-key` | Raw SSH private key (prefer env var) | `""` |
 | `--git-backup-ssh-key-path` | Path to SSH private key file | `""` |
 | `--git-backup-ssh-known-hosts` | Path to `known_hosts` for MITM protection | `""` |
@@ -584,6 +587,7 @@ Backups run automatically on a configurable interval and can also be triggered m
 | `LEAFWIKI_GIT_BACKUP` | Enable git backup |
 | `LEAFWIKI_GIT_BACKUP_REMOTE` | SSH or HTTP(S) remote URL |
 | `LEAFWIKI_GIT_BACKUP_BRANCH` | Branch to push to |
+| `LEAFWIKI_GIT_BACKUP_PATH` | Directory holding `root/` and `assets/`, e.g. `docs` → `docs/root` + `docs/assets` |
 | `LEAFWIKI_GIT_BACKUP_SSH_KEY` | Raw SSH private key |
 | `LEAFWIKI_GIT_BACKUP_SSH_KEY_PATH` | Path to SSH private key file |
 | `LEAFWIKI_GIT_BACKUP_SSH_KNOWN_HOSTS` | Path to `known_hosts` file |
@@ -627,6 +631,8 @@ On GitHub, create a **fine-grained personal access token** limited to the backup
 - `--git-backup-ssh-known-hosts` is optional but recommended for SSH remotes. If not set, LeafWiki falls back to `~/.ssh/known_hosts`. If that file does not exist either (common in containers), SSH host key verification is **disabled** — leaving connections open to MITM attacks. Set this flag explicitly in production. It has no effect on HTTP(S) remotes, which are verified via TLS.
 - If the remote diverges (e.g. someone pushed directly to the backup branch), LeafWiki will stop auto-pushing and show a **Conflict — remote diverged** warning in the UI. Click **Force Push** in the UI to overwrite the remote with the current local backup history. Your wiki content is never lost — the local backup repo is always authoritative.
 - This backs up **content only** — the SQLite database is not included. For a full backup, use your data directory (`cp -r` with the app stopped).
+- When LeafWiki first connects to a remote that already contains a backup, it syncs that content into the local data directory before the wiki loads its pages (local files always win — nothing is overwritten). A new instance therefore picks up the backed-up pages instead of overwriting the remote with an empty wiki, and it does not seed its default welcome page when the backup already has content. After that first sync, backups behave normally, including committing deletions.
+- `--git-backup-path` (e.g. `docs`) commits `root/` and `assets/` under that directory instead of the top level — `docs` produces `docs/root/` and `docs/assets/` — and pulls external edits back from there. This is handy when the backup remote is a monorepo: files outside the configured directory are left untouched. LeafWiki's live content still lives in `<data-dir>/root` and `<data-dir>/assets`; nothing is copied into the repository working tree. Leave it empty to keep the historical top-level layout.
 
 ---
 

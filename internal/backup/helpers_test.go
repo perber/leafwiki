@@ -127,3 +127,41 @@ func commitToRemote(t *testing.T, bareDir, filename, content string) {
 		t.Fatalf("commitToRemote: Push failed: %v", err)
 	}
 }
+
+// deleteFromRemote simulates an external client deleting a file on the remote.
+func deleteFromRemote(t *testing.T, bareDir, filename string) {
+	t.Helper()
+	cloneDir := t.TempDir()
+	cloned, err := gogit.PlainClone(cloneDir, false, &gogit.CloneOptions{
+		URL:           "file://" + bareDir,
+		ReferenceName: plumbing.NewBranchReferenceName("main"),
+	})
+	if err != nil {
+		t.Fatalf("deleteFromRemote: PlainClone failed: %v", err)
+	}
+	wt, err := cloned.Worktree()
+	if err != nil {
+		t.Fatalf("deleteFromRemote: Worktree failed: %v", err)
+	}
+	if _, err := wt.Remove(filename); err != nil {
+		t.Fatalf("deleteFromRemote: Remove failed: %v", err)
+	}
+	if _, err := wt.Commit("external delete", &gogit.CommitOptions{
+		Author: &object.Signature{
+			Name:  "External",
+			Email: "ext@example.com",
+			When:  time.Now(),
+		},
+	}); err != nil {
+		t.Fatalf("deleteFromRemote: Commit failed: %v", err)
+	}
+	remote, err := cloned.Remote("origin")
+	if err != nil {
+		t.Fatalf("deleteFromRemote: Remote failed: %v", err)
+	}
+	if err := remote.Push(&gogit.PushOptions{
+		RefSpecs: []config.RefSpec{"refs/heads/main:refs/heads/main"},
+	}); err != nil {
+		t.Fatalf("deleteFromRemote: Push failed: %v", err)
+	}
+}

@@ -11,6 +11,7 @@ type Config struct {
 	Enabled           bool
 	RootDir           string // path to LeafWiki root/ content directory
 	AssetsDir         string // path to LeafWiki assets/ directory
+	Path              string // repository-relative directory to commit content under; "" = repository top level (monorepo prefix, e.g. "docs/wiki")
 	AuthorName        string
 	AuthorEmail       string
 	RemoteURL         string        // SSH remote (git@github.com:user/repo.git) or HTTPS remote (https://github.com/user/repo.git)
@@ -53,6 +54,18 @@ func (c Config) WithSettingsDefaults() Config {
 		c.AuthorEmail = DefaultAuthorEmail
 	}
 	return c
+}
+
+// ContentTreePaths returns the repository-relative, slash-separated directory
+// paths the live root/ and assets/ directories are committed under. With an
+// empty Path that is "root" and "assets" (historical layout); with Path set it
+// is "<path>/root" and "<path>/assets", so a monorepo remote keeps its sibling
+// files while LeafWiki owns only its own subtree.
+func (c Config) ContentTreePaths() (rootPath, assetsPath string) {
+	if c.Path == "" {
+		return "root", "assets"
+	}
+	return c.Path + "/root", c.Path + "/assets"
 }
 
 // ValidateForSettings checks a Config that came from the admin settings UI.

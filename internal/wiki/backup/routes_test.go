@@ -149,10 +149,10 @@ func TestHandleTriggerPull_ErrorHasEmptyTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Worktree: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(cloneDir, "page.md"), []byte("version B from remote\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(cloneDir, "root", "page.md"), []byte("version B from remote\n"), 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
-	if _, err := wt.Add("page.md"); err != nil {
+	if _, err := wt.Add("root/page.md"); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 	if _, err := wt.Commit("external commit", &gogit.CommitOptions{
