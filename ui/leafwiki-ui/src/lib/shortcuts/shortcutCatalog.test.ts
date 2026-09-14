@@ -63,6 +63,15 @@ describe('shortcutCatalog', () => {
     ])
   })
 
+  it('does not advertise the Explorer/Search panel toggles on the Settings page (#1550)', () => {
+    // Settings has no Explorer/Search panel to toggle — Sidebar (the only thing
+    // that registers these hotkeys) unmounts while in Settings, so listing them
+    // here would advertise shortcuts that don't actually do anything.
+    expect(
+      getVisibleShortcutsForMode('settings').map((item) => item.id),
+    ).toEqual(['settings.exit', 'shortcuts.help.open'])
+  })
+
   it('includes the remaining viewer and editor shortcuts in the catalog', () => {
     expect(getShortcutDefinition('shortcuts.help.open').keyCombo).toBe(
       'Mod+Slash',
