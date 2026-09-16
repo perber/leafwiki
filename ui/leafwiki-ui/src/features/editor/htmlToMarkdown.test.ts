@@ -219,6 +219,19 @@ describe('htmlToMarkdown', () => {
       const result = htmlToMarkdown(html)
       expect(result).toBe('| Name | Age |\n| --- | --- |\n| Alice | 30 |')
     })
+
+    it('converts table with paragraph-wrapped cells (LibreOffice Writer/Word paste)', () => {
+      const html = `
+        <table>
+          <tbody>
+            <tr><td><p>Name</p></td><td><p>Age</p></td></tr>
+            <tr><td><p>Alice</p></td><td><p>30</p></td></tr>
+          </tbody>
+        </table>
+      `
+      const result = htmlToMarkdown(html)
+      expect(result).toBe('| Name | Age |\n| --- | --- |\n| Alice | 30 |')
+    })
   })
 
   describe('paragraphs', () => {
