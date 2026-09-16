@@ -138,7 +138,8 @@ function isFirstTableRow(tr: HTMLTableRowElement): boolean {
 function tableCell(content: string, node: HTMLTableCellElement): string {
   const index = Array.from(node.parentNode?.childNodes ?? []).indexOf(node)
   const prefix = index === 0 ? '| ' : ' '
-  return `${prefix}${content} |`
+  const flattened = content.trim().replace(/\s*\n+\s*/g, ' ')
+  return `${prefix}${flattened} |`
 }
 
 const converter = createConverter()
