@@ -23,6 +23,15 @@ describe('MarkdownImage', () => {
     expect(screen.getByAltText('foo')).toHaveStyle({ display: 'inline-block' })
   })
 
+  it('has no vertical margin so paragraph spacing governs the gap around it (#1524)', () => {
+    render(<MarkdownImage src="/assets/foo.png" alt="foo" />)
+
+    expect(screen.getByAltText('foo')).toHaveStyle({
+      marginTop: '0px',
+      marginBottom: '0px',
+    })
+  })
+
   it('lets the surrounding link handle the click instead of opening the preview', () => {
     render(
       <a href="https://github.com/perber/leafwiki">
