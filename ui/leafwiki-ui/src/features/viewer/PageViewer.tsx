@@ -231,12 +231,13 @@ export default function PageViewer() {
                   />
                 )}
               </div>
-              {showTocButton && (
+              {showRightPane && (
                 <div className="page-viewer__toc-button">
                   <TocDropdownButton
                     entries={tocEntries}
                     clickable
                     activeId={tocActiveId}
+                    downloads={attachments}
                   />
                 </div>
               )}

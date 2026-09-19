@@ -3,12 +3,14 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TocDropdownButton } from './TocDropdownButton'
 import type { TocEntry } from './extractTocEntries'
+import type { PageAttachment } from '@/lib/api/assets'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => {
       const map: Record<string, string> = {
         'toc.onThisPage': 'On this page',
+        'toc.downloads': 'Attached Media',
       }
       return map[key] ?? key
     },
@@ -151,5 +153,41 @@ describe('TocDropdownButton — click navigation', () => {
     const user = userEvent.setup()
     await user.click(await screen.findByText('Background'))
     expect(scrollMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('TocDropdownButton — downloads', () => {
+  const downloads: PageAttachment[] = [
+    { name: 'notes.pdf', url: '/assets/p1/notes.pdf' },
+  ]
+
+  it('lists attachments below the entries', async () => {
+    render(<TocDropdownButton entries={entries} downloads={downloads} />)
+    await openDropdown()
+
+    const link = await screen.findByTestId('toc-dropdown-download-notes.pdf')
+    expect(link).toHaveAttribute('href', '/assets/p1/notes.pdf')
+    expect(link).toHaveAttribute('download', 'notes.pdf')
+  })
+
+  it('shows the downloads label when entries are also present', async () => {
+    render(<TocDropdownButton entries={entries} downloads={downloads} />)
+    await openDropdown()
+    expect(await screen.findByText('Attached Media')).toBeInTheDocument()
+  })
+
+  it('omits the downloads label when there are no entries', async () => {
+    render(<TocDropdownButton entries={[]} downloads={downloads} />)
+    await openDropdown()
+    expect(
+      await screen.findByTestId('toc-dropdown-download-notes.pdf'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Attached Media')).not.toBeInTheDocument()
+  })
+
+  it('renders no downloads section when there are none', async () => {
+    render(<TocDropdownButton entries={entries} downloads={[]} />)
+    await openDropdown()
+    expect(screen.queryByText('Attached Media')).not.toBeInTheDocument()
   })
 })

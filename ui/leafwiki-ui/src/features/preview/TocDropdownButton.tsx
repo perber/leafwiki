@@ -3,8 +3,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import type { PageAttachment } from '@/lib/api/assets'
+import { withBasePath } from '@/lib/routePath'
 import { scrollToHeadlineHash } from '@/lib/scrollToHeadline'
 import { cn } from '@/lib/utils'
 import { ChevronDown } from 'lucide-react'
@@ -16,6 +20,7 @@ type Props = {
   entries: TocEntry[]
   clickable?: boolean
   activeId?: string | null
+  downloads?: PageAttachment[]
 }
 
 function getTocEntryClassName(level: number) {
@@ -38,6 +43,7 @@ export function TocDropdownButton({
   entries,
   clickable = true,
   activeId: externalActiveId,
+  downloads = [],
 }: Props) {
   const { t } = useTranslation('viewer')
   // When the parent provides activeId, skip internal scroll spy (no duplicate listener).
@@ -80,6 +86,29 @@ export function TocDropdownButton({
             {entry.text}
           </DropdownMenuItem>
         ))}
+        {downloads.length > 0 && (
+          <>
+            {entries.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>{t('toc.downloads')}</DropdownMenuLabel>
+              </>
+            )}
+            {downloads.map((file) => (
+              <DropdownMenuItem key={file.url} asChild>
+                <a
+                  href={withBasePath(file.url)}
+                  download={file.name}
+                  className="cursor-pointer text-sm"
+                  title={file.name}
+                  data-testid={`toc-dropdown-download-${file.name}`}
+                >
+                  {file.name}
+                </a>
+              </DropdownMenuItem>
+            ))}
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )
