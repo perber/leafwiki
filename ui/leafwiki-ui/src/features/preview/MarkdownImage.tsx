@@ -77,6 +77,15 @@ export function MarkdownImage({
         // same Markdown line (`![alt](img) text`). Keep Markdown images inline
         // so trailing/leading text stays on the same line (#1471).
         display: 'inline-block',
+        // Tailwind Typography's `prose img` rule adds a 2em top/bottom margin
+        // sized for a standalone block-level figure. On an inline-block image
+        // that margin never collapses with the surrounding paragraph's own
+        // margin, so it stacked on top of it and produced an oversized gap
+        // around "image + text" lines (and before a wrapped second line of
+        // the same paragraph). Let the paragraph's margin be the only source
+        // of vertical spacing (#1524).
+        marginTop: 0,
+        marginBottom: 0,
         ...style,
         cursor: 'zoom-in',
         ...(width
