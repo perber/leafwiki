@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 
 type FormState = {
   remoteUrl: string
+  path: string
   branch: string
   authorName: string
   authorEmail: string
@@ -26,6 +27,7 @@ type FormState = {
 function emptyForm(): FormState {
   return {
     remoteUrl: '',
+    path: '',
     branch: 'main',
     authorName: '',
     authorEmail: '',
@@ -80,6 +82,7 @@ export default function BackupConfigForm() {
     if (!config) return
     setForm({
       remoteUrl: config.remoteUrl || '',
+      path: config.path || '',
       branch: config.branch || 'main',
       authorName: config.authorName || '',
       authorEmail: config.authorEmail || '',
@@ -117,6 +120,7 @@ export default function BackupConfigForm() {
 
   const buildInput = (): BackupConfigInput => ({
     remoteUrl: form.remoteUrl.trim(),
+    path: form.path.trim(),
     branch: form.branch.trim(),
     authorName: form.authorName.trim(),
     authorEmail: form.authorEmail.trim(),
@@ -290,6 +294,17 @@ export default function BackupConfigForm() {
               placeholder={t('config.branchPlaceholder')}
               onChange={(e) => set('branch', e.target.value)}
             />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="backup-path">{t('config.path')}</Label>
+            <Input
+              id="backup-path"
+              value={form.path}
+              placeholder={t('config.pathPlaceholder')}
+              onChange={(e) => set('path', e.target.value)}
+            />
+            <p className="text-muted text-xs">{t('config.pathHint')}</p>
           </div>
 
           <div className="flex gap-3">

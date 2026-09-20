@@ -68,6 +68,23 @@ func (c Config) ContentTreePaths() (rootPath, assetsPath string) {
 	return c.Path + "/root", c.Path + "/assets"
 }
 
+// contentTarget pairs a repository-relative tree path (from ContentTreePaths)
+// with the live directory it's committed from / materialized into.
+type contentTarget struct {
+	treePath string
+	liveDir  string
+}
+
+// contentTargets returns the root/ and assets/ content targets this Config
+// commits, in a fixed order.
+func (c Config) contentTargets() []contentTarget {
+	rootPath, assetsPath := c.ContentTreePaths()
+	return []contentTarget{
+		{rootPath, c.RootDir},
+		{assetsPath, c.AssetsDir},
+	}
+}
+
 // ValidateForSettings checks a Config that came from the admin settings UI.
 // Unlike the ENV/flag path it requires a remote (a UI-configured backup always
 // pushes somewhere — that is the whole point of the "test connection" step) and
@@ -84,6 +101,9 @@ func (c Config) ValidateForSettings() error {
 	}
 	if strings.TrimSpace(c.AuthorEmail) == "" || strings.TrimSpace(c.AuthorName) == "" {
 		return fmt.Errorf("commit author name and email are required")
+	}
+	if _, err := normalizeBackupPath(c.Path); err != nil {
+		return err
 	}
 	return ValidateRemoteCredentials(c.RemoteURL, c.SSHKey, c.SSHKeyPath, c.HTTPUsername, c.HTTPPassword)
 }

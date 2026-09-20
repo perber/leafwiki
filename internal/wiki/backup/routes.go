@@ -147,6 +147,7 @@ func (r *Routes) respondNotEnabled(c *gin.Context) {
 // Empty sshKey / httpPassword mean "keep the stored value".
 type backupConfigRequest struct {
 	RemoteURL         string `json:"remoteUrl"`
+	Path              string `json:"path"`
 	Branch            string `json:"branch"`
 	AuthorName        string `json:"authorName"`
 	AuthorEmail       string `json:"authorEmail"`
@@ -181,6 +182,7 @@ func (r *Routes) handleGetBackupConfig(c *gin.Context) {
 		"maxIntervalMinutes":     maxSettingsIntervalMinutes,
 		"config": gin.H{
 			"remoteUrl":         backupSvc.RedactRemoteURL(cfg.RemoteURL),
+			"path":              cfg.Path,
 			"branch":            cfg.Branch,
 			"authorName":        cfg.AuthorName,
 			"authorEmail":       cfg.AuthorEmail,
@@ -297,6 +299,7 @@ func (r *Routes) bindAndValidateConfig(c *gin.Context) (backupSvc.Config, bool) 
 
 	cfg := backupSvc.Config{
 		RemoteURL:         remoteURL,
+		Path:              strings.TrimSpace(req.Path),
 		Branch:            strings.TrimSpace(req.Branch),
 		AuthorName:        strings.TrimSpace(req.AuthorName),
 		AuthorEmail:       strings.TrimSpace(req.AuthorEmail),

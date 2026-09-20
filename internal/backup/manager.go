@@ -47,6 +47,44 @@ type Manager struct {
 	store      *ConfigStore // nil when envManaged
 	rootDir    string
 	assetsDir  string
+
+	// onContentSynced, when set, is called after build() brings up a Repository
+	// that materialized remote content directly onto disk (see
+	// Repository.SyncedContentOnInit) — i.e. whenever that can happen against
+	// an already-running wiki: a settings Reconfigure, or the background boot
+	// in NewSettingsManager racing wiki startup. It exists so the composition
+	// root can wire in a resync (e.g. Wiki.TriggerResyncAsync) without this
+	// package depending on the wiki layer.
+	onContentSynced func()
+
+	// pendingContentSync records a sync that happened before onContentSynced
+	// was set. NewSettingsManager can start booting in the background before
+	// its caller (main.go) has a Wiki instance to wire the callback with, so a
+	// fast boot's build() can reach the sync check while onContentSynced is
+	// still nil. SetOnContentSynced fires immediately for a pending sync it
+	// finds already recorded, closing that race.
+	pendingContentSync bool
+}
+
+// SetOnContentSynced registers fn to run after build() activates a Repository
+// that synced remote content straight onto disk (see
+// Repository.SyncedContentOnInit) — the caller uses this to keep its
+// tree/SQLite index from going stale relative to disk.
+//
+// The settings-managed background boot (NewSettingsManager) can finish before
+// this is called (its caller typically doesn't have fn — e.g. a Wiki instance
+// — ready yet), so a sync that already happened is remembered and fn is
+// invoked immediately in that case, rather than only for syncs that happen
+// after this call.
+func (m *Manager) SetOnContentSynced(fn func()) {
+	m.mu.Lock()
+	m.onContentSynced = fn
+	pending := m.pendingContentSync
+	m.pendingContentSync = false
+	m.mu.Unlock()
+	if pending && fn != nil {
+		fn()
+	}
 }
 
 // NewEnvManager wraps an already-built repo + scheduler produced by the
@@ -127,6 +165,20 @@ func (m *Manager) build(cfg Config) (*Repository, *Scheduler, Config, error) {
 	repo, err := Init(cfg)
 	if err != nil {
 		return nil, nil, Config{}, err
+	}
+	if repo.SyncedContentOnInit() {
+		m.mu.Lock()
+		onSynced := m.onContentSynced
+		if onSynced == nil {
+			// No callback registered yet (e.g. this is NewSettingsManager's
+			// background boot outrunning main.go's SetOnContentSynced call) —
+			// remember it so SetOnContentSynced fires as soon as it's set.
+			m.pendingContentSync = true
+		}
+		m.mu.Unlock()
+		if onSynced != nil {
+			onSynced()
+		}
 	}
 	return repo, NewScheduler(repo), cfg, nil
 }

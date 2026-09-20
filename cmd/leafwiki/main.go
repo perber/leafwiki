@@ -287,6 +287,11 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 	}()
 
 	defer backupManager.Stop()
+	// A settings Reconfigure (or the settings-managed manager's own background
+	// boot) can materialize remote content straight onto disk after the wiki's
+	// tree/SQLite index has already loaded — keep the index from going stale by
+	// triggering the same resync used for SIGUSR1/SIGHUP.
+	backupManager.SetOnContentSynced(w.TriggerResyncAsync)
 	w.SetBackupRoutes(wikibackup.NewRoutes(backupManager, w.AuthService()))
 
 	// Initialize full backup snapshots if enabled

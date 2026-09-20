@@ -43,6 +43,48 @@ type Repository struct {
 	status           *Status
 	looseObjsSinceGC int
 	lastPushedHash   plumbing.Hash // hash of the last commit successfully pushed; zero = never pushed
+
+	// afterListBeforeFetch, when set, runs right after pullBeforeBackup lists the
+	// remote branch tip and before it fetches it. It exists only so tests can
+	// deterministically simulate a remote history rewrite landing in that window
+	// (see TestPull_RemoteRewrittenBetweenListAndFetch); production code never
+	// sets it.
+	afterListBeforeFetch func()
+
+	// liveFSCaseInsensitive records whether repoDir's filesystem folds case
+	// (the default on Windows and macOS), probed once at Init. materialize
+	// uses it to avoid treating two differently-cased paths that the OS
+	// resolves to the same physical file as unrelated.
+	liveFSCaseInsensitive bool
+
+	// syncedContentOnInit records whether this Init() call wrote files to
+	// RootDir/AssetsDir via syncContentFromRemote (first contact with a
+	// remote that already had history). See SyncedContentOnInit.
+	syncedContentOnInit bool
+}
+
+// SyncedContentOnInit reports whether Init materialized remote content onto
+// disk (first contact with a remote that already had history) without going
+// through the normal wiki write path. A caller whose wiki tree/SQLite index
+// may already be loaded (i.e. anything other than process startup, before
+// wiki.NewWiki runs) must trigger a resync when this is true, or the synced
+// pages exist on disk but stay invisible in search/tags/links/nav.
+func (r *Repository) SyncedContentOnInit() bool {
+	return r.syncedContentOnInit
+}
+
+// probeCaseInsensitiveFilesystem reports whether dir's filesystem folds case.
+// It writes a throwaway file rather than relying on GOOS, since e.g. macOS can
+// be configured case-sensitive. A probe failure (e.g. read-only dir) is
+// treated as case-sensitive, the safer default (Linux behaviour).
+func probeCaseInsensitiveFilesystem(dir string) bool {
+	probe := filepath.Join(dir, ".leafwiki-case-probe")
+	if err := os.WriteFile(probe, nil, 0o644); err != nil {
+		return false
+	}
+	defer func() { _ = os.Remove(probe) }()
+	_, err := os.Stat(filepath.Join(dir, ".LEAFWIKI-CASE-PROBE"))
+	return err == nil
 }
 
 // Init opens an existing repo at repoDir or initialises a new one.
@@ -76,9 +118,10 @@ func Init(cfg Config) (*Repository, error) {
 	}
 
 	r := &Repository{
-		cfg:     cfg,
-		repoDir: repoDir,
-		status:  &Status{},
+		cfg:                   cfg,
+		repoDir:               repoDir,
+		status:                &Status{},
+		liveFSCaseInsensitive: probeCaseInsensitiveFilesystem(repoDir),
 	}
 
 	// Try to open existing repo
@@ -126,9 +169,15 @@ func Init(cfg Config) (*Repository, error) {
 				// the wiki loads its tree. Otherwise the first backup would treat every
 				// remote-only file as a local deletion and wipe the remote, and the
 				// wiki would seed a welcome page on top of the restored content.
-				if err := r.syncContentFromRemote(head.Hash()); err != nil {
+				synced, err := r.syncContentFromRemote(head.Hash())
+				if err != nil {
 					return nil, fmt.Errorf("failed to sync content from remote: %w", err)
 				}
+				// Reconfigure (settings UI, live process) can hit this same path
+				// against an already-running wiki whose tree/SQLite index was
+				// loaded before these files landed on disk — SyncedContentOnInit
+				// lets the caller trigger a resync so the index catches up.
+				r.syncedContentOnInit = synced > 0
 			}
 			if err := EnsureGitignore(repoDir); err != nil {
 				return nil, fmt.Errorf(errWriteGitignoreFailed, err)
@@ -602,17 +651,14 @@ func (r *Repository) pullBeforeBackup() error {
 
 	auth, err := r.buildAuth()
 	if err != nil {
-		msg := fmt.Sprintf("failed to build auth for pre-backup pull: %v", err)
-		r.status.SetError(msg)
-		return fmt.Errorf("%s", msg)
+		return r.failWith(fmt.Sprintf("failed to build auth for pre-backup pull: %v", err))
 	}
 
 	remoteHead, err := r.listRemoteBranch(remote, auth)
 	if err != nil {
 		msg := fmt.Sprintf("failed to query remote before backup: %v", err)
 		slog.Error(msg, "remote", r.remoteForLog())
-		r.status.SetError(msg)
-		return fmt.Errorf("%s", msg)
+		return r.failWith(msg)
 	}
 	if remoteHead.IsZero() {
 		slog.Debug("pullBeforeBackup: remote branch not present yet, skipping pull (first push)", "branch", r.cfg.Branch)
@@ -621,34 +667,45 @@ func (r *Repository) pullBeforeBackup() error {
 
 	localCommit, err := r.headCommit()
 	if err != nil {
-		msg := fmt.Sprintf("failed to resolve local HEAD before pull: %v", err)
-		r.status.SetError(msg)
-		return fmt.Errorf("%s", msg)
+		return r.failWith(fmt.Sprintf("failed to resolve local HEAD before pull: %v", err))
 	}
 	if localCommit != nil && localCommit.Hash == remoteHead {
 		slog.Debug("pullBeforeBackup: already up-to-date, no pull needed")
 		return nil
 	}
 
+	if r.afterListBeforeFetch != nil {
+		r.afterListBeforeFetch()
+	}
+
 	if err := r.fetchBranch(remote, auth); err != nil {
 		msg := fmt.Sprintf("failed to fetch from remote before backup: %v", err)
 		slog.Error(msg, "remote", r.remoteForLog())
-		r.status.SetError(msg)
-		return fmt.Errorf("%s", msg)
+		return r.failWith(msg)
 	}
+
+	// Re-resolve the branch tip from what fetchBranch actually fetched into the
+	// tracking ref, rather than trusting the value listed before the fetch: if
+	// the remote branch was rewritten concurrently (e.g. a force-push landing
+	// between listRemoteBranch and here), the commit remoteHead pointed to may
+	// never have been fetched at all, while the tracking ref always reflects
+	// whatever this fetch actually brought down.
+	tracking := plumbing.NewRemoteReferenceName("origin", r.cfg.Branch)
+	trackingRef, err := r.repo.Reference(tracking, true)
+	if err != nil {
+		return r.failWith(fmt.Sprintf("failed to resolve fetched remote branch: %v", err))
+	}
+	remoteHead = trackingRef.Hash()
+
 	remoteCommit, err := r.repo.CommitObject(remoteHead)
 	if err != nil {
-		msg := fmt.Sprintf("failed to read fetched remote commit: %v", err)
-		r.status.SetError(msg)
-		return fmt.Errorf("%s", msg)
+		return r.failWith(fmt.Sprintf("failed to read fetched remote commit: %v", err))
 	}
 
 	if localCommit != nil {
 		behind, err := localCommit.IsAncestor(remoteCommit)
 		if err != nil {
-			msg := fmt.Sprintf("failed to compare local and remote history: %v", err)
-			r.status.SetError(msg)
-			return fmt.Errorf("%s", msg)
+			return r.failWith(fmt.Sprintf("failed to compare local and remote history: %v", err))
 		}
 		if !behind {
 			ahead, aErr := remoteCommit.IsAncestor(localCommit)
@@ -658,8 +715,7 @@ func (r *Repository) pullBeforeBackup() error {
 			}
 			msg := divergenceMessage(r.repoDir, r.cfg.Branch)
 			slog.Error("pullBeforeBackup: "+msg, "remote", r.remoteForLog())
-			r.status.SetNeedsIntervention(msg)
-			return fmt.Errorf("%s", msg)
+			return r.failNeedsIntervention(msg)
 		}
 	}
 
@@ -669,14 +725,11 @@ func (r *Repository) pullBeforeBackup() error {
 		}
 		msg := fmt.Sprintf("failed to update local content from remote: %v", err)
 		slog.Error(msg, "remote", r.remoteForLog())
-		r.status.SetError(msg)
-		return fmt.Errorf("%s", msg)
+		return r.failWith(msg)
 	}
 
 	if err := r.setHead(remoteHead); err != nil {
-		msg := fmt.Sprintf("failed to update local branch after pull: %v", err)
-		r.status.SetError(msg)
-		return fmt.Errorf("%s", msg)
+		return r.failWith(fmt.Sprintf("failed to update local branch after pull: %v", err))
 	}
 	r.lastPushedHash = remoteHead
 	slog.Info("pullBeforeBackup: pulled remote changes", "head", remoteHead.String())
@@ -692,15 +745,11 @@ func (r *Repository) ensureRemote() (*gogit.Remote, error) {
 		Name: "origin",
 		URLs: []string{r.cfg.RemoteURL},
 	}); err != nil {
-		msg := fmt.Sprintf("failed to create remote before pull: %v", err)
-		r.status.SetError(msg)
-		return nil, fmt.Errorf("%s", msg)
+		return nil, r.failWith(fmt.Sprintf("failed to create remote before pull: %v", err))
 	}
 	remote, err := r.repo.Remote("origin")
 	if err != nil {
-		msg := fmt.Sprintf("failed to get remote before pull: %v", err)
-		r.status.SetError(msg)
-		return nil, fmt.Errorf("%s", msg)
+		return nil, r.failWith(fmt.Sprintf("failed to get remote before pull: %v", err))
 	}
 	slog.Debug("pullBeforeBackup: created remote 'origin'", "url", r.remoteForLog())
 	return remote, nil
@@ -842,6 +891,23 @@ func redactRemote(remoteURL string) string {
 // masked. Use it everywhere the remote is logged or surfaced to the user.
 func (r *Repository) remoteForLog() string {
 	return redactRemote(r.cfg.RemoteURL)
+}
+
+// failWith records msg as the repository's error status and returns it as an
+// error, replacing the "SetError then return" tail every pullBeforeBackup/
+// ensureRemote/listRemoteBranch failure path repeats. It does not log — call
+// sites that already logged before this call keep doing so explicitly, since
+// not all of them did (this only collapses the status+return duplication, it
+// doesn't change which paths log).
+func (r *Repository) failWith(msg string) error {
+	r.status.SetError(msg)
+	return errors.New(msg)
+}
+
+// failNeedsIntervention is failWith's NeedsIntervention counterpart.
+func (r *Repository) failNeedsIntervention(msg string) error {
+	r.status.SetNeedsIntervention(msg)
+	return errors.New(msg)
 }
 
 // buildAuth builds the transport authentication for the configured remote.

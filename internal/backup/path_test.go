@@ -279,6 +279,68 @@ func TestRunBackup_IgnoresGitignoredFiles(t *testing.T) {
 	assertFileInCommit(t, commit, "docs/wiki/root/keep.md", "keep\n")
 }
 
+// TestRunBackup_PathCollidesWithExistingFile checks that RunBackup fails
+// loudly instead of silently dropping a pre-existing top-level file when the
+// configured content path collides with it (spliceTree must not treat an
+// existing non-directory tree entry as an absent subtree to splice into).
+//
+// Both cases are needed: a single-segment path (the default, no
+// --git-backup-path) is a "direct" replacement in spliceTree, while a
+// multi-segment path goes through its "groups" branch instead — two
+// independent code paths that both need the same guard.
+func TestRunBackup_PathCollidesWithExistingFile(t *testing.T) {
+	cases := []struct {
+		name   string
+		prefix string // --git-backup-path; "" exercises spliceTree's direct map
+	}{
+		{"no prefix", ""},
+		{"with prefix", "docs"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			collidesWith := "root"
+			if tc.prefix != "" {
+				collidesWith = tc.prefix
+			}
+
+			bareDir := initBareRemote(t)
+			pushFirstCommitToRemote(t, bareDir, "main", collidesWith, "existing top-level file, not a directory\n")
+
+			tmpDir := t.TempDir()
+			rootDir := filepath.Join(tmpDir, "root")
+			assetsDir := filepath.Join(tmpDir, "assets")
+			if err := os.MkdirAll(rootDir, 0755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.MkdirAll(assetsDir, 0755); err != nil {
+				t.Fatal(err)
+			}
+			writeFileHelper(t, rootDir, "page.md", "# Page\n")
+
+			repo, err := Init(Config{
+				RootDir:     rootDir,
+				AssetsDir:   assetsDir,
+				Path:        tc.prefix,
+				AuthorName:  "Test Author",
+				AuthorEmail: "test@example.com",
+				Branch:      "main",
+				RemoteURL:   "file://" + bareDir,
+				SSHKey:      testSSHKeyPEM,
+			})
+			if err != nil {
+				t.Fatalf("Init: %v", err)
+			}
+
+			if err := repo.RunBackup(); err == nil {
+				t.Fatal("expected RunBackup to fail when the content path collides with an existing top-level file")
+			}
+
+			commit := headCommit(t, repo)
+			assertFileInCommit(t, commit, collidesWith, "existing top-level file, not a directory\n")
+		})
+	}
+}
+
 func writeFileHelper(t *testing.T, base, rel, content string) {
 	t.Helper()
 	p := filepath.Join(base, filepath.FromSlash(rel))

@@ -47,6 +47,7 @@ func TestConfigStore_SaveLoad_RoundTripsIncludingSecrets(t *testing.T) {
 		AuthorName:   "Backup Bot",
 		AuthorEmail:  "bot@example.com",
 		RemoteURL:    "https://github.com/acme/wiki-backup.git",
+		Path:         "docs/wiki",
 		Branch:       "main",
 		HTTPUsername: "acme-bot",
 		HTTPPassword: "ghp_supersecrettoken",
@@ -68,6 +69,9 @@ func TestConfigStore_SaveLoad_RoundTripsIncludingSecrets(t *testing.T) {
 	}
 	if got.RemoteURL != in.RemoteURL || got.Branch != in.Branch || got.Interval != in.Interval {
 		t.Fatalf("config did not round trip: %+v", got)
+	}
+	if got.Path != in.Path {
+		t.Fatalf("Path did not round trip: got %q, want %q", got.Path, in.Path)
 	}
 }
 

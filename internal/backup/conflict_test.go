@@ -69,6 +69,43 @@ func TestConflict_FileConflict(t *testing.T) {
 	}
 }
 
+// TestConflict_LocalDeleteRemoteModify tests that RunBackup surfaces a
+// conflict (NeedsIntervention) instead of silently resurrecting a file that
+// was deleted locally, when the remote independently modified that same file
+// before the delete was backed up.
+//
+// Setup:
+//  1. Local repo A: page.md = "# Page\n" committed + pushed
+//  2. Local on disk: page.md deleted (not committed)
+//  3. External client: page.md = "version B" committed + pushed to remote
+//  4. RunBackup → materializeContent must not silently rewrite page.md with
+//     the remote content; the local deletion must not be reverted without the
+//     operator being told about the conflict.
+func TestConflict_LocalDeleteRemoteModify(t *testing.T) {
+	bareDir := initBareRemote(t)
+	repo, rootDir := newRepoWithRemote(t, bareDir)
+	pagePath := filepath.Join(rootDir, "page.md")
+
+	if err := os.Remove(pagePath); err != nil {
+		t.Fatalf("Remove page.md: %v", err)
+	}
+
+	commitToRemote(t, bareDir, "root/page.md", "version B from remote\n")
+
+	err := repo.RunBackup()
+	if err == nil {
+		t.Fatal("expected RunBackup to return an error on a delete/modify conflict")
+	}
+
+	snap := repo.Status()
+	if !snap.NeedsIntervention {
+		t.Error("expected NeedsIntervention = true after a delete/modify conflict")
+	}
+	if _, statErr := os.Stat(pagePath); !os.IsNotExist(statErr) {
+		t.Errorf("expected the local deletion of page.md to be preserved, stat err = %v", statErr)
+	}
+}
+
 // TestConflict_FirstPush_NoError tests that RunBackup succeeds when the remote
 // branch does not exist yet (ErrReferenceNotFound treated as first push).
 func TestConflict_FirstPush_NoError(t *testing.T) {

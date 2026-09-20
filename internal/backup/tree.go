@@ -24,13 +24,6 @@ import (
 // then committed. Nothing is ever copied into the repository working tree, so a
 // monorepo remote keeps files outside the configured prefix untouched.
 
-// treeReplacement is the new state of one directory inside the repository tree.
-// present=false removes the directory (and everything beneath it).
-type treeReplacement struct {
-	hash    plumbing.Hash
-	present bool
-}
-
 // errPullConflict marks a remote content change that would clobber a dirty live
 // file. materializeContent sets NeedsIntervention itself; callers match on this
 // sentinel so they don't overwrite that status with a generic error.
@@ -226,47 +219,44 @@ func (r *Repository) ancestorIgnorePatterns(target string) ([]string, []gitignor
 
 // buildContentReplacements builds the tree for the live root/ and assets/
 // directories and maps each to the repository-relative path it belongs at.
-func (r *Repository) buildContentReplacements() (map[string]treeReplacement, error) {
-	rootPath, assetsPath := r.cfg.ContentTreePaths()
-	targets := []struct {
-		treePath string
-		liveDir  string
-	}{
-		{rootPath, r.cfg.RootDir},
-		{assetsPath, r.cfg.AssetsDir},
-	}
+func (r *Repository) buildContentReplacements() (map[string]plumbing.Hash, error) {
+	targets := r.cfg.contentTargets()
 
-	replacements := make(map[string]treeReplacement, len(targets))
+	replacements := make(map[string]plumbing.Hash, len(targets))
 	for _, t := range targets {
 		rel, patterns, err := r.ancestorIgnorePatterns(t.liveDir)
 		if err != nil {
 			return nil, err
 		}
-		hash, present, err := r.buildDirTree(t.liveDir, rel, patterns)
+		hash, _, err := r.buildDirTree(t.liveDir, rel, patterns)
 		if err != nil {
 			return nil, err
 		}
-		replacements[t.treePath] = treeReplacement{hash: hash, present: present}
+		// hash is the zero hash when present is false (dir missing or empty) —
+		// a zero value here means "remove this path", matching spliceTree.
+		replacements[t.treePath] = hash
 	}
 	return replacements, nil
 }
 
 // spliceTree returns a tree based on base but with every path in replacements
-// created, replaced or removed. A zero base is treated as an empty tree. The
-// bool is false when the result would be an empty tree.
-func (r *Repository) spliceTree(base plumbing.Hash, replacements map[string]treeReplacement) (plumbing.Hash, bool, error) {
-	direct := map[string]treeReplacement{}
-	groups := map[string]map[string]treeReplacement{}
-	for p, rep := range replacements {
+// created, replaced or removed. A zero base is treated as an empty tree. A
+// zero hash in replacements removes that path; every other value is a
+// directory hash. The returned bool is false when the result would be an
+// empty tree.
+func (r *Repository) spliceTree(base plumbing.Hash, replacements map[string]plumbing.Hash) (plumbing.Hash, bool, error) {
+	direct := map[string]plumbing.Hash{}
+	groups := map[string]map[string]plumbing.Hash{}
+	for p, hash := range replacements {
 		seg, rest, found := strings.Cut(p, "/")
 		if !found {
-			direct[seg] = rep
+			direct[seg] = hash
 			continue
 		}
 		if groups[seg] == nil {
-			groups[seg] = map[string]treeReplacement{}
+			groups[seg] = map[string]plumbing.Hash{}
 		}
-		groups[seg][rest] = rep
+		groups[seg][rest] = hash
 	}
 
 	var entries []object.TreeEntry
@@ -281,19 +271,29 @@ func (r *Repository) spliceTree(base plumbing.Hash, replacements map[string]tree
 		}
 	}
 
-	for name, rep := range direct {
-		entries = upsertTreeEntry(entries, name, rep)
+	for name, hash := range direct {
+		if e := findTreeEntry(entries, name); e != nil && e.Mode != filemode.Dir {
+			return plumbing.ZeroHash, false, fmt.Errorf(
+				"backup path segment %q collides with an existing file in the repository; "+
+					"choose a --git-backup-path that does not overlap with existing content", name)
+		}
+		entries = upsertTreeEntry(entries, name, hash)
 	}
 	for seg, subs := range groups {
 		var childBase plumbing.Hash
 		if e := findTreeEntry(entries, seg); e != nil {
+			if e.Mode != filemode.Dir {
+				return plumbing.ZeroHash, false, fmt.Errorf(
+					"backup path segment %q collides with an existing file in the repository; "+
+						"choose a --git-backup-path that does not overlap with existing content", seg)
+			}
 			childBase = e.Hash
 		}
-		hash, present, err := r.spliceTree(childBase, subs)
+		hash, _, err := r.spliceTree(childBase, subs)
 		if err != nil {
 			return plumbing.ZeroHash, false, err
 		}
-		entries = upsertTreeEntry(entries, seg, treeReplacement{hash: hash, present: present})
+		entries = upsertTreeEntry(entries, seg, hash)
 	}
 
 	if len(entries) == 0 {
@@ -315,17 +315,17 @@ func findTreeEntry(entries []object.TreeEntry, name string) *object.TreeEntry {
 	return nil
 }
 
-// upsertTreeEntry replaces the entry named name, or removes it when rep.present
-// is false. Every spliced target is a directory.
-func upsertTreeEntry(entries []object.TreeEntry, name string, rep treeReplacement) []object.TreeEntry {
+// upsertTreeEntry replaces the entry named name, or removes it when hash is
+// zero. Every spliced target is a directory.
+func upsertTreeEntry(entries []object.TreeEntry, name string, hash plumbing.Hash) []object.TreeEntry {
 	out := entries[:0]
 	for _, e := range entries {
 		if e.Name != name {
 			out = append(out, e)
 		}
 	}
-	if rep.present {
-		out = append(out, object.TreeEntry{Name: name, Mode: filemode.Dir, Hash: rep.hash})
+	if !hash.IsZero() {
+		out = append(out, object.TreeEntry{Name: name, Mode: filemode.Dir, Hash: hash})
 	}
 	return out
 }
@@ -519,43 +519,36 @@ func liveFiles(dir string) (map[string]plumbing.Hash, error) {
 // wiping the remote down to whatever it happens to contain. Because the content
 // is on disk before the wiki boots, the wiki also sees those pages and skips
 // seeding its default welcome page.
-func (r *Repository) syncContentFromRemote(commitHash plumbing.Hash) error {
+func (r *Repository) syncContentFromRemote(commitHash plumbing.Hash) (int, error) {
 	commit, err := r.repo.CommitObject(commitHash)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	rootPath, assetsPath := r.cfg.ContentTreePaths()
-	targets := []struct {
-		treePath string
-		liveDir  string
-	}{
-		{rootPath, r.cfg.RootDir},
-		{assetsPath, r.cfg.AssetsDir},
-	}
+	targets := r.cfg.contentTargets()
 
 	synced := 0
 	for _, t := range targets {
 		files, err := r.filesUnder(commit.TreeHash, t.treePath)
 		if err != nil {
-			return fmt.Errorf("read remote %s tree: %w", t.treePath, err)
+			return synced, fmt.Errorf("read remote %s tree: %w", t.treePath, err)
 		}
 		for rel, blobHash := range files {
 			livePath := filepath.Join(t.liveDir, filepath.FromSlash(rel))
 			if _, err := os.Stat(livePath); err == nil {
 				continue // keep the local copy; never overwrite
 			} else if !os.IsNotExist(err) {
-				return err
+				return synced, err
 			}
 			content, err := r.readBlob(blobHash)
 			if err != nil {
-				return fmt.Errorf("read remote blob for %s: %w", rel, err)
+				return synced, fmt.Errorf("read remote blob for %s: %w", rel, err)
 			}
 			if err := os.MkdirAll(filepath.Dir(livePath), 0o755); err != nil {
-				return err
+				return synced, err
 			}
 			if err := os.WriteFile(livePath, content, 0o644); err != nil {
-				return err
+				return synced, err
 			}
 			synced++
 			slog.Debug("backup: synced remote content", "path", t.treePath+"/"+rel)
@@ -564,7 +557,7 @@ func (r *Repository) syncContentFromRemote(commitHash plumbing.Hash) error {
 	if synced > 0 {
 		slog.Info("backup: synced content from remote into the local data directory", "files", synced)
 	}
-	return nil
+	return synced, nil
 }
 
 // materializeContent writes the remote tree's content subtree into the live
@@ -572,10 +565,17 @@ func (r *Repository) syncContentFromRemote(commitHash plumbing.Hash) error {
 // in the running wiki. It only touches the configured content directories;
 // sibling files in a monorepo prefix are left alone.
 //
-// A file that changed on the remote is a conflict when the live copy is dirty
-// (differs from the local HEAD version) — matching git's "would be overwritten"
-// refusal — which the caller surfaces as NeedsIntervention. materialize sets
-// that status itself and returns an error.
+// A file that changed on the remote is a conflict when the live copy deviates
+// from the local HEAD version — whether it was edited *or deleted* — matching
+// git's "would be overwritten" refusal, which the caller surfaces as
+// NeedsIntervention. materialize sets that status itself and returns an error.
+//
+// When baseCommit is nil (the local branch is still unborn, e.g. Init() found
+// nothing to commit before the remote gained history), there is no local HEAD
+// to compare against, so conflict detection is meaningless. That case falls
+// back to the same additive, local-wins policy as the first-contact sync in
+// syncContentFromRemote: a path already present locally is left untouched
+// instead of being overwritten or deleted.
 func (r *Repository) materializeContent(baseCommit, remoteCommit *object.Commit) error {
 	var baseTree plumbing.Hash
 	checkConflicts := baseCommit != nil
@@ -584,14 +584,7 @@ func (r *Repository) materializeContent(baseCommit, remoteCommit *object.Commit)
 	}
 	remoteTree := remoteCommit.TreeHash
 
-	rootPath, assetsPath := r.cfg.ContentTreePaths()
-	targets := []struct {
-		treePath string
-		liveDir  string
-	}{
-		{rootPath, r.cfg.RootDir},
-		{assetsPath, r.cfg.AssetsDir},
-	}
+	targets := r.cfg.contentTargets()
 
 	for _, t := range targets {
 		baseFiles, err := r.filesUnder(baseTree, t.treePath)
@@ -606,6 +599,17 @@ func (r *Repository) materializeContent(baseCommit, remoteCommit *object.Commit)
 		if err != nil {
 			return fmt.Errorf("read live %s: %w", t.liveDir, err)
 		}
+		// On a filesystem that folds case, a live file recorded under a
+		// different case than the tree path (e.g. a local rename) is still
+		// the same physical file the OS would write over. Fall back to a
+		// case-folded lookup so it isn't treated as absent.
+		var liveFolded map[string]plumbing.Hash
+		if r.liveFSCaseInsensitive {
+			liveFolded = make(map[string]plumbing.Hash, len(live))
+			for k, v := range live {
+				liveFolded[strings.ToLower(k)] = v
+			}
+		}
 
 		for _, rel := range unionKeys(baseFiles, remoteFiles) {
 			baseHash, baseOK := baseFiles[rel]
@@ -615,7 +619,30 @@ func (r *Repository) materializeContent(baseCommit, remoteCommit *object.Commit)
 			}
 
 			liveHash, liveOK := live[rel]
-			if checkConflicts && liveOK && (!baseOK || liveHash != baseHash) {
+			if !liveOK && liveFolded != nil {
+				liveHash, liveOK = liveFolded[strings.ToLower(rel)]
+			}
+			livePath := filepath.Join(t.liveDir, filepath.FromSlash(rel))
+
+			if !checkConflicts {
+				// No local HEAD to compare against: additive only, matching
+				// syncContentFromRemote. Never touch a path that already
+				// exists locally.
+				if liveOK || !remoteOK {
+					continue
+				}
+				if err := r.writeLiveBlob(livePath, remoteHash); err != nil {
+					return fmt.Errorf("read remote blob for %s: %w", rel, err)
+				}
+				continue
+			}
+
+			// The live copy deviates from base when it was edited (hash
+			// differs) OR deleted (liveOK != baseOK) — either way, the remote
+			// also changed this path, so applying the remote change would
+			// silently discard a local change.
+			localMatchesBase := liveOK == baseOK && (!liveOK || liveHash == baseHash)
+			if !localMatchesBase {
 				msg := "pull conflict: a wiki file has been modified both on the remote and locally; " +
 					"reset the conflicting file on the remote or wait for the next backup cycle to retry"
 				slog.Error("pullBeforeBackup: "+msg, "remote", r.remoteForLog(), "file", rel)
@@ -623,17 +650,9 @@ func (r *Repository) materializeContent(baseCommit, remoteCommit *object.Commit)
 				return fmt.Errorf("%w: %s", errPullConflict, msg)
 			}
 
-			livePath := filepath.Join(t.liveDir, filepath.FromSlash(rel))
 			if remoteOK {
-				content, err := r.readBlob(remoteHash)
-				if err != nil {
+				if err := r.writeLiveBlob(livePath, remoteHash); err != nil {
 					return fmt.Errorf("read remote blob for %s: %w", rel, err)
-				}
-				if err := os.MkdirAll(filepath.Dir(livePath), 0o755); err != nil {
-					return err
-				}
-				if err := os.WriteFile(livePath, content, 0o644); err != nil {
-					return err
 				}
 				continue
 			}
@@ -644,6 +663,19 @@ func (r *Repository) materializeContent(baseCommit, remoteCommit *object.Commit)
 		}
 	}
 	return nil
+}
+
+// writeLiveBlob writes blobHash's content to livePath, creating parent
+// directories as needed.
+func (r *Repository) writeLiveBlob(livePath string, blobHash plumbing.Hash) error {
+	content, err := r.readBlob(blobHash)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(livePath), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(livePath, content, 0o644)
 }
 
 func unionKeys(a, b map[string]plumbing.Hash) []string {
