@@ -13,21 +13,23 @@ import (
 	httpinternal "github.com/perber/wiki/internal/http"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/publicaccess"
+	"github.com/perber/wiki/internal/tocdisplay"
 )
 
 // Routes is the RouteRegistrar for runtime instance settings.
 type Routes struct {
 	publicAccess *publicaccess.Service
+	tocDisplay   *tocdisplay.Service
 	authService  *coreauth.AuthService
 	log          *slog.Logger
 }
 
 // NewRoutes constructs the instance-settings RouteRegistrar.
-func NewRoutes(publicAccess *publicaccess.Service, authService *coreauth.AuthService, log *slog.Logger) *Routes {
+func NewRoutes(publicAccess *publicaccess.Service, tocDisplay *tocdisplay.Service, authService *coreauth.AuthService, log *slog.Logger) *Routes {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Routes{publicAccess: publicAccess, authService: authService, log: log}
+	return &Routes{publicAccess: publicAccess, tocDisplay: tocDisplay, authService: authService, log: log}
 }
 
 // RegisterRoutes implements RouteRegistrar.
@@ -41,6 +43,10 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		authmw.RequireAdmin(ctx.Opts.AuthDisabled),
 		authmw.RequireCookieSession(),
 		r.handleSetPublicAccess,
+	)
+	adminGroup.PUT("/toc-display",
+		authmw.RequireAdmin(ctx.Opts.AuthDisabled),
+		r.handleSetTocDisplay,
 	)
 }
 
@@ -67,6 +73,27 @@ func (r *Routes) handleSetPublicAccess(c *gin.Context) {
 		"actor_id", actorID(c),
 	)
 	c.JSON(http.StatusOK, gin.H{"enabled": r.publicAccess.Enabled()})
+}
+
+func (r *Routes) handleSetTocDisplay(c *gin.Context) {
+	var req struct {
+		AlwaysShow *bool `json:"alwaysShow"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.AlwaysShow == nil {
+		respondWithStatusError(c, http.StatusBadRequest, ErrCodeInvalidPayload, "Invalid payload", "invalid payload")
+		return
+	}
+
+	if err := r.tocDisplay.SetAlwaysShow(*req.AlwaysShow); err != nil {
+		respondWithError(c, err)
+		return
+	}
+
+	r.log.Info("toc always-show setting changed",
+		"always_show", r.tocDisplay.AlwaysShow(),
+		"actor_id", actorID(c),
+	)
+	c.JSON(http.StatusOK, gin.H{"alwaysShow": r.tocDisplay.AlwaysShow()})
 }
 
 func actorID(c *gin.Context) string {

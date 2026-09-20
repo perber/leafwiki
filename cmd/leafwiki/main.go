@@ -33,6 +33,7 @@ import (
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/publicaccess"
+	"github.com/perber/wiki/internal/tocdisplay"
 	"github.com/perber/wiki/internal/restore"
 	"github.com/perber/wiki/internal/snapshot"
 	"github.com/perber/wiki/internal/wiki"
@@ -215,6 +216,11 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 
 	publicAccessService := buildPublicAccessService(cmd, cfg)
 
+	tocDisplayService, err := tocdisplay.New(cfg.server.dataDir)
+	if err != nil {
+		fail("Failed to load toc-display configuration", "error", err)
+	}
+
 	if !cfg.auth.disableAuth {
 		if cfg.auth.jwtSecret == "" {
 			fail("JWT secret is required. Set it using --jwt-secret or LEAFWIKI_JWT_SECRET environment variable.")
@@ -271,7 +277,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		fail("Failed to initialize Wiki", "error", err)
 	}
 
-	w.SetInstanceSettingsRoutes(wikiinstancesettings.NewRoutes(publicAccessService, w.AuthService(), slog.Default()))
+	w.SetInstanceSettingsRoutes(wikiinstancesettings.NewRoutes(publicAccessService, tocDisplayService, w.AuthService(), slog.Default()))
 
 	// Log .leafwikiignore status
 	rootDir := filepath.Join(cfg.server.dataDir, "root")
@@ -332,7 +338,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 			APIKeyService:      w.APIKeyService(),
 			Favorites:          w.Favorites(),
 			UserSettings:       w.UserSettingsService(),
-			Reloadables:        []settings.Reloadable{w.BrandingService(), publicAccessService},
+			Reloadables:        []settings.Reloadable{w.BrandingService(), publicAccessService, tocDisplayService},
 			UserResolver:       w.UserResolver(),
 			TriggerResync:      w.TriggerResyncAsync,
 			MaxUploadSizeBytes: restoreUploadMaxSize,
@@ -346,6 +352,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            publicAccessService,
+		AlwaysShowToc:           tocDisplayService,
 		EditorLimit:             cfg.auth.editorLimit,
 		InjectCodeInHeader:      cfg.frontend.injectCodeInHeader,
 		CustomStylesheet:        cfg.frontend.customStylesheet,

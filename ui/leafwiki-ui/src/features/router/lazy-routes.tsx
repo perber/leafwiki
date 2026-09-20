@@ -37,6 +37,11 @@ export const SnapshotSettings = lazy(() =>
     default: m.SnapshotSettings,
   })),
 )
+export const TocDisplaySettings = lazy(() =>
+  import('../settings/adminSections').then((m) => ({
+    default: m.TocDisplaySettings,
+  })),
+)
 export const UserManagement = lazy(() =>
   import('../settings/adminSections').then((m) => ({
     default: m.UserManagement,

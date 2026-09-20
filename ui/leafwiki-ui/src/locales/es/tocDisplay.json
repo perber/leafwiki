@@ -1,0 +1,10 @@
+{
+  "menuLabel": "Tabla de contenidos",
+  "pageTitle": "Tabla de contenidos",
+  "sectionTitle": "Tabla de contenidos",
+  "sectionDescription": "Controla cuándo se muestra la tabla de contenidos \"En esta página\" al ver una página.",
+  "checkboxLabel": "Mostrar siempre la tabla de contenidos",
+  "checkboxDescription": "De forma predeterminada, la tabla de contenidos solo aparece cuando una página tiene más de 3 encabezados. Activa esta opción para mostrarla siempre, incluso en páginas con uno o dos encabezados.",
+  "savedToast": "Configuración de la tabla de contenidos guardada",
+  "updateError": "No se pudo actualizar la configuración de la tabla de contenidos"
+}

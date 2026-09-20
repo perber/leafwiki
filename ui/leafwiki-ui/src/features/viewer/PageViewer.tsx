@@ -21,6 +21,7 @@ import {
   getWikiTargetRoutePath,
   toWikiLookupPath,
 } from '@/lib/wikiPath'
+import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useHotKeysStore } from '@/stores/hotkeys'
 import { useSessionStore } from '@/stores/session'
@@ -36,6 +37,7 @@ import { extractTocEntries } from '../preview/extractTocEntries'
 import MarkdownPreview from '../preview/MarkdownPreview'
 import { TocDropdownButton } from '../preview/TocDropdownButton'
 import { TocSidePanel } from '../preview/TocSidePanel'
+import { shouldShowToc } from '../preview/tocVisibility'
 import { useTocScrollSpy } from '../preview/useTocScrollSpy'
 import Breadcrumbs from './Breadcrumbs'
 import EmptySectionChildrenList from './EmptySectionChildrenList'
@@ -166,10 +168,11 @@ export default function PageViewer() {
     }
   }, [page?.id])
 
-  const showTocButton = tocEntries.length > 3
-  const showRightPane = showTocButton || attachments.length > 0
+  const alwaysShowToc = useConfigStore((s) => s.alwaysShowToc)
+  const showToc = shouldShowToc(tocEntries.length, alwaysShowToc)
+  const showRightPane = showToc || attachments.length > 0
   // Single scroll spy for both the dropdown and the side panel.
-  const tocActiveId = useTocScrollSpy(showTocButton ? tocEntries : [])
+  const tocActiveId = useTocScrollSpy(showToc ? tocEntries : [])
 
   const toggleTocCollapsed = useTocPanelStore((state) => state.toggleCollapsed)
   const tocCollapsed = useTocPanelStore((state) => state.collapsed)
@@ -251,7 +254,7 @@ export default function PageViewer() {
     showRightPane && page && !error && tocPaneRoot
       ? createPortal(
           <TocSidePanel
-            entries={showTocButton ? tocEntries : []}
+            entries={tocEntries}
             activeId={tocActiveId}
             downloads={attachments}
           />,

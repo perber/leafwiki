@@ -1,0 +1,10 @@
+{
+  "menuLabel": "Inhaltsverzeichnis",
+  "pageTitle": "Inhaltsverzeichnis",
+  "sectionTitle": "Inhaltsverzeichnis",
+  "sectionDescription": "Legt fest, wann das Inhaltsverzeichnis \"Auf dieser Seite\" beim Anzeigen einer Seite eingeblendet wird.",
+  "checkboxLabel": "Inhaltsverzeichnis immer anzeigen",
+  "checkboxDescription": "Standardmäßig erscheint das Inhaltsverzeichnis erst, wenn eine Seite mehr als 3 Überschriften hat. Aktiviere diese Option, um es immer anzuzeigen, auch bei Seiten mit nur ein oder zwei Überschriften.",
+  "savedToast": "Einstellung für das Inhaltsverzeichnis gespeichert",
+  "updateError": "Einstellung für das Inhaltsverzeichnis konnte nicht geändert werden"
+}

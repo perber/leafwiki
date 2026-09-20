@@ -1,0 +1,10 @@
+{
+  "menuLabel": "Table of contents",
+  "pageTitle": "Table of contents",
+  "sectionTitle": "Table of contents",
+  "sectionDescription": "Controls when the \"On this page\" table of contents is shown while viewing a page.",
+  "checkboxLabel": "Always show the table of contents",
+  "checkboxDescription": "By default the table of contents only appears once a page has more than 3 headings. Turn this on to always show it, even on pages with just one or two headings.",
+  "savedToast": "Table of contents setting saved",
+  "updateError": "Could not update the table of contents setting"
+}
