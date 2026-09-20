@@ -25,6 +25,9 @@ export type BackupAuthMode = 'ssh' | 'https' | ''
 
 export interface BackupConfig {
   remoteUrl: string
+  // Repository-relative directory content is committed under; '' = repository
+  // top level. Useful when the backup remote is a monorepo.
+  path: string
   branch: string
   authorName: string
   authorEmail: string
@@ -54,6 +57,7 @@ export interface BackupConfigResponse {
 // Fields the form submits. Empty sshKey / httpPassword mean "keep the stored value".
 export interface BackupConfigInput {
   remoteUrl: string
+  path: string
   branch: string
   authorName: string
   authorEmail: string

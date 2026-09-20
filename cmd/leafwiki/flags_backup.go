@@ -13,6 +13,7 @@ type backupOptions struct {
 	gitBackupAuthorEmail   string
 	gitBackupRemote        string
 	gitBackupBranch        string
+	gitBackupPath          string
 	gitBackupSSHKeyPath    string
 	gitBackupSSHKey        string
 	gitBackupSSHKnownHosts string
@@ -71,6 +72,14 @@ func (o *backupOptions) Flags() []cli.Flag {
 			Usage:       "git branch to push to",
 			Value:       "main",
 			Sources:     envVars("LEAFWIKI_GIT_BACKUP_BRANCH"),
+			Config:      trimmed,
+		},
+		&cli.StringFlag{
+			Name:        "git-backup-path",
+			Destination: &o.gitBackupPath,
+			Category:    catGitBackup,
+			Usage:       "repository-relative directory holding root/ and assets/ (e.g. docs → docs/root, docs/assets); empty = repository top level",
+			Sources:     envVars("LEAFWIKI_GIT_BACKUP_PATH"),
 			Config:      trimmed,
 		},
 		&cli.StringFlag{

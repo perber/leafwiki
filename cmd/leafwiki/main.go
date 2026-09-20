@@ -230,6 +230,14 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		metrics = httpmetrics.NewHTTPMetrics(Version)
 	}
 
+	// Initialize git backup before the wiki loads its tree: on first contact with
+	// an existing backup this syncs its content into the data directory, so the
+	// wiki boots with those pages and does not seed a welcome page on top of them.
+	backupManager, err := buildBackupManager(cfg)
+	if err != nil {
+		fail("git backup init failed: %v", err)
+	}
+
 	w, err := wiki.NewWiki(&wiki.WikiOptions{
 		StorageDir:             cfg.server.dataDir,
 		AdminUsername:          cfg.auth.adminUsername,
@@ -279,12 +287,12 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		}
 	}()
 
-	// Initialize git backup (env-managed vs settings-managed — see buildBackupManager).
-	backupManager, err := buildBackupManager(cfg)
-	if err != nil {
-		fail("git backup init failed: %v", err)
-	}
 	defer backupManager.Stop()
+	// A settings Reconfigure (or the settings-managed manager's own background
+	// boot) can materialize remote content straight onto disk after the wiki's
+	// tree/SQLite index has already loaded — keep the index from going stale by
+	// triggering the same resync used for SIGUSR1/SIGHUP.
+	backupManager.SetOnContentSynced(w.TriggerResyncAsync)
 	w.SetBackupRoutes(wikibackup.NewRoutes(backupManager, w.AuthService()))
 
 	// Initialize full backup snapshots if enabled
@@ -703,6 +711,7 @@ func buildBackupManager(cfg *serverConfig) (*backup.Manager, error) {
 		Enabled:           true,
 		RootDir:           rootDir,
 		AssetsDir:         assetsDir,
+		Path:              cfg.backup.gitBackupPath,
 		AuthorName:        cfg.backup.gitBackupAuthorName,
 		AuthorEmail:       cfg.backup.gitBackupAuthorEmail,
 		RemoteURL:         cfg.backup.gitBackupRemote,

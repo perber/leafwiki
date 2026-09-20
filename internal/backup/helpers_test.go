@@ -127,3 +127,128 @@ func commitToRemote(t *testing.T, bareDir, filename, content string) {
 		t.Fatalf("commitToRemote: Push failed: %v", err)
 	}
 }
+
+// pushFirstCommitToRemote creates the very first commit on bareDir's branch
+// directly, without going through Init/RunBackup — simulating an external
+// client (e.g. another instance, or an admin) creating the remote branch out
+// of band, before any local instance has ever synced with it.
+func pushFirstCommitToRemote(t *testing.T, bareDir, branch, filename, content string) {
+	t.Helper()
+	pushNewHistoryToRemote(t, bareDir, branch, filename, content, "external initial commit", false)
+}
+
+// forcePushRewrite creates a brand-new, unrelated commit history (no shared
+// ancestry with whatever the remote branch currently points to) and
+// force-pushes it, simulating an external history rewrite.
+func forcePushRewrite(t *testing.T, bareDir, branch, filename, content string) {
+	t.Helper()
+	pushNewHistoryToRemote(t, bareDir, branch, filename, content, "rewritten history", true)
+}
+
+// pushNewHistoryToRemote creates a fresh single-commit repo containing
+// filename/content and pushes it to bareDir's branch, simulating an external
+// client acting directly on the remote. force selects a normal push (for a
+// branch that doesn't exist on the remote yet) or a forced one (to rewrite an
+// existing, unrelated branch).
+func pushNewHistoryToRemote(t *testing.T, bareDir, branch, filename, content, commitMessage string, force bool) {
+	t.Helper()
+	cloneDir := t.TempDir()
+	repo, err := gogit.PlainInitWithOptions(cloneDir, &gogit.PlainInitOptions{
+		InitOptions: gogit.InitOptions{DefaultBranch: plumbing.NewBranchReferenceName(branch)},
+	})
+	if err != nil {
+		t.Fatalf("pushNewHistoryToRemote: PlainInitWithOptions: %v", err)
+	}
+	wt, err := repo.Worktree()
+	if err != nil {
+		t.Fatalf("pushNewHistoryToRemote: Worktree: %v", err)
+	}
+	path := filepath.Join(cloneDir, filename)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatalf("pushNewHistoryToRemote: MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatalf("pushNewHistoryToRemote: WriteFile: %v", err)
+	}
+	if _, err := wt.Add(filename); err != nil {
+		t.Fatalf("pushNewHistoryToRemote: Add: %v", err)
+	}
+	if _, err := wt.Commit(commitMessage, &gogit.CommitOptions{
+		Author: &object.Signature{Name: "External", Email: "ext@example.com", When: time.Now()},
+	}); err != nil {
+		t.Fatalf("pushNewHistoryToRemote: Commit: %v", err)
+	}
+	if _, err := repo.CreateRemote(&config.RemoteConfig{
+		Name: "origin",
+		URLs: []string{"file://" + bareDir},
+	}); err != nil {
+		t.Fatalf("pushNewHistoryToRemote: CreateRemote: %v", err)
+	}
+	remote, err := repo.Remote("origin")
+	if err != nil {
+		t.Fatalf("pushNewHistoryToRemote: Remote: %v", err)
+	}
+	branchRef := plumbing.NewBranchReferenceName(branch)
+	refSpec := config.RefSpec(branchRef + ":" + branchRef)
+	if force {
+		refSpec = config.RefSpec("+" + branchRef + ":" + branchRef)
+	}
+	if err := remote.Push(&gogit.PushOptions{
+		RefSpecs: []config.RefSpec{refSpec},
+		Force:    force,
+	}); err != nil {
+		t.Fatalf("pushNewHistoryToRemote: Push: %v", err)
+	}
+}
+
+// filesystemIsCaseInsensitive reports whether t.TempDir()'s filesystem folds
+// case (the default on Windows and macOS). Tests that depend on this should
+// skip on a case-sensitive filesystem (the default on Linux/CI) rather than
+// fail, since the scenario they exercise cannot occur there.
+func filesystemIsCaseInsensitive(t *testing.T) bool {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "case-probe"), []byte("x"), 0644); err != nil {
+		t.Fatalf("filesystemIsCaseInsensitive: WriteFile: %v", err)
+	}
+	_, err := os.Stat(filepath.Join(dir, "CASE-PROBE"))
+	return err == nil
+}
+
+// deleteFromRemote simulates an external client deleting a file on the remote.
+func deleteFromRemote(t *testing.T, bareDir, filename string) {
+	t.Helper()
+	cloneDir := t.TempDir()
+	cloned, err := gogit.PlainClone(cloneDir, false, &gogit.CloneOptions{
+		URL:           "file://" + bareDir,
+		ReferenceName: plumbing.NewBranchReferenceName("main"),
+	})
+	if err != nil {
+		t.Fatalf("deleteFromRemote: PlainClone failed: %v", err)
+	}
+	wt, err := cloned.Worktree()
+	if err != nil {
+		t.Fatalf("deleteFromRemote: Worktree failed: %v", err)
+	}
+	if _, err := wt.Remove(filename); err != nil {
+		t.Fatalf("deleteFromRemote: Remove failed: %v", err)
+	}
+	if _, err := wt.Commit("external delete", &gogit.CommitOptions{
+		Author: &object.Signature{
+			Name:  "External",
+			Email: "ext@example.com",
+			When:  time.Now(),
+		},
+	}); err != nil {
+		t.Fatalf("deleteFromRemote: Commit failed: %v", err)
+	}
+	remote, err := cloned.Remote("origin")
+	if err != nil {
+		t.Fatalf("deleteFromRemote: Remote failed: %v", err)
+	}
+	if err := remote.Push(&gogit.PushOptions{
+		RefSpecs: []config.RefSpec{"refs/heads/main:refs/heads/main"},
+	}); err != nil {
+		t.Fatalf("deleteFromRemote: Push failed: %v", err)
+	}
+}

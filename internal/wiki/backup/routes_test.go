@@ -149,10 +149,10 @@ func TestHandleTriggerPull_ErrorHasEmptyTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Worktree: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(cloneDir, "page.md"), []byte("version B from remote\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(cloneDir, "root", "page.md"), []byte("version B from remote\n"), 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
-	if _, err := wt.Add("page.md"); err != nil {
+	if _, err := wt.Add("root/page.md"); err != nil {
 		t.Fatalf("Add: %v", err)
 	}
 	if _, err := wt.Commit("external commit", &gogit.CommitOptions{
@@ -411,6 +411,70 @@ func TestHandleSaveBackupConfig_UnreachableRemote_Returns400AndPersistsNothing(t
 	}
 	if cur, _ := routes.mgr.CurrentConfig(); cur.RemoteURL != "" {
 		t.Fatal("nothing should have been persisted after a failed save")
+	}
+}
+
+// TestBindAndValidateConfig_ParsesPath checks that the monorepo-prefix Path
+// field (previously only settable via --git-backup-path/LEAFWIKI_GIT_BACKUP_PATH)
+// is parsed from the POST body into Config, the way every other field already is.
+func TestBindAndValidateConfig_ParsesPath(t *testing.T) {
+	routes := settingsRoutes(t)
+	body := `{"remoteUrl":"https://example.com/wiki.git","path":"docs/wiki","httpUsername":"u","httpPassword":"p","intervalMinutes":30}`
+	c, _ := ginPOSTJSON(t, "/api/admin/backup/config", body)
+	cfg, ok := routes.bindAndValidateConfig(c)
+	if !ok {
+		t.Fatal("bindAndValidateConfig rejected a valid path")
+	}
+	if cfg.Path != "docs/wiki" {
+		t.Fatalf("cfg.Path = %q, want %q", cfg.Path, "docs/wiki")
+	}
+}
+
+// TestHandleGetBackupConfig_ReturnsPath checks that GET /backup/config
+// reflects a configured Path back to the settings form.
+func TestHandleGetBackupConfig_ReturnsPath(t *testing.T) {
+	routes := settingsRoutes(t)
+	bareDir := t.TempDir()
+	if _, err := gogit.PlainInit(bareDir, true); err != nil {
+		t.Fatalf("PlainInit: %v", err)
+	}
+	// Reconfigure skips the URL-scheme validation (see
+	// TestHandleGetBackupConfig_RedactsSecrets), so a local file:// remote works.
+	if err := routes.mgr.Reconfigure(backupSvc.Config{
+		RemoteURL: "file://" + bareDir,
+		Path:      "docs/wiki",
+		Branch:    "main",
+		SSHKey:    testEd25519PEM(t),
+		Interval:  30 * time.Minute,
+	}); err != nil {
+		t.Fatalf("Reconfigure: %v", err)
+	}
+
+	get, getRec := ginPOSTJSON(t, "/api/admin/backup/config", "")
+	routes.handleGetBackupConfig(get)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("get failed: %d", getRec.Code)
+	}
+	if !strings.Contains(getRec.Body.String(), `"path":"docs/wiki"`) {
+		t.Fatalf("expected path in GET response, got:\n%s", getRec.Body.String())
+	}
+}
+
+// TestBindAndValidateConfig_InvalidPath_Returns400 checks that a Path value
+// normalizeBackupPath rejects (e.g. a ".." traversal segment) is caught here
+// as a clean validation error, rather than only failing later and deeper
+// inside Manager.Reconfigure -> backup.Init.
+func TestBindAndValidateConfig_InvalidPath_Returns400(t *testing.T) {
+	routes := settingsRoutes(t)
+	body := `{"remoteUrl":"https://example.com/wiki.git","path":"../escape","httpUsername":"u","httpPassword":"p","intervalMinutes":30}`
+	c, rec := ginPOSTJSON(t, "/api/admin/backup/config", body)
+	if _, ok := routes.bindAndValidateConfig(c); ok {
+		t.Fatal("expected rejection for a path containing \"..\"")
+	}
+	var respBody BackupErrorResponse
+	_ = json.Unmarshal(rec.Body.Bytes(), &respBody)
+	if respBody.Error.Code != ErrCodeBackupInvalidConfig {
+		t.Fatalf("expected %q, got %q (msg %q)", ErrCodeBackupInvalidConfig, respBody.Error.Code, respBody.Error.Message)
 	}
 }
 

@@ -48,6 +48,7 @@ type persistedConfig struct {
 	AuthorName        string `json:"authorName,omitempty"`
 	AuthorEmail       string `json:"authorEmail,omitempty"`
 	RemoteURL         string `json:"remoteUrl,omitempty"`
+	Path              string `json:"path,omitempty"`
 	Branch            string `json:"branch,omitempty"`
 	SSHKeyPath        string `json:"sshKeyPath,omitempty"`
 	SSHKeyEnc         string `json:"sshKeyEnc,omitempty"`
@@ -108,6 +109,7 @@ func (s *ConfigStore) Load() (Config, bool, error) {
 		AuthorName:        pc.AuthorName,
 		AuthorEmail:       pc.AuthorEmail,
 		RemoteURL:         pc.RemoteURL,
+		Path:              pc.Path,
 		Branch:            pc.Branch,
 		SSHKeyPath:        pc.SSHKeyPath,
 		SSHKnownHostsPath: pc.SSHKnownHostsPath,
@@ -150,6 +152,7 @@ func (s *ConfigStore) Save(cfg Config) error {
 		AuthorName:        cfg.AuthorName,
 		AuthorEmail:       cfg.AuthorEmail,
 		RemoteURL:         cfg.RemoteURL,
+		Path:              cfg.Path,
 		Branch:            cfg.Branch,
 		SSHKeyPath:        cfg.SSHKeyPath,
 		SSHKnownHostsPath: cfg.SSHKnownHostsPath,

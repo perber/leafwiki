@@ -12,6 +12,7 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 const baseConfig: BackupConfig = {
   remoteUrl: 'https://github.com/acme/wiki-backup.git',
+  path: '',
   branch: 'main',
   authorName: 'Backup Bot',
   authorEmail: 'bot@example.com',
@@ -106,6 +107,20 @@ describe('BackupConfigForm', () => {
     })
     expect(screen.getByLabelText('config.sshKey')).toBeInTheDocument()
     expect(screen.queryByText('config.httpUsername')).not.toBeInTheDocument()
+  })
+
+  it('seeds the repository path field from the loaded config and submits a trimmed value', async () => {
+    storeState = makeState({ config: { ...baseConfig, path: 'docs/wiki' } })
+    render(<BackupConfigForm />)
+    const pathInput = screen.getByLabelText('config.path') as HTMLInputElement
+    expect(pathInput.value).toBe('docs/wiki')
+
+    fireEvent.change(pathInput, { target: { value: '  docs/other  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'config.saveButton' }))
+
+    expect(storeState.saveConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'docs/other' }),
+    )
   })
 
   it('keeps credential fields editable and shows a note when secrets are stored unencrypted', () => {

@@ -108,6 +108,87 @@ func TestManager_Reconfigure_BringsBackupUpAndPersists(t *testing.T) {
 	}
 }
 
+// TestManager_Reconfigure_TriggersOnContentSynced checks that Reconfigure
+// invokes the OnContentSynced callback exactly when syncContentFromRemote
+// actually wrote files to disk: reconnecting a previous backup (remote
+// already has history) needs a resync to keep the tree/SQLite index from
+// going stale, while the common case (first push to a new/empty remote,
+// nothing to materialize) must not spuriously trigger one.
+func TestManager_Reconfigure_TriggersOnContentSynced(t *testing.T) {
+	cases := []struct {
+		name       string
+		seedRemote bool
+		wantCalls  int
+	}{
+		{"non-empty remote (first contact with prior history)", true, 1},
+		{"empty remote (first push)", false, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m, bare := managerFixture(t)
+			t.Cleanup(m.Stop)
+
+			if tc.seedRemote {
+				pushFirstCommitToRemote(t, bare, "main", "root/from-remote.md", "from remote\n")
+			}
+
+			var mu sync.Mutex
+			calls := 0
+			m.SetOnContentSynced(func() {
+				mu.Lock()
+				calls++
+				mu.Unlock()
+			})
+
+			if err := m.Reconfigure(fileRemoteConfig(bare)); err != nil {
+				t.Fatalf("Reconfigure: %v", err)
+			}
+
+			mu.Lock()
+			got := calls
+			mu.Unlock()
+			if got != tc.wantCalls {
+				t.Errorf("OnContentSynced calls = %d, want %d", got, tc.wantCalls)
+			}
+		})
+	}
+}
+
+// TestManager_SetOnContentSynced_FiresForPendingSyncFromEarlierBoot checks
+// that a sync which happened before SetOnContentSynced was ever called still
+// fires the callback once it's registered. NewSettingsManager's background
+// boot can race main.go, which only has a Wiki instance to wire the callback
+// with after wiki.NewWiki() returns — a fast boot's build() can reach the
+// sync check first.
+func TestManager_SetOnContentSynced_FiresForPendingSyncFromEarlierBoot(t *testing.T) {
+	m, bare := managerFixture(t)
+	t.Cleanup(m.Stop)
+
+	pushFirstCommitToRemote(t, bare, "main", "root/from-remote.md", "from remote\n")
+
+	// Simulate a boot that completed before any callback was registered.
+	repo, sched, eff, err := m.build(fileRemoteConfig(bare).WithSettingsDefaults())
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	m.activate(repo, sched, eff)
+
+	var mu sync.Mutex
+	calls := 0
+	m.SetOnContentSynced(func() {
+		mu.Lock()
+		calls++
+		mu.Unlock()
+	})
+
+	mu.Lock()
+	got := calls
+	mu.Unlock()
+	if got != 1 {
+		t.Errorf("expected the pending sync to fire OnContentSynced once registered, got %d calls", got)
+	}
+}
+
 func TestManager_Reconfigure_SwapsSchedulerWithoutLeaking(t *testing.T) {
 	m, bare1 := managerFixture(t)
 	t.Cleanup(m.Stop)

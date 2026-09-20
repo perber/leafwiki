@@ -11,6 +11,7 @@ type Config struct {
 	Enabled           bool
 	RootDir           string // path to LeafWiki root/ content directory
 	AssetsDir         string // path to LeafWiki assets/ directory
+	Path              string // repository-relative directory to commit content under; "" = repository top level (monorepo prefix, e.g. "docs/wiki")
 	AuthorName        string
 	AuthorEmail       string
 	RemoteURL         string        // SSH remote (git@github.com:user/repo.git) or HTTPS remote (https://github.com/user/repo.git)
@@ -55,6 +56,35 @@ func (c Config) WithSettingsDefaults() Config {
 	return c
 }
 
+// ContentTreePaths returns the repository-relative, slash-separated directory
+// paths the live root/ and assets/ directories are committed under. With an
+// empty Path that is "root" and "assets" (historical layout); with Path set it
+// is "<path>/root" and "<path>/assets", so a monorepo remote keeps its sibling
+// files while LeafWiki owns only its own subtree.
+func (c Config) ContentTreePaths() (rootPath, assetsPath string) {
+	if c.Path == "" {
+		return "root", "assets"
+	}
+	return c.Path + "/root", c.Path + "/assets"
+}
+
+// contentTarget pairs a repository-relative tree path (from ContentTreePaths)
+// with the live directory it's committed from / materialized into.
+type contentTarget struct {
+	treePath string
+	liveDir  string
+}
+
+// contentTargets returns the root/ and assets/ content targets this Config
+// commits, in a fixed order.
+func (c Config) contentTargets() []contentTarget {
+	rootPath, assetsPath := c.ContentTreePaths()
+	return []contentTarget{
+		{rootPath, c.RootDir},
+		{assetsPath, c.AssetsDir},
+	}
+}
+
 // ValidateForSettings checks a Config that came from the admin settings UI.
 // Unlike the ENV/flag path it requires a remote (a UI-configured backup always
 // pushes somewhere — that is the whole point of the "test connection" step) and
@@ -71,6 +101,9 @@ func (c Config) ValidateForSettings() error {
 	}
 	if strings.TrimSpace(c.AuthorEmail) == "" || strings.TrimSpace(c.AuthorName) == "" {
 		return fmt.Errorf("commit author name and email are required")
+	}
+	if _, err := normalizeBackupPath(c.Path); err != nil {
+		return err
 	}
 	return ValidateRemoteCredentials(c.RemoteURL, c.SSHKey, c.SSHKeyPath, c.HTTPUsername, c.HTTPPassword)
 }
