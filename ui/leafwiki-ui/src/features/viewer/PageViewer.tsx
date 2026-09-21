@@ -237,7 +237,7 @@ export default function PageViewer() {
               {showRightPane && (
                 <div className="page-viewer__toc-button">
                   <TocDropdownButton
-                    entries={tocEntries}
+                    entries={showToc ? tocEntries : []}
                     clickable
                     activeId={tocActiveId}
                     downloads={attachments}
@@ -254,7 +254,7 @@ export default function PageViewer() {
     showRightPane && page && !error && tocPaneRoot
       ? createPortal(
           <TocSidePanel
-            entries={tocEntries}
+            entries={showToc ? tocEntries : []}
             activeId={tocActiveId}
             downloads={attachments}
           />,
