@@ -1,3 +1,4 @@
+import { uploadAsset } from '@/lib/api/assets'
 import { act, fireEvent, render } from '@testing-library/react'
 import { useEffect, useRef } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -96,6 +97,7 @@ vi.mock('@codemirror/view', () => ({
 vi.mock('@/lib/config', () => ({
   formatBytes: (n: number) => `${n}B`,
   IMAGE_EXTENSIONS: ['png', 'jpg', 'gif', 'webp'],
+  PDF_EXTENSIONS: ['pdf'],
 }))
 
 vi.mock('../preview/rehypeLineNumber', () => ({
@@ -273,5 +275,43 @@ describe('MarkdownEditor – breakpoint remount preserves content', () => {
     expect(editorPane.style.flex).toBe('0 0 60%')
     expect(divider).toHaveAttribute('aria-valuenow', '60')
     expect(divider).toHaveAttribute('aria-orientation', 'horizontal')
+  })
+
+  it('uploads a PDF dropped directly onto the editor', async () => {
+    vi.mocked(uploadAsset).mockResolvedValue({
+      file: '/assets/page-1/manual.pdf',
+    })
+
+    const { container } = render(
+      <MarkdownEditor initialValue="" pageId="page-1" onChange={vi.fn()} />,
+    )
+
+    const wrapper = container.querySelector('.markdown-editor') as HTMLElement
+    const file = new File(['%PDF-1.4'], 'manual.pdf', {
+      type: 'application/pdf',
+    })
+
+    await act(async () => {
+      fireEvent.drop(wrapper, { dataTransfer: { files: [file] } })
+    })
+
+    expect(uploadAsset).toHaveBeenCalledWith('page-1', file)
+  })
+
+  it('leaves a dropped image to the browser’s native handling', async () => {
+    vi.mocked(uploadAsset).mockClear()
+
+    const { container } = render(
+      <MarkdownEditor initialValue="" pageId="page-1" onChange={vi.fn()} />,
+    )
+
+    const wrapper = container.querySelector('.markdown-editor') as HTMLElement
+    const file = new File(['fake'], 'photo.png', { type: 'image/png' })
+
+    await act(async () => {
+      fireEvent.drop(wrapper, { dataTransfer: { files: [file] } })
+    })
+
+    expect(uploadAsset).not.toHaveBeenCalled()
   })
 })
