@@ -23,8 +23,8 @@ import (
 	httpinternal "github.com/perber/wiki/internal/http"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/publicaccess"
-	"github.com/perber/wiki/internal/tocdisplay"
 	"github.com/perber/wiki/internal/test_utils"
+	"github.com/perber/wiki/internal/tocdisplay"
 	"github.com/perber/wiki/internal/wiki"
 	wikiinstancesettings "github.com/perber/wiki/internal/wiki/instancesettings"
 )

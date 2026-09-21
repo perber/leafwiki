@@ -95,7 +95,7 @@ type RouterOptions struct {
 	// PublicAccess is the current "public mode" state (anonymous read access to
 	// every page), read per request so it can be toggled at runtime with no
 	// restart. nil is treated as a fixed-false provider. See internal/publicaccess.
-	PublicAccess            publicaccess.Provider
+	PublicAccess publicaccess.Provider
 	// AlwaysShowToc is the current "always show table of contents" state
 	// (show the TOC panel/dropdown regardless of heading count), read per
 	// request so it can be toggled at runtime with no restart. nil is
