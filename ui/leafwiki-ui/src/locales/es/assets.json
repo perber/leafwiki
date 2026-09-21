@@ -9,7 +9,7 @@
     "uploading_other": "Subiendo {{count}} archivos…",
     "loading": "Cargando recursos…",
     "empty": "Aún no hay recursos",
-    "tip": "Consejo: Haz doble clic para insertar la anotación predeterminada. También puedes añadir imágenes como enlaces; el audio y el vídeo tienen un botón para insertar el reproductor."
+    "tip": "Consejo: Haz doble clic para insertar la anotación predeterminada. También puedes añadir imágenes y PDFs como enlaces; el audio y el vídeo tienen un botón para insertar el reproductor."
   },
   "item": {
     "renameSuccess": "Recurso renombrado",
@@ -19,9 +19,11 @@
     "save": "Guardar",
     "cancel": "Cancelar",
     "insertImageLink": "Insertar enlace de imagen",
+    "insertPdfLink": "Insertar enlace de PDF",
     "insertAudioPlayer": "Insertar reproductor de audio",
     "insertVideoPlayer": "Insertar reproductor de vídeo",
     "insertImage": "Insertar imagen",
+    "insertPdf": "Insertar PDF",
     "insertLink": "Insertar enlace",
     "rename": "Renombrar",
     "delete": "Eliminar"

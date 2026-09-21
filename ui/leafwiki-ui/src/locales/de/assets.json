@@ -9,7 +9,7 @@
     "uploading_other": "{{count}} Dateien werden hochgeladen…",
     "loading": "Dateien werden geladen…",
     "empty": "Noch keine Dateien vorhanden",
-    "tip": "Tipp: Doppelklick fügt das Standard-Markup ein. Bilder können auch als Links eingefügt werden, für Audio/Video gibt es einen Player-Einfüge-Button."
+    "tip": "Tipp: Doppelklick fügt das Standard-Markup ein. Bilder und PDFs können auch als Links eingefügt werden, für Audio/Video gibt es einen Player-Einfüge-Button."
   },
   "item": {
     "renameSuccess": "Datei umbenannt",
@@ -19,9 +19,11 @@
     "save": "Speichern",
     "cancel": "Abbrechen",
     "insertImageLink": "Bildlink einfügen",
+    "insertPdfLink": "PDF-Link einfügen",
     "insertAudioPlayer": "Audio-Player einfügen",
     "insertVideoPlayer": "Video-Player einfügen",
     "insertImage": "Bild einfügen",
+    "insertPdf": "PDF einfügen",
     "insertLink": "Link einfügen",
     "rename": "Umbenennen",
     "delete": "Löschen"

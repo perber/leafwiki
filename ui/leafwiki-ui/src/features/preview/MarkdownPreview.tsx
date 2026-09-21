@@ -1,5 +1,6 @@
 import { useDesignModeStore } from '@/features/designtoggle/designmode'
 import i18next from '@/lib/i18n'
+import { PDF_EXTENSIONS } from '@/lib/config'
 import { preprocessWikilinks } from '@/lib/preprocessWikilinks'
 import { withBasePath } from '@/lib/routePath'
 import { useTreeStore } from '@/stores/tree'
@@ -42,6 +43,7 @@ import MarkdownCodeBlock from './MarkdownCodeBlock'
 import MarkdownInlineCode from './MarkdownInlineCode'
 import { MarkdownImage } from './MarkdownImage'
 import { MarkdownLink } from './MarkdownLink'
+import { MarkdownPdfEmbed } from './MarkdownPdfEmbed'
 import './markdownPreviewCodeTheme.css'
 import MermaidBlock from './MermaidBlock'
 import { normalizeMarkdownListIndentation } from './normalizeMarkdownListIndentation'
@@ -228,6 +230,13 @@ function normalizeAssetMediaSrc(src?: string) {
   return src
 }
 
+function isPdfSrc(src?: string) {
+  if (!src) return false
+  const withoutQuery = src.split(/[?#]/)[0]
+  const ext = withoutQuery.split('.').pop()?.toLowerCase()
+  return !!ext && PDF_EXTENSIONS.includes(ext)
+}
+
 function normalizeFootnoteHref(href?: string) {
   if (!href?.startsWith(FOOTNOTE_TARGET_PREFIX)) {
     return href
@@ -331,6 +340,11 @@ export default function MarkdownPreview({
         ClassAttributes<HTMLImageElement> &
         HTMLAttributes<HTMLImageElement>) => {
         void node
+        if (isPdfSrc(props.src)) {
+          return (
+            <MarkdownPdfEmbed {...props} resolveAssetUrl={resolveAssetUrl} />
+          )
+        }
         return <MarkdownImage {...props} resolveAssetUrl={resolveAssetUrl} />
       },
       audio: ({

@@ -9,7 +9,7 @@
     "uploading_other": "Uploading {{count}} files…",
     "loading": "Loading assets…",
     "empty": "No assets yet",
-    "tip": "Tip: Double-click inserts the default markup. Images can also be added as links, and audio/video have a player insert button."
+    "tip": "Tip: Double-click inserts the default markup. Images and PDFs can also be added as links, and audio/video have a player insert button."
   },
   "item": {
     "renameSuccess": "Asset renamed",
@@ -19,9 +19,11 @@
     "save": "Save",
     "cancel": "Cancel",
     "insertImageLink": "Insert image link",
+    "insertPdfLink": "Insert PDF link",
     "insertAudioPlayer": "Insert audio player",
     "insertVideoPlayer": "Insert video player",
     "insertImage": "Insert image",
+    "insertPdf": "Insert PDF",
     "insertLink": "Insert link",
     "rename": "Rename",
     "delete": "Delete"

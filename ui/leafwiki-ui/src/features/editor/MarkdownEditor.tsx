@@ -26,7 +26,7 @@ import {
 
 import { uploadAsset, UploadAssetResponse } from '@/lib/api/assets'
 import { mapApiError } from '@/lib/api/errors'
-import { formatBytes, IMAGE_EXTENSIONS } from '@/lib/config'
+import { formatBytes, IMAGE_EXTENSIONS, PDF_EXTENSIONS } from '@/lib/config'
 import { useConfigStore } from '@/stores/config'
 import { useEditorStore } from '@/stores/editor'
 import { toast } from 'sonner'
@@ -217,10 +217,14 @@ const MarkdownEditor = (
           const isImage =
             file.type.startsWith('image/') ||
             IMAGE_EXTENSIONS.includes(ext ?? '')
+          const isPdf =
+            file.type === 'application/pdf' ||
+            PDF_EXTENSIONS.includes(ext ?? '')
 
-          const markdown = isImage
-            ? `![${file.name}](${uploadedFile})\n`
-            : `[${file.name}](${uploadedFile})\n`
+          const markdown =
+            isImage || isPdf
+              ? `![${file.name}](${uploadedFile})\n`
+              : `[${file.name}](${uploadedFile})\n`
 
           const view = editorViewRef.current
           if (!view) continue

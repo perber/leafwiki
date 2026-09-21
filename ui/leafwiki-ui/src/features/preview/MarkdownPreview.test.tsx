@@ -145,6 +145,18 @@ echo two
     expect(image?.getAttribute('alt')).toBe('Remote banner')
   })
 
+  it('embeds pdfs referenced via markdown image syntax as an iframe', () => {
+    const { container } = renderPreview(
+      '![Manual](https://example.com/manual.pdf)',
+    )
+
+    expect(container.querySelector('img')).toBeNull()
+    const frame = container.querySelector('iframe')
+    expect(frame).not.toBeNull()
+    expect(frame?.getAttribute('src')).toBe('https://example.com/manual.pdf')
+    expect(frame?.getAttribute('title')).toBe('Manual')
+  })
+
   it('renders inline code with its copy action', () => {
     const { container } = renderPreview('Use `npm run build` here.')
 
