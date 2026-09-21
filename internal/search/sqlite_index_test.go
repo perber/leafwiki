@@ -848,6 +848,555 @@ func TestSQLiteIndex_Search_FindsTermsInsideCodeBlocks(t *testing.T) {
 	}
 }
 
+// TestSQLiteIndex_Search_TolerateFTS5SpecialCharacters is the regression test
+// for https://github.com/perber/leafwiki/issues/1577: a comma, apostrophe, or
+// stray quote in the query used to reach SQLite's FTS5 query parser
+// unescaped and fail with "fts5: syntax error" / "unterminated string",
+// surfacing to callers as a generic error instead of a normal (possibly
+// empty) result.
+func TestSQLiteIndex_Search_TolerateFTS5SpecialCharacters(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Hello World", tree.NodeKindPage, "hello world content")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+
+	queries := []string{
+		"hello,world",
+		"hello, world",
+		"it's",
+		`hello "world`,
+		`hello"world`,
+	}
+
+	for _, q := range queries {
+		if _, err := index.Search(q, nil, 0, 10); err != nil {
+			t.Errorf("Search(%q) returned an error instead of a result: %v", q, err)
+		}
+		if _, err := index.SearchPageIDs(q, nil); err != nil {
+			t.Errorf("SearchPageIDs(%q) returned an error instead of a result: %v", q, err)
+		}
+	}
+}
+
+// TestSQLiteIndex_Search_CommaSeparatedTermsStillFindMatches guards against a
+// fix that merely swallows the error (e.g. by returning empty results
+// whenever punctuation is present) instead of actually searching: splitting
+// "hello,world" on the comma should still find a page containing both words.
+func TestSQLiteIndex_Search_CommaSeparatedTermsStillFindMatches(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Greeting", tree.NodeKindPage, "hello world, this page greets everyone")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+
+	result, err := index.Search("hello,world", nil, 0, 10)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if result.Count != 1 || len(result.Items) == 0 || result.Items[0].PageID != "alpha1" {
+		t.Errorf("expected comma-joined query to still find the page, got count=%d", result.Count)
+	}
+}
+
+// TestSQLiteIndex_Search_SingleWordPrefixMatchUnaffectedByQuoting pins the
+// existing prefix-search behavior for ordinary single-word queries: the fix
+// for #1577 must not change ranking/matching for the common case.
+func TestSQLiteIndex_Search_SingleWordPrefixMatchUnaffectedByQuoting(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "this page is about searching and searches")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+
+	result, err := index.Search("search", nil, 0, 10)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if result.Count != 1 || len(result.Items) == 0 || result.Items[0].PageID != "alpha1" {
+		t.Errorf("expected prefix match on 'search' to still find the page, got count=%d", result.Count)
+	}
+}
+
+// TestSQLiteIndex_Search_ExplicitFTS5SyntaxStillPassesThrough guards the
+// existing "trust the user's FTS5 syntax" branch (column filters, boolean
+// operators): the #1577 fix only changes the plain-word fallback path.
+func TestSQLiteIndex_Search_ExplicitFTS5SyntaxStillPassesThrough(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha Search Test", tree.NodeKindPage, "This content is about SQLite search.")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+
+	result, err := index.Search("content:search*", nil, 0, 10)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if result.Count != 1 {
+		t.Errorf("expected explicit FTS5 column-filter syntax to still work, got count=%d", result.Count)
+	}
+
+	result, err = index.Search("search AND content", nil, 0, 10)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if result.Count != 1 {
+		t.Errorf("expected explicit FTS5 AND syntax to still work, got count=%d", result.Count)
+	}
+}
+
+// TestSQLiteIndex_Search_HyphenatedQueryStillFindsPunctuationToken guards the
+// old branch-2 behavior (querying a hyphen/dot/hash-bearing token) after its
+// whole-query quoting is replaced by per-term quoting: a query matching an
+// indexed punctuation-bearing token should still be found.
+func TestSQLiteIndex_Search_HyphenatedQueryStillFindsPunctuationToken(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Report", tree.NodeKindPage, "see report-final.v2 for details")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+
+	result, err := index.Search("report-final.v2", nil, 0, 10)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if result.Count != 1 || len(result.Items) == 0 || result.Items[0].PageID != "alpha1" {
+		t.Errorf("expected hyphenated/dotted query to still find the page, got count=%d", result.Count)
+	}
+}
+
+// TestBuildFuzzyQuery_NeverProducesSyntaxErrorForMixedPunctuationAndOperators
+// is the regression test for the follow-up finding on #1577: the original
+// fix only escaped a comma/apostrophe when the *whole query* contained no
+// FTS5 operator character anywhere, so a query mixing an operator in one
+// field with a bare comma/apostrophe in another (e.g. "foo* bar,baz") still
+// produced "fts5: syntax error". Each case here is executed against a real
+// FTS5 table, not just asserted against buildFuzzyQuery's string output, so
+// a change that "looks" safe but is still invalid FTS5 syntax would fail.
+func TestBuildFuzzyQuery_NeverProducesSyntaxErrorForMixedPunctuationAndOperators(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Foo Bar", tree.NodeKindPage, "foo bar baz content")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+
+	queries := []string{
+		"foo* bar,baz",
+		"foo AND bar,baz",
+		`"foo" bar,baz`,
+		"it's* thing",
+		`"foo*`, // unbalanced quote directly adjacent to an operator character
+		// NB: "(foo) bar,baz" is deliberately not covered here — it hits a
+		// separate, pre-existing FTS5 grammar quirk unrelated to #1577: a
+		// parenthesized group followed by any other juxtaposed term (with no
+		// explicit AND/OR) is already a syntax error before this fix too,
+		// since the pre-#1577 code trusted anything containing "(" and
+		// passed it through unescaped. Tracked separately (see pleaf issue
+		// "Search Queries Combining Parentheses With Another Bareword Term
+		// Always Crash").
+	}
+
+	for _, q := range queries {
+		if _, err := index.Search(q, nil, 0, 10); err != nil {
+			t.Errorf("Search(%q) returned an error instead of a result: %v", q, err)
+		}
+	}
+}
+
+// TestSQLiteIndex_Search_ApostropheWordStillMatchesIndexedContent guards
+// against a fix that merely avoids the crash without still finding the
+// intended content: "it's" should still find a page containing "it's".
+func TestSQLiteIndex_Search_ApostropheWordStillMatchesIndexedContent(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Note", tree.NodeKindPage, "it's a great day today")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+
+	result, err := index.Search("it's", nil, 0, 10)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if result.Count != 1 || len(result.Items) == 0 || result.Items[0].PageID != "alpha1" {
+		t.Errorf("expected apostrophe word to still find the page, got count=%d", result.Count)
+	}
+}
+
+// TestSQLiteIndex_Search_BareColonQueriesDoNotCrash is the regression test
+// for a pre-existing bug found (and fixed) as a side effect of #1577: any
+// query containing ":" was trusted as an FTS5 column filter regardless of
+// whether the text before the colon was a real column, so a pasted URL,
+// Windows path, or time crashed with "no such column: ...".
+func TestSQLiteIndex_Search_BareColonQueriesDoNotCrash(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Notes", tree.NodeKindPage, "see http example com for the schedule at 10 30")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+
+	queries := []string{
+		"http://example.com",
+		"see http://example.com for details",
+		`c:\Users\foo`,
+		"time: 10:30",
+	}
+
+	for _, q := range queries {
+		if _, err := index.Search(q, nil, 0, 10); err != nil {
+			t.Errorf("Search(%q) returned an error instead of a result: %v", q, err)
+		}
+	}
+}
+
+// TestSQLiteIndex_Search_RealColumnFilterStillWorks guards the existing
+// "content:search*" style power-user syntax after adding column-name
+// validation: a genuine column filter naming a real column must still be
+// trusted and behave as before.
+func TestSQLiteIndex_Search_RealColumnFilterStillWorks(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha Search Test", tree.NodeKindPage, "This content is about SQLite search.")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+
+	for _, q := range []string{"content:search*", "title:Alpha*", "PAGEID:alpha1"} {
+		result, err := index.Search(q, nil, 0, 10)
+		if err != nil {
+			t.Fatalf("Search(%q) failed: %v", q, err)
+		}
+		if result.Count != 1 {
+			t.Errorf("Search(%q): expected column-filter syntax to still find the page, got count=%d", q, result.Count)
+		}
+	}
+}
+
+// TestSQLiteIndex_Search_DanglingBooleanKeywordDoesNotCrash is the
+// regression test for the other pre-existing bug found (and fixed) as a
+// side effect of #1577: a bare AND/OR/NOT with no operand on one side (a
+// user literally searching for that word, or an as-you-type request
+// captured mid-typing) was trusted as a boolean operator regardless of
+// context and crashed with an FTS5 syntax error.
+func TestSQLiteIndex_Search_DanglingBooleanKeywordDoesNotCrash(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Notes", tree.NodeKindPage, "foo and bar or not baz")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+
+	queries := []string{"AND", "OR", "NOT", "NOT foo", "foo AND", "AND foo"}
+
+	for _, q := range queries {
+		if _, err := index.Search(q, nil, 0, 10); err != nil {
+			t.Errorf("Search(%q) returned an error instead of a result: %v", q, err)
+		}
+	}
+}
+
+// TestSQLiteIndex_Search_BooleanOperatorBetweenRealOperandsStillWorks
+// guards the existing "search AND content" style explicit boolean syntax
+// after adding the neighbor-context check: AND/OR sitting between two real
+// operands must still be trusted and behave as before.
+func TestSQLiteIndex_Search_BooleanOperatorBetweenRealOperandsStillWorks(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha Search Test", tree.NodeKindPage, "This content is about SQLite search.")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+
+	result, err := index.Search("search AND content", nil, 0, 10)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if result.Count != 1 {
+		t.Errorf("expected explicit FTS5 AND syntax between real operands to still work, got count=%d", result.Count)
+	}
+}
+
+// TestSQLiteIndex_Search_PunctuationOnlyQueryReturnsEmptyResultNotError is
+// the regression test for a bug found (and fixed) as a side effect of
+// #1577: a query built entirely from characters outside the tokenizer's
+// word alphabet (a lone comma, apostrophe, unbalanced quote, colon(s), or
+// emoji) sanitizes to an empty FTS5 query string, and `pages MATCH ”` is
+// itself an FTS5 syntax error — the exact crash class #1577 reported, for
+// the simplest possible input. It should behave like any other query with
+// nothing to search on: an empty result, not an error.
+func TestSQLiteIndex_Search_PunctuationOnlyQueryReturnsEmptyResultNotError(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "some content")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+
+	queries := []string{",", "'", `"`, "::", "!!!", "😀"}
+
+	for _, q := range queries {
+		result, err := index.Search(q, nil, 0, 10)
+		if err != nil {
+			t.Errorf("Search(%q) returned an error instead of a result: %v", q, err)
+			continue
+		}
+		if result.Count != 0 {
+			t.Errorf("Search(%q): expected 0 results for a punctuation-only query, got %d", q, result.Count)
+		}
+		if _, err := index.SearchPageIDs(q, nil); err != nil {
+			t.Errorf("SearchPageIDs(%q) returned an error instead of a result: %v", q, err)
+		}
+	}
+}
+
+// TestSQLiteIndex_Search_PunctuationOnlyQueryWithPageIDFilterStillFilters
+// guards the combined case: a punctuation-only query text alongside a
+// pageIDs filter should behave like an empty query with that filter (return
+// the filtered pages, no MATCH applied) rather than erroring or ignoring
+// the filter.
+func TestSQLiteIndex_Search_PunctuationOnlyQueryWithPageIDFilterStillFilters(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "some content")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+	err = index.IndexPage("notes/beta", "notes/beta.md", "beta1", "Beta", tree.NodeKindPage, "other content")
+	if err != nil {
+		t.Fatalf("failed to index beta page: %v", err)
+	}
+
+	result, err := index.Search(",", []string{"alpha1"}, 0, 10)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if result.Count != 1 || len(result.Items) == 0 || result.Items[0].PageID != "alpha1" {
+		t.Errorf("expected punctuation-only query + pageID filter to return the filtered page, got count=%d", result.Count)
+	}
+}
+
+// TestSQLiteIndex_Search_BareOperatorCharacterDoesNotCrash is the
+// regression test for a bug found (and fixed) as a side effect of #1577:
+// a lone "*", "(", or ")" with no operand/matching partner was trusted as
+// deliberate FTS5 syntax purely because it contained an operator
+// character, even though none of these are valid standalone FTS5 syntax.
+func TestSQLiteIndex_Search_BareOperatorCharacterDoesNotCrash(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "some content")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+
+	for _, q := range []string{"*", "(", ")", "foo * bar"} {
+		if _, err := index.Search(q, nil, 0, 10); err != nil {
+			t.Errorf("Search(%q) returned an error instead of a result: %v", q, err)
+		}
+	}
+}
+
+// TestSQLiteIndex_Search_DoubledBooleanKeywordDoesNotCrash is the
+// regression test for a bug found (and fixed) as a side effect of #1577:
+// hasRealOperandNeighbors only checked slice position, not whether a
+// keyword's neighbor was itself another keyword, so a doubled "AND AND"
+// (a plausible typo or fast-typing artifact) was trusted twice over and
+// reached SQLite as two adjacent, unconnected operators.
+func TestSQLiteIndex_Search_DoubledBooleanKeywordDoesNotCrash(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "foo bar content")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+
+	if _, err := index.Search("foo AND AND bar", nil, 0, 10); err != nil {
+		t.Errorf("Search(%q) returned an error instead of a result: %v", "foo AND AND bar", err)
+	}
+}
+
+// TestSQLiteIndex_Search_ColumnFilterWithPunctuationValueStaysScoped is the
+// regression test for two bugs found (and fixed) as a side effect of
+// #1577: a column filter's value was either trusted verbatim (breaking on
+// a pasted URL like "content:http://example.com", whose second ":" is
+// invalid FTS5 syntax) or, once that was gated behind an "unsafe chars"
+// check, silently lost its column scope entirely for a value containing
+// an apostrophe or comma (falling back to an unscoped, all-columns
+// search). Rewriting into a scoped, per-word quoted-prefix group fixes
+// both: no crash, and the column scope from the user's `col:` filter is
+// preserved rather than dropped.
+func TestSQLiteIndex_Search_ColumnFilterWithPunctuationValueStaysScoped(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "don't forget the http example com link")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+	// "wobble" appears only in beta's title, never in any page's content -
+	// used below to confirm a punctuation-value column filter still
+	// actually scopes to the named column instead of silently falling back
+	// to an unscoped, all-columns search.
+	err = index.IndexPage("notes/beta", "notes/beta.md", "beta1", "Wobble's Page", tree.NodeKindPage, "unrelated body text")
+	if err != nil {
+		t.Fatalf("failed to index beta page: %v", err)
+	}
+
+	for _, q := range []string{"content:http://example.com", "content:don't"} {
+		if _, err := index.Search(q, nil, 0, 10); err != nil {
+			t.Errorf("Search(%q) returned an error instead of a result: %v", q, err)
+		}
+	}
+
+	result, err := index.Search("content:wobble", nil, 0, 10)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if result.Count != 0 {
+		t.Errorf("content:wobble matched %d pages, want 0 (\"wobble\" only appears in beta's title) — a punctuation-value column filter must still be column-scoped, not silently searching every column", result.Count)
+	}
+
+	result, err = index.Search("content:don't", nil, 0, 10)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if result.Count != 1 || len(result.Items) == 0 || result.Items[0].PageID != "alpha1" {
+		t.Errorf("expected content:don't to still find alpha1 via its content, got count=%d", result.Count)
+	}
+}
+
+// TestSQLiteIndex_Search_NearFunctionCallStillWorks is the regression test
+// for an actual regression found (and fixed) as a side effect of #1577,
+// not just an unfixed pre-existing gap: NEAR(term1 term2, distance) syntax
+// worked before this fix's per-field classification existed (the whole
+// query was trusted verbatim), but per-field splitting on whitespace broke
+// it apart into "term2," and "distance)" as two unrelated fields and
+// silently stripped the comma the NEAR grammar requires — no error, just
+// wrong (empty) results.
+func TestSQLiteIndex_Search_NearFunctionCallStillWorks(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "foo one two three bar")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+
+	result, err := index.Search("NEAR(foo bar, 5)", nil, 0, 10)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if result.Count != 1 || len(result.Items) == 0 || result.Items[0].PageID != "alpha1" {
+		t.Errorf("expected NEAR(...) proximity syntax to still find the page, got count=%d", result.Count)
+	}
+}
+
 func TestExtractHeadings_SingleH1(t *testing.T) {
 	got := extractHeadings("# Hello World")
 	if !strings.Contains(got, "Hello World") {
