@@ -24,6 +24,7 @@ import (
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/test_utils"
+	"github.com/perber/wiki/internal/tocdisplay"
 	"github.com/perber/wiki/internal/wiki"
 	wikiinstancesettings "github.com/perber/wiki/internal/wiki/instancesettings"
 )
@@ -3408,12 +3409,39 @@ func TestReadRouteAccessMatrix(t *testing.T) {
 
 // routerWithPublicAccess wires the instance-settings registrar (the runtime
 // public-mode toggle endpoint) into a test router, with the same
-// publicaccess.Service backing both the toggle and the read-route gate.
+// publicaccess.Service backing both the toggle and the read-route gate. The
+// toc-display service is an unrelated throwaway — these tests don't assert
+// on it.
 func routerWithPublicAccess(t *testing.T, w *wiki.Wiki, svc *publicaccess.Service) *gin.Engine {
 	t.Helper()
-	w.SetInstanceSettingsRoutes(wikiinstancesettings.NewRoutes(svc, w.AuthService(), slog.Default()))
+	tocSvc, err := tocdisplay.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("tocdisplay.New: %v", err)
+	}
+	w.SetInstanceSettingsRoutes(wikiinstancesettings.NewRoutes(svc, tocSvc, w.AuthService(), slog.Default()))
 	return httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            svc,
+		AllowInsecure:           true,
+		AccessTokenTimeout:      15 * time.Minute,
+		RefreshTokenTimeout:     7 * 24 * time.Hour,
+		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
+	})
+}
+
+// routerWithTocDisplay wires the instance-settings registrar's toc-display
+// toggle endpoint into a test router, with the same tocdisplay.Service
+// backing both the toggle and /api/config. The public-access service is an
+// unrelated throwaway — these tests don't assert on it.
+func routerWithTocDisplay(t *testing.T, w *wiki.Wiki, svc *tocdisplay.Service) *gin.Engine {
+	t.Helper()
+	paSvc, err := publicaccess.NewSettingsManaged(t.TempDir())
+	if err != nil {
+		t.Fatalf("publicaccess.NewSettingsManaged: %v", err)
+	}
+	w.SetInstanceSettingsRoutes(wikiinstancesettings.NewRoutes(paSvc, svc, w.AuthService(), slog.Default()))
+	return httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		PublicAccess:            paSvc,
+		AlwaysShowToc:           svc,
 		AllowInsecure:           true,
 		AccessTokenTimeout:      15 * time.Minute,
 		RefreshTokenTimeout:     7 * 24 * time.Hour,
@@ -3553,6 +3581,92 @@ func TestPublicAccessToggle_BadPayload_Returns400(t *testing.T) {
 
 	for _, body := range []string{`{}`, `{"enabled":"yes"}`, `not json`} {
 		rec := authenticatedRequest(t, router, http.MethodPut, "/api/admin/settings/public-access", strings.NewReader(body))
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("payload %q: want 400, got %d %s", body, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+func TestTocDisplayToggle_ConfigEndpointReflectsTheChangeOnTheSameEngine(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	svc, err := tocdisplay.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("tocdisplay.New: %v", err)
+	}
+	router := routerWithTocDisplay(t, w, svc)
+
+	readConfig := func() map[string]any {
+		req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("GET /api/config: %d", rec.Code)
+		}
+		var m map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &m); err != nil {
+			t.Fatalf("decode /api/config: %v", err)
+		}
+		return m
+	}
+
+	if cfg := readConfig(); cfg["alwaysShowToc"] != false {
+		t.Fatalf("initial config: want alwaysShowToc=false, got %v", cfg["alwaysShowToc"])
+	}
+
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/admin/settings/toc-display", strings.NewReader(`{"alwaysShow":true}`))
+	if rec.Code != http.StatusOK || rec.Body.String() != `{"alwaysShow":true}` {
+		t.Fatalf("enable: want 200 {\"alwaysShow\":true}, got %d %s", rec.Code, rec.Body.String())
+	}
+
+	if cfg := readConfig(); cfg["alwaysShowToc"] != true {
+		t.Fatalf("after enable: want alwaysShowToc=true, got %v", cfg["alwaysShowToc"])
+	}
+
+	rec = authenticatedRequest(t, router, http.MethodPut, "/api/admin/settings/toc-display", strings.NewReader(`{"alwaysShow":false}`))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("disable: want 200, got %d %s", rec.Code, rec.Body.String())
+	}
+
+	if cfg := readConfig(); cfg["alwaysShowToc"] != false {
+		t.Fatalf("after disable: want alwaysShowToc=false, got %v", cfg["alwaysShowToc"])
+	}
+}
+
+func TestTocDisplayToggle_RequiresAdmin(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	svc, err := tocdisplay.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("tocdisplay.New: %v", err)
+	}
+	router := routerWithTocDisplay(t, w, svc)
+
+	// Anonymous → 401.
+	if code := anonStatus(router, http.MethodPut, "/api/admin/settings/toc-display"); code != http.StatusUnauthorized {
+		t.Fatalf("anon PUT: want 401, got %d", code)
+	}
+
+	// Editor → 403.
+	authenticatedRequest(t, router, http.MethodPost, "/api/users",
+		strings.NewReader(`{"username":"ed2","email":"ed2@example.com","password":"editorpass","role":"editor"}`))
+	rec := authenticatedRequestAs(t, router, "ed2", "editorpass", http.MethodPut, "/api/admin/settings/toc-display", strings.NewReader(`{"alwaysShow":true}`))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("editor PUT: want 403, got %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestTocDisplayToggle_BadPayload_Returns400(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	svc, err := tocdisplay.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("tocdisplay.New: %v", err)
+	}
+	router := routerWithTocDisplay(t, w, svc)
+
+	for _, body := range []string{`{}`, `{"alwaysShow":"yes"}`, `not json`} {
+		rec := authenticatedRequest(t, router, http.MethodPut, "/api/admin/settings/toc-display", strings.NewReader(body))
 		if rec.Code != http.StatusBadRequest {
 			t.Errorf("payload %q: want 400, got %d %s", body, rec.Code, rec.Body.String())
 		}

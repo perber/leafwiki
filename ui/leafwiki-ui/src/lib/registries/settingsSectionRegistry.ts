@@ -13,6 +13,7 @@ import {
   Importer,
   PublicAccessSettings,
   SnapshotSettings,
+  TocDisplaySettings,
   UserManagement,
   BrokenLinks,
 } from '@/features/router/lazy-routes'
@@ -23,6 +24,7 @@ import {
   GitBranch,
   Globe,
   KeyRound,
+  ListTree,
   Palette,
   Upload,
   User,
@@ -103,6 +105,15 @@ export const settingsSections: SettingsSection[] = [
     // Always visible to admins; env-managed instances render a status-only
     // view inside the component rather than being hidden.
     Component: PublicAccessSettings,
+  },
+  {
+    id: 'toc-display',
+    path: 'toc-display',
+    labelKey: 'menuLabel',
+    ns: 'tocDisplay',
+    icon: ListTree,
+    roles: ['admin'],
+    Component: TocDisplaySettings,
   },
   {
     id: 'users',

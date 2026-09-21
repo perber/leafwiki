@@ -1,6 +1,7 @@
 import { fetchWithAuth } from './auth'
 
 const PUBLIC_ACCESS_URL = '/api/admin/settings/public-access'
+const TOC_DISPLAY_URL = '/api/admin/settings/toc-display'
 
 export type PublicAccessResponse = {
   enabled: boolean
@@ -20,4 +21,23 @@ export async function setPublicAccess(
     body: JSON.stringify({ enabled }),
   })
   return res as PublicAccessResponse
+}
+
+export type TocDisplayResponse = {
+  alwaysShow: boolean
+}
+
+/**
+ * Toggle "always show table of contents" (show the TOC panel/dropdown
+ * regardless of heading count) at runtime.
+ */
+export async function setAlwaysShowToc(
+  alwaysShow: boolean,
+): Promise<TocDisplayResponse> {
+  const res = await fetchWithAuth(TOC_DISPLAY_URL, {
+    method: 'PUT',
+    credentials: 'include',
+    body: JSON.stringify({ alwaysShow }),
+  })
+  return res as TocDisplayResponse
 }
