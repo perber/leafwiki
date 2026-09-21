@@ -12,6 +12,15 @@ describe('MarkdownPdfEmbed', () => {
     expect(frame?.getAttribute('title')).toBe('Manual')
   })
 
+  it('keeps a #page= fragment through cache-busting versioning', () => {
+    render(<MarkdownPdfEmbed src="/assets/manual.pdf#page=3" alt="Manual" />)
+
+    const frame = document.querySelector('iframe')
+    const src = frame?.getAttribute('src') ?? ''
+    expect(src).toContain('/assets/manual.pdf')
+    expect(src).toMatch(/\?v=\d+#page=3$/)
+  })
+
   it('renders a fallback link to open the pdf in a new tab', () => {
     render(<MarkdownPdfEmbed src="https://example.com/doc.pdf" alt="Doc" />)
 

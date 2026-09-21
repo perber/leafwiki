@@ -19,6 +19,10 @@ function normalizePdfSrc(src: string) {
   return src
 }
 
+// A `#page=N` fragment on the source (e.g. `manual.pdf#page=3`) is a standard
+// PDF "open parameter" that Chrome/Firefox/Edge's built-in viewer honors to
+// open on that page — kept intact below through URL/searchParams handling
+// since the fragment is never part of `search`.
 export function MarkdownPdfEmbed({
   src = '',
   alt,

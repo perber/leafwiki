@@ -157,6 +157,17 @@ echo two
     expect(frame?.getAttribute('title')).toBe('Manual')
   })
 
+  it('keeps a #page= fragment so the embed opens on that page', () => {
+    const { container } = renderPreview(
+      '![Manual](https://example.com/manual.pdf#page=3)',
+    )
+
+    const frame = container.querySelector('iframe')
+    expect(frame?.getAttribute('src')).toBe(
+      'https://example.com/manual.pdf#page=3',
+    )
+  })
+
   it('renders inline code with its copy action', () => {
     const { container } = renderPreview('Use `npm run build` here.')
 

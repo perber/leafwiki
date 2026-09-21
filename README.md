@@ -74,7 +74,7 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
 - Backlinks and link status per page (incoming, outgoing, broken links), with a dedicated admin view for auditing broken links
 - Built-in Markdown editor with live preview, keyboard shortcuts, and autocomplete for internal page links
 - Optimistic locking for concurrent edits
-- Markdown: tables, task lists, footnotes, callouts (`:::info` / `:::warning`), collapsible blocks (`:::collapsible` / `:::collapsed`), Mermaid diagrams, KaTeX math blocks (`$$...$$`, inline `$...$` not supported), sanitized inline HTML, embedded PDFs (`![name](file.pdf)`)
+- Markdown: tables, task lists, footnotes, callouts (`:::info` / `:::warning`), collapsible blocks (`:::collapsible` / `:::collapsed`), Mermaid diagrams, KaTeX math blocks (`$$...$$`, inline `$...$` not supported), sanitized inline HTML, embedded PDFs (`![name](file.pdf)`, optionally opened on a specific page with `![name](file.pdf#page=3)`)
 
 **Customization:**
 - Custom stylesheet (`--custom-stylesheet`, v0.8.5+)
