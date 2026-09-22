@@ -14,6 +14,14 @@
     "label": "站点名称",
     "placeholder": "LeafWiki"
   },
+  "notFoundPage": {
+    "title": "“页面未找到”界面",
+    "description": "当 URL 不存在时显示——出于设计，当用户没有读取权限时也会显示同样的内容，这样拒绝访问就不会暴露该页面确实存在。留空则使用默认文案。",
+    "titleLabel": "标题",
+    "titlePlaceholder": "页面未找到",
+    "messageLabel": "提示信息",
+    "messagePlaceholder": "您要查找的页面不存在。"
+  },
   "logo": {
     "title": "Logo",
     "description": "显示在页眉站点名称旁的 Logo。",

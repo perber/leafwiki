@@ -14,6 +14,14 @@
     "label": "Nombre del sitio",
     "placeholder": "LeafWiki"
   },
+  "notFoundPage": {
+    "title": "Pantalla de Página No Encontrada",
+    "description": "Se muestra para una URL que no existe, y también, a propósito, para una página a la que alguien no tiene acceso de lectura, para que una denegación nunca revele que una página existe. Déjalo en blanco para usar el texto predeterminado.",
+    "titleLabel": "Título",
+    "titlePlaceholder": "Página No Encontrada",
+    "messageLabel": "Mensaje",
+    "messagePlaceholder": "La página que buscas no existe."
+  },
   "logo": {
     "title": "Logotipo",
     "description": "El logotipo que se muestra en el encabezado junto al nombre del sitio.",

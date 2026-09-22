@@ -9,12 +9,16 @@ type BrandingStore = {
   siteName: string
   logoFile: string
   faviconFile: string
+  notFoundTitle: string
+  notFoundMessage: string
   logoVersion: number
   faviconVersion: number
   logoExts: string[]
   maxLogoSize: number
   faviconExts: string[]
   maxFaviconSize: number
+  maxNotFoundTitleLength: number
+  maxNotFoundMessageLength: number
   isLoaded: boolean
   isLoading: boolean
   error: string | null
@@ -31,12 +35,16 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
   siteName: 'LeafWiki',
   logoFile: '',
   faviconFile: '',
+  notFoundTitle: '',
+  notFoundMessage: '',
   logoVersion: 0,
   faviconVersion: 0,
   logoExts: [],
   maxLogoSize: 0,
   faviconExts: [],
   maxFaviconSize: 0,
+  maxNotFoundTitleLength: 0,
+  maxNotFoundMessageLength: 0,
   isLoaded: false,
   isLoading: false,
   error: null,
@@ -57,6 +65,12 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
         faviconVersion: assetVersion,
         faviconExts: config.brandingConstraints.faviconExts,
         maxFaviconSize: config.brandingConstraints.maxFaviconSize,
+        notFoundTitle: config.notFoundTitle,
+        notFoundMessage: config.notFoundMessage,
+        maxNotFoundTitleLength:
+          config.brandingConstraints.maxNotFoundTitleLength,
+        maxNotFoundMessageLength:
+          config.brandingConstraints.maxNotFoundMessageLength,
         isLoaded: true,
         isLoading: false,
       })
@@ -78,6 +92,8 @@ export const useBrandingStore = create<BrandingStore>((set) => ({
         siteName: updated.siteName,
         logoFile: updated.logoFile,
         faviconFile: updated.faviconFile,
+        notFoundTitle: updated.notFoundTitle,
+        notFoundMessage: updated.notFoundMessage,
         isLoading: false,
       })
     } catch (err) {
