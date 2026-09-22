@@ -1,7 +1,8 @@
 import { useDesignModeStore } from '@/features/designtoggle/designmode'
+import { normalizeAssetSrc } from '@/lib/assetSrc'
 import i18next from '@/lib/i18n'
+import { PDF_EXTENSIONS } from '@/lib/config'
 import { preprocessWikilinks } from '@/lib/preprocessWikilinks'
-import { withBasePath } from '@/lib/routePath'
 import { useTreeStore } from '@/stores/tree'
 import 'katex/dist/katex.min.css'
 import {
@@ -13,6 +14,7 @@ import {
   Component,
   ErrorInfo,
   HTMLAttributes,
+  ImgHTMLAttributes,
   ReactElement,
   ReactNode,
   VideoHTMLAttributes,
@@ -42,6 +44,7 @@ import MarkdownCodeBlock from './MarkdownCodeBlock'
 import MarkdownInlineCode from './MarkdownInlineCode'
 import { MarkdownImage } from './MarkdownImage'
 import { MarkdownLink } from './MarkdownLink'
+import { MarkdownPdfEmbed } from './MarkdownPdfEmbed'
 import './markdownPreviewCodeTheme.css'
 import MermaidBlock from './MermaidBlock'
 import { normalizeMarkdownListIndentation } from './normalizeMarkdownListIndentation'
@@ -217,15 +220,11 @@ class MarkdownPreviewErrorBoundary extends Component<
   }
 }
 
-function normalizeAssetMediaSrc(src?: string) {
-  if (!src) return src
-  if (src.startsWith('/assets/')) {
-    return withBasePath(src)
-  }
-  if (src.startsWith('assets/')) {
-    return withBasePath(`/${src}`)
-  }
-  return src
+function isPdfSrc(src?: string) {
+  if (!src) return false
+  const withoutQuery = src.split(/[?#]/)[0]
+  const ext = withoutQuery.split('.').pop()?.toLowerCase()
+  return !!ext && PDF_EXTENSIONS.includes(ext)
 }
 
 function normalizeFootnoteHref(href?: string) {
@@ -329,8 +328,13 @@ export default function MarkdownPreview({
         ...props
       }: MarkdownNodeProp &
         ClassAttributes<HTMLImageElement> &
-        HTMLAttributes<HTMLImageElement>) => {
+        ImgHTMLAttributes<HTMLImageElement>) => {
         void node
+        if (isPdfSrc(props.src)) {
+          return (
+            <MarkdownPdfEmbed {...props} resolveAssetUrl={resolveAssetUrl} />
+          )
+        }
         return <MarkdownImage {...props} resolveAssetUrl={resolveAssetUrl} />
       },
       audio: ({
@@ -339,7 +343,12 @@ export default function MarkdownPreview({
       }: MarkdownNodeProp & AudioHTMLAttributes<HTMLAudioElement>) => {
         void node
         const resolvedSrc = resolveAssetUrl?.(props.src ?? '') ?? props.src
-        return <audio {...props} src={normalizeAssetMediaSrc(resolvedSrc)} />
+        return (
+          <audio
+            {...props}
+            src={resolvedSrc ? normalizeAssetSrc(resolvedSrc) : resolvedSrc}
+          />
+        )
       },
       video: ({
         node,
@@ -347,7 +356,12 @@ export default function MarkdownPreview({
       }: MarkdownNodeProp & VideoHTMLAttributes<HTMLVideoElement>) => {
         void node
         const resolvedSrc = resolveAssetUrl?.(props.src ?? '') ?? props.src
-        return <video {...props} src={normalizeAssetMediaSrc(resolvedSrc)} />
+        return (
+          <video
+            {...props}
+            src={resolvedSrc ? normalizeAssetSrc(resolvedSrc) : resolvedSrc}
+          />
+        )
       },
       section: ({
         children,

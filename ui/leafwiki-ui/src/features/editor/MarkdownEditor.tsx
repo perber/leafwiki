@@ -5,6 +5,7 @@ import { EditorView } from '@codemirror/view'
 import { Code2, Eye } from 'lucide-react'
 import {
   ClipboardEvent,
+  DragEvent,
   forwardRef,
   JSX,
   MouseEvent as ReactMouseEvent,
@@ -26,7 +27,7 @@ import {
 
 import { uploadAsset, UploadAssetResponse } from '@/lib/api/assets'
 import { mapApiError } from '@/lib/api/errors'
-import { formatBytes, IMAGE_EXTENSIONS } from '@/lib/config'
+import { formatBytes, IMAGE_EXTENSIONS, PDF_EXTENSIONS } from '@/lib/config'
 import { useConfigStore } from '@/stores/config'
 import { useEditorStore } from '@/stores/editor'
 import { toast } from 'sonner'
@@ -160,6 +161,75 @@ const MarkdownEditor = (
     )
   }, [editorPaneWidth])
 
+  // Uploads a single file and inserts its markdown reference into the editor.
+  // Shared by paste-of-files and the drag-and-drop handler below. `insertPos`
+  // pins the insertion to a specific document offset (the drop point); when
+  // omitted, the cursor position at the time the upload resolves is used
+  // instead, which is what paste wants.
+  const uploadFileToEditor = useCallback(
+    async (file: File, insertPos?: number) => {
+      if (file.size > maxAssetUploadSizeBytes) {
+        toast.error(
+          t('markdownEditor.fileTooLarge', {
+            maxSize: formatBytes(maxAssetUploadSizeBytes),
+          }),
+        )
+        return
+      }
+
+      try {
+        const res: UploadAssetResponse = await uploadAsset(pageId, file)
+
+        toast.success(
+          t('markdownEditor.uploadedToast', { filename: file.name }),
+        )
+
+        // The result of uploadAsset looks like this:
+        // {"file":"/assets/0NmpvSivg/preview-scrollbar.gif"}
+        const uploadedFile = res.file
+        const ext = file.name.split('.').pop()?.toLowerCase()
+
+        const isImage =
+          file.type.startsWith('image/') || IMAGE_EXTENSIONS.includes(ext ?? '')
+        const isPdf =
+          file.type === 'application/pdf' || PDF_EXTENSIONS.includes(ext ?? '')
+
+        const markdown =
+          isImage || isPdf
+            ? `![${file.name}](${uploadedFile})\n`
+            : `[${file.name}](${uploadedFile})\n`
+
+        const view = editorViewRef.current
+        if (!view) return
+        // The document may have changed while the upload was in flight;
+        // clamp a caller-supplied drop position to the current doc length
+        // so it can't land out of range.
+        const from =
+          insertPos !== undefined
+            ? Math.min(insertPos, view.state.doc.length)
+            : view.state.selection.main.from
+        view.dispatch({
+          changes: { from, insert: markdown },
+          selection: { anchor: from + markdown.length },
+        })
+
+        const newDoc = view.state.doc.toString()
+        setMarkdown(newDoc)
+        onChange(newDoc)
+        editorViewRef.current?.focus()
+      } catch (err) {
+        console.error('Upload failed', err)
+        toast.error(
+          mapApiError(
+            err,
+            t('markdownEditor.uploadErrorFallback', { filename: file.name }),
+          ).message,
+        )
+      }
+    },
+    [editorViewRef, maxAssetUploadSizeBytes, onChange, pageId, setMarkdown, t],
+  )
+
   // Handles paste requests.
   // This allows to paste images from clipboard directly into the editor.
   const handlePaste = useCallback(
@@ -190,62 +260,41 @@ const MarkdownEditor = (
       event.preventDefault()
       event.stopPropagation()
 
-      // Process each file
       for (const file of files) {
-        if (file.size > maxAssetUploadSizeBytes) {
-          toast.error(
-            t('markdownEditor.fileTooLarge', {
-              maxSize: formatBytes(maxAssetUploadSizeBytes),
-            }),
-          )
-          continue
-        }
-
-        // Upload each file
-        try {
-          const res: UploadAssetResponse = await uploadAsset(pageId, file)
-
-          toast.success(
-            t('markdownEditor.uploadedToast', { filename: file.name }),
-          )
-
-          // The result of uploadAsset looks like this:
-          // {"file":"/assets/0NmpvSivg/preview-scrollbar.gif"}
-          const uploadedFile = res.file
-          const ext = file.name.split('.').pop()?.toLowerCase()
-
-          const isImage =
-            file.type.startsWith('image/') ||
-            IMAGE_EXTENSIONS.includes(ext ?? '')
-
-          const markdown = isImage
-            ? `![${file.name}](${uploadedFile})\n`
-            : `[${file.name}](${uploadedFile})\n`
-
-          const view = editorViewRef.current
-          if (!view) continue
-          const { from } = view.state.selection.main
-          view.dispatch({
-            changes: { from, insert: markdown },
-            selection: { anchor: from + markdown.length },
-          })
-
-          const newDoc = view.state.doc.toString()
-          setMarkdown(newDoc)
-          onChange(newDoc)
-          editorViewRef.current?.focus()
-        } catch (err) {
-          console.error('Upload failed', err)
-          toast.error(
-            mapApiError(
-              err,
-              t('markdownEditor.uploadErrorFallback', { filename: file.name }),
-            ).message,
-          )
-        }
+        await uploadFileToEditor(file)
       }
     },
-    [editorViewRef, maxAssetUploadSizeBytes, onChange, pageId, setMarkdown, t],
+    [uploadFileToEditor],
+  )
+
+  // Dropping a file onto the editor is otherwise unhandled and falls through
+  // to the browser's native contenteditable behavior — which inlines images
+  // as bulky base64 data URIs and does nothing useful for a PDF or any other
+  // file type. Intercept every file drop and upload through the same path as
+  // paste, inserting at the drop point instead of wherever the text cursor
+  // happens to be. Only the first file anchors to the drop point; the rest
+  // chain off the cursor position paste itself just advanced to, the same
+  // way a multi-file paste stacks its insertions.
+  const handleDrop = useCallback(
+    async (event: DragEvent<HTMLDivElement>) => {
+      const files = Array.from(event.dataTransfer?.files ?? [])
+      if (files.length === 0) {
+        return
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+
+      const view = editorViewRef.current
+      const dropPos =
+        view?.posAtCoords({ x: event.clientX, y: event.clientY }) ??
+        view?.state.selection.main.from
+
+      for (let i = 0; i < files.length; i++) {
+        await uploadFileToEditor(files[i], i === 0 ? dropPos : undefined)
+      }
+    },
+    [editorViewRef, uploadFileToEditor],
   )
 
   useEffect(() => {
@@ -698,7 +747,7 @@ const MarkdownEditor = (
   }, [assetVersion, debouncedPreview, setPreviewRef, path])
 
   return (
-    <div className="markdown-editor" onPaste={handlePaste}>
+    <div className="markdown-editor" onPaste={handlePaste} onDrop={handleDrop}>
       {/* Mobile */}
       {isMobile && (
         <div className="markdown-editor__mobile">

@@ -65,3 +65,5 @@ export const IMAGE_EXTENSIONS = [
 export const AUDIO_EXTENSIONS = ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac']
 
 export const VIDEO_EXTENSIONS = ['mp4', 'webm', 'ogv', 'mov', 'm4v']
+
+export const PDF_EXTENSIONS = ['pdf']

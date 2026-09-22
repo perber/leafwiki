@@ -4,6 +4,7 @@ import { mapApiError } from '@/lib/api/errors'
 import {
   AUDIO_EXTENSIONS,
   IMAGE_EXTENSIONS,
+  PDF_EXTENSIONS,
   VIDEO_EXTENSIONS,
 } from '@/lib/config'
 import { withBasePath } from '@/lib/routePath'
@@ -18,6 +19,7 @@ import { AssetPreviewTooltip } from './AssetPreviewTooltip'
 const imageExtensions = IMAGE_EXTENSIONS
 const audioExtensions = AUDIO_EXTENSIONS
 const videoExtensions = VIDEO_EXTENSIONS
+const pdfExtensions = PDF_EXTENSIONS
 
 type Props = {
   pageId: string
@@ -52,7 +54,9 @@ export function AssetItem({
   const isImage = imageExtensions.includes(ext ?? '')
   const isAudio = audioExtensions.includes(ext ?? '')
   const isVideo = videoExtensions.includes(ext ?? '')
+  const isPdf = pdfExtensions.includes(ext ?? '')
   const isPlayableMedia = isAudio || isVideo
+  const isEmbeddable = isImage || isPdf
   const baseName = filename.split('/').pop() ?? filename
   const isEditing = editingFilename === filename
   const registerHotkey = useHotKeysStore((s) => s.registerHotkey)
@@ -127,7 +131,7 @@ export function AssetItem({
       return `[${baseName}](${markdownAssetUrl})\n`
     }
 
-    return isImage
+    return isEmbeddable
       ? `![${baseName}](${markdownAssetUrl})\n`
       : `[${baseName}](${markdownAssetUrl})\n`
   }
@@ -226,7 +230,7 @@ export function AssetItem({
           </>
         ) : (
           <>
-            {isImage && (
+            {isEmbeddable && (
               <Button
                 variant="outline"
                 size="icon"
@@ -235,7 +239,9 @@ export function AssetItem({
                   e.stopPropagation()
                   handleInsertLink()
                 }}
-                title={t('item.insertImageLink')}
+                title={
+                  isImage ? t('item.insertImageLink') : t('item.insertPdfLink')
+                }
                 data-testid="asset-insert-link-button"
               >
                 <Link2 size={16} />
@@ -268,7 +274,13 @@ export function AssetItem({
                 e.stopPropagation()
                 handleInsertMarkdown()
               }}
-              title={isImage ? t('item.insertImage') : t('item.insertLink')}
+              title={
+                isImage
+                  ? t('item.insertImage')
+                  : isPdf
+                    ? t('item.insertPdf')
+                    : t('item.insertLink')
+              }
               data-testid="asset-insert-default-button"
             >
               <FileText size={16} />

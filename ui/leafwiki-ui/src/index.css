@@ -2306,6 +2306,24 @@
     max-width: 100%;
   }
 
+  .markdown-editor__preview .markdown-pdf-embed,
+  .page-viewer__content .markdown-pdf-embed,
+  .page-history__preview-body .markdown-pdf-embed {
+    @apply my-4 block max-w-full;
+  }
+
+  .markdown-editor__preview .markdown-pdf-embed__frame,
+  .page-viewer__content .markdown-pdf-embed__frame,
+  .page-history__preview-body .markdown-pdf-embed__frame {
+    @apply border-border bg-surface block h-[600px] w-full rounded-md border;
+  }
+
+  .markdown-editor__preview .markdown-pdf-embed__open-link,
+  .page-viewer__content .markdown-pdf-embed__open-link,
+  .page-history__preview-body .markdown-pdf-embed__open-link {
+    @apply text-muted-foreground mt-1 inline-flex items-center gap-1 text-xs no-underline hover:underline;
+  }
+
   .table-wrapper {
     @apply max-w-full overflow-auto;
   }
