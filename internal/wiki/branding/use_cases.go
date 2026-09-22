@@ -43,7 +43,9 @@ func (uc *GetBrandingUseCase) Execute(_ context.Context) (*GetBrandingOutput, er
 // ─── UpdateBrandingUseCase ───────────────────────────────────────────────────
 
 type UpdateBrandingInput struct {
-	SiteName string
+	SiteName        string
+	NotFoundTitle   string
+	NotFoundMessage string
 }
 
 type UpdateBrandingUseCase struct {
@@ -55,7 +57,11 @@ func NewUpdateBrandingUseCase(b *corebanding.BrandingService) *UpdateBrandingUse
 }
 
 func (uc *UpdateBrandingUseCase) Execute(_ context.Context, in UpdateBrandingInput) (*GetBrandingOutput, error) {
-	if err := uc.branding.UpdateBranding(in.SiteName); err != nil {
+	if err := uc.branding.UpdateBranding(corebanding.UpdateBrandingInput{
+		SiteName:        in.SiteName,
+		NotFoundTitle:   in.NotFoundTitle,
+		NotFoundMessage: in.NotFoundMessage,
+	}); err != nil {
 		return nil, err
 	}
 	cfg, err := uc.branding.GetBranding()
