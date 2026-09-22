@@ -1,0 +1,19 @@
+{
+  "menuLabel": "Accès public",
+  "pageTitle": "Accès public",
+  "sectionTitle": "Mode public",
+  "sectionDescription": "Lorsque le mode public est activé, chaque page peut être lue sans se connecter. La modification nécessite toujours un compte.",
+  "statusOn": "Le mode public est activé — chaque page est lisible sans connexion.",
+  "statusOff": "Le mode public est désactivé — les visiteurs doivent se connecter pour lire les pages.",
+  "enableButton": "Activer le mode public",
+  "disableButton": "Désactiver le mode public",
+  "confirmTitle": "Rendre toutes les pages publiques ?",
+  "confirmDescription": "Toute personne pouvant accéder à ce site pourra lire toutes les pages sans compte. Vous pourrez désactiver cela à tout moment.",
+  "confirmAction": "Activer le mode public",
+  "cancel": "Annuler",
+  "enabledToast": "Le mode public est maintenant activé",
+  "disabledToast": "Le mode public est maintenant désactivé",
+  "updateError": "Impossible de mettre à jour le mode public",
+  "envManagedTitle": "Défini par la configuration d’environnement",
+  "envManagedDescription": "Le mode public est contrôlé par le paramètre LEAFWIKI_PUBLIC_ACCESS / --public-access (ou --disable-auth) de cette instance et ne peut être modifié qu’à cet endroit."
+}

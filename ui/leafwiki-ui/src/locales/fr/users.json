@@ -1,0 +1,124 @@
+{
+  "pageTitle": "Gestion des utilisateurs",
+  "loading": "Chargement des utilisateurs…",
+  "loadErrorFallback": "Erreur lors du chargement des utilisateurs",
+  "noUsersFound": "Aucun utilisateur trouvé.",
+  "columns": {
+    "username": "Nom d'utilisateur",
+    "email": "E-mail",
+    "role": "Rôle",
+    "actions": "Actions"
+  },
+  "actions": {
+    "edit": "Modifier",
+    "new": "Nouvel utilisateur",
+    "changePassword": "Modifier le mot de passe",
+    "delete": "Supprimer"
+  },
+  "invite": {
+    "pendingPill": "Invitation en attente",
+    "resendAction": "Renvoyer l'invitation",
+    "resending": "Renvoi…",
+    "resendSuccessToast": "E-mail d'invitation renvoyé",
+    "resendErrorFallback": "Erreur lors du renvoi de l'invitation",
+    "emailNotSentWarning": "Utilisateur créé, mais l'e-mail d'invitation n'a pas pu être envoyé. Utilisez \"Renvoyer l'invitation\" pour réessayer."
+  },
+  "validation": {
+    "passwordTooShort": "Le mot de passe doit comporter au moins 8 caractères",
+    "passwordsDoNotMatch": "Les mots de passe ne correspondent pas"
+  },
+  "changePasswordDialog": {
+    "title": "Modifier le mot de passe de {{username}}",
+    "description": "Définir un nouveau mot de passe pour l'utilisateur.",
+    "cancel": "Annuler",
+    "update": "Mettre à jour le mot de passe",
+    "updating": "Mise à jour…",
+    "newPasswordLabel": "Nouveau mot de passe",
+    "confirmPasswordLabel": "Confirmer le mot de passe",
+    "successToast": "Mot de passe modifié avec succès",
+    "errorFallback": "Erreur lors de la mise à jour du mot de passe"
+  },
+  "userForm": {
+    "editTitle": "Modifier l'utilisateur",
+    "newTitle": "Nouvel utilisateur",
+    "editDescription": "Modifier les détails de l'utilisateur",
+    "newDescription": "Créer un nouvel utilisateur",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "successToast": "Utilisateur enregistré avec succès",
+    "errorFallback": "Erreur lors de l'enregistrement de l'utilisateur",
+    "usernameLabel": "Nom d'utilisateur",
+    "usernamePlaceholder": "Nom d'utilisateur",
+    "emailLabel": "E-mail",
+    "emailPlaceholder": "E-mail",
+    "passwordLabel": "Mot de passe",
+    "passwordPlaceholder": "Mot de passe",
+    "rolePlaceholder": "Sélectionner un rôle",
+    "roleViewer": "Lecteur",
+    "roleEditor": "Éditeur",
+    "roleAdmin": "Administrateur",
+    "modeSetPassword": "Définir le mot de passe maintenant",
+    "modeInvite": "Envoyer un e-mail d'invitation",
+    "inviteSuccessToast": "Invitation envoyée avec succès"
+  },
+  "deleteUser": {
+    "title": "Supprimer l'utilisateur ?",
+    "description": "Voulez-vous vraiment supprimer cet utilisateur ? Cette action est irréversible.",
+    "cancel": "Annuler",
+    "deleting": "Suppression…",
+    "delete": "Supprimer",
+    "successToast": "Utilisateur supprimé avec succès",
+    "errorFallback": "Impossible de supprimer l'utilisateur. Veuillez réessayer.",
+    "body": "L'utilisateur <strong>{{username}}</strong> sera définitivement supprimé du système."
+  },
+  "changeOwnPassword": {
+    "title": "Modifier mon mot de passe",
+    "description": "Modifiez votre mot de passe. Assurez-vous de le retenir !",
+    "cancel": "Annuler",
+    "saving": "Enregistrement…",
+    "save": "Enregistrer",
+    "successToast": "Mot de passe modifié avec succès",
+    "errorFallback": "Erreur lors de la mise à jour du mot de passe",
+    "oldPasswordLabel": "Ancien mot de passe",
+    "newPasswordLabel": "Nouveau mot de passe",
+    "confirmPasswordLabel": "Confirmer le mot de passe"
+  },
+  "totp": {
+    "column": "2FA",
+    "enabled": "Activé",
+    "disabled": "Désactivé",
+    "menuEnable": "Activer l'authentification à deux facteurs",
+    "menuDisable": "Désactiver l'authentification à deux facteurs",
+    "cancel": "Annuler",
+    "setup": {
+      "passwordStepTitle": "Activer l'authentification à deux facteurs",
+      "passwordStepDescription": "Confirmez votre mot de passe actuel pour démarrer la configuration.",
+      "passwordPlaceholder": "Mot de passe actuel",
+      "continue": "Continuer",
+      "continuing": "Vérification…",
+      "verifyStepTitle": "Scannez le code QR",
+      "verifyStepDescription": "Scannez ce code QR avec votre application d'authentification, ou saisissez la clé manuellement. Puis entrez le code à 6 chiffres affiché.",
+      "manualKeyLabel": "Clé de saisie manuelle",
+      "codePlaceholder": "Code à 6 chiffres",
+      "enable": "Activer",
+      "enabling": "Vérification…",
+      "recoveryStepTitle": "Enregistrez vos codes de récupération",
+      "recoveryStepDescription": "Conservez ces codes dans un endroit sûr. Chacun peut être utilisé une fois pour vous connecter si vous perdez l'accès à votre application d'authentification. Ils ne seront plus affichés.",
+      "copyRecoveryCodes": "Copier les codes",
+      "recoveryCodesCopied": "Codes de récupération copiés dans le presse-papiers",
+      "done": "Terminé",
+      "successToast": "Authentification à deux facteurs activée",
+      "errorFallback": "Impossible d'activer l'authentification à deux facteurs"
+    },
+    "disable": {
+      "title": "Désactiver l'authentification à deux facteurs",
+      "description": "Confirmez votre mot de passe actuel et un code de votre application d'authentification ou un code de récupération.",
+      "passwordPlaceholder": "Mot de passe actuel",
+      "codePlaceholder": "Code ou code de récupération",
+      "confirm": "Désactiver",
+      "disabling": "Désactivation…",
+      "successToast": "Authentification à deux facteurs désactivée",
+      "errorFallback": "Impossible de désactiver l'authentification à deux facteurs"
+    }
+  }
+}

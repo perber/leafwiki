@@ -1,0 +1,30 @@
+{
+  "menuLabel": "Liens brisés",
+  "pageTitle": "Liens brisés",
+  "title": "Liens brisés",
+  "description": "Recherchez les pages qui pointent vers des pages wiki manquantes.",
+  "heading": "Pages manquantes",
+  "sortLabel": "Triées par ordre alphabétique",
+  "linksTo": "pointe vers",
+  "loading": "Chargement des liens brisés…",
+  "button": {
+    "text": "Actualiser",
+    "refreshing": "Actualisation…"
+  },
+  "summaryCard": {
+    "broken": "Liens brisés",
+    "missing": "Pages manquantes",
+    "affected": "Pages concernées"
+  },
+  "groupCard": {
+    "reference": "référence",
+    "references": "références"
+  },
+  "empty": {
+    "title": "Aucun lien brisé",
+    "description": "Tous les liens du wiki pointent vers des pages existantes."
+  },
+  "error": {
+    "loadFailed": "Impossible de charger les liens brisés."
+  }
+}
