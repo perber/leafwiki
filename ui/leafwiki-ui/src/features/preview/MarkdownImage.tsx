@@ -1,7 +1,7 @@
+import { versionAssetSrc } from '@/lib/assetSrc'
 import { DIALOG_IMAGE_PREVIEW } from '@/lib/registries'
-import { withBasePath } from '@/lib/routePath'
 import { useDialogsStore } from '@/stores/dialogs'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 
 type MarkdownImageProps = React.ImgHTMLAttributes<HTMLImageElement> & {
   resolveAssetUrl?: (src: string) => string
@@ -17,18 +17,6 @@ function shouldOpenInNewTab(e: React.MouseEvent<HTMLImageElement>) {
   return e.button === 0 && (e.metaKey || e.ctrlKey)
 }
 
-function normalizeImageSrc(src: string) {
-  if (src.startsWith('/assets/') || src.startsWith('/api/')) {
-    return withBasePath(src)
-  }
-
-  if (src.startsWith('assets/')) {
-    return withBasePath(`/${src}`)
-  }
-
-  return src
-}
-
 export function MarkdownImage({
   src = '',
   style,
@@ -42,30 +30,10 @@ export function MarkdownImage({
     () => resolveAssetUrl?.(src) ?? src,
     [resolveAssetUrl, src],
   )
-  const [versionedSrc, setVersionedSrc] = useState(() =>
-    normalizeImageSrc(resolvedSrc),
+  const versionedSrc = useMemo(
+    () => versionAssetSrc(resolvedSrc),
+    [resolvedSrc],
   )
-
-  useEffect(() => {
-    if (
-      !resolvedSrc?.startsWith('/assets/') &&
-      !resolvedSrc?.startsWith('assets/') &&
-      !resolvedSrc?.startsWith('/api/')
-    ) {
-      setVersionedSrc(normalizeImageSrc(resolvedSrc))
-      return
-    }
-
-    try {
-      const url = new URL(normalizeImageSrc(resolvedSrc), location.origin)
-      if (!url.searchParams.has('v')) {
-        url.searchParams.set('v', Date.now().toString())
-      }
-      setVersionedSrc(url.toString())
-    } catch {
-      setVersionedSrc(normalizeImageSrc(resolvedSrc))
-    }
-  }, [resolvedSrc])
 
   return (
     <img

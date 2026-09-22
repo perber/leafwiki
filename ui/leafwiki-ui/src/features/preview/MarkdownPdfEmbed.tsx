@@ -1,22 +1,10 @@
+import { versionAssetSrc } from '@/lib/assetSrc'
 import i18next from '@/lib/i18n'
-import { withBasePath } from '@/lib/routePath'
 import { ExternalLink } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 
 type MarkdownPdfEmbedProps = React.ImgHTMLAttributes<HTMLImageElement> & {
   resolveAssetUrl?: (src: string) => string
-}
-
-function normalizePdfSrc(src: string) {
-  if (src.startsWith('/assets/') || src.startsWith('/api/')) {
-    return withBasePath(src)
-  }
-
-  if (src.startsWith('assets/')) {
-    return withBasePath(`/${src}`)
-  }
-
-  return src
 }
 
 // A `#page=N` fragment on the source (e.g. `manual.pdf#page=3`) is a standard
@@ -33,36 +21,16 @@ export function MarkdownPdfEmbed({
     () => resolveAssetUrl?.(src) ?? src,
     [resolveAssetUrl, src],
   )
-  const [versionedSrc, setVersionedSrc] = useState(() =>
-    normalizePdfSrc(resolvedSrc),
+  const versionedSrc = useMemo(
+    () => versionAssetSrc(resolvedSrc),
+    [resolvedSrc],
   )
-
-  useEffect(() => {
-    if (
-      !resolvedSrc?.startsWith('/assets/') &&
-      !resolvedSrc?.startsWith('assets/') &&
-      !resolvedSrc?.startsWith('/api/')
-    ) {
-      setVersionedSrc(normalizePdfSrc(resolvedSrc))
-      return
-    }
-
-    try {
-      const url = new URL(normalizePdfSrc(resolvedSrc), location.origin)
-      if (!url.searchParams.has('v')) {
-        url.searchParams.set('v', Date.now().toString())
-      }
-      setVersionedSrc(url.toString())
-    } catch {
-      setVersionedSrc(normalizePdfSrc(resolvedSrc))
-    }
-  }, [resolvedSrc])
 
   return (
     <span className="markdown-pdf-embed" style={{ width: width || '100%' }}>
       <iframe
         src={versionedSrc}
-        title={alt || 'PDF'}
+        title={alt || i18next.t('pdfEmbed.defaultTitle', { ns: 'viewer' })}
         className="markdown-pdf-embed__frame"
         loading="lazy"
       />

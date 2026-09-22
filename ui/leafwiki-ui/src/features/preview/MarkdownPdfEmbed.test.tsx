@@ -21,6 +21,13 @@ describe('MarkdownPdfEmbed', () => {
     expect(src).toMatch(/\?v=\d+#page=3$/)
   })
 
+  it('falls back to a translated title when no alt text is given', () => {
+    render(<MarkdownPdfEmbed src="/assets/manual.pdf" />)
+
+    const frame = document.querySelector('iframe')
+    expect(frame?.getAttribute('title')).toBe('PDF')
+  })
+
   it('renders a fallback link to open the pdf in a new tab', () => {
     render(<MarkdownPdfEmbed src="https://example.com/doc.pdf" alt="Doc" />)
 

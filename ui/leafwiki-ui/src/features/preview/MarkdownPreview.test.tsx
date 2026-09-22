@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import type { PageNode } from '@/lib/api/pages'
+import * as assetSrcModule from '@/lib/assetSrc'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useDesignModeStore } from '@/features/designtoggle/designmode'
 import { useTreeStore } from '@/stores/tree'
@@ -166,6 +167,20 @@ echo two
     expect(frame?.getAttribute('src')).toBe(
       'https://example.com/manual.pdf#page=3',
     )
+  })
+
+  it('normalizes audio/video src through the shared assetSrc helper (no local duplicate)', () => {
+    const spy = vi.spyOn(assetSrcModule, 'normalizeAssetSrc')
+
+    const { container } = renderPreview(
+      '<audio controls src="/api/assets/page-1/note.mp3"></audio>',
+    )
+
+    expect(spy).toHaveBeenCalledWith('/api/assets/page-1/note.mp3')
+    const audio = container.querySelector('audio')
+    expect(audio?.getAttribute('src')).toBe('/api/assets/page-1/note.mp3')
+
+    spy.mockRestore()
   })
 
   it('renders inline code with its copy action', () => {
