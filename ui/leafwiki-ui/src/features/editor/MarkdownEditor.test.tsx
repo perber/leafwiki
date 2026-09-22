@@ -298,8 +298,10 @@ describe('MarkdownEditor – breakpoint remount preserves content', () => {
     expect(uploadAsset).toHaveBeenCalledWith('page-1', file)
   })
 
-  it('leaves a dropped image to the browser’s native handling', async () => {
-    vi.mocked(uploadAsset).mockClear()
+  it('uploads an image dropped directly onto the editor instead of leaving it to native handling', async () => {
+    vi.mocked(uploadAsset).mockResolvedValue({
+      file: '/assets/page-1/photo.png',
+    })
 
     const { container } = render(
       <MarkdownEditor initialValue="" pageId="page-1" onChange={vi.fn()} />,
@@ -312,6 +314,31 @@ describe('MarkdownEditor – breakpoint remount preserves content', () => {
       fireEvent.drop(wrapper, { dataTransfer: { files: [file] } })
     })
 
-    expect(uploadAsset).not.toHaveBeenCalled()
+    expect(uploadAsset).toHaveBeenCalledWith('page-1', file)
+  })
+
+  it('uploads every file in a mixed-type drop instead of silently skipping some', async () => {
+    vi.mocked(uploadAsset)
+      .mockResolvedValueOnce({ file: '/assets/page-1/manual.pdf' })
+      .mockResolvedValueOnce({ file: '/assets/page-1/photo.png' })
+
+    const { container } = render(
+      <MarkdownEditor initialValue="" pageId="page-1" onChange={vi.fn()} />,
+    )
+
+    const wrapper = container.querySelector('.markdown-editor') as HTMLElement
+    const pdfFile = new File(['%PDF-1.4'], 'manual.pdf', {
+      type: 'application/pdf',
+    })
+    const imageFile = new File(['fake'], 'photo.png', { type: 'image/png' })
+
+    await act(async () => {
+      fireEvent.drop(wrapper, {
+        dataTransfer: { files: [pdfFile, imageFile] },
+      })
+    })
+
+    expect(uploadAsset).toHaveBeenCalledWith('page-1', pdfFile)
+    expect(uploadAsset).toHaveBeenCalledWith('page-1', imageFile)
   })
 })

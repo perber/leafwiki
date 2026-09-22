@@ -161,10 +161,13 @@ const MarkdownEditor = (
     )
   }, [editorPaneWidth])
 
-  // Uploads a single file and inserts its markdown reference at the cursor.
-  // Shared by paste-of-files and the PDF drag-and-drop handler below.
+  // Uploads a single file and inserts its markdown reference into the editor.
+  // Shared by paste-of-files and the drag-and-drop handler below. `insertPos`
+  // pins the insertion to a specific document offset (the drop point); when
+  // omitted, the cursor position at the time the upload resolves is used
+  // instead, which is what paste wants.
   const uploadFileToEditor = useCallback(
-    async (file: File) => {
+    async (file: File, insertPos?: number) => {
       if (file.size > maxAssetUploadSizeBytes) {
         toast.error(
           t('markdownEditor.fileTooLarge', {
@@ -198,7 +201,13 @@ const MarkdownEditor = (
 
         const view = editorViewRef.current
         if (!view) return
-        const { from } = view.state.selection.main
+        // The document may have changed while the upload was in flight;
+        // clamp a caller-supplied drop position to the current doc length
+        // so it can't land out of range.
+        const from =
+          insertPos !== undefined
+            ? Math.min(insertPos, view.state.doc.length)
+            : view.state.selection.main.from
         view.dispatch({
           changes: { from, insert: markdown },
           selection: { anchor: from + markdown.length },
@@ -258,31 +267,34 @@ const MarkdownEditor = (
     [uploadFileToEditor],
   )
 
-  const isPdfFile = useCallback((file: File) => {
-    const ext = file.name.split('.').pop()?.toLowerCase()
-    return file.type === 'application/pdf' || PDF_EXTENSIONS.includes(ext ?? '')
-  }, [])
-
   // Dropping a file onto the editor is otherwise unhandled and falls through
-  // to the browser's native contenteditable behavior, which inlines an image
-  // as a base64 data URI but does nothing useful for a PDF. Only intercept
-  // drops that are exclusively PDFs so every other drop (images included)
-  // keeps its existing native behavior unchanged.
+  // to the browser's native contenteditable behavior — which inlines images
+  // as bulky base64 data URIs and does nothing useful for a PDF or any other
+  // file type. Intercept every file drop and upload through the same path as
+  // paste, inserting at the drop point instead of wherever the text cursor
+  // happens to be. Only the first file anchors to the drop point; the rest
+  // chain off the cursor position paste itself just advanced to, the same
+  // way a multi-file paste stacks its insertions.
   const handleDrop = useCallback(
     async (event: DragEvent<HTMLDivElement>) => {
       const files = Array.from(event.dataTransfer?.files ?? [])
-      if (files.length === 0 || !files.every(isPdfFile)) {
+      if (files.length === 0) {
         return
       }
 
       event.preventDefault()
       event.stopPropagation()
 
-      for (const file of files) {
-        await uploadFileToEditor(file)
+      const view = editorViewRef.current
+      const dropPos =
+        view?.posAtCoords({ x: event.clientX, y: event.clientY }) ??
+        view?.state.selection.main.from
+
+      for (let i = 0; i < files.length; i++) {
+        await uploadFileToEditor(files[i], i === 0 ? dropPos : undefined)
       }
     },
-    [isPdfFile, uploadFileToEditor],
+    [editorViewRef, uploadFileToEditor],
   )
 
   useEffect(() => {
