@@ -686,40 +686,89 @@ func (s *SQLiteIndex) Search(query string, pageIDs []string, offset, limit int) 
 		}, nil
 	}
 
+	// For short queries (< 3 chars), trigram cannot form any 3-character
+	// window, so fall back to a LIKE substring search to improve recall.
+	// This makes 1-2 character Chinese/English searches work as substring matches.
+	useLikeFallback := len(query) < 3 && query != ""
+
 	sr := &SearchResult{TagFacets: []SearchTagFacet{}}
 
 	err := s.withDBRead(func(db *sql.DB) error {
 		var total int
-		whereClause, whereArgs := buildSearchWhereClause(ftsQuery, pageIDs)
+
+		// Build WHERE clause
+		var clauses []string
+		var args []interface{}
+
+		if ftsQuery != "" && !useLikeFallback {
+			clauses = append(clauses, "pages MATCH ?")
+			args = append(args, ftsQuery)
+		}
+
+		if useLikeFallback {
+			// LIKE fallback for short queries
+			likePattern := "%" + query + "%"
+			clauses = append(clauses, "(title LIKE ? OR headings LIKE ? OR content LIKE ?)")
+			args = append(args, likePattern, likePattern, likePattern)
+		}
+
+		if len(pageIDs) > 0 {
+			placeholders := strings.TrimSuffix(strings.Repeat("?,"), len(pageIDs)), ",")
+			clauses = append(clauses, fmt.Sprintf("pageID IN (%s)", placeholders))
+			for _, pageID := range pageIDs {
+				args = append(args, pageID)
+			}
+		}
+
+		whereClause := strings.Join(clauses, " AND ")
 
 		countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM pages WHERE %s;`, whereClause)
-		if err := db.QueryRow(countQuery, whereArgs...).Scan(&total); err != nil {
+		if err := db.QueryRow(countQuery, args...).Scan(&total); err != nil {
 			return err
 		}
 		sr.Count = total
 
-		searchQuery := fmt.Sprintf(`
-		SELECT 
-			pageID,
-			path,
-			kind,
-			%s AS highlighted_title,
-			%s AS excerpt,
-			content,
-			%s AS bm25_score
-		FROM pages
-		WHERE %s
-		ORDER BY %s
-		LIMIT ? OFFSET ?;
-	`,
-			searchTitleExpr(ftsQuery != ""),
-			searchExcerptExpr(ftsQuery != ""),
-			searchRankExpr(ftsQuery != ""),
-			whereClause,
-			searchOrderByExpr(ftsQuery != ""),
-		)
+		// Build SELECT query
+		var searchQuery string
+		if useLikeFallback {
+			searchQuery = fmt.Sprintf(`
+			SELECT 
+				pageID,
+				path,
+				kind,
+				title,
+				'',
+				content,
+				0.0
+			FROM pages
+			WHERE %s
+			ORDER BY title COLLATE NOCASE ASC
+			LIMIT ? OFFSET ?;
+		`, whereClause)
+		} else {
+			searchQuery = fmt.Sprintf(`
+			SELECT 
+				pageID,
+				path,
+				kind,
+				%s AS highlighted_title,
+				%s AS excerpt,
+				content,
+				%s AS bm25_score
+			FROM pages
+			WHERE %s
+			ORDER BY %s
+			LIMIT ? OFFSET ?;
+		`,
+				searchTitleExpr(ftsQuery != ""),
+				searchExcerptExpr(ftsQuery != ""),
+				searchRankExpr(ftsQuery != ""),
+				whereClause,
+				searchOrderByExpr(ftsQuery != ""),
+			)
+		}
 
-		queryArgs := append(append([]interface{}{}, whereArgs...), limit, offset)
+		queryArgs := append(append([]interface{}{}, args...), limit, offset)
 		rows, err := db.Query(searchQuery, queryArgs...)
 		if err != nil {
 			return err
@@ -739,14 +788,15 @@ func (s *SQLiteIndex) Search(query string, pageIDs []string, offset, limit int) 
 			if err := rows.Scan(&r.PageID, &r.Path, &r.Kind, &r.Title, &r.Excerpt, &content, &bm25Score); err != nil {
 				return err
 			}
-			r.Title = sanitizeSearchTitle(r.Title)
-			if strings.TrimSpace(r.Excerpt) == "" {
-				r.Excerpt = excerpt.FromBody(content)
-			}
 
-			if ftsQuery == "" {
+			if useLikeFallback {
+				r.Excerpt = excerpt.FromBody(content)
 				r.Rank = 1
 			} else {
+				r.Title = sanitizeSearchTitle(r.Title)
+				if strings.TrimSpace(r.Excerpt) == "" {
+					r.Excerpt = excerpt.FromBody(content)
+				}
 				// Convert bm25 score to a rank (lower score = higher rank)
 				if bm25Score < 0 {
 					bm25Score = 0
@@ -826,7 +876,7 @@ func buildSearchWhereClause(ftsQuery string, pageIDs []string) (string, []interf
 	}
 
 	if len(pageIDs) > 0 {
-		placeholders := strings.TrimSuffix(strings.Repeat("?,", len(pageIDs)), ",")
+		placeholders := strings.TrimSuffix(strings.Repeat("?,"), len(pageIDs)), ",")
 		clauses = append(clauses, fmt.Sprintf("pageID IN (%s)", placeholders))
 		for _, pageID := range pageIDs {
 			args = append(args, pageID)
