@@ -1,0 +1,59 @@
+{
+  "menu": { "title": "API 密钥" },
+  "page": {
+    "title": "API 密钥",
+    "heading": "API 密钥",
+    "loadErrorFallback": "加载 API 密钥出错"
+  },
+  "table": {
+    "name": "名称",
+    "owner": "所有者",
+    "role": "角色",
+    "expires": "过期时间",
+    "lastUsed": "最近使用",
+    "actions": "操作",
+    "loading": "正在加载 API 密钥…",
+    "empty": "未找到 API 密钥。",
+    "revoked": "已撤销"
+  },
+  "role": {
+    "admin": "管理员",
+    "editor": "编辑者",
+    "viewer": "查看者"
+  },
+  "create": {
+    "button": "新建 API 密钥",
+    "title": "新建 API 密钥",
+    "description": "为自动化或代理访问创建新的 API 密钥。",
+    "nameLabel": "名称",
+    "namePlaceholder": "如 research-agent",
+    "userPlaceholder": "选择所属用户",
+    "expiresLabel": "过期时间（可选）",
+    "roleHelper": "新密钥目前默认为查看者（只读）。",
+    "cancel": "取消",
+    "submit": "创建",
+    "successToast": "API 密钥创建成功",
+    "errorFallback": "创建 API 密钥出错"
+  },
+  "secret": {
+    "title": "API 密钥已创建",
+    "description": "请立即复制此密钥——它不会再次显示。",
+    "label": "密钥",
+    "copy": "复制",
+    "copiedToast": "已复制到剪贴板",
+    "copyErrorToast": "无法复制到剪贴板",
+    "helper": "完整密钥仅此一次显示，请妥善保存。",
+    "done": "完成"
+  },
+  "delete": {
+    "button": "撤销",
+    "title": "撤销 API 密钥？",
+    "description": "确定要撤销此 API 密钥吗？此操作无法撤销。",
+    "body": "API 密钥 <strong>{{name}}</strong> 将立即失效。任何使用它的代理或自动化都将失去访问权限。",
+    "cancel": "取消",
+    "confirm": "撤销",
+    "confirming": "撤销中…",
+    "successToast": "API 密钥撤销成功",
+    "errorFallback": "撤销 API 密钥失败，请重试。"
+  }
+}

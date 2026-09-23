@@ -1,0 +1,30 @@
+{
+  "menuLabel": "失效链接",
+  "pageTitle": "失效链接",
+  "title": "失效链接",
+  "description": "找出链接到不存在页面的页面。",
+  "heading": "缺失页面",
+  "sortLabel": "按字母排序",
+  "linksTo": "链接到",
+  "loading": "正在加载失效链接…",
+  "button": {
+    "text": "刷新",
+    "refreshing": "正在刷新…"
+  },
+  "summaryCard": {
+    "broken": "失效链接",
+    "missing": "缺失页面",
+    "affected": "受影响页面"
+  },
+  "groupCard": {
+    "reference": "次引用",
+    "references": "次引用"
+  },
+  "empty": {
+    "title": "没有失效链接",
+    "description": "Wiki 中所有链接都指向存在的页面。"
+  },
+  "error": {
+    "loadFailed": "加载失效链接失败。"
+  }
+}
