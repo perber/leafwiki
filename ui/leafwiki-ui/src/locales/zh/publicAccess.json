@@ -1,0 +1,19 @@
+{
+  "menuLabel": "公开访问",
+  "pageTitle": "公开访问",
+  "sectionTitle": "公开模式",
+  "sectionDescription": "开启公开模式后，无需登录即可阅读所有页面。编辑仍需登录账户。",
+  "statusOn": "公开模式已开启——无需登录即可阅读所有页面。",
+  "statusOff": "公开模式已关闭——访客必须登录才能阅读页面。",
+  "enableButton": "开启公开模式",
+  "disableButton": "关闭公开模式",
+  "confirmTitle": "将所有页面设为公开？",
+  "confirmDescription": "任何能访问本站点的人都可以无需账户阅读所有页面。你可以随时再次关闭。",
+  "confirmAction": "开启公开模式",
+  "cancel": "取消",
+  "enabledToast": "公开模式已开启",
+  "disabledToast": "公开模式已关闭",
+  "updateError": "无法更新公开访问设置",
+  "envManagedTitle": "由环境配置设定",
+  "envManagedDescription": "本实例的公开模式由 LEAFWIKI_PUBLIC_ACCESS / --public-access 设置（或 --disable-auth）控制，只能在该处修改。"
+}
