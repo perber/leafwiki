@@ -139,6 +139,9 @@
   "imagePreview": {
     "openInNewTab": "Ouvrir dans un nouvel onglet"
   },
+  "pdfEmbed": {
+    "defaultTitle": "PDF"
+  },
   "pageSwitcher": {
     "trigger": "Aller à la page",
     "triggerWithHotkey": "Aller à la page ({{hotkey}})",

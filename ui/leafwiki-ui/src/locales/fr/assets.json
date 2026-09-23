@@ -2,14 +2,14 @@
   "manager": {
     "title": "Ressources",
     "fileTooLarge": "Fichier trop volumineux. Taille maximale autorisée : {{maxTaille}}.",
-    "uploadErrorFallback": "Échec de l’envoi de la ressource",
+    "uploadErrorFallback": "Échec de l'envoi de la ressource",
     "dropzoneText": "Déposez des fichiers ici ou cliquez pour les envoyer",
     "maxFileSize": "Taille maximale : {{maxTaille}}",
     "uploading_one": "Envoi de {{count}} fichier…",
     "uploading_other": "Envoi de {{count}} fichiers…",
     "loading": "Chargement des ressources…",
     "empty": "Aucune ressource",
-    "tip": "Astuce : un double-clic insère le balisage par défaut. Les images peuvent aussi être ajoutées comme liens ; les fichiers audio et vidéo disposent d’un bouton d’insertion de lecteur."
+    "tip": "Astuce : un double-clic insère le balisage par défaut. Les images et les PDF peuvent aussi être ajoutés comme liens ; les fichiers audio et vidéo disposent d'un bouton d'insertion de lecteur."
   },
   "item": {
     "renameSuccess": "Ressource renommée",
@@ -18,10 +18,12 @@
     "deleteErrorFallback": "Échec de la suppression",
     "save": "Enregistrer",
     "cancel": "Annuler",
-    "insertImageLink": "Insérer un lien d’image",
+    "insertImageLink": "Insérer un lien d'image",
+    "insertPdfLink": "Insérer un lien PDF",
     "insertAudioPlayer": "Insérer un lecteur audio",
     "insertVideoPlayer": "Insérer un lecteur vidéo",
     "insertImage": "Insérer une image",
+    "insertPdf": "Insérer un PDF",
     "insertLink": "Insérer un lien",
     "rename": "Renommer",
     "delete": "Supprimer"
