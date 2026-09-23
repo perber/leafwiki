@@ -302,7 +302,7 @@ var searchColumns = map[string]bool{
 // rewriteColumnFilterField checks whether f looks like a deliberate FTS5
 // column filter (e.g. "content:search") naming one of the pages table's
 // real columns, as opposed to incidental punctuation with a colon in it —
-// a pasted URL ("http://example.com"), a Windows path ("c:\Users\foo"), or
+// a pasted URL ("http://example.com"), a Windows path ("c:\\Users\\foo"), or
 // a time ("10:30") all contain ":" but aren't column filters, and trusting
 // any colon-bearing field unconditionally (the pre-#1577 behavior) sends
 // SQLite a "no such column" error for all three.
@@ -435,7 +435,7 @@ func (s *SQLiteIndex) ensureSchema() error {
 				title,
 				headings,
 				content,
-				tokenize = "unicode61 tokenchars '` + searchTokenChars + `'"
+				tokenize = "trigram"
 			);
         `)
 		return err
@@ -590,8 +590,8 @@ func (s *SQLiteIndex) IndexPage(path string, filePath string, pageID string, tit
 
 // RemovePages removes multiple pages from the index in a single
 // transaction — the batch counterpart to RemovePage, used for subtree
-// deletes for the same reason IndexPages exists (one commit instead of
-// one per page).
+// deletes for the same reason IndexPages exists: one commit instead of
+// one per page.
 func (s *SQLiteIndex) RemovePages(pageIDs []string) error {
 	if len(pageIDs) == 0 {
 		return nil
@@ -782,7 +782,7 @@ func (s *SQLiteIndex) SearchPageIDs(query string, pageIDs []string) ([]string, e
 		ORDER BY %s;
 	`, searchRankExpr(ftsQuery != ""), whereClause, searchOrderByExpr(ftsQuery != ""))
 
-		rows, err := db.Query(searchQuery, whereArgs...)
+		rows, err := db.Query(searchQuery, queryArgs...)
 		if err != nil {
 			return err
 		}
