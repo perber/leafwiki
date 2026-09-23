@@ -109,7 +109,16 @@ func buildFuzzyQuery(q string) string {
 	for i := range fields {
 		sanitized[i] = sanitizeFTS5Field(fields, i)
 	}
-	return strings.Join(sanitized, " ")
+	result := strings.Join(sanitized, " ")
+
+	// For short queries (< 3 chars), trigram cannot form any 3-character
+	// window, so prefix-expand the query to improve recall. This makes
+	// 1-2 character Chinese/English searches work as prefix matches.
+	if len(q) < 3 {
+		return q + "*"
+	}
+
+	return result
 }
 
 // isNearFunctionCall reports whether q, trimmed, is shaped like a complete
@@ -782,7 +791,7 @@ func (s *SQLiteIndex) SearchPageIDs(query string, pageIDs []string) ([]string, e
 		ORDER BY %s;
 	`, searchRankExpr(ftsQuery != ""), whereClause, searchOrderByExpr(ftsQuery != ""))
 
-		rows, err := db.Query(searchQuery, queryArgs...)
+		rows, err := db.Query(searchQuery, whereArgs...)
 		if err != nil {
 			return err
 		}
