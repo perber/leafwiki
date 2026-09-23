@@ -1,0 +1,129 @@
+{
+  "common": {
+    "page": "页面",
+    "section": "章节",
+    "pageCapitalized": "页面",
+    "sectionCapitalized": "章节",
+    "cancel": "取消",
+    "errorPrefix": "错误：{{error}}",
+    "unknownError": "发生未知错误"
+  },
+  "addDialog": {
+    "slugNotGenerated": "无法生成路径，请手动输入。",
+    "slugStillGenerating": "请等待路径生成完成。",
+    "createdToast": "{{item}}已创建",
+    "createErrorFallback": "创建{{item}}出错",
+    "create": "创建",
+    "createAndEdit": "创建并编辑{{item}}",
+    "titlePage": "新建页面",
+    "titleSection": "新建章节",
+    "descriptionPage": "输入新页面的标题",
+    "descriptionSection": "输入新章节的标题",
+    "titleLabel": "标题",
+    "titlePlaceholder": "{{item}}标题",
+    "pathPrefix": "路径："
+  },
+  "moveDialog": {
+    "movedToast": "页面移动成功",
+    "moveErrorFallback": "移动{{item}}出错",
+    "title": "移动{{item}}",
+    "description": "为此{{item}}选择新的父级",
+    "move": "移动"
+  },
+  "deleteDialog": {
+    "loadReferencesErrorFallback": "加载页面引用失败",
+    "deletedToast": "{{item}}删除成功",
+    "deleteErrorFallback": "删除{{item}}出错",
+    "title": "删除{{item}}？",
+    "description": "确定要删除{{item}}“{{name}}”吗？此操作无法撤销。",
+    "deleting": "删除中…",
+    "delete": "删除",
+    "modifiedWarningTitle": "此页面已被其他用户修改。",
+    "modifiedWarningBody": "页面已刷新。仍要删除吗？",
+    "backlinksLoading": "正在检查哪些页面引用此页…",
+    "backlinksError": "无法加载页面引用。删除仍可进行，但无法显示链接影响。",
+    "backlinksWarning_one": "此页被 {{count}} 个页面引用。",
+    "backlinksWarning_other": "此页被 {{count}} 个页面引用。",
+    "backlinksWarningBody": "删除此页会使这些链接失效。",
+    "noBacklinks": "当前没有页面引用此页。",
+    "deleteSubpages": "同时删除所有子页面"
+  },
+  "sortDialog": {
+    "dragToReorder": "拖拽以排序",
+    "sortedToast": "{{item}}子项排序成功",
+    "sortErrorFallback": "排序{{item}}子项出错",
+    "title": "排序{{item}}子项",
+    "description": "拖拽排序、使用箭头，或选择排序方式。点击“保存”后生效。",
+    "save": "保存",
+    "sortAlphabetically": "按字母排序：",
+    "ascending": "A → Z",
+    "descending": "Z → A",
+    "sortSections": "章节分组：",
+    "sectionsFirst": "章节优先",
+    "sectionsLast": "章节在后"
+  },
+  "copyDialog": {
+    "slugNotGenerated": "无法生成路径，请手动输入。",
+    "slugStillGenerating": "请等待路径生成完成。",
+    "copiedToast": "{{item}}已复制",
+    "copyErrorFallback": "复制{{item}}出错",
+    "copyOfTitle": "{{title}}的副本",
+    "title": "复制{{item}}",
+    "description": "创建此{{item}}的副本",
+    "copying": "复制中…",
+    "copyAndEdit": "复制并编辑{{item}}",
+    "titleLabel": "标题",
+    "titlePlaceholder": "{{item}}标题",
+    "pathPrefix": "路径："
+  },
+  "permalinkDialog": {
+    "copyErrorToast": "无法复制永久链接",
+    "copiedToast": "永久链接已复制",
+    "title": "分享页面",
+    "description": "指向{{title}}的永久链接",
+    "close": "关闭",
+    "urlLabel": "永久链接",
+    "copyLink": "复制链接",
+    "openLink": "打开链接",
+    "purposeNote": "这是一个永久内部链接。即使页面被重命名或移动也依然有效，可放心收藏或被其他页面引用。",
+    "accessNote": "它不是公开链接。除非整个 Wiki 设为公开访问，否则收件人仍需登录才能打开。LeafWiki 无法在保持其他页面私密的同时单独公开某个页面。"
+  },
+  "createByPathDialog": {
+    "createdToast": "页面创建成功",
+    "createErrorFallback": "创建页面出错",
+    "title": "新建页面",
+    "description": "请输入标题",
+    "creating": "创建中…",
+    "create": "创建",
+    "createAndEdit": "创建并编辑",
+    "existsAlert": "该路径已存在页面。",
+    "lookupResultTitle": "路径查询结果：",
+    "segmentExists": "已存在",
+    "segmentWillBeCreated": "将被创建",
+    "titleLabel": "标题",
+    "titlePlaceholder": "页面标题",
+    "pathLabel": "路径",
+    "pathPlaceholder": "页面路径"
+  },
+  "select": {
+    "topLevel": "顶层",
+    "searchPlaceholder": "搜索页面…",
+    "searchAriaLabel": "搜索页面",
+    "noPagesFound": "未找到页面。",
+    "pagesAriaLabel": "页面"
+  },
+  "refactorDialog": {
+    "title": "更新引用？",
+    "description": "此更改会影响页面路径。继续前请查看受影响的页面。",
+    "saveWithoutRewrite": "不更新链接，直接保存",
+    "continue": "继续",
+    "oldPath": "旧路径：",
+    "newPath": "新路径：",
+    "updateLinksLabel": "自动更新引用页面上的链接",
+    "referencingPages": "引用页面（{{count}}）",
+    "noReferences": "没有页面引用此路径。"
+  },
+  "historyPage": {
+    "backToPage": "返回页面"
+  }
+}
