@@ -9,7 +9,7 @@ jobs:
     if: >-
       github.event.issue.pull_request &&
       contains(github.event.comment.body, '/create-test-image') &&
-      github.event.comment.author_association == 'OWNER'
+      contains(fromJSON('["OWNER", "COLLABORATOR"]'), github.event.comment.author_association)
 
     runs-on: ubuntu-latest
 
@@ -57,9 +57,18 @@ jobs:
         run: |
           SHA=$(echo "${{ steps.pr.outputs.sha }}" | cut -c1-7)
           VERSION=pr-${{ github.event.issue.number }}-$SHA
+          OWNER=${{ steps.vars.outputs.owner }}
 
           echo "Building image version: $VERSION"
 
-          make docker-build-publish \
-            VERSION=$VERSION \
-            REPO_OWNER=${{ steps.vars.outputs.owner }}
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --file Dockerfile \
+            --target final \
+            --build-arg APP_VERSION=$VERSION \
+            --tag ghcr.io/$OWNER/leafwiki:$VERSION \
+            --annotation "index:org.opencontainers.image.title=LeafWiki" \
+            --annotation "index:org.opencontainers.image.description=LeafWiki – A fast wiki for people who think in folders, not feeds" \
+            --sbom=true \
+            --provenance=mode=max \
+            --push .
