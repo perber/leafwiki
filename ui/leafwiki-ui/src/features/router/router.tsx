@@ -8,7 +8,7 @@ import {
   PageViewer,
   PermalinkRedirect,
   ResetPasswordPage,
-  RootRedirect,
+  RootPage,
 } from './lazy-routes'
 import { settingsSections } from '@/lib/registries/settingsSectionRegistry'
 import ExternalRedirect from '../auth/ExternalRedirect'
@@ -75,11 +75,11 @@ export const createLeafWikiRouter = (
         path: '/',
         element: isReadOnlyViewer ? (
           <ReadOnlyWrapper>
-            <RootRedirect />
+            <RootPage />
           </ReadOnlyWrapper>
         ) : (
           <AuthWrapper>
-            <RootRedirect />
+            <RootPage />
           </AuthWrapper>
         ),
       },
