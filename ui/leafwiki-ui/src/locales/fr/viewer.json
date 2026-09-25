@@ -28,6 +28,7 @@
   },
   "mermaid": {
     "renderError": "Impossible de rendre le diagramme Mermaid.",
+    "chunkLoadError": "Ce diagramme n'a pas pu être chargé car une nouvelle version de LeafWiki est disponible. Rechargez la page pour résoudre ce problème.",
     "noSvgOutput": "Aucun élément SVG dans la sortie Mermaid"
   },
   "headline": {

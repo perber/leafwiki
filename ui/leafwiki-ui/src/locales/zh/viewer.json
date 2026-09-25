@@ -28,6 +28,7 @@
   },
   "mermaid": {
     "renderError": "无法渲染 Mermaid 图表。",
+    "chunkLoadError": "由于有新版本的 LeafWiki 可用,此图表无法加载。请重新加载页面以解决此问题。",
     "noSvgOutput": "Mermaid 输出中没有 SVG 元素"
   },
   "headline": {
