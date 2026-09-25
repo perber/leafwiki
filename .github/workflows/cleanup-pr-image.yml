@@ -1,7 +1,7 @@
 name: Cleanup PR test images
 
 on:
-  pull_request:
+  pull_request_target:
     types: [closed]
 
   schedule:
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   cleanup-closed-pr:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request_target'
     runs-on: ubuntu-latest
 
     steps:
