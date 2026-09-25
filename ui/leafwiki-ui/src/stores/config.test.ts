@@ -117,12 +117,12 @@ describe('loadConfig defaultLanguage', () => {
   it('ignores an unrecognized defaultLanguage', async () => {
     ;(configApi.getConfig as Mock).mockResolvedValueOnce({
       ...baseConfig,
-      defaultLanguage: 'fr',
+      defaultLanguage: 'xx',
     })
 
     await useConfigStore.getState().loadConfig()
 
     expect(i18next.language).toBe('en')
-    expect(useConfigStore.getState().defaultLanguage).toBe('fr')
+    expect(useConfigStore.getState().defaultLanguage).toBe('xx')
   })
 })

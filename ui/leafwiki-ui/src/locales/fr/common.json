@@ -8,11 +8,11 @@
     "body": "Une erreur inattendue s'est produite. Recharger la page résout généralement le problème.",
     "reloadButton": "Recharger la page",
     "tryRecoverButton": "Essayer de récupérer",
-    "detailsSummary": "Détails de l’erreur"
+    "detailsSummary": "Détails de l'erreur"
   },
   "page404": {
     "heading": "Page introuvable",
-    "body": "La page que vous recherchez n’existe pas.",
+    "body": "La page que vous recherchez n'existe pas.",
     "createPrompt": "Créez la page en cliquant sur le bouton ci-dessous.",
     "createButton": "Créer la page"
   },

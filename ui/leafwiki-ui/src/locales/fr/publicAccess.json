@@ -14,6 +14,6 @@
   "enabledToast": "Le mode public est maintenant activé",
   "disabledToast": "Le mode public est maintenant désactivé",
   "updateError": "Impossible de mettre à jour le mode public",
-  "envManagedTitle": "Défini par la configuration d’environnement",
-  "envManagedDescription": "Le mode public est contrôlé par le paramètre LEAFWIKI_PUBLIC_ACCESS / --public-access (ou --disable-auth) de cette instance et ne peut être modifié qu’à cet endroit."
+  "envManagedTitle": "Défini par la configuration d'environnement",
+  "envManagedDescription": "Le mode public est contrôlé par le paramètre LEAFWIKI_PUBLIC_ACCESS / --public-access (ou --disable-auth) de cette instance et ne peut être modifié qu'à cet endroit."
 }
