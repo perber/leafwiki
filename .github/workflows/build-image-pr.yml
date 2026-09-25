@@ -15,10 +15,22 @@ jobs:
 
     permissions:
       contents: read
+      issues: write
       pull-requests: write
       packages: write
 
     steps:
+      - name: React to triggering comment
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: '+1',
+            });
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
 
@@ -54,10 +66,12 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build & Push Docker image
+        id: build
         run: |
           SHA=$(echo "${{ steps.pr.outputs.sha }}" | cut -c1-7)
           VERSION=pr-${{ github.event.issue.number }}-$SHA
           OWNER=${{ steps.vars.outputs.owner }}
+          IMAGE=ghcr.io/$OWNER/leafwiki:$VERSION
 
           echo "Building image version: $VERSION"
 
@@ -66,9 +80,23 @@ jobs:
             --file Dockerfile \
             --target final \
             --build-arg APP_VERSION=$VERSION \
-            --tag ghcr.io/$OWNER/leafwiki:$VERSION \
+            --tag $IMAGE \
             --annotation "index:org.opencontainers.image.title=LeafWiki" \
             --annotation "index:org.opencontainers.image.description=LeafWiki – A fast wiki for people who think in folders, not feeds" \
             --sbom=true \
             --provenance=mode=max \
             --push .
+
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Comment image reference on PR
+        if: success()
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `🐳 Test image built: \`${{ steps.build.outputs.image }}\`\n\n\`\`\`\ndocker pull ${{ steps.build.outputs.image }}\n\`\`\``,
+            });
