@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { isDynamicImportChunkError } from '@/lib/dynamicImportError'
 import i18next from '@/lib/i18n'
+import { useEffect, useRef } from 'react'
 
 type MermaidDefault = (typeof import('mermaid'))['default']
 
@@ -36,12 +37,17 @@ async function ensureMermaidInitialized(
   return mermaid
 }
 
+export type MermaidRenderError = {
+  message: string
+  isChunkLoadError: boolean
+}
+
 export type MermaidInjectorOps = {
   containerRef: React.RefObject<HTMLDivElement | null>
   code: string
   dataLine?: string
   theme: 'default' | 'dark'
-  onError: (message: string | null) => void
+  onError: (error: MermaidRenderError | null) => void
 }
 
 function djb2(str: string) {
@@ -172,7 +178,10 @@ export function useMermaidInjector({
         lastHashRef.current = null
         const message = error instanceof Error ? error.message : String(error)
         console.warn('Mermaid diagram could not be rendered:', message)
-        onError(message)
+        onError({
+          message,
+          isChunkLoadError: isDynamicImportChunkError(message),
+        })
       }
     }
 
