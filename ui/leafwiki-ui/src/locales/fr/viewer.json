@@ -1,0 +1,259 @@
+{
+  "layout": {
+    "toggleSidebar": "Afficher/masquer la barre latérale",
+    "resizeSidebar": "Redimensionner la barre latérale",
+    "closeSidebar": "Fermer la barre latérale"
+  },
+  "breadcrumbs": {
+    "navAriaLabel": "Fil d'Ariane"
+  },
+  "section": {
+    "overviewTitle": "Aperçu de '{{title}}'",
+    "overviewDescriptionBase": "Cette page est l'aperçu par défaut de la section et liste ses pages et sections.",
+    "overviewDescriptionEditorHint": "Lors de l'édition de cette page, vous pouvez définir une page d'accueil personnalisée pour la section.",
+    "overviewDescriptionReadOnly": "Cette page est un aperçu auto-généré de la section.",
+    "emptyTitle": "Cette section est vide.",
+    "emptyDescriptionEditor": "La section {{title}} ne contient encore aucune page ni section. Commencez par ajouter une nouvelle page ou créez une nouvelle section.",
+    "emptyDescriptionReadOnly": "La section {{title}} ne contient encore aucune page ni section.",
+    "addPage": "Ajouter une page",
+    "addSection": "Ajouter une section",
+    "subpagesAriaLabel": "Sous-pages de {{title}}",
+    "sectionSuffix": "(Section)",
+    "updatedByLabel": "Mis à jour par {{editor}} · {{time}}",
+    "updatedLabel": "Mis à jour {{time}}"
+  },
+  "markdownPreview": {
+    "renderError": "Cette page contient du Markdown qui n'a pas pu être rendu de manière sécurisée.",
+    "brokenLinkTooltip": "Cette page n'existe pas encore."
+  },
+  "mermaid": {
+    "renderError": "Impossible de rendre le diagramme Mermaid.",
+    "noSvgOutput": "Aucun élément SVG dans la sortie Mermaid"
+  },
+  "headline": {
+    "linkToSection": "Lien vers la section"
+  },
+  "backlinks": {
+    "errorPrefix": "Erreur : {{error}}",
+    "pageIdRequired": "L'identifiant de la page est requis",
+    "fetchFailedFallback": "Impossible de récupérer le statut des liens",
+    "referencedBy": "Référencé par",
+    "loading": "Chargement…",
+    "noReferences": "Aucune page ne référence cette page.",
+    "brokenLinks": "Liens brisés",
+    "noBrokenLinks": "Aucun lien brisé.",
+    "brokenOutgoingsTitle": "Cette page contient des liens vers des cibles manquantes",
+    "brokenIncomingTitle": "Pages pointant vers un ancien chemin"
+  },
+  "pinned": {
+    "sectionTitle": "Épinglées",
+    "pagesSectionTitle": "Pages",
+    "pinPage": "Épingler",
+    "unpinPage": "Désépingler",
+    "pinSuccess": "Page épinglée",
+    "unpinSuccess": "Page désépinglée",
+    "pinError": "Impossible de mettre à jour le statut d'épingle",
+    "togglePinnedSection": "Afficher/masquer la section épinglée",
+    "togglePagesSection": "Afficher/masquer la section des pages",
+    "unpinPageAriaLabel": "Désépingler la page"
+  },
+  "favorites": {
+    "sectionTitle": "Favoris",
+    "addFavorite": "Ajouter aux favoris",
+    "removeFavorite": "Retirer des favoris",
+    "addSuccess": "Ajouté aux favoris",
+    "removeSuccess": "Retiré des favoris",
+    "favoriteError": "Impossible de mettre à jour les favoris",
+    "toggleFavoritesSection": "Afficher/masquer la section des favoris"
+  },
+  "toc": {
+    "title": "Table des matières",
+    "onThisPage": "Sur cette page",
+    "downloads": "Médias joints",
+    "collapse": "Réduire la table des matières",
+    "expand": "Développer la table des matières"
+  },
+  "toolbar": {
+    "moreActions": "Plus d'actions",
+    "expandAll": "Tout développer",
+    "collapseAll": "Tout réduire",
+    "sortPages": "Trier les pages",
+    "refresh": "Actualiser l'explorateur",
+    "refreshSuccess": "Explorateur actualisé",
+    "refreshError": "Échec de l'actualisation",
+    "refreshAlreadyRunning": "Actualisation déjà en cours",
+    "refreshPullFailed": "Échec de la récupération des modifications distantes",
+    "syncJobLostFallback": "Tâche de synchronisation perdue — le serveur a peut-être redémarré"
+  },
+  "pageToolbar": {
+    "itemPage": "Page",
+    "itemSection": "Section",
+    "editButton": "Modifier {{item}}",
+    "shareButton": "Partager {{item}}",
+    "printButton": "Imprimer {{item}}",
+    "copyButton": "Copier {{item}}",
+    "deleteButton": "Supprimer {{item}}",
+    "historyButton": "Historique de {{item}}"
+  },
+  "treeActions": {
+    "loading": "Chargement…",
+    "loadErrorPrefix": "Erreur : {{error}}",
+    "createNewPageTooltip": "Créer une page",
+    "createNewSectionTooltip": "Créer une section",
+    "untitledPage": "Page sans titre",
+    "convertedToast": "Page convertie avec succès",
+    "conflictRetryMessage": "Cette page a été modifiée par un autre utilisateur. Veuillez réessayer.",
+    "convertErrorFallback": "Impossible de convertir la page",
+    "renameEditingWarning": "{{item}} est actuellement en cours d'édition. Veuillez utiliser la barre de titre de l'éditeur pour le renommer.",
+    "renamedToast": "{{item}} renommé(e) avec succès",
+    "renameErrorFallback": "Impossible de renommer la page",
+    "deleteEditingWarning": "{{item}} est actuellement en cours d'édition. Veuillez fermer l'éditeur avant de le supprimer.",
+    "menuAddPage": "Ajouter une page",
+    "menuAddSection": "Ajouter une section",
+    "menuEdit": "Modifier {{item}}",
+    "menuRename": "Renommer {{item}}",
+    "menuCopyPage": "Copier la page",
+    "menuSortChildren": "Trier les enfants de {{item}}",
+    "menuMove": "Déplacer {{item}}",
+    "menuConvertToPage": "Convertir en page",
+    "menuDelete": "Supprimer {{item}}",
+    "emptySectionToast": "\"{{title}}\" est maintenant une section vide",
+    "convertBackAction": "Reconvertir en page",
+    "convertedBackToast": "\"{{title}}\" est de nouveau une page",
+    "convertBackErrorFallback": "Impossible de reconvertir la section en page",
+    "reorderErrorFallback": "Impossible de réordonner les pages",
+    "moveErrorFallback": "Impossible de déplacer la page"
+  },
+  "codeBlock": {
+    "copyErrorToast": "Impossible de copier le code",
+    "copiedToast": "Code copié",
+    "copyTooltip": "Copier le code",
+    "copiedTooltip": "Copié",
+    "copyAriaLabel": "Copier le code",
+    "copiedAriaLabel": "Code copié"
+  },
+  "designToggle": {
+    "switchToLight": "Passer en mode clair",
+    "switchToDark": "Passer en mode sombre"
+  },
+  "imagePreview": {
+    "openInNewTab": "Ouvrir dans un nouvel onglet"
+  },
+  "pdfEmbed": {
+    "defaultTitle": "PDF"
+  },
+  "pageSwitcher": {
+    "trigger": "Aller à la page",
+    "triggerWithHotkey": "Aller à la page ({{hotkey}})",
+    "dialogTitle": "Aller à la page",
+    "dialogDescription": "Recherchez des pages existantes par titre, chemin ou fil d'Ariane.",
+    "searchPlaceholder": "Saisissez un titre de page…",
+    "searchAriaLabel": "Rechercher des pages",
+    "noMatch": "Aucune page correspondante.",
+    "matchingPagesAriaLabel": "Pages correspondantes"
+  },
+  "metadata": {
+    "propertiesToggle": "Propriétés ({{count}})"
+  },
+  "shortcutsHelp": {
+    "menuItem": "Raccourcis clavier",
+    "title": "Raccourcis clavier disponibles",
+    "description": "Un aperçu rapide des raccourcis pour le mode de page actuel.",
+    "currentMode": "Mode de page actuel : {{mode}}",
+    "dialogHint": "Les raccourcis de dialogue sont également inclus lorsque ce dialogue est ouvert.",
+    "closeButton": "Fermer",
+    "categories": {
+      "navigation": "Navigation",
+      "editing": "Édition",
+      "viewing": "Affichage",
+      "dialogs": "Dialogues"
+    },
+    "modes": {
+      "view": "affichage",
+      "edit": "édition",
+      "history": "historique",
+      "settings": "paramètres",
+      "dialog": "dialogue"
+    },
+    "items": {
+      "goToPage": {
+        "action": "Aller à la page"
+      },
+      "openShortcutsHelp": {
+        "action": "Ouvrir les raccourcis clavier"
+      },
+      "editPage": {
+        "action": "Modifier la page"
+      },
+      "sharePage": {
+        "action": "Partager la page"
+      },
+      "printPage": {
+        "action": "Imprimer la page"
+      },
+      "copyPage": {
+        "action": "Copier la page"
+      },
+      "deletePage": {
+        "action": "Supprimer la page"
+      },
+      "pageHistory": {
+        "action": "Historique de la page"
+      },
+      "toggleToc": {
+        "action": "Afficher/masquer la table des matières"
+      },
+      "openExplorer": {
+        "action": "Ouvrir l'explorateur"
+      },
+      "openSearch": {
+        "action": "Ouvrir la recherche"
+      },
+      "savePage": {
+        "action": "Enregistrer la page"
+      },
+      "closeEditor": {
+        "action": "Fermer l'éditeur"
+      },
+      "formatBold": {
+        "action": "Mettre en gras"
+      },
+      "formatItalic": {
+        "action": "Mettre en italique"
+      },
+      "insertHeadingOne": {
+        "action": "Insérer un titre 1"
+      },
+      "insertHeadingTwo": {
+        "action": "Insérer un titre 2"
+      },
+      "insertHeadingThree": {
+        "action": "Insérer un titre 3"
+      },
+      "formatInlineCode": {
+        "action": "Mettre en code en ligne"
+      },
+      "insertLink": {
+        "action": "Insérer un lien"
+      },
+      "backToPage": {
+        "action": "Retour à la page"
+      },
+      "exitSettings": {
+        "action": "Quitter les paramètres"
+      },
+      "closeDialog": {
+        "action": "Fermer le dialogue"
+      },
+      "confirmDialog": {
+        "action": "Action par défaut du dialogue"
+      },
+      "confirmRename": {
+        "action": "Confirmer le renommage"
+      },
+      "cancelRename": {
+        "action": "Annuler le renommage"
+      }
+    }
+  }
+}

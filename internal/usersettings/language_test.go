@@ -7,14 +7,15 @@ import (
 
 func TestAllowedLanguages_ReturnsSortedShippedCodes(t *testing.T) {
 	got := AllowedLanguages()
-	want := []string{"de", "en", "es", "zh"}
+
+	want := []string{"de", "en", "es", "fr", "zh"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
 	}
 }
 
 func TestIsAllowedLanguage_AcceptsShippedCodesAndRejectsUnknownOnes(t *testing.T) {
-	for _, lang := range []string{"en", "de", "es", "zh"} {
+	for _, lang := range []string{"en", "de", "es", "fr", "zh"} {
 		if !IsAllowedLanguage(lang) {
 			t.Errorf("expected %q to be allowed", lang)
 		}

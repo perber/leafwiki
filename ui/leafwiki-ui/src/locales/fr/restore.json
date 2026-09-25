@@ -1,0 +1,44 @@
+{
+  "restoreButton": "Restaurer",
+  "restoreConfirmTitle": "Restaurer cette sauvegarde ?",
+  "restoreConfirmDescription": "Cela écrase tout le contenu, les utilisateurs et les paramètres en direct avec le contenu de cette sauvegarde, et déconnecte immédiatement tout le monde — y compris vous. Tout le monde devra se reconnecter. Les écritures sont temporairement désactivées pendant la restauration. Cette action est irréversible.",
+  "restoreConfirmCancel": "Annuler",
+  "restoreConfirmAction": "Restaurer",
+  "restoring": "Restauration…",
+  "uploadSectionTitle": "Restaurer à partir d'une sauvegarde téléversée",
+  "uploadSectionDescription": "Restaurer à partir d'un fichier ZIP de sauvegarde provenant d'ailleurs — par exemple un fichier téléchargé précédemment ou copié depuis une autre instance.",
+  "uploadSelectButton": "Sélectionner un fichier ZIP",
+  "currentFileLabel": "ZIP actuel :",
+  "noFileSelected": "Aucun fichier ZIP sélectionné",
+  "uploadConfirmTitle": "Restaurer cette sauvegarde téléversée ?",
+  "uploadConfirmDescription": "Cela écrase tout le contenu, les utilisateurs et les paramètres en direct avec le contenu de la sauvegarde téléversée, et déconnecte immédiatement tout le monde — y compris vous. Tout le monde devra se reconnecter. Les écritures sont temporairement désactivées pendant la restauration. Cette action est irréversible.",
+  "uploadConfirmCancel": "Annuler",
+  "uploadConfirmAction": "Restaurer",
+  "progressLabel": "Phase actuelle",
+  "resyncTailLabel": "Restauration terminée — reconstruction de l'index de recherche avant rechargement",
+  "progress": {
+    "validating": "Validation de la sauvegarde",
+    "swapping": "Remplacement des fichiers",
+    "reopening_auth": "Réouverture de la base de données utilisateurs",
+    "invalidating_sessions": "Invalidation des sessions",
+    "reloading_branding": "Rechargement des paramètres de marque",
+    "tree": "Reconstruction de l'arborescence des pages",
+    "links": "Indexation des liens",
+    "tags": "Reconstruction des tags et propriétés",
+    "search": "Indexation de la recherche"
+  },
+  "versionWarningLabel": "Incompatibilité de version",
+  "needsInterventionTitle": "La restauration nécessite une intervention",
+  "needsInterventionDescription": "La restauration n'a pas pu se terminer proprement et cette instance peut être dans un état partiellement restauré. Les écritures restent désactivées jusqu'à résolution. Redémarrer le serveur maintenant recharge ce qui se trouve réellement sur le disque, ce qui est la méthode recommandée pour revenir à un état cohérent.",
+  "selfRestartButton": "Redémarrer le serveur maintenant",
+  "selfRestarting": "Redémarrage du serveur… cette page se rechargera automatiquement dans quelques secondes.",
+  "toast": {
+    "restoreAlreadyRunning": "Une restauration est déjà en cours",
+    "restoreFailed": "Échec de la restauration",
+    "restoreSucceeded": "Restauration terminée. Rechargement…",
+    "restoreSucceededResyncUnconfirmed": "Restauration terminée, mais la reconstruction de l'index de recherche n'a pas pu être confirmée. Rechargement — cliquez sur le bouton d'actualisation dans l'explorateur si les résultats de recherche semblent obsolètes."
+  },
+  "errors": {
+    "jobLost": "Tâche de restauration perdue — le serveur a peut-être redémarré"
+  }
+}

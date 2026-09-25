@@ -1,0 +1,131 @@
+{
+  "wikiLinkDisambiguation": {
+    "title": "Plusieurs pages trouvées",
+    "descriptionPrefix": "Plusieurs pages correspondent à",
+    "descriptionSuffix": ". Choisissez celle que vous vouliez."
+  },
+  "slugInput": {
+    "label": "Slug",
+    "placeholder": "Slug de la page",
+    "generateErrorFallback": "Erreur lors de la génération du slug"
+  },
+  "addPageDialog": {
+    "dateTitleTooltip": "Définir le titre à la date du jour"
+  },
+  "editPageMetadataDialog": {
+    "dialogTitle": "Modifier les métadonnées de {{item}}",
+    "dialogDescription": "Modifier les métadonnées de {{item}}",
+    "titleLabel": "Titre",
+    "titlePlaceholder": "Titre de {{item}}",
+    "pathPrefix": "Chemin :",
+    "cancelButton": "Annuler",
+    "saveButton": "Modifier",
+    "dateTitleTooltip": "Définir le titre à la date du jour"
+  },
+  "toolbar": {
+    "closeEditorButton": "Fermer l'éditeur",
+    "savePageButton": "Enregistrer la page",
+    "boldTooltip": "Gras (Ctrl+B)",
+    "italicTooltip": "Italique (Ctrl+I)",
+    "strikethroughTooltip": "Barré",
+    "highlightTooltip": "Surligné",
+    "linkTooltip": "Lien (Ctrl+K)",
+    "heading1Tooltip": "Titre 1 (Ctrl+Alt+1)",
+    "heading2Tooltip": "Titre 2 (Ctrl+Alt+2)",
+    "heading3Tooltip": "Titre 3 (Ctrl+Alt+3)",
+    "tableTooltip": "Tableau",
+    "tableSizeSelect": "Sélectionner la taille",
+    "tableSizeLabel": "{{col}} × {{row}}",
+    "tableInsertAriaLabel": "Insérer un tableau {{col}} x {{row}}",
+    "codeBlockTooltip": "Bloc de code",
+    "inlineCodeTooltip": "Code en ligne (Ctrl+`)",
+    "imageTooltip": "Image / Fichier",
+    "undoTooltip": "Annuler",
+    "redoTooltip": "Rétablir",
+    "lineWrapEnableTooltip": "Activer le retour à la ligne",
+    "lineWrapDisableTooltip": "Désactiver le retour à la ligne",
+    "moreOptionsAriaLabel": "Plus d'options de formatage",
+    "previewSplitTooltip": "Aperçu côte à côte",
+    "previewStackedTooltip": "Aperçu empilé",
+    "showPreviewTooltip": "Afficher l'aperçu",
+    "hidePreviewTooltip": "Masquer l'aperçu",
+    "pasteRichTooltip": "Coller avec mise en forme (Ctrl+Maj+V)",
+    "pastePlainTooltip": "Coller sans mise en forme (Ctrl+V)",
+    "pasteRich": "Coller avec mise en forme",
+    "pastePlain": "Coller sans mise en forme",
+    "pasteClipboardError": "Impossible de lire le contenu du presse-papiers",
+    "strikethrough": "Barré",
+    "highlight": "Surligné",
+    "heading1": "Titre 1",
+    "heading2": "Titre 2",
+    "heading3": "Titre 3",
+    "insertTable": "Insérer un tableau (3×3)",
+    "lineWrap": "Retour à la ligne",
+    "autoSave": "Enregistrement auto",
+    "autoSavePaused": "en pause"
+  },
+  "pageEditor": {
+    "savedToast": "Page enregistrée avec succès",
+    "saveErrorFallback": "Erreur lors de l'enregistrement de la page",
+    "saveAnyway": "Enregistrer quand même",
+    "conflictAgainMessage": "La page a été modifiée à nouveau pendant l'enregistrement. Veuillez recharger la page et réappliquer vos modifications.",
+    "errorPrefix": "Erreur : {{error}}",
+    "metadataErrorsBeforeSave": "Veuillez corriger les erreurs de métadonnées avant d'enregistrer.",
+    "contentNullFallback": "Le contenu mis à jour de la page est nul ou indéfini",
+    "unknownErrorFallback": "Une erreur inconnue s'est produite"
+  },
+  "linkInsertDialog": {
+    "dialogTitle": "Insérer un lien",
+    "displayTextLabel": "Texte affiché",
+    "urlLabel": "URL",
+    "textPlaceholder": "Texte du lien",
+    "urlPlaceholder": "https:// ou rechercher des pages…",
+    "cancelButton": "Annuler",
+    "insertButton": "Insérer"
+  },
+  "frontmatterPanel": {
+    "metadataTitle": "Métadonnées",
+    "tagsHeading": "Tags",
+    "propertiesHeading": "Propriétés",
+    "removeFieldAriaLabel": "Supprimer le champ frontmatter {{field}}",
+    "addTagPlaceholder": "Ajouter un tag",
+    "keyPlaceholder": "Clé",
+    "valuePlaceholder": "Valeur",
+    "internalFieldsToggle": "Champs internes",
+    "addPropertyButton": "Ajouter une propriété",
+    "flatHint": "Gardez les champs plats pour le moment. Si vous avez besoin de métadonnées imbriquées plus tard, utilisez des clés à points comme <code>seo.title</code>.",
+    "unsupportedNotice": "Le frontmatter avancé existant est conservé en arrière-plan mais n'est pas encore modifiable dans cette vue compacte."
+  },
+  "tagInput": {
+    "loading": "Chargement…",
+    "noMatchingTags": "Aucun tag correspondant.",
+    "removeTagAriaLabel": "Supprimer le tag {{tag}}"
+  },
+  "markdownEditor": {
+    "editorTab": "Éditeur",
+    "previewTab": "Aperçu",
+    "resizeAriaLabel": "Redimensionner les panneaux éditeur et aperçu",
+    "fileTooLarge": "Fichier trop volumineux. Taille maximale autorisée : {{maxTaille}}.",
+    "uploadedToast": "{{filename}} envoyé",
+    "uploadErrorFallback": "Impossible d'envoyer {{filename}}"
+  },
+  "autoSave": {
+    "savedToast": "Enregistré",
+    "versionConflictToast": "Enregistrement auto en pause — la page a été modifiée par un autre utilisateur. Enregistrez manuellement pour continuer.",
+    "errorFallback": "Échec de l'enregistrement automatique"
+  },
+  "frontmatterValidation": {
+    "tagsWhitespace": "Les tags ne doivent pas contenir d'espaces en début ou en fin.",
+    "tagsEmpty": "Les tags ne doivent pas être vides.",
+    "tagsUnique": "Les tags doivent être uniques.",
+    "keyEmpty": "La clé de propriété ne doit pas être vide.",
+    "keyWhitespace": "La clé de propriété ne doit pas contenir d'espaces en début ou en fin.",
+    "keyReservedPrefix": "La clé de propriété utilise un préfixe réservé.",
+    "keyReserved": "La clé de propriété est réservée.",
+    "keyUnique": "La clé de propriété doit être unique.",
+    "valueType": "La valeur de propriété doit être une chaîne, un nombre, un booléen ou une liste plate."
+  },
+  "titleBar": {
+    "dirtyIndicator": "(Modifié)"
+  }
+}

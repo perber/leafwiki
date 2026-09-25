@@ -1,0 +1,61 @@
+{
+  "menu": {
+    "title": "Clés API"
+  },
+  "page": {
+    "title": "Clés API",
+    "heading": "Clés API",
+    "loadErrorFallback": "Erreur lors du chargement des clés API"
+  },
+  "table": {
+    "name": "Nom",
+    "owner": "Propriétaire",
+    "role": "Rôle",
+    "expires": "Date d'expiration",
+    "lastUsed": "Dernière utilisation",
+    "actions": "Actions",
+    "loading": "Chargement des clés API…",
+    "empty": "Aucune clé API trouvée.",
+    "revoked": "Révoquer"
+  },
+  "role": {
+    "admin": "Administrateur",
+    "editor": "Éditeur",
+    "viewer": "Lecteur"
+  },
+  "create": {
+    "button": "Nouvelle clé API",
+    "title": "Nouvelle clé API",
+    "description": "Créer une nouvelle clé API pour l'automatisation ou l'accès par agent.",
+    "nameLabel": "Nom",
+    "namePlaceholder": "ex. research-agent",
+    "userPlaceholder": "Sélectionner un utilisateur propriétaire",
+    "expiresLabel": "Date d'expiration (facultatif)",
+    "roleHelper": "Les nouvelles clés sont en lecture seule pour le moment.",
+    "cancel": "Annuler",
+    "submit": "Créer",
+    "successToast": "Clé API créée avec succès",
+    "errorFallback": "Erreur lors de la création de la clé API"
+  },
+  "secret": {
+    "title": "Clé API créée",
+    "description": "Copiez cette clé maintenant — elle ne sera plus affichée.",
+    "label": "Clé secrète",
+    "copy": "Copier",
+    "copiedToast": "Copié dans le presse-papiers",
+    "copyErrorToast": "Impossible de copier dans le presse-papiers",
+    "helper": "C'est la seule fois où la clé complète sera affichée. Conservez-la en lieu sûr.",
+    "done": "Terminé"
+  },
+  "delete": {
+    "button": "Révoquer",
+    "title": "Révoquer la clé API ?",
+    "description": "Voulez-vous vraiment révoquer cette clé API ? Cette action est irréversible.",
+    "body": "La clé API <strong>{{name}}</strong> cessera immédiatement de fonctionner. Tout agent ou processus l'utilisant perdra son accès.",
+    "cancel": "Annuler",
+    "confirm": "Révoquer",
+    "confirming": "Révocation…",
+    "successToast": "Clé API révoquée avec succès",
+    "errorFallback": "Impossible de révoquer la clé API. Veuillez réessayer."
+  }
+}

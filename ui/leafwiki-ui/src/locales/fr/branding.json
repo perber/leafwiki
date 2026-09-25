@@ -1,0 +1,48 @@
+{
+  "pageTitle": "Paramètres de marque",
+  "storeErrors": {
+    "loadFallback": "Impossible de charger les paramètres de marque",
+    "updateFallback": "Impossible de mettre à jour les paramètres de marque",
+    "uploadLogoFallback": "Impossible de téléverser le logo",
+    "uploadFaviconFallback": "Impossible de téléverser le favicon",
+    "deleteLogoFallback": "Impossible de supprimer le logo",
+    "deleteFaviconFallback": "Impossible de supprimer le favicon"
+  },
+  "siteName": {
+    "title": "Nom du site",
+    "description": "Le nom affiché dans l'en-tête, les titres de page et l'écran de connexion.",
+    "label": "Nom du site",
+    "placeholder": "LeafWiki"
+  },
+  "logo": {
+    "title": "Logo",
+    "description": "Le logo affiché dans l'en-tête à côté du nom du site.",
+    "currentLabel": "Logo actuel :",
+    "noLogo": "Aucun logo téléversé",
+    "uploadLabel": "Téléverser un logo",
+    "uploadButton": "Téléverser une image",
+    "hint": "Formats acceptés : {{exts}}, taille max. {{size}} Mo"
+  },
+  "favicon": {
+    "title": "Favicon",
+    "description": "L'icône affichée dans l'onglet du navigateur.",
+    "currentLabel": "Favicon actuel :",
+    "noFavicon": "Favicon par défaut utilisé",
+    "uploadLabel": "Téléverser un favicon",
+    "uploadButton": "Téléverser un favicon",
+    "hint": "Formats acceptés : {{exts}}, taille max. {{size}} Mo"
+  },
+  "save": "Enregistrer les paramètres",
+  "toast": {
+    "logoDeleted": "Logo supprimé avec succès",
+    "logoDeleteFailed": "Impossible de supprimer le logo",
+    "faviconDeleted": "Favicon supprimé avec succès",
+    "faviconDeleteFailed": "Impossible de supprimer le favicon",
+    "brandingSaved": "Paramètres de marque enregistrés",
+    "brandingSaveFailed": "Impossible d'enregistrer les paramètres de marque",
+    "logoUploaded": "Logo téléversé avec succès",
+    "logoUploadFailed": "Impossible de téléverser le logo",
+    "faviconUploaded": "Favicon téléversé avec succès",
+    "faviconUploadFailed": "Impossible de téléverser le favicon"
+  }
+}

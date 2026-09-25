@@ -1,0 +1,108 @@
+{
+  "common": {
+    "unknown": "Inconnu",
+    "unknownTime": "Heure inconnue"
+  },
+  "errors": {
+    "loadListFallback": "Impossible de charger l'historique de la page",
+    "loadPreviewFallback": "Impossible de charger l'aperçu de la révision",
+    "compareFallback": "Impossible de comparer les révisions",
+    "loadMoreFallback": "Impossible de charger plus de révisions"
+  },
+  "trigger": {
+    "contentUpdate": "Enregistré après mise à jour du contenu",
+    "assetUpdate": "Enregistré après mise à jour d'une ressource",
+    "structureUpdate": "Enregistré après mise à jour de la structure",
+    "restore": "Enregistré après restauration",
+    "delete": "Enregistré avant suppression",
+    "generic": "Enregistré en tant que {{type}}"
+  },
+  "assetChange": {
+    "added": "Ajouté",
+    "removed": "Supprimé",
+    "replaced": "Remplacé"
+  },
+  "restoreDialog": {
+    "title": "Restaurer la révision ?",
+    "description": "Cela restaure le contenu, le titre et les ressources de la révision. Le slug et l'emplacement actuels restent inchangés.",
+    "cancel": "Annuler",
+    "confirm": "Restaurer la révision",
+    "restoredTitleLabel": "Titre restauré :",
+    "slugNote": "Cette révision utilisait le slug <mono>{{revisionSlug}}</mono>. Le slug actuel <mono>{{currentSlug}}</mono> restera inchangé."
+  },
+  "diff": {
+    "noTextDifference": "Aucune différence de texte entre cette révision et la version active."
+  },
+  "changes": {
+    "summaryHeading": "Résumé des modifications",
+    "linesAdded": "Lignes ajoutées depuis",
+    "linesRemoved": "Lignes supprimées depuis",
+    "assetsChanged": "Ressources modifiées",
+    "diffHeading": "Diff",
+    "diffNote": "comparé à la version active",
+    "assetsDetails": "Ressources ({{count}})",
+    "assetAdded": "{{count}} ajoutée(s)",
+    "assetReplaced": "{{count}} remplacée(s)",
+    "assetRemoved": "{{count}} supprimée(s)"
+  },
+  "rawText": {
+    "heading": "Texte brut",
+    "empty": "(vide)"
+  },
+  "assetsPanel": {
+    "heading": "Ressources",
+    "empty": "Aucune ressource n'a été stockée avec cette révision.",
+    "octetStream": "application/octet-stream",
+    "openAsset": "Ouvrir la ressource",
+    "downloadAsset": "Télécharger la ressource"
+  },
+  "tabs": {
+    "preview": "Aperçu",
+    "changes": "Modifications",
+    "raw": "Texte brut",
+    "assets": "Ressources",
+    "mobileRevisions": "Révisions",
+    "mobileDetails": "Détails"
+  },
+  "detail": {
+    "loadingHistory": "Chargement de l'historique…",
+    "noRevisionSelectedTitle": "Aucune révision sélectionnée",
+    "noRevisionSelectedMessage": "Sélectionnez une révision dans la liste pour voir les détails.",
+    "loadingDiff": "Chargement du diff…",
+    "loadingPreview": "Chargement de l'aperçu…",
+    "noPreview": "Aucun aperçu disponible.",
+    "noChangesFromCurrent": "Aucune différence avec la version actuelle.",
+    "noComparisonData": "Aucune donnée de comparaison disponible.",
+    "noRawText": "Aucun texte brut disponible.",
+    "noAssetData": "Aucune donnée de ressource disponible."
+  },
+  "list": {
+    "loading": "Chargement de l'historique…",
+    "emptyWithLatest": "Aucune révision précédente. Les anciennes versions apparaîtront ici après de nouvelles modifications.",
+    "emptyNoLatest": "Aucune révision pour le moment. Elles apparaîtront ici après des modifications de la page.",
+    "activeVersionBadge": "Version active",
+    "loadMoreLoading": "Chargement…",
+    "loadMore": "Charger plus",
+    "resizeAriaLabel": "Redimensionner la liste des révisions",
+    "title": "Historique des révisions"
+  },
+  "header": {
+    "revisionBy": "Révision par {{author}} · {{time}}",
+    "restoreLoading": "Restauration…",
+    "currentVersion": "Version actuelle",
+    "restore": "Restaurer",
+    "titleLabel": "Titre",
+    "slugLabel": "Slug",
+    "emptyValue": "(vide)"
+  },
+  "chips": {
+    "revisionSlug": "Slug de la révision : {{slug}}",
+    "currentSlug": "Slug actuel : {{slug}}",
+    "assetChangesCount": "{{count}} modifications de ressources",
+    "assetsCount": "{{count}} ressources"
+  },
+  "toasts": {
+    "restoreSuccess": "Révision restaurée",
+    "restoreErrorFallback": "Impossible de restaurer la révision"
+  }
+}

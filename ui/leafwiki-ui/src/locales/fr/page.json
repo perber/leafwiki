@@ -1,0 +1,129 @@
+{
+  "common": {
+    "page": "page",
+    "section": "section",
+    "pageCapitalized": "Page",
+    "sectionCapitalized": "Section",
+    "cancel": "Annuler",
+    "errorPrefix": "Erreur : {{error}}",
+    "unknownError": "Une erreur inconnue s'est produite"
+  },
+  "addDialog": {
+    "slugNotGenerated": "Le slug n'a pas pu être généré. Veuillez le saisir manuellement.",
+    "slugStillGenerating": "Veuillez patienter jusqu'à ce que le slug soit entièrement généré.",
+    "createdToast": "{{item}} créé(e)",
+    "createErrorFallback": "Erreur lors de la création de {{item}}",
+    "create": "Créer",
+    "createAndEdit": "Créer et modifier {{item}}",
+    "titlePage": "Créer une nouvelle page",
+    "titleSection": "Créer une nouvelle section",
+    "descriptionPage": "Saisissez le titre de la nouvelle page",
+    "descriptionSection": "Saisissez le titre de la nouvelle section",
+    "titleLabel": "Titre",
+    "titlePlaceholder": "Titre de {{item}}",
+    "pathPrefix": "Chemin :"
+  },
+  "moveDialog": {
+    "movedToast": "Page déplacée avec succès",
+    "moveErrorFallback": "Erreur lors du déplacement de {{item}}",
+    "title": "Déplacer {{item}}",
+    "description": "Sélectionnez un nouveau parent pour {{item}}",
+    "move": "Déplacer"
+  },
+  "deleteDialog": {
+    "loadReferencesErrorFallback": "Impossible de charger les références de la page",
+    "deletedToast": "{{item}} supprimé(e) avec succès",
+    "deleteErrorFallback": "Erreur lors de la suppression de {{item}}",
+    "title": "Supprimer {{item}} ?",
+    "description": "Voulez-vous vraiment supprimer {{item}} \"{{name}}\" ? Cette action est irréversible.",
+    "deleting": "Suppression…",
+    "delete": "Supprimer",
+    "modifiedWarningTitle": "Cette page a été modifiée par un autre utilisateur.",
+    "modifiedWarningBody": "La page a été actualisée. Voulez-vous toujours la supprimer ?",
+    "backlinksLoading": "Vérification des pages qui référencent cette page…",
+    "backlinksError": "Impossible de charger les références de la page. La suppression fonctionnera quand même, mais l'impact sur les liens n'a pas pu être affiché.",
+    "backlinksWarning_one": "Cette page est référencée par {{count}} page.",
+    "backlinksWarning_other": "Cette page est référencée par {{count}} pages.",
+    "backlinksWarningBody": "Supprimer cette page laissera ces liens brisés.",
+    "noBacklinks": "Aucune page ne référence actuellement cette page.",
+    "deleteSubpages": "Supprimer également toutes les sous-pages"
+  },
+  "sortDialog": {
+    "dragToReorder": "Glissez pour réordonner",
+    "sortedToast": "Enfants de {{item}} triés avec succès",
+    "sortErrorFallback": "Erreur lors du tri des enfants de {{item}}",
+    "title": "Trier les enfants de {{item}}",
+    "description": "Glissez les éléments pour les réordonner, utilisez les flèches ou choisissez une option de tri. Les modifications sont enregistrées après avoir cliqué sur 'Enregistrer'.",
+    "save": "Enregistrer",
+    "sortAlphabetically": "Trier alphabétiquement :",
+    "ascending": "A → Z",
+    "descending": "Z → A",
+    "sortSections": "Grouper les sections :",
+    "sectionsFirst": "Sections en premier",
+    "sectionsLast": "Sections en dernier"
+  },
+  "copyDialog": {
+    "slugNotGenerated": "Le slug n'a pas pu être généré. Veuillez le saisir manuellement.",
+    "slugStillGenerating": "Veuillez patienter jusqu'à ce que le slug soit entièrement généré.",
+    "copiedToast": "{{item}} copié(e)",
+    "copyErrorFallback": "Erreur lors de la copie de {{item}}",
+    "copyOfTitle": "Copie de {{title}}",
+    "title": "Copier {{item}}",
+    "description": "Créer une copie de {{item}}",
+    "copying": "Copie en cours…",
+    "copyAndEdit": "Copier et modifier {{item}}",
+    "titleLabel": "Titre",
+    "titlePlaceholder": "Titre de {{item}}",
+    "pathPrefix": "Chemin :"
+  },
+  "permalinkDialog": {
+    "copyErrorToast": "Impossible de copier le lien permanent",
+    "copiedToast": "Lien permanent copié",
+    "title": "Partager la page",
+    "description": "Lien permanent vers {{title}}",
+    "close": "Fermer",
+    "urlLabel": "Lien permanent",
+    "copyLink": "Copier le lien",
+    "openLink": "Ouvrir le lien",
+    "purposeNote": "Ceci est un lien interne permanent. Il continue de fonctionner même après le renommage ou le déplacement de la page, vous pouvez donc le mettre en favori ou le référencer depuis d'autres pages en toute sécurité.",
+    "accessNote": "Ce n'est pas un lien public. Toute personne à qui vous l'envoyez devra se connecter à ce wiki pour l'ouvrir, sauf si le wiki est configuré en accès public. LeafWiki ne peut pas rendre une seule page publique tandis que le reste reste privé."
+  },
+  "createByPathDialog": {
+    "createdToast": "Page créée avec succès",
+    "createErrorFallback": "Erreur lors de la création de la page",
+    "title": "Créer une nouvelle page",
+    "description": "Veuillez saisir le titre",
+    "creating": "Création…",
+    "create": "Créer",
+    "createAndEdit": "Créer et modifier",
+    "existsAlert": "Une page existe déjà à ce chemin.",
+    "lookupResultTitle": "Résultat de la recherche de chemin :",
+    "segmentExists": "existe",
+    "segmentWillBeCreated": "sera créé",
+    "titleLabel": "Titre",
+    "titlePlaceholder": "Titre de la page",
+    "pathLabel": "Chemin",
+    "pathPlaceholder": "Chemin de la page"
+  },
+  "select": {
+    "topLevel": "Niveau supérieur",
+    "searchPlaceholder": "Rechercher des pages…",
+    "searchAriaLabel": "Rechercher des pages",
+    "noPagesFound": "Aucune page trouvée.",
+    "pagesAriaLabel": "Pages"
+  },
+  "refactorDialog": {
+    "title": "Mettre à jour les références ?",
+    "description": "Cette modification affecte le chemin de la page. Examinez les pages impactées avant de continuer.",
+    "saveWithoutRewrite": "Enregistrer sans mettre à jour les liens",
+    "continue": "Continuer",
+    "oldPath": "Ancien chemin :",
+    "newPath": "Nouveau chemin :",
+    "updateLinksLabel": "Mettre à jour automatiquement les liens sur les pages référençantes",
+    "referencingPages": "Pages référençantes ({{count}})",
+    "noReferences": "Aucune page ne référence ce chemin."
+  },
+  "historyPage": {
+    "backToPage": "Retour à la page"
+  }
+}

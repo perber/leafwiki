@@ -1,0 +1,43 @@
+{
+  "sidebar": {
+    "explorerTab": "Explorateur",
+    "searchTab": "Rechercher"
+  },
+  "errorBoundary": {
+    "heading": "Un problème est survenu",
+    "body": "Une erreur inattendue s'est produite. Recharger la page résout généralement le problème.",
+    "reloadButton": "Recharger la page",
+    "tryRecoverButton": "Essayer de récupérer",
+    "detailsSummary": "Détails de l'erreur"
+  },
+  "page404": {
+    "heading": "Page introuvable",
+    "body": "La page que vous recherchez n'existe pas.",
+    "createPrompt": "Créez la page en cliquant sur le bouton ci-dessous.",
+    "createButton": "Créer la page"
+  },
+  "unsavedChangesDialog": {
+    "title": "Modifications non enregistrées",
+    "description": "Vous avez des modifications non enregistrées. Voulez-vous vraiment quitter cette page ? Les données non enregistrées seront perdues.",
+    "cancelButton": "Annuler",
+    "leaveAnywayButton": "Quitter quand même"
+  },
+  "dialog": {
+    "closeSrOnly": "Fermer"
+  },
+  "validation": {
+    "failedToast": "Échec de la validation"
+  },
+  "configLoad": {
+    "fetchErrorFallback": "Impossible de charger la configuration : {{status}} {{statusText}}",
+    "errorFallback": "Impossible de charger la configuration"
+  },
+  "language": {
+    "selfName": "Français"
+  },
+  "pagination": {
+    "prev": "← Préc.",
+    "next": "Suiv. →",
+    "pageOf": "Page {{page}} sur {{total}}"
+  }
+}

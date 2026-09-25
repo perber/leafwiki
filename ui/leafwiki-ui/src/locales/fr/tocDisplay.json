@@ -1,0 +1,10 @@
+{
+  "menuLabel": "Table des matières",
+  "pageTitle": "Table des matières",
+  "sectionTitle": "Table des matières",
+  "sectionDescription": "Contrôle l'affichage du panneau « Sur cette page » lors de la consultation d'une page.",
+  "checkboxLabel": "Toujours afficher la table des matières",
+  "checkboxDescription": "Par défaut, la table des matières n'apparaît que lorsqu'une page contient plus de 3 titres. Activez cette option pour l'afficher en permanence, même sur les pages n'ayant qu'un ou deux titres.",
+  "savedToast": "Paramètre de table des matières enregistré",
+  "updateError": "Impossible de mettre à jour le paramètre de table des matières"
+}
