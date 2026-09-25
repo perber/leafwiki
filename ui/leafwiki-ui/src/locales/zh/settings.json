@@ -1,0 +1,52 @@
+{
+  "exit": "退出设置",
+  "nav": {
+    "title": "设置",
+    "account": "账户"
+  },
+  "account": {
+    "pageTitle": "账户",
+    "avatar": {
+      "sectionTitle": "头像",
+      "sectionDescription": "上传一张图片以个性化你的账户。",
+      "currentLabel": "当前头像：",
+      "uploadButton": "上传图片",
+      "deleteButton": "移除图片",
+      "hint": "允许格式：{{exts}}。最大尺寸：{{size}}。",
+      "uploadSuccess": "头像已上传",
+      "uploadFailed": "头像上传失败",
+      "deleteSuccess": "头像已移除",
+      "deleteFailed": "头像移除失败"
+    },
+    "passwordSectionTitle": "密码",
+    "passwordSectionDescription": "修改你的密码，请务必牢记！",
+    "twoFactorSectionTitle": "两步验证",
+    "twoFactorSectionDescription": "为你的账户增加一层安全保护。",
+    "preferences": {
+      "sectionTitle": "偏好",
+      "sectionDescription": "编辑偏好设置，跨设备同步。",
+      "autoSaveLabel": "启用自动保存",
+      "autoSaveDescription": "编辑页面时自动保存你的修改。",
+      "savedToast": "偏好已保存",
+      "autoSaveToggleError": "无法更新自动保存设置",
+      "languageLabel": "语言",
+      "languageChangeError": "无法更新语言设置",
+      "dateFormatLabel": "日期格式",
+      "dateFormatChangeError": "无法更新日期格式设置",
+      "timeFormatLabel": "时间格式",
+      "timeFormatChangeError": "无法更新时间格式设置",
+      "dateFormat": {
+        "locale": "跟随语言",
+        "iso": "2026-08-27",
+        "dmyDot": "27.08.2026",
+        "mdySlash": "08/27/2026",
+        "dmySlash": "27/08/2026"
+      },
+      "timeFormat": {
+        "locale": "跟随语言",
+        "h24": "24 小时制（14:30）",
+        "h12": "12 小时制（2:30 PM）"
+      }
+    }
+  }
+}

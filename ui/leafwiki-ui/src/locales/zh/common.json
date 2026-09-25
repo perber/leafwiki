@@ -1,0 +1,43 @@
+{
+  "sidebar": {
+    "explorerTab": "导航",
+    "searchTab": "搜索"
+  },
+  "errorBoundary": {
+    "heading": "出了点问题",
+    "body": "发生意外错误。刷新页面通常可以解决。",
+    "reloadButton": "刷新页面",
+    "tryRecoverButton": "尝试恢复",
+    "detailsSummary": "错误详情"
+  },
+  "page404": {
+    "heading": "页面不存在",
+    "body": "你要找的页面不存在。",
+    "createPrompt": "点击下方按钮创建该页面。",
+    "createButton": "创建页面"
+  },
+  "unsavedChangesDialog": {
+    "title": "有未保存的修改",
+    "description": "你有未保存的修改。确定要离开此页面吗？未保存的数据将会丢失。",
+    "cancelButton": "取消",
+    "leaveAnywayButton": "仍要离开"
+  },
+  "dialog": {
+    "closeSrOnly": "关闭"
+  },
+  "validation": {
+    "failedToast": "校验失败"
+  },
+  "configLoad": {
+    "fetchErrorFallback": "无法加载配置：{{status}} {{statusText}}",
+    "errorFallback": "无法加载配置"
+  },
+  "language": {
+    "selfName": "中文"
+  },
+  "pagination": {
+    "prev": "← 上一页",
+    "next": "下一页 →",
+    "pageOf": "第 {{page}} 页 / 共 {{total}} 页"
+  }
+}
