@@ -1,0 +1,10 @@
+{
+  "menuLabel": "目录显示",
+  "pageTitle": "目录显示",
+  "sectionTitle": "目录显示",
+  "sectionDescription": "控制查看页面时何时显示“本页目录”。",
+  "checkboxLabel": "始终显示目录",
+  "checkboxDescription": "默认情况下，页面超过 3 个标题时才显示目录。开启后即使只有一两个标题也始终显示。",
+  "savedToast": "目录显示设置已保存",
+  "updateError": "无法更新目录显示设置"
+}

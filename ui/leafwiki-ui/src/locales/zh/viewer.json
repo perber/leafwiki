@@ -1,0 +1,207 @@
+{
+  "layout": {
+    "toggleSidebar": "切换侧栏",
+    "resizeSidebar": "调整侧栏宽度",
+    "closeSidebar": "关闭侧栏"
+  },
+  "breadcrumbs": {
+    "navAriaLabel": "面包屑"
+  },
+  "section": {
+    "overviewTitle": "“{{title}}”概览",
+    "overviewDescriptionBase": "此页面是该章节的默认概览，列出其页面与子章节。",
+    "overviewDescriptionEditorHint": "编辑此页面时，你可以为该章节指定一个自定义起始页。",
+    "overviewDescriptionReadOnly": "此页面是该章节自动生成的概览。",
+    "emptyTitle": "该章节为空。",
+    "emptyDescriptionEditor": "章节 {{title}} 目前还没有任何页面或子章节。先添加一个新页面或新建子章节吧。",
+    "emptyDescriptionReadOnly": "章节 {{title}} 目前还没有任何页面或子章节。",
+    "addPage": "添加页面",
+    "addSection": "添加章节",
+    "subpagesAriaLabel": "{{title}} 的子页面",
+    "sectionSuffix": "（章节）",
+    "updatedByLabel": "由 {{editor}} 更新 · {{time}}",
+    "updatedLabel": "更新于 {{time}}"
+  },
+  "markdownPreview": {
+    "renderError": "此页面包含无法安全渲染的 Markdown。",
+    "brokenLinkTooltip": "此页面尚未创建。"
+  },
+  "mermaid": {
+    "renderError": "无法渲染 Mermaid 图表。",
+    "noSvgOutput": "Mermaid 输出中没有 SVG 元素"
+  },
+  "headline": {
+    "linkToSection": "链接到章节"
+  },
+  "backlinks": {
+    "errorPrefix": "错误：{{error}}",
+    "pageIdRequired": "需要页面 ID",
+    "fetchFailedFallback": "获取链接状态失败",
+    "referencedBy": "被以下页面引用",
+    "loading": "加载中…",
+    "noReferences": "没有页面引用此页。",
+    "brokenLinks": "失效链接",
+    "noBrokenLinks": "没有失效链接。",
+    "brokenOutgoingsTitle": "此页链接到了不存在的目标",
+    "brokenIncomingTitle": "有页面链接到了旧路径"
+  },
+  "pinned": {
+    "sectionTitle": "置顶",
+    "pagesSectionTitle": "页面",
+    "pinPage": "置顶",
+    "unpinPage": "取消置顶",
+    "pinSuccess": "页面已置顶",
+    "unpinSuccess": "已取消置顶",
+    "pinError": "更新置顶状态失败",
+    "togglePinnedSection": "切换置顶页面区",
+    "togglePagesSection": "切换页面区",
+    "unpinPageAriaLabel": "取消置顶页面"
+  },
+  "favorites": {
+    "sectionTitle": "收藏",
+    "addFavorite": "加入收藏",
+    "removeFavorite": "取消收藏",
+    "addSuccess": "已加入收藏",
+    "removeSuccess": "已取消收藏",
+    "favoriteError": "更新收藏失败",
+    "toggleFavoritesSection": "切换收藏区"
+  },
+  "toc": {
+    "title": "目录",
+    "onThisPage": "本页目录",
+    "downloads": "附件",
+    "collapse": "折叠目录",
+    "expand": "展开目录"
+  },
+  "toolbar": {
+    "moreActions": "更多操作",
+    "expandAll": "全部展开",
+    "collapseAll": "全部折叠",
+    "sortPages": "排序页面",
+    "refresh": "刷新导航",
+    "refreshSuccess": "导航已刷新",
+    "refreshError": "刷新失败",
+    "refreshAlreadyRunning": "刷新已在进行中",
+    "refreshPullFailed": "拉取远端更改失败",
+    "syncJobLostFallback": "同步任务丢失——服务器可能已重启"
+  },
+  "pageToolbar": {
+    "itemPage": "页面",
+    "itemSection": "章节",
+    "editButton": "编辑{{item}}",
+    "shareButton": "分享{{item}}",
+    "printButton": "打印{{item}}",
+    "copyButton": "复制{{item}}",
+    "deleteButton": "删除{{item}}",
+    "historyButton": "{{item}}历史"
+  },
+  "treeActions": {
+    "loading": "加载中…",
+    "loadErrorPrefix": "错误：{{error}}",
+    "createNewPageTooltip": "新建页面",
+    "createNewSectionTooltip": "新建章节",
+    "untitledPage": "未命名页面",
+    "convertedToast": "页面转换成功",
+    "conflictRetryMessage": "此页面已被其他用户修改，请重试。",
+    "convertErrorFallback": "页面转换失败",
+    "renameEditingWarning": "此{{item}}正在被编辑。请通过编辑器标题栏重命名。",
+    "renamedToast": "{{item}}重命名成功",
+    "renameErrorFallback": "重命名页面失败",
+    "deleteEditingWarning": "此{{item}}正在被编辑。删除前请先关闭编辑器。",
+    "menuAddPage": "添加页面",
+    "menuAddSection": "添加章节",
+    "menuEdit": "编辑{{item}}",
+    "menuRename": "重命名",
+    "menuCopyPage": "复制页面",
+    "menuSortChildren": "排序{{item}}子项",
+    "menuMove": "移动{{item}}",
+    "menuConvertToPage": "转换为页面",
+    "menuDelete": "删除{{item}}",
+    "emptySectionToast": "“{{title}}”现在是空章节",
+    "convertBackAction": "转回页面",
+    "convertedBackToast": "“{{title}}”恢复为页面",
+    "convertBackErrorFallback": "将章节转回页面失败",
+    "reorderErrorFallback": "页面排序失败",
+    "moveErrorFallback": "移动页面失败"
+  },
+  "codeBlock": {
+    "copyErrorToast": "复制代码失败",
+    "copiedToast": "代码已复制",
+    "copyTooltip": "复制代码",
+    "copiedTooltip": "已复制",
+    "copyAriaLabel": "复制代码",
+    "copiedAriaLabel": "代码已复制"
+  },
+  "designToggle": {
+    "switchToLight": "切换到浅色模式",
+    "switchToDark": "切换到深色模式"
+  },
+  "imagePreview": {
+    "openInNewTab": "在新标签页打开"
+  },
+  "pdfEmbed": {
+    "defaultTitle": "PDF"
+  },
+  "pageSwitcher": {
+    "trigger": "跳转到页面",
+    "triggerWithHotkey": "跳转到页面（{{hotkey}}）",
+    "dialogTitle": "跳转到页面",
+    "dialogDescription": "按标题、路径或面包屑搜索已有页面。",
+    "searchPlaceholder": "输入页面标题…",
+    "searchAriaLabel": "搜索页面",
+    "noMatch": "未找到匹配的页面。",
+    "matchingPagesAriaLabel": "匹配的页面"
+  },
+  "metadata": {
+    "propertiesToggle": "属性（{{count}}）"
+  },
+  "shortcutsHelp": {
+    "menuItem": "键盘快捷键",
+    "title": "可用的键盘快捷键",
+    "description": "当前页面模式下快捷键一览。",
+    "currentMode": "当前页面模式：{{mode}}",
+    "dialogHint": "对话框打开时也包含对话框快捷键。",
+    "closeButton": "关闭",
+    "categories": {
+      "navigation": "导航",
+      "editing": "编辑",
+      "viewing": "查看",
+      "dialogs": "对话框"
+    },
+    "modes": {
+      "view": "查看",
+      "edit": "编辑",
+      "history": "历史",
+      "settings": "设置",
+      "dialog": "对话框"
+    },
+    "items": {
+      "goToPage": { "action": "跳转到页面" },
+      "openShortcutsHelp": { "action": "打开键盘快捷键" },
+      "editPage": { "action": "编辑页面" },
+      "sharePage": { "action": "分享页面" },
+      "printPage": { "action": "打印页面" },
+      "copyPage": { "action": "复制页面" },
+      "deletePage": { "action": "删除页面" },
+      "pageHistory": { "action": "页面历史" },
+      "toggleToc": { "action": "切换目录" },
+      "openExplorer": { "action": "打开导航" },
+      "openSearch": { "action": "打开搜索" },
+      "savePage": { "action": "保存页面" },
+      "closeEditor": { "action": "关闭编辑器" },
+      "formatBold": { "action": "加粗" },
+      "formatItalic": { "action": "斜体" },
+      "insertHeadingOne": { "action": "插入一级标题" },
+      "insertHeadingTwo": { "action": "插入二级标题" },
+      "insertHeadingThree": { "action": "插入三级标题" },
+      "formatInlineCode": { "action": "行内代码" },
+      "insertLink": { "action": "插入链接" },
+      "backToPage": { "action": "返回页面" },
+      "exitSettings": { "action": "退出设置" },
+      "closeDialog": { "action": "关闭对话框" },
+      "confirmDialog": { "action": "对话框默认操作" },
+      "confirmRename": { "action": "确认重命名" },
+      "cancelRename": { "action": "取消重命名" }
+    }
+  }
+}

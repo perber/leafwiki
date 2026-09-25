@@ -10,6 +10,7 @@ var allowedLanguages = map[string]bool{
 	"de":            true,
 	"es":            true,
 	"fr":            true,
+	"zh":            true,
 }
 
 // IsAllowedLanguage reports whether lang is a language UserSettings accepts.

@@ -1,0 +1,108 @@
+{
+  "common": {
+    "unknown": "未知",
+    "unknownTime": "未知时间"
+  },
+  "errors": {
+    "loadListFallback": "加载页面历史失败",
+    "loadPreviewFallback": "加载版本预览失败",
+    "compareFallback": "比较版本失败",
+    "loadMoreFallback": "加载更多版本失败"
+  },
+  "trigger": {
+    "contentUpdate": "内容更新后保存",
+    "assetUpdate": "附件更新后保存",
+    "structureUpdate": "结构更新后保存",
+    "restore": "恢复后保存",
+    "delete": "删除前保存",
+    "generic": "保存为 {{type}}"
+  },
+  "assetChange": {
+    "added": "新增",
+    "removed": "移除",
+    "replaced": "替换"
+  },
+  "restoreDialog": {
+    "title": "恢复此版本？",
+    "description": "这会恢复该版本的内容、标题和附件。当前路径与位置保持不变。",
+    "cancel": "取消",
+    "confirm": "恢复版本",
+    "restoredTitleLabel": "恢复后的标题：",
+    "slugNote": "此版本使用路径 <mono>{{revisionSlug}}</mono>，当前路径 <mono>{{currentSlug}}</mono> 保持不变。"
+  },
+  "diff": {
+    "noTextDifference": "此版本与当前版本无文本差异。"
+  },
+  "changes": {
+    "summaryHeading": "变更摘要",
+    "linesAdded": "新增行",
+    "linesRemoved": "删除行",
+    "assetsChanged": "附件变更",
+    "diffHeading": "差异",
+    "diffNote": "与当前版本相比",
+    "assetsDetails": "附件（{{count}}）",
+    "assetAdded": "新增 {{count}}",
+    "assetReplaced": "替换 {{count}}",
+    "assetRemoved": "移除 {{count}}"
+  },
+  "rawText": {
+    "heading": "原始文本",
+    "empty": "（空）"
+  },
+  "assetsPanel": {
+    "heading": "附件",
+    "empty": "此版本未保存任何附件。",
+    "octetStream": "application/octet-stream",
+    "openAsset": "打开附件",
+    "downloadAsset": "下载附件"
+  },
+  "tabs": {
+    "preview": "预览",
+    "changes": "变更",
+    "raw": "原始文本",
+    "assets": "附件",
+    "mobileRevisions": "版本",
+    "mobileDetails": "详情"
+  },
+  "detail": {
+    "loadingHistory": "正在加载历史…",
+    "noRevisionSelectedTitle": "未选择版本",
+    "noRevisionSelectedMessage": "从列表中选择一个版本以查看详情。",
+    "loadingDiff": "正在加载差异…",
+    "loadingPreview": "正在加载预览…",
+    "noPreview": "无可用预览。",
+    "noChangesFromCurrent": "与当前版本无差异。",
+    "noComparisonData": "无可用比较数据。",
+    "noRawText": "无可用原始文本。",
+    "noAssetData": "无可用附件数据。"
+  },
+  "list": {
+    "loading": "正在加载历史…",
+    "emptyWithLatest": "尚无历史版本。更多变更后，旧版本会显示在这里。",
+    "emptyNoLatest": "尚无版本。页面变更后会显示在这里。",
+    "activeVersionBadge": "当前版本",
+    "loadMoreLoading": "加载中…",
+    "loadMore": "加载更多",
+    "resizeAriaLabel": "调整版本列表大小",
+    "title": "版本历史"
+  },
+  "header": {
+    "revisionBy": "版本由 {{author}} · {{time}}",
+    "restoreLoading": "正在恢复…",
+    "currentVersion": "当前版本",
+    "restore": "恢复",
+    "titleLabel": "标题",
+    "slugLabel": "路径",
+    "emptyValue": "（空）"
+  },
+  "chips": {
+    "revisionSlug": "版本路径：{{slug}}",
+    "currentSlug": "当前路径：{{slug}}",
+    "assetChangesCount": "附件变更 {{count}} 处",
+    "assetsCount": "附件 {{count}} 个"
+  },
+  "toasts": {
+    "restoreSuccess": "版本已恢复",
+    "restoreErrorFallback": "恢复版本失败"
+  }
+}
