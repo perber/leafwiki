@@ -23,6 +23,7 @@ jobs:
 
     steps:
       - name: React to triggering comment
+        continue-on-error: true # cosmetic 👍 only; known GITHUB_TOKEN reactions-API flakiness must not block the actual build
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         with:
           script: |
