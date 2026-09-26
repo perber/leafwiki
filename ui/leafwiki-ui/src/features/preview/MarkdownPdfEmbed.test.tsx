@@ -2,7 +2,17 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { MarkdownPdfEmbed } from './MarkdownPdfEmbed'
 
+let mockIsMobile = false
+
+vi.mock('@/lib/useIsMobile', () => ({
+  useIsMobile: () => mockIsMobile,
+}))
+
 describe('MarkdownPdfEmbed', () => {
+  beforeEach(() => {
+    mockIsMobile = false
+  })
+
   it('renders an iframe pointing at the pdf source', () => {
     render(<MarkdownPdfEmbed src="/assets/manual.pdf" alt="Manual" />)
 
@@ -33,6 +43,17 @@ describe('MarkdownPdfEmbed', () => {
 
     const link = screen.getByRole('link')
     expect(link.getAttribute('href')).toBe('https://example.com/doc.pdf')
+    expect(link.getAttribute('target')).toBe('_blank')
+  })
+
+  it('skips the iframe on mobile and only renders an open button', () => {
+    mockIsMobile = true
+    render(<MarkdownPdfEmbed src="/assets/manual.pdf" alt="Manual" />)
+
+    expect(document.querySelector('iframe')).toBeNull()
+
+    const link = screen.getByRole('link')
+    expect(link.getAttribute('href')).toContain('/assets/manual.pdf')
     expect(link.getAttribute('target')).toBe('_blank')
   })
 })
