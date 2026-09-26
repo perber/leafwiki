@@ -15,7 +15,8 @@ jobs:
 
     permissions:
       contents: read
-      issues: write # only for the reaction
+      issues: write # for the reaction
+      pull-requests: write # reacting to a comment on a PR (not a plain issue) needs this too, despite the REST docs only listing issues=write
 
     outputs:
       version: ${{ steps.vars.outputs.version }}
