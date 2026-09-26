@@ -5,7 +5,7 @@ on:
     types: [created]
 
 jobs:
-  build-images:
+  build:
     if: >-
       github.event.issue.pull_request &&
       contains(github.event.comment.body, '/create-test-image') &&
@@ -15,9 +15,11 @@ jobs:
 
     permissions:
       contents: read
-      issues: write
-      pull-requests: write
-      packages: write
+      issues: write # only for the reaction
+
+    outputs:
+      version: ${{ steps.vars.outputs.version }}
+      owner: ${{ steps.vars.outputs.owner }}
 
     steps:
       - name: React to triggering comment
@@ -46,51 +48,76 @@ jobs:
             });
 
             core.setOutput('sha', pr.data.head.sha);
-            core.setOutput('ref', pr.data.head.ref);
 
       - name: Checkout PR commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ steps.pr.outputs.sha }}
 
-      - name: Set lowercase image owner
+      - name: Set version/owner
         id: vars
         run: |
-          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_GITHUB_TOKEN }}
-
-      - name: Build & Push Docker image
-        id: build
-        run: |
           SHA=$(echo "${{ steps.pr.outputs.sha }}" | cut -c1-7)
-          VERSION=pr-${{ github.event.issue.number }}-$SHA
-          OWNER=${{ steps.vars.outputs.owner }}
-          IMAGE=ghcr.io/$OWNER/leafwiki:$VERSION
+          echo "version=pr-${{ github.event.issue.number }}-$SHA" >> "$GITHUB_OUTPUT"
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
 
-          echo "Building image version: $VERSION"
-
+      # No docker/login-action, no packages: write, no GHCR_GITHUB_TOKEN
+      # anywhere above or below this line — this job builds the PR's own
+      # (possibly forked, untrusted) code and must never hold registry
+      # credentials while doing so. See pleaf issue
+      # build-image-pr-pwn-request-pattern.md.
+      - name: Build image (no push)
+        run: |
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --file Dockerfile \
             --target final \
-            --build-arg APP_VERSION=$VERSION \
-            --tag $IMAGE \
+            --build-arg APP_VERSION=${{ steps.vars.outputs.version }} \
             --annotation "index:org.opencontainers.image.title=LeafWiki" \
             --annotation "index:org.opencontainers.image.description=LeafWiki – A fast wiki for people who think in folders, not feeds" \
             --sbom=true \
             --provenance=mode=max \
-            --push .
+            --output type=oci,dest=image.tar \
+            .
 
+      - name: Upload image artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr-image
+          path: image.tar
+          retention-days: 1
+
+  push:
+    needs: build
+    runs-on: ubuntu-latest
+    container:
+      image: quay.io/skopeo/stable@sha256:064d2cefb512c97d5a22979599ca05b7198fd6176494a634e1f31bd6b5fbd77a
+      options: --user 0
+
+    permissions:
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: pr-image
+
+      # This job never checks out the repo and never runs any code from the
+      # PR — it only copies the already-built artifact from the `build` job
+      # into the registry, so it's the only job that needs GHCR_GITHUB_TOKEN.
+      - name: Push image to GHCR
+        id: push
+        run: |
+          IMAGE=ghcr.io/${{ needs.build.outputs.owner }}/leafwiki:${{ needs.build.outputs.version }}
+          skopeo copy \
+            --dest-creds "${{ github.actor }}:${{ secrets.GHCR_GITHUB_TOKEN }}" \
+            oci-archive:image.tar \
+            docker://$IMAGE
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
       - name: Comment image reference on PR
-        if: success()
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         with:
           script: |
@@ -98,5 +125,5 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `🐳 Test image built: \`${{ steps.build.outputs.image }}\`\n\n\`\`\`\ndocker pull ${{ steps.build.outputs.image }}\n\`\`\``,
+              body: `🐳 Test image built: \`${{ steps.push.outputs.image }}\`\n\n\`\`\`\ndocker pull ${{ steps.push.outputs.image }}\n\`\`\``,
             });
