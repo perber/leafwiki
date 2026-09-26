@@ -1,5 +1,7 @@
+import { Button } from '@/components/ui/button'
 import { versionAssetSrc } from '@/lib/assetSrc'
 import i18next from '@/lib/i18n'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { ExternalLink } from 'lucide-react'
 import { useMemo } from 'react'
 
@@ -25,6 +27,29 @@ export function MarkdownPdfEmbed({
     () => versionAssetSrc(resolvedSrc),
     [resolvedSrc],
   )
+  const isMobile = useIsMobile()
+  const openLabel = i18next.t('imagePreview.openInNewTab', { ns: 'viewer' })
+
+  // In-page PDF iframes aren't usable on mobile (no pinch-zoom in most
+  // mobile browsers, fixed embed height), so skip the embed there and only
+  // offer the "open" action.
+  if (isMobile) {
+    return (
+      <span className="markdown-pdf-embed" style={{ width: width || '100%' }}>
+        <Button asChild variant="outline" className="w-full">
+          <a
+            href={versionedSrc}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={alt || openLabel}
+          >
+            <ExternalLink size={14} />
+            {openLabel}
+          </a>
+        </Button>
+      </span>
+    )
+  }
 
   return (
     <span className="markdown-pdf-embed" style={{ width: width || '100%' }}>
@@ -41,7 +66,7 @@ export function MarkdownPdfEmbed({
         className="markdown-pdf-embed__open-link"
       >
         <ExternalLink size={14} />
-        {i18next.t('imagePreview.openInNewTab', { ns: 'viewer' })}
+        {openLabel}
       </a>
     </span>
   )
