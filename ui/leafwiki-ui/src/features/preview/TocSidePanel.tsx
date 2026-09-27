@@ -110,7 +110,13 @@ export function TocSidePanel({
           <>
             {entries.length > 0 && (
               <li>
-                <p className="page-viewer__toc-panel-title mt-3">
+                <p
+                  className={cn(
+                    'page-viewer__toc-panel-title mt-3',
+                    collapsed && 'page-viewer__toc-panel-hidden',
+                  )}
+                  aria-hidden={collapsed}
+                >
                   {t('toc.downloads')}
                 </p>
               </li>
