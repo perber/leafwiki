@@ -13,6 +13,12 @@ export function useScrollRestoration(
     const hash = window.location.hash
     if (hash) return
 
+    // Search result navigation (?q=) scrolls to the first match instead.
+    const searchQuery = (
+      new URLSearchParams(window.location.search).get('q') ?? ''
+    ).trim()
+    if (searchQuery.length >= 3) return
+
     if (isLoading) return
 
     const el = document.getElementById(containerId)
@@ -34,6 +40,11 @@ export function useScrollRestoration(
     // if hash is present, do not restore scroll position
     const hash = window.location.hash
     if (hash) return
+
+    const searchQuery = (
+      new URLSearchParams(window.location.search).get('q') ?? ''
+    ).trim()
+    if (searchQuery.length >= 3) return
 
     return () => {
       const el = document.getElementById(containerId)
