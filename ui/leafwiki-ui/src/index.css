@@ -2388,6 +2388,15 @@
     @apply list-disc;
   }
 
+  /* remark-gfm marks task-list items with this class, but the forced
+     list-disc above still applies to them, so the checkbox renders next to
+     a bullet dot instead of alone (#1579). */
+  .markdown-editor__preview ul li.task-list-item,
+  .page-viewer__content ul li.task-list-item,
+  .page-history__preview-body ul li.task-list-item {
+    @apply list-none;
+  }
+
   .markdown-editor__preview .markdown-footnotes,
   .page-viewer__content .markdown-footnotes {
     @apply border-border/70 relative mt-10 overflow-x-hidden border-t pt-6 text-sm;
