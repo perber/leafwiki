@@ -79,9 +79,12 @@ export function PageQuickSwitcherDialog() {
 
   const openResult = (path: string) => {
     queueMicrotask(() => {
+      // Close before navigating: committing the route change first leaves a
+      // render race between the transition and this dialog's own close
+      // state, which can flash the dialog back open for a frame.
+      closeDialog()
       openAncestorsForPath(path)
       navigate(`/${path}`, { state: createNavigationVisitState() })
-      closeDialog()
     })
   }
 
