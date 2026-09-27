@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TocDropdownButton } from './TocDropdownButton'
@@ -56,9 +56,9 @@ afterEach(() => {
   document.querySelectorAll('h2[id]').forEach((el) => el.remove())
 })
 
-async function openDropdown() {
+async function openDropdown(name: RegExp | string = /on this page/i) {
   const user = userEvent.setup()
-  await user.click(screen.getByRole('button', { name: /on this page/i }))
+  await user.click(screen.getByRole('button', { name }))
 }
 
 describe('TocDropdownButton — rendering', () => {
@@ -178,16 +178,34 @@ describe('TocDropdownButton — downloads', () => {
 
   it('omits the downloads label when there are no entries', async () => {
     render(<TocDropdownButton entries={[]} downloads={downloads} />)
-    await openDropdown()
+    await openDropdown(/attached media/i)
+    const menu = await screen.findByRole('menu')
     expect(
-      await screen.findByTestId('toc-dropdown-download-notes.pdf'),
+      await within(menu).findByTestId('toc-dropdown-download-notes.pdf'),
     ).toBeInTheDocument()
-    expect(screen.queryByText('Attached Media')).not.toBeInTheDocument()
+    expect(within(menu).queryByText('Attached Media')).not.toBeInTheDocument()
   })
 
   it('renders no downloads section when there are none', async () => {
     render(<TocDropdownButton entries={entries} downloads={[]} />)
     await openDropdown()
     expect(screen.queryByText('Attached Media')).not.toBeInTheDocument()
+  })
+
+  it('shows the downloads label as the trigger text when there are no entries', () => {
+    render(<TocDropdownButton entries={[]} downloads={downloads} />)
+    expect(
+      screen.getByRole('button', { name: 'Attached Media' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /on this page/i }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('keeps the "on this page" trigger text when entries are present, even with downloads', () => {
+    render(<TocDropdownButton entries={entries} downloads={downloads} />)
+    expect(
+      screen.getByRole('button', { name: /on this page/i }),
+    ).toBeInTheDocument()
   })
 })

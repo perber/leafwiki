@@ -57,7 +57,7 @@ export function TocDropdownButton({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm">
-          {t('toc.onThisPage')}
+          {entries.length > 0 ? t('toc.onThisPage') : t('toc.downloads')}
           <ChevronDown size={12} />
         </Button>
       </DropdownMenuTrigger>
