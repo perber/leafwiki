@@ -4,6 +4,10 @@ import {
   scrollToSearchQuery,
 } from './scrollToSearchQuery'
 
+// jsdom has never implemented scrollIntoView; vi.spyOn requires the property
+// to exist on the prototype first (see other tests, e.g. MovePageDialog.test.tsx).
+Element.prototype.scrollIntoView = () => {}
+
 beforeEach(() => {
   const sc = document.createElement('div')
   sc.id = 'scroll-container'

@@ -8,9 +8,7 @@ export type ScrollToSearchQueryOptions = {
   rootSelector?: string
 }
 
-export function clearSearchQueryHighlights(
-  root: ParentNode = document,
-): void {
+export function clearSearchQueryHighlights(root: ParentNode = document): void {
   root.querySelectorAll(`mark.${HIGHLIGHT_CLASS}`).forEach((mark) => {
     const parent = mark.parentNode
     if (!parent) return
