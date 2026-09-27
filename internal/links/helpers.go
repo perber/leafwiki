@@ -266,8 +266,15 @@ func resolveURLPath(currentPath, href string) (string, error) {
 
 	resolved := base.ResolveReference(ref)
 
+	path := resolved.Path
+	// Importers and filesystem-oriented Markdown often keep a .md suffix;
+	// LeafWiki page routes do not, so strip it before lookup.
+	if strings.HasSuffix(strings.ToLower(path), ".md") {
+		path = path[:len(path)-3]
+	}
+
 	// normalize result path (strip trailing slash etc.)
-	return normalizeWikiPath(resolved.Path), nil
+	return normalizeWikiPath(path), nil
 }
 
 func resolveTargetLinks(tree *tree.TreeService, currentPath string, links []string) []TargetLink {
