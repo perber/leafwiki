@@ -46,8 +46,48 @@ if ! git rev-parse --verify "$CURRENT_TAG" >/dev/null 2>&1; then
   exit 1
 fi
 
+HAVE_GH=0
+if command -v gh >/dev/null 2>&1; then
+  HAVE_GH=1
+else
+  echo "⚠️  'gh' not found, falling back to git author names instead of GitHub handles."
+fi
+
+declare -A PR_AUTHOR_CACHE
+
+# Resolves a commit subject to "@<github-handle>" via its PR number when
+# possible (GitHub squash-merges append "(#1234)" to the subject); falls back
+# to the git commit author's display name otherwise.
+resolve_author() {
+  local commit_hash="$1"
+  local subject="$2"
+  local pr_number=""
+
+  if [[ "$subject" =~ \(#([0-9]+)\)[[:space:]]*$ ]]; then
+    pr_number="${BASH_REMATCH[1]}"
+  fi
+
+  if [[ -n "$pr_number" && "$HAVE_GH" -eq 1 ]]; then
+    if [[ -z "${PR_AUTHOR_CACHE[$pr_number]+set}" ]]; then
+      PR_AUTHOR_CACHE[$pr_number]=$(gh pr view "$pr_number" --json author -q '.author.login' 2>/dev/null || true)
+    fi
+    if [[ -n "${PR_AUTHOR_CACHE[$pr_number]}" ]]; then
+      echo "@${PR_AUTHOR_CACHE[$pr_number]}"
+      return
+    fi
+  fi
+
+  git log -1 --format="%an" "$commit_hash"
+}
+
 # Collect commits
-COMMITS=$(git log "$PREVIOUS_TAG".."$CURRENT_TAG" --pretty=format:"%s (@%an)")
+COMMITS=""
+while IFS=$'\t' read -r hash subject; do
+  [[ -z "$hash" ]] && continue
+  author=$(resolve_author "$hash" "$subject")
+  COMMITS+="$subject ($author)"$'\n'
+done < <(git log "$PREVIOUS_TAG".."$CURRENT_TAG" --pretty=format:"%H%x09%s")
+COMMITS="${COMMITS%$'\n'}"
 
 # Categorize exclusively
 FEATURES=""
