@@ -1547,7 +1547,7 @@
   }
 
   .page-viewer__content mark.search-query-highlight {
-    @apply bg-brand/25 text-inherit rounded-sm px-0.5;
+    @apply bg-brand/25 rounded-sm px-0.5 text-inherit;
   }
 
   .page-refactor-dialog__results-view {
