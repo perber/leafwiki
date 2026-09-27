@@ -208,4 +208,11 @@ describe('TocDropdownButton — downloads', () => {
       screen.getByRole('button', { name: /on this page/i }),
     ).toBeInTheDocument()
   })
+
+  it('falls back to "on this page" when there are neither entries nor downloads', () => {
+    render(<TocDropdownButton entries={[]} downloads={[]} />)
+    expect(
+      screen.getByRole('button', { name: /on this page/i }),
+    ).toBeInTheDocument()
+  })
 })
