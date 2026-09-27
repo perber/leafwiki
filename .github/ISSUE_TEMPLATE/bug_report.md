@@ -22,7 +22,29 @@ assignees: ''
 * [ ] Desktop Web
 * [ ] Mobile Web
 
-### Running on
+### Browser
+
+* [ ] Chrome
+* [ ] Firefox
+* [ ] Safari
+* [ ] Edge
+* [ ] Other (please specify):
+
+### Client OS
+
+<!-- The device/OS you're browsing from, not the server. -->
+
+* [ ] Windows
+* [ ] MacOS
+* [ ] Linux
+* [ ] iOS
+* [ ] Android
+* [ ] Other (please specify):
+
+### Server OS
+
+<!-- The machine/container running your LeafWiki instance, not the device you're browsing from. -->
+
 * [ ] Docker
 * [ ] linux amd64
 * [ ] windows amd64
