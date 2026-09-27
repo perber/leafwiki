@@ -2327,6 +2327,39 @@ First reference[^leafwiki] and second reference[^leafwiki]
       .toBe('#user-content-fnref-leafwiki-2');
   });
 
+  // Regression for #1579: remark-gfm marks task-list items with a
+  // `task-list-item` class, but our own CSS forces `list-disc` on every
+  // `ul li` in this content, so the checkbox rendered alongside a bullet
+  // dot instead of alone.
+  test('task list items render without a bullet marker', async ({ page }) => {
+    const timestamp = Date.now();
+    const slug = `task-list-markers-${timestamp}`;
+    const title = `Task List Markers ${timestamp}`;
+    const content = [
+      '- [ ] Go into an estate that has an amount that would be included in the cheque',
+      '- [ ] Go to banking > Recoverable expenses',
+      '  - [ ] Nested task item',
+    ].join('\n');
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    const taskListItems = page.locator('article li.task-list-item');
+    await taskListItems.first().waitFor({ state: 'visible' });
+    await test.expect(taskListItems).toHaveCount(3);
+
+    const listStyles = await taskListItems.evaluateAll((items) =>
+      items.map((item) => getComputedStyle(item).listStyleType),
+    );
+    for (const listStyleType of listStyles) {
+      test.expect(listStyleType).toBe('none');
+    }
+
+    await test.expect(taskListItems.first().locator('input[type="checkbox"]')).toBeVisible();
+  });
+
   test('navigating away from markdown-it sample stays responsive', async ({ page }) => {
     const timestamp = Date.now();
     const slug = `markdown-it-sample-${timestamp}`;
