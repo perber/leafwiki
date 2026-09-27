@@ -30,6 +30,7 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
 - [Install](#install)
   - [Docker](#docker)
   - [Docker Compose](#docker-compose)
+  - [Kubernetes](#kubernetes)
   - [Linux installer](#linux-installer)
   - [Binary](#binary)
   - [Reset admin password](#reset-admin-password)
@@ -173,6 +174,10 @@ services:
       - ${HOME}/leafwiki-data:/app/data
     restart: unless-stopped
 ```
+
+### Kubernetes
+
+See [docs/install/kubernetes.md](docs/install/kubernetes.md) for a `Deployment` + `PersistentVolumeClaim` + `Service` + `Ingress` example (Gateway API alternative included).
 
 ### Linux installer
 
