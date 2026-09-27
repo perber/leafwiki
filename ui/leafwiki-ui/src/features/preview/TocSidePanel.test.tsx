@@ -310,4 +310,20 @@ describe('TocSidePanel — downloads', () => {
       '/assets/p1/notes.pdf',
     )
   })
+
+  it('shows the downloads title when there are attachments but no headings', () => {
+    render(
+      <TocSidePanel
+        entries={[]}
+        downloads={[{ name: 'notes.pdf', url: '/assets/p1/notes.pdf' }]}
+      />,
+    )
+    expect(screen.getByText('Attached Media')).toBeInTheDocument()
+    expect(screen.queryByText('On this page')).not.toBeInTheDocument()
+  })
+
+  it('falls back to the "on this page" title when there are neither headings nor attachments', () => {
+    render(<TocSidePanel entries={[]} downloads={[]} />)
+    expect(screen.getByText('On this page')).toBeInTheDocument()
+  })
 })

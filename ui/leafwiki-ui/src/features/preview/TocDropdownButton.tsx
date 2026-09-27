@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { ChevronDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { TocEntry } from './extractTocEntries'
+import { tocTitleKey } from './tocTitleKey'
 import { useTocScrollSpy } from './useTocScrollSpy'
 
 type Props = {
@@ -57,7 +58,7 @@ export function TocDropdownButton({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm">
-          {t('toc.onThisPage')}
+          {t(tocTitleKey(entries.length, downloads.length))}
           <ChevronDown size={12} />
         </Button>
       </DropdownMenuTrigger>
