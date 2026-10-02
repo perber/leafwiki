@@ -3,7 +3,7 @@ module github.com/perber/wiki
 go 1.26.0
 
 require (
-	github.com/dustin/go-humanize v1.0.1
+	github.com/dustin/go-humanize v1.1.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-git/go-git/v5 v5.19.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -13,12 +13,12 @@ require (
 	github.com/prometheus/client_golang v1.24.1
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/teris-io/shortid v0.0.0-20220617161101-71ec9f2aa569
-	github.com/urfave/cli/v3 v3.11.0
-	github.com/yuin/goldmark v1.8.5
-	golang.org/x/crypto v0.56.0
-	golang.org/x/image v0.45.0
+	github.com/urfave/cli/v3 v3.13.0
+	github.com/yuin/goldmark v1.8.6
+	golang.org/x/crypto v0.57.0
+	golang.org/x/image v0.46.0
 	gopkg.in/yaml.v3 v3.0.1
-	modernc.org/sqlite v1.57.0
+	modernc.org/sqlite v1.60.0
 )
 
 require (
@@ -74,12 +74,12 @@ require (
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	go.mongodb.org/mongo-driver/v2 v2.5.0 // indirect
 	golang.org/x/arch v0.22.0 // indirect
-	golang.org/x/net v0.57.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
-	modernc.org/libc v1.74.4 // indirect
+	modernc.org/libc v1.77.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
-	modernc.org/memory v1.11.0 // indirect
+	modernc.org/memory v1.12.1 // indirect
 )
