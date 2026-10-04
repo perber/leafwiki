@@ -53,6 +53,12 @@ updates:
     groups:
       npm-dependencies:
         patterns: ["*"]
+    ignore:
+      # typescript-eslint hard-fails on TS 7 ("does not support TS 7.0");
+      # drop this once it supports it.
+      - dependency-name: "typescript"
+        update-types:
+          - "version-update:semver-major"
     labels:
       - "dependencies"
       - "frontend"
