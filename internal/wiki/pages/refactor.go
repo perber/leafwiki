@@ -215,7 +215,7 @@ func (uc *PreviewPageRefactorUseCase) getAffectedPages(oldPath string, pageTitle
 	if sentinelTitle != "" {
 		// If multiple pages share the old title the [[OldTitle]] sentinel is
 		// ambiguous. After the rename the title will belong to fewer pages and
-		// HealWikiLinksForTitleIfUnambiguous will resolve the sentinel
+		// ReconcileTitle will resolve the sentinel
 		// automatically. Showing these links in the refactor preview would be
 		// misleading — skip them.
 		if len(uc.tree.FindPagesByTitle(sentinelTitle)) <= 1 {
@@ -489,7 +489,7 @@ func (uc *ApplyPageRefactorUseCase) buildApplyPlan(in RefactorApplyInput) (*appl
 	// are not found by the prefix-based lookup above.
 	if in.Kind == RefactorKindRename && in.Title != plan.page.Title {
 		// If multiple pages share the old title the sentinel is ambiguous.
-		// HealWikiLinksForTitleIfUnambiguous resolves it automatically after the
+		// ReconcileTitle resolves it automatically after the
 		// rename — including them here would silently rewrite links the user
 		// never approved (preview showed 0 affected pages for this case).
 		if len(uc.tree.FindPagesByTitle(plan.page.Title)) <= 1 {

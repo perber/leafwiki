@@ -71,13 +71,13 @@ func TestLinkIndexSideEffect_Rename_HealsPreexistingBrokenWikilinks(t *testing.T
 		t.Fatalf("UpdateLinksForPage: %v", err)
 	}
 
-	// Precondition: sentinel must be broken (ambiguous).
+	// Precondition: sentinel is ambiguous (unresolved, but not broken).
 	out, err := svc.GetOutgoingLinksForPage(linkerID)
 	if err != nil {
 		t.Fatalf("GetOutgoingLinksForPage: %v", err)
 	}
-	if out.Count != 1 || !out.Outgoings[0].Broken {
-		t.Fatalf("precondition failed: expected 1 broken [[Alpha]] sentinel, got %+v", out.Outgoings)
+	if out.Count != 1 || out.Outgoings[0].Broken || out.Outgoings[0].ToPageID != "" {
+		t.Fatalf("precondition failed: expected 1 ambiguous [[Alpha]] sentinel, got %+v", out.Outgoings)
 	}
 
 	// Rename "Alpha" → "Beta" in the tree (UpdateNode mutates the live node).

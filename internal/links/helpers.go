@@ -37,10 +37,37 @@ func WikilinkTitleFromSentinel(toPath string) string {
 	return strings.TrimPrefix(toPath, wikilinkSentinelPrefix)
 }
 
+// LinkState is the resolution state of a stored link. It is computed on write
+// (source save and title reconcile), never on read.
+type LinkState int
+
+const (
+	// LinkResolved: the target exists and is unique.
+	LinkResolved LinkState = 0
+	// LinkBroken: the target does not exist.
+	LinkBroken LinkState = 1
+	// LinkAmbiguous: a [[Title]] matches several pages. Not broken — it shows
+	// up as a backlink on every matching page.
+	LinkAmbiguous LinkState = 2
+)
+
+// classifyTitleMatches is the single rule mapping the number of pages that
+// match a wiki-link title to a link state.
+func classifyTitleMatches(matches int) LinkState {
+	switch {
+	case matches == 0:
+		return LinkBroken
+	case matches == 1:
+		return LinkResolved
+	default:
+		return LinkAmbiguous
+	}
+}
+
 type TargetLink struct {
 	TargetPageID   string
 	TargetPagePath string
-	Broken         bool
+	State          LinkState
 }
 
 var markdownParser = goldmark.New()
@@ -128,10 +155,9 @@ func extractWikiLinksFromMarkdown(content string) []string {
 // happens to share a slug path. Only when there is NO title match at all is
 // a slash-containing target retried as a direct route-path lookup
 // ([[Folder/Title]] → /folder/title), which supports nested-path link hints
-// that are not real page titles. An ambiguous title match (N>1) is treated
-// the same as the plain-title case below — broken — rather than falling
-// back to a route-path guess, for consistency: ambiguity is always surfaced
-// as broken, never silently resolved via a different mechanism.
+// that are not real page titles. An ambiguous title match (N>1) is never
+// retried as a route path; it is stored as LinkAmbiguous (see
+// classifyTitleMatches), never silently resolved via a different mechanism.
 func resolveWikiLinkTargets(treeService *tree.TreeService, targets []string) []TargetLink {
 	if !treeService.IsLoaded() || len(targets) == 0 {
 		return nil
@@ -139,61 +165,39 @@ func resolveWikiLinkTargets(treeService *tree.TreeService, targets []string) []T
 
 	var result []TargetLink
 	for _, target := range targets {
-		if strings.Contains(target, "/") {
-			pages := treeService.FindPagesByTitle(target)
-			if len(pages) == 1 {
+		pages := treeService.FindPagesByTitle(target)
+
+		// A slash-containing target with NO title match is retried as a direct
+		// route-path hint ([[Folder/Title]] → /folder/title).
+		if strings.Contains(target, "/") && len(pages) == 0 {
+			routePath := strings.TrimPrefix(target, "/")
+			page, err := treeService.FindPageByRoutePath(routePath)
+			if err == nil && page != nil {
 				result = append(result, TargetLink{
-					TargetPageID:   pages[0].ID,
-					TargetPagePath: wikilinkSentinel(target),
-					Broken:         false,
+					TargetPageID:   page.ID,
+					TargetPagePath: normalizeWikiPath(page.CalculatePath()),
+					State:          LinkResolved,
 				})
 				continue
 			}
-			if len(pages) == 0 {
-				// No title matches this exact string — retry as a
-				// route-path hint (e.g. [[some/nested/page]]).
-				routePath := strings.TrimPrefix(target, "/")
-				page, err := treeService.FindPageByRoutePath(routePath)
-				if err == nil && page != nil {
-					result = append(result, TargetLink{
-						TargetPageID:   page.ID,
-						TargetPagePath: normalizeWikiPath(page.CalculatePath()),
-						Broken:         false,
-					})
-					continue
-				}
-				// Store as a normal broken route path so
-				// HealLinksForExactPath can heal it when the page is later
-				// created at that path.
-				result = append(result, TargetLink{
-					Broken:         true,
-					TargetPagePath: "/" + routePath,
-				})
-				continue
-			}
-			// N>1 title matches — ambiguous, same as the plain-title case.
+			// Store as a normal broken route path so
+			// HealLinksForExactPath can heal it when the page is later
+			// created at that path.
 			result = append(result, TargetLink{
-				Broken:         true,
-				TargetPagePath: wikilinkSentinel(target),
+				State:          LinkBroken,
+				TargetPagePath: "/" + routePath,
 			})
 			continue
 		}
 
-		// Pure title-based lookup.
-		pages := treeService.FindPagesByTitle(target)
-		if len(pages) == 1 {
-			result = append(result, TargetLink{
-				TargetPageID:   pages[0].ID,
-				TargetPagePath: wikilinkSentinel(target),
-				Broken:         false,
-			})
-		} else {
-			// 0 matches (not found) or N>1 (ambiguous) → broken sentinel.
-			result = append(result, TargetLink{
-				Broken:         true,
-				TargetPagePath: wikilinkSentinel(target),
-			})
+		link := TargetLink{
+			State:          classifyTitleMatches(len(pages)),
+			TargetPagePath: wikilinkSentinel(target),
 		}
+		if len(pages) == 1 {
+			link.TargetPageID = pages[0].ID
+		}
+		result = append(result, link)
 	}
 	return result
 }
@@ -301,14 +305,14 @@ func resolveTargetLinks(tree *tree.TreeService, currentPath string, links []stri
 			targetLinks = append(targetLinks, TargetLink{
 				TargetPageID:   page.ID,
 				TargetPagePath: resolvedPath,
-				Broken:         false,
+				State:          LinkResolved,
 			})
 		} else {
 			// not found, broken link
 			targetLinks = append(targetLinks, TargetLink{
 				TargetPageID:   "",
 				TargetPagePath: resolvedPath,
-				Broken:         true,
+				State:          LinkBroken,
 			})
 		}
 	}
@@ -367,7 +371,7 @@ func toOutgoingResultItem(tree *tree.TreeService, outgoing Outgoing) OutgoingRes
 	item := OutgoingResultItem{
 		ToPageID:   outgoing.ToPageID,
 		ToPath:     displayPath,
-		Broken:     outgoing.Broken,
+		Broken:     outgoing.State == LinkBroken,
 		FromPageID: outgoing.FromPageID,
 	}
 
