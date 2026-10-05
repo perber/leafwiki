@@ -58,6 +58,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		assetsFS := gin.Dir(r.assetsDir, false)
 		assetsGroup := ctx.Base.Group("/assets")
 		assetsGroup.Use(
+			assetServeHeaders(),
 			authmw.InjectPublicEditor(opts.AuthDisabled),
 			authmw.RequireAuthOrPublicRead(r.authService, ctx.AuthCookies, opts.AuthDisabled, opts.PublicAccess),
 		)
