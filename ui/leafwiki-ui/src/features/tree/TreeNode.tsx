@@ -13,7 +13,7 @@ import { useTreeStore } from '@/stores/tree'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import clsx from 'clsx'
 import { ChevronUp, FilePlus, FolderPlus } from 'lucide-react'
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { useTreeDndStore } from './treeDndStore'
@@ -22,9 +22,16 @@ import TreeNodeActionsMenu from './TreeNodeActionsMenu'
 
 type Props = {
   node: PageNode
+  // True when an ancestor section is collapsed. Such rows are hidden, so
+  // they must not register as drag/drop targets: dnd-kit measures every
+  // registered droppable when a drag starts.
+  inClosedBranch?: boolean
 }
 
-export const TreeNode = React.memo(function TreeNode({ node }: Props) {
+export const TreeNode = React.memo(function TreeNode({
+  node,
+  inClosedBranch = false,
+}: Props) {
   const { t } = useTranslation('viewer')
   const open = useTreeStore((s) => !!s.openNodeIdSet?.[node.id])
   const isStoreActive = useTreeStore((s) => s.activeNodeId === node.id)
@@ -70,19 +77,21 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
   const dropZone = useTreeDndStore((s) =>
     s.dropTarget?.nodeId === node.id ? s.dropTarget.zone : null,
   )
+  const dndData = useMemo(() => ({ node }), [node])
+  const dndDisabled = !dndEnabled || inClosedBranch
   const {
     setNodeRef: setDragRef,
     listeners,
     isDragging,
   } = useDraggable({
     id: node.id,
-    data: { node },
-    disabled: !dndEnabled,
+    data: dndData,
+    disabled: dndDisabled,
   })
   const { setNodeRef: setDropRef } = useDroppable({
     id: node.id,
-    data: { node },
-    disabled: !dndEnabled,
+    data: dndData,
+    disabled: dndDisabled,
   })
   const setRowRef = (el: HTMLElement | null) => {
     setDragRef(el)
@@ -210,7 +219,11 @@ export const TreeNode = React.memo(function TreeNode({ node }: Props) {
       >
         {hasChildren &&
           node.children?.map((child) => (
-            <TreeNode key={child.id} node={child} />
+            <TreeNode
+              key={child.id}
+              node={child}
+              inClosedBranch={inClosedBranch || !open}
+            />
           ))}
       </div>
     </>
