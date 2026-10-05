@@ -43,6 +43,13 @@ function manualChunks(id: string): string | undefined {
   return undefined
 }
 
+// Go's //go:embed skips files whose names start with "_" or "." when embedding
+// a directory, so a chunk like "_baseUniq-*.js" would be missing from the
+// binary and 404 at runtime. Strip such prefixes from chunk names.
+export function chunkFileName(chunk: { name: string }): string {
+  return `static/${chunk.name.replace(/^[._]+/, '')}-[hash].js`
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ command }: ConfigEnv) => ({
   // Relative base so asset paths in the built HTML are ./static/... instead of /static/...
@@ -80,7 +87,7 @@ export default defineConfig(({ command }: ConfigEnv) => ({
     assetsDir: 'static', // <--- here you change the target directory
     rollupOptions: {
       output: {
-        chunkFileNames: 'static/[name]-[hash].js',
+        chunkFileNames: chunkFileName,
         entryFileNames: 'static/[name]-[hash].js',
         assetFileNames: 'static/[name].[hash][extname]',
         manualChunks,
