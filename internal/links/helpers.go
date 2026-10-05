@@ -54,10 +54,10 @@ const (
 // classifyTitleMatches is the single rule mapping the number of pages that
 // match a wiki-link title to a link state.
 func classifyTitleMatches(matches int) LinkState {
-	switch {
-	case matches == 0:
+	switch matches {
+	case 0:
 		return LinkBroken
-	case matches == 1:
+	case 1:
 		return LinkResolved
 	default:
 		return LinkAmbiguous
