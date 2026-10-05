@@ -4,8 +4,8 @@ type Outgoing struct {
 	FromPageID string
 	ToPageID   string
 	FromTitle  string
-	ToPath     string // Path of the target page
-	Broken     bool   // Indicates if the link is broken
+	ToPath     string    // Path of the target page
+	State      LinkState // Resolution state (resolved, broken, ambiguous)
 }
 
 type OutgoingResult struct {

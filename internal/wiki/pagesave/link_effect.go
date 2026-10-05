@@ -2,6 +2,7 @@ package pagesave
 
 import (
 	"log/slog"
+	"strings"
 
 	"github.com/perber/wiki/internal/core/tree"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
@@ -34,28 +35,16 @@ func (e *LinkIndexSideEffect) Apply(event PageSaveEvent) {
 	switch event.Operation {
 	case PageOperationCreate:
 		e.updateAndHeal(event.After, event.Operation)
+		e.reconcilePageTitle(event.After, event.Operation)
 
 	case PageOperationRestore:
 		// Content was restored to a previous version; update outgoing links and heal incoming.
 		e.updateAndHeal(event.After, event.Operation)
+		e.reconcilePageTitle(event.After, event.Operation)
 
 	case PageOperationUpdate:
 		if event.SlugChanged {
 			e.markBrokenForOldPath(event.OldPath, event.Operation)
-			// When the title also changed, healed wikilink sentinels
-			// (wikilink:OldTitle, broken=0) are not reached by the path-prefix
-			// query above. Break them by page ID, then re-heal if another page
-			// now exclusively holds the old title.
-			if event.TitleChanged && event.After != nil {
-				if err := e.svc.MarkIncomingLinksBrokenForPage(event.After.ID); err != nil {
-					e.log.Warn("failed to mark incoming links broken for renamed page", "pageID", event.After.ID, "error", err)
-					e.recordFailure(event.Operation)
-				}
-				if err := e.svc.HealWikiLinksForTitleIfUnambiguous(event.OldTitle); err != nil {
-					e.log.Warn("failed to heal wiki links for old title", "title", event.OldTitle, "error", err)
-					e.recordFailure(event.Operation)
-				}
-			}
 			for _, p := range event.AffectedPages {
 				e.updateAndHeal(p, event.Operation)
 			}
@@ -65,6 +54,12 @@ func (e *LinkIndexSideEffect) Apply(event PageSaveEvent) {
 				e.recordFailure(event.Operation)
 			}
 			e.healExact(event.After, event.Operation)
+		}
+		// A title change alters which pages carry the old and the new title,
+		// whether or not the slug changed. [[OldTitle]] and [[NewTitle]] links
+		// are recomputed in one statement per title.
+		if event.TitleChanged && event.After != nil {
+			e.reconcileTitles(event.Operation, event.OldTitle, event.After.Title)
 		}
 
 	case PageOperationMove:
@@ -81,6 +76,7 @@ func (e *LinkIndexSideEffect) Apply(event PageSaveEvent) {
 			}
 		}
 		if event.Before == nil {
+			e.reconcileDeletedTitles(event)
 			return
 		}
 		if len(event.AffectedPages) > 1 {
@@ -110,23 +106,7 @@ func (e *LinkIndexSideEffect) Apply(event PageSaveEvent) {
 				}
 			}
 		}
-		// After deletion the title may now be unambiguous: heal any [[Title]]
-		// sentinels that were waiting for a unique match. Deduplicate by title
-		// to avoid redundant DB round-trips for same-titled pages in a subtree.
-		seenTitles := make(map[string]struct{}, len(event.AffectedPages))
-		for _, p := range event.AffectedPages {
-			if p == nil || p.Title == "" {
-				continue
-			}
-			if _, seen := seenTitles[p.Title]; seen {
-				continue
-			}
-			seenTitles[p.Title] = struct{}{}
-			if err := e.svc.HealWikiLinksForTitleIfUnambiguous(p.Title); err != nil {
-				e.log.Warn("failed to heal wiki links after delete", "title", p.Title, "error", err)
-				e.recordFailure(event.Operation)
-			}
-		}
+		e.reconcileDeletedTitles(event)
 	}
 }
 
@@ -138,9 +118,44 @@ func (e *LinkIndexSideEffect) healExact(p *tree.Page, operation PageOperationTyp
 		e.log.Warn("failed to heal links for page", "pageID", p.ID, "error", err)
 		e.recordFailure(operation)
 	}
-	if err := e.svc.HealWikiLinksForPage(p); err != nil {
-		e.log.Warn("failed to heal wiki links for page", "pageID", p.ID, "error", err)
-		e.recordFailure(operation)
+}
+
+// reconcileDeletedTitles: the deleted pages no longer carry their titles, so
+// [[Title]] links may now be resolved (one page left), still ambiguous or broken.
+func (e *LinkIndexSideEffect) reconcileDeletedTitles(event PageSaveEvent) {
+	titles := make([]string, 0, len(event.AffectedPages))
+	for _, p := range event.AffectedPages {
+		if p != nil {
+			titles = append(titles, p.Title)
+		}
+	}
+	e.reconcileTitles(event.Operation, titles...)
+}
+
+func (e *LinkIndexSideEffect) reconcilePageTitle(p *tree.Page, operation PageOperationType) {
+	if p == nil {
+		return
+	}
+	e.reconcileTitles(operation, p.Title)
+}
+
+// reconcileTitles recomputes the state of all [[Title]] links for each given
+// title, once per distinct (case-insensitive) title.
+func (e *LinkIndexSideEffect) reconcileTitles(operation PageOperationType, titles ...string) {
+	seen := make(map[string]struct{}, len(titles))
+	for _, title := range titles {
+		key := strings.ToLower(strings.TrimSpace(title))
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		if err := e.svc.ReconcileTitle(title); err != nil {
+			e.log.Warn("failed to reconcile wiki links for title", "title", title, "error", err)
+			e.recordFailure(operation)
+		}
 	}
 }
 

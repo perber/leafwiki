@@ -1636,7 +1636,7 @@ func TestPreviewPageRefactorUseCase_Rename_ExcludesAmbiguousSentinelPagesFromPre
 	// preview, because:
 	//   a) it is ambiguous and cannot be auto-updated
 	//   b) after the rename only one "Grafana" page remains, so
-	//      HealWikiLinksForTitleIfUnambiguous will resolve it automatically.
+	//      ReconcileTitle will resolve it automatically.
 	deps := newTestDeps(t)
 	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default(), nil)
 	updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default(), nil)
@@ -2223,8 +2223,8 @@ func TestDeletePageUseCase_SingleDelete_HealsSentinelWhenDuplicateTitleRemoved(t
 	if err != nil {
 		t.Fatalf("GetOutgoingLinksForPage: %v", err)
 	}
-	if out.Count != 1 || !out.Outgoings[0].Broken {
-		t.Fatalf("precondition: expected broken sentinel, got %+v", out)
+	if out.Count != 1 || out.Outgoings[0].Broken || out.Outgoings[0].ToPageID != "" {
+		t.Fatalf("precondition: expected ambiguous (unresolved) sentinel, got %+v", out)
 	}
 
 	// Delete kafka1 → only kafka2 remains → sentinel should be healed.
@@ -2296,8 +2296,8 @@ func TestDeletePageUseCase_Recursive_HealsSentinelWhenDuplicateTitleRemoved(t *t
 	if err != nil {
 		t.Fatalf("GetOutgoingLinksForPage: %v", err)
 	}
-	if out.Count != 1 || !out.Outgoings[0].Broken {
-		t.Fatalf("precondition: expected broken sentinel, got %+v", out)
+	if out.Count != 1 || out.Outgoings[0].Broken || out.Outgoings[0].ToPageID != "" {
+		t.Fatalf("precondition: expected ambiguous (unresolved) sentinel, got %+v", out)
 	}
 
 	// Delete the whole section (contains kafka1) → kafka2 remains → sentinel healed.
@@ -2334,7 +2334,7 @@ func TestDeletePageUseCase_Recursive_HealsSentinelWhenDuplicateTitleRemoved(t *t
 //
 // Critical setup: [[Kafka]] must be written BEFORE the kafka page exists so it
 // is stored as a broken sentinel (to_path="wikilink:Kafka"). Only then does
-// healing via HealWikiLinksForPage produce a healed sentinel (broken=0,
+// reconciling via ReconcileTitle produce a healed sentinel (broken=0,
 // to_page_id=kafka1, to_path="wikilink:Kafka").
 func TestDeletePageUseCase_Recursive_MarksHealedWikiLinkSentinelBroken(t *testing.T) {
 	deps := newTestDeps(t)
@@ -2357,7 +2357,7 @@ func TestDeletePageUseCase_Recursive_MarksHealedWikiLinkSentinelBroken(t *testin
 		t.Fatalf("UpdatePage source: %v", err)
 	}
 
-	// Step 2: create kafka1 inside a section → HealWikiLinksForPage heals the sentinel
+	// Step 2: create kafka1 inside a section → ReconcileTitle resolves the sentinel
 	// to broken=0, to_page_id=kafka1, to_path="wikilink:Kafka" (not the route path).
 	section, err := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "system", Title: "Section", Slug: "section", Kind: pageKind(),

@@ -192,8 +192,8 @@ func TestResolveTargetLinks_ReturnsBrokenTargetsForNonExisting(t *testing.T) {
 		t.Fatalf("expected 2 target links, got %d: %#v", len(targets), targets)
 	}
 
-	if targets[0].Broken != true {
-		t.Errorf("targets[0].Broken = %v, want true", targets[0].Broken)
+	if targets[0].State != LinkBroken {
+		t.Errorf("targets[0].Broken = %v, want LinkBroken", targets[0].State)
 	}
 	if targets[0].TargetPageID != "" {
 		t.Errorf("targets[0].TargetPageID = %q, want empty", targets[0].TargetPageID)
@@ -202,8 +202,8 @@ func TestResolveTargetLinks_ReturnsBrokenTargetsForNonExisting(t *testing.T) {
 		t.Errorf("targets[0].TargetPagePath = %q, want %q", targets[0].TargetPagePath, "/docs/page1/does-not-exist")
 	}
 
-	if targets[1].Broken != true {
-		t.Errorf("targets[1].Broken = %v, want true", targets[1].Broken)
+	if targets[1].State != LinkBroken {
+		t.Errorf("targets[1].Broken = %v, want LinkBroken", targets[1].State)
 	}
 	if targets[1].TargetPageID != "" {
 		t.Errorf("targets[1].TargetPageID = %q, want empty", targets[1].TargetPageID)
@@ -539,7 +539,7 @@ func TestToOutgoingResult_MapsOutgoingToResultItems(t *testing.T) {
 		t.Fatalf("tree root is nil")
 	}
 
-	outgoings := []Outgoing{{FromPageID: page1ID, ToPageID: page2ID, ToPath: "/docs/page2", Broken: false, FromTitle: "Page 1"}}
+	outgoings := []Outgoing{{FromPageID: page1ID, ToPageID: page2ID, ToPath: "/docs/page2", State: LinkResolved, FromTitle: "Page 1"}}
 
 	result := toOutgoingLinkResult(ts, outgoings)
 	if result == nil {
@@ -580,7 +580,7 @@ func TestToOutgoingResult_WikilinkSentinelDisplaysPlainTitle(t *testing.T) {
 	outgoings := []Outgoing{{
 		FromPageID: page1ID,
 		ToPath:     wikilinkSentinel("Kafka"),
-		Broken:     true,
+		State:      LinkBroken,
 		FromTitle:  "Page 1",
 	}}
 
@@ -1418,7 +1418,7 @@ func TestResolveWikiLinkTargets_SingleTitleMatch(t *testing.T) {
 	if targets[0].TargetPageID != page1ID {
 		t.Errorf("TargetPageID = %q, want %q", targets[0].TargetPageID, page1ID)
 	}
-	if targets[0].Broken {
+	if targets[0].State != LinkResolved {
 		t.Errorf("expected resolved link, got broken")
 	}
 }
@@ -1430,7 +1430,7 @@ func TestResolveWikiLinkTargets_NoMatch_ReturnsBroken(t *testing.T) {
 	if len(targets) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(targets))
 	}
-	if !targets[0].Broken {
+	if targets[0].State != LinkBroken {
 		t.Errorf("expected broken link for unmatched title")
 	}
 }
@@ -1459,7 +1459,7 @@ func TestResolveWikiLinkTargets_AmbiguousTitle_ReturnsBroken(t *testing.T) {
 	if len(targets) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(targets))
 	}
-	if !targets[0].Broken {
+	if targets[0].State != LinkAmbiguous {
 		t.Errorf("expected broken link for ambiguous title")
 	}
 }
@@ -1474,7 +1474,7 @@ func TestResolveWikiLinkTargets_PathHint_Resolved(t *testing.T) {
 	if targets[0].TargetPageID != page1ID {
 		t.Errorf("TargetPageID = %q, want %q", targets[0].TargetPageID, page1ID)
 	}
-	if targets[0].Broken {
+	if targets[0].State != LinkResolved {
 		t.Errorf("expected resolved path hint, got broken")
 	}
 }
@@ -1486,7 +1486,7 @@ func TestResolveWikiLinkTargets_PathHint_BrokenWhenNotFound(t *testing.T) {
 	if len(targets) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(targets))
 	}
-	if !targets[0].Broken {
+	if targets[0].State != LinkBroken {
 		t.Errorf("expected broken link for missing path hint")
 	}
 }
@@ -1498,7 +1498,7 @@ func TestResolveWikiLinkTargets_BrokenSentinelFormat(t *testing.T) {
 	if len(targets) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(targets))
 	}
-	if !targets[0].Broken {
+	if targets[0].State != LinkBroken {
 		t.Errorf("expected broken link")
 	}
 	want := wikilinkSentinel("Nonexistent Page")
@@ -1524,7 +1524,7 @@ func TestResolveWikiLinkTargets_SlashTitleFallback(t *testing.T) {
 	if len(targets) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(targets))
 	}
-	if targets[0].Broken {
+	if targets[0].State != LinkResolved {
 		t.Errorf("expected resolved link via title fallback, got broken")
 	}
 	if targets[0].TargetPageID != *idPtr {
@@ -1568,7 +1568,7 @@ func TestResolveWikiLinkTargets_SlashTitle_PrefersTitleOverCollidingRoutePath(t 
 	if len(targets) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(targets))
 	}
-	if targets[0].Broken {
+	if targets[0].State != LinkResolved {
 		t.Fatalf("expected resolved link to the titled page, got broken")
 	}
 	if targets[0].TargetPageID != *titledIDPtr {
@@ -1597,14 +1597,14 @@ func TestResolveWikiLinkTargets_AmbiguousSlashTitle_ReturnsBroken(t *testing.T) 
 	if len(targets) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(targets))
 	}
-	if !targets[0].Broken {
+	if targets[0].State != LinkAmbiguous {
 		t.Errorf("expected broken link for ambiguous slash-title match")
 	}
 }
 
-// ─── HealWikiLinksForPage ────────────────────────────────────────────────────
+// ─── ReconcileTitle ────────────────────────────────────────────────────
 
-func TestLinkService_HealWikiLinksForPage_HealsAfterPageCreation(t *testing.T) {
+func TestLinkService_ReconcileTitle_HealsAfterPageCreation(t *testing.T) {
 	svc, ts, _ := setupLinkService(t)
 
 	// Page A contains [[Target Page]] which does not exist yet.
@@ -1639,9 +1639,9 @@ func TestLinkService_HealWikiLinksForPage_HealsAfterPageCreation(t *testing.T) {
 		t.Fatalf("GetPage target-page: %v", err)
 	}
 
-	// Healing via HealWikiLinksForPage.
-	if err := svc.HealWikiLinksForPage(targetPage); err != nil {
-		t.Fatalf("HealWikiLinksForPage: %v", err)
+	// Healing via ReconcileTitle.
+	if err := svc.ReconcileTitle(targetPage.Title); err != nil {
+		t.Fatalf("ReconcileTitle: %v", err)
 	}
 
 	// Outgoing should now be resolved.
@@ -1657,9 +1657,9 @@ func TestLinkService_HealWikiLinksForPage_HealsAfterPageCreation(t *testing.T) {
 	}
 }
 
-// Fix 2: HealWikiLinksForTitle uses COLLATE NOCASE, so [[notes]] heals
+// Fix 2: ReconcileTitle matches case-insensitively, so [[notes]] heals
 // when a page titled "Notes" is created.
-func TestLinkService_HealWikiLinksForPage_CaseInsensitive(t *testing.T) {
+func TestLinkService_ReconcileTitle_CaseInsensitive(t *testing.T) {
 	svc, ts, _ := setupLinkService(t)
 
 	pageAIDPtr, err := ts.CreateNode("system", nil, "Page A", "page-a", pageNodeKind())
@@ -1685,8 +1685,8 @@ func TestLinkService_HealWikiLinksForPage_CaseInsensitive(t *testing.T) {
 		t.Fatalf("GetPage notes: %v", err)
 	}
 
-	if err := svc.HealWikiLinksForPage(targetPage); err != nil {
-		t.Fatalf("HealWikiLinksForPage: %v", err)
+	if err := svc.ReconcileTitle(targetPage.Title); err != nil {
+		t.Fatalf("ReconcileTitle: %v", err)
 	}
 
 	out, err := svc.GetOutgoingLinksForPage(*pageAIDPtr)
@@ -1698,9 +1698,10 @@ func TestLinkService_HealWikiLinksForPage_CaseInsensitive(t *testing.T) {
 	}
 }
 
-// Fix 3: Sentinel paths are skipped in rewriteResolvedTargets so they are
-// not mangled into "/wikilink:..." route paths during rename refactors.
-func TestRewriteResolvedTargets_SkipsWikilinkSentinels(t *testing.T) {
+// Fix 3: Wiki-link sentinels are never mangled into "/wikilink:..." route
+// paths during rename refactors; they are re-resolved by title and stay in the
+// result, otherwise ReplaceLinksAndHeal would drop their index rows.
+func TestRewriteResolvedTargets_KeepsWikilinkSentinelsUnmangled(t *testing.T) {
 	ts, page1ID, _ := setupTreeForLinksTest(t)
 
 	page1, err := ts.GetPage(page1ID)
@@ -1709,18 +1710,27 @@ func TestRewriteResolvedTargets_SkipsWikilinkSentinels(t *testing.T) {
 	}
 
 	outgoings := []Outgoing{
-		{FromPageID: page1ID, ToPath: wikilinkSentinel("Missing Page"), Broken: true},
-		{FromPageID: page1ID, ToPath: "/docs/page1", Broken: false, ToPageID: page1ID},
+		{FromPageID: page1ID, ToPath: wikilinkSentinel("Missing Page"), State: LinkBroken},
+		{FromPageID: page1ID, ToPath: "/docs/page1", State: LinkResolved, ToPageID: page1ID},
 	}
 	rules := []RewriteRule{{OldPath: "/docs", NewPath: "/archive"}}
 
 	result := rewriteResolvedTargets(page1.CalculatePath(), outgoings, rules, ts)
 
-	// Only the real path link should be in the result; sentinel is skipped.
-	for _, r := range result {
-		if strings.HasPrefix(r.TargetPagePath, "wikilink:") || strings.HasPrefix(r.TargetPagePath, "/wikilink:") {
-			t.Errorf("sentinel path must not appear in rewrite result, got %q", r.TargetPagePath)
+	var sentinel *TargetLink
+	for i, r := range result {
+		if strings.HasPrefix(r.TargetPagePath, "/wikilink:") {
+			t.Errorf("sentinel mangled into a route path: %q", r.TargetPagePath)
 		}
+		if r.TargetPagePath == wikilinkSentinel("Missing Page") {
+			sentinel = &result[i]
+		}
+	}
+	if sentinel == nil {
+		t.Fatalf("sentinel must be kept in the rewrite result, got %#v", result)
+	}
+	if sentinel.State != LinkBroken {
+		t.Errorf("sentinel state = %v, want broken", sentinel.State)
 	}
 }
 
@@ -1733,7 +1743,7 @@ func TestResolveWikiLinkTargets_PathHint_BrokenStoresAsRoutePath(t *testing.T) {
 	if len(targets) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(targets))
 	}
-	if !targets[0].Broken {
+	if targets[0].State != LinkBroken {
 		t.Errorf("expected broken link")
 	}
 	if IsWikilinkSentinel(targets[0].TargetPagePath) {
@@ -1872,11 +1882,11 @@ func TestLinkService_AmbiguousWikiLinksAreNotBrokenInSourceStatus(t *testing.T) 
 	}
 }
 
-// ─── HealWikiLinksForPage ambiguity guard ─────────────────────────────────────
+// ─── ReconcileTitle ambiguity guard ─────────────────────────────────────
 
-// Gap 3: when N>1 pages share a title, HealWikiLinksForPage must not heal
+// Gap 3: when N>1 pages share a title, ReconcileTitle must not heal
 // broken [[Title]] sentinels, because the link is still ambiguous.
-func TestLinkService_HealWikiLinksForPage_DoesNotHealWhenAmbiguous(t *testing.T) {
+func TestLinkService_ReconcileTitle_StaysAmbiguousWhenSeveralPagesRemain(t *testing.T) {
 	svc, ts, _ := setupLinkService(t)
 
 	// Two "Kafka" pages already exist.
@@ -1907,11 +1917,11 @@ func TestLinkService_HealWikiLinksForPage_DoesNotHealWhenAmbiguous(t *testing.T)
 	if err != nil {
 		t.Fatalf("GetOutgoingLinksForPage: %v", err)
 	}
-	if out.Count != 1 || !out.Outgoings[0].Broken {
-		t.Fatalf("precondition: expected [[Kafka]] to be a broken sentinel with 2 pages, got %+v", out)
+	if out.Count != 1 || out.Outgoings[0].Broken || out.Outgoings[0].ToPageID != "" {
+		t.Fatalf("precondition: expected [[Kafka]] to be an ambiguous (unresolved, not broken) sentinel with 2 pages, got %+v", out)
 	}
 
-	// Create a third "Kafka" page and call HealWikiLinksForPage for it.
+	// Create a third "Kafka" page and call ReconcileTitle for it.
 	// The sentinel must stay broken because 3 pages share the title.
 	kafka3IDPtr, err := ts.CreateNode("system", nil, "Kafka", "kafka3", pageNodeKind())
 	if err != nil {
@@ -1922,8 +1932,8 @@ func TestLinkService_HealWikiLinksForPage_DoesNotHealWhenAmbiguous(t *testing.T)
 		t.Fatalf("GetPage kafka3: %v", err)
 	}
 	_ = kafka2IDPtr
-	if err := svc.HealWikiLinksForPage(kafka3); err != nil {
-		t.Fatalf("HealWikiLinksForPage: %v", err)
+	if err := svc.ReconcileTitle(kafka3.Title); err != nil {
+		t.Fatalf("ReconcileTitle: %v", err)
 	}
 
 	out, err = svc.GetOutgoingLinksForPage(*sourceIDPtr)
@@ -1933,7 +1943,7 @@ func TestLinkService_HealWikiLinksForPage_DoesNotHealWhenAmbiguous(t *testing.T)
 	if out.Count != 1 {
 		t.Fatalf("expected 1 outgoing, got %d", out.Count)
 	}
-	if !out.Outgoings[0].Broken {
-		t.Fatalf("[[Kafka]] should remain broken/ambiguous after 3rd Kafka page created, but was healed to %q", out.Outgoings[0].ToPath)
+	if out.Outgoings[0].Broken || out.Outgoings[0].ToPageID != "" {
+		t.Fatalf("[[Kafka]] should remain ambiguous after 3rd Kafka page created, got %+v", out.Outgoings[0])
 	}
 }
