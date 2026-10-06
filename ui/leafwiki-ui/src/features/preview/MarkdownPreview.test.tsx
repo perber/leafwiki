@@ -147,26 +147,33 @@ echo two
   })
 
   it('embeds pdfs referenced via markdown image syntax as an iframe', () => {
-    const { container } = renderPreview(
-      '![Manual](https://example.com/manual.pdf)',
-    )
+    const { container } = renderPreview('![Manual](/assets/manual.pdf)')
 
     expect(container.querySelector('img')).toBeNull()
     const frame = container.querySelector('iframe')
     expect(frame).not.toBeNull()
-    expect(frame?.getAttribute('src')).toBe('https://example.com/manual.pdf')
+    expect(frame?.getAttribute('src')).toContain('/assets/manual.pdf')
     expect(frame?.getAttribute('title')).toBe('Manual')
   })
 
   it('keeps a #page= fragment so the embed opens on that page', () => {
-    const { container } = renderPreview(
-      '![Manual](https://example.com/manual.pdf#page=3)',
-    )
+    const { container } = renderPreview('![Manual](/assets/manual.pdf#page=3)')
 
     const frame = container.querySelector('iframe')
-    expect(frame?.getAttribute('src')).toBe(
-      'https://example.com/manual.pdf#page=3',
+    expect(frame?.getAttribute('src')).toMatch(
+      /\/assets\/manual\.pdf\?v=\d+#page=3$/,
     )
+  })
+
+  it('links to a pdf from another origin instead of embedding it', () => {
+    const { container } = renderPreview(
+      '![Manual](https://example.com/manual.pdf)',
+    )
+
+    expect(container.querySelector('iframe')).toBeNull()
+    expect(
+      container.querySelector('a[href="https://example.com/manual.pdf"]'),
+    ).not.toBeNull()
   })
 
   it('normalizes audio/video src through the shared assetSrc helper (no local duplicate)', () => {
