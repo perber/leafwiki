@@ -55,4 +55,27 @@ test.describe('Account settings — language', () => {
     await settingsPage.selectLanguage('English');
     await expect(settingsPage.pageTitle()).toHaveText('Account');
   });
+
+  for (const { name, accountTitle } of [
+    { name: 'Español', accountTitle: 'Cuenta' },
+    { name: 'Français', accountTitle: 'Compte' },
+    { name: '中文', accountTitle: '账户' },
+  ]) {
+    test(`switching to ${name} translates the account page`, async ({ page }) => {
+      const loginPage = new LoginPage(page);
+      const viewPage = new ViewPage(page);
+      const settingsPage = new AccountSettingsPage(page);
+
+      await loginPage.goto();
+      await loginPage.login(user, password);
+      await viewPage.expectUserLoggedIn();
+
+      await settingsPage.goto();
+      await expect(settingsPage.pageTitle()).toHaveText('Account');
+
+      await settingsPage.selectLanguage(name);
+      await expect(settingsPage.pageTitle()).toHaveText(accountTitle);
+      await expect(settingsPage.languageSelect()).toHaveText(name);
+    });
+  }
 });
