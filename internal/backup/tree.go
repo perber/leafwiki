@@ -29,8 +29,14 @@ import (
 // sentinel so they don't overwrite that status with a generic error.
 var errPullConflict = errors.New("pull conflict")
 
-// writeBlob stores data as a git blob object and returns its hash.
+// writeBlob stores data as a git blob object and returns its hash. Content
+// that is already in the object store (loose or packed) is not written again,
+// so an unchanged backup run costs hashing only.
 func (r *Repository) writeBlob(data []byte) (plumbing.Hash, error) {
+	h := plumbing.ComputeHash(plumbing.BlobObject, data)
+	if r.repo.Storer.HasEncodedObject(h) == nil {
+		return h, nil
+	}
 	obj := r.repo.Storer.NewEncodedObject()
 	obj.SetType(plumbing.BlobObject)
 	w, err := obj.Writer()
@@ -56,6 +62,9 @@ func (r *Repository) writeTree(entries []object.TreeEntry) (plumbing.Hash, error
 	obj := r.repo.Storer.NewEncodedObject()
 	if err := tree.Encode(obj); err != nil {
 		return plumbing.ZeroHash, err
+	}
+	if h := obj.Hash(); r.repo.Storer.HasEncodedObject(h) == nil {
+		return h, nil
 	}
 	return r.repo.Storer.SetEncodedObject(obj)
 }
