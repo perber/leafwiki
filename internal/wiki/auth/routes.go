@@ -141,7 +141,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 	authGroup.POST("/users", authmw.RequireAdmin(opts.AuthDisabled), r.handleCreateUser)
 	authGroup.GET("/users", authmw.RequireAdmin(opts.AuthDisabled), r.handleGetUsers)
-	authGroup.PUT("/users/:id", authmw.RequireSelfOrAdmin(opts.AuthDisabled), r.handleUpdateUser)
+	authGroup.PUT("/users/:id", authmw.RequireAdmin(opts.AuthDisabled), r.handleUpdateUser)
 	authGroup.DELETE("/users/:id", authmw.RequireAdmin(opts.AuthDisabled), r.handleDeleteUser)
 	// Invite is only ever meaningful with SMTP configured — the underlying
 	// use cases already short-circuit on ErrEmailDisabled when emailTokens()
@@ -152,7 +152,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	authGroup.POST("/users/:id/invite/resend", authmw.RequireAdmin(opts.AuthDisabled), r.handleResendInvite)
 
 	if !opts.AuthDisabled {
-		authGroup.PUT("/users/me/password", r.handleChangeOwnPassword)
+		authGroup.PUT("/users/me/password", r.handleChangeOwnPassword(ctx))
 
 		// Setup/confirm/disable all guess a secret (password, TOTP code, or
 		// recovery code); share one rate-limit budget separate from the
@@ -463,7 +463,7 @@ func (r *Routes) handleUpdateUser(c *gin.Context) {
 	}
 	out, err := r.updateUser.Execute(c.Request.Context(), UpdateUserInput{
 		ID: id, Username: req.Username, Email: req.Email, Password: req.Password, Role: req.Role,
-		RequesterIsAdmin: requester.HasRole(coreauth.RoleAdmin),
+		RequesterID: requester.ID, RequesterIsAdmin: requester.HasRole(coreauth.RoleAdmin),
 	})
 	if err != nil {
 		respondWithAuthError(c, err)
@@ -481,26 +481,39 @@ func (r *Routes) handleDeleteUser(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func (r *Routes) handleChangeOwnPassword(c *gin.Context) {
-	user := authmw.MustGetUser(c)
-	if user == nil {
-		return
+// handleChangeOwnPassword changes the current user's password after verifying
+// the old one. Every other session for the user is revoked; the session making
+// this request is identified via its own refresh cookie and left intact.
+func (r *Routes) handleChangeOwnPassword(rctx httpinternal.RouterContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user := authmw.MustGetUser(c)
+		if user == nil {
+			return
+		}
+		var req struct {
+			OldPassword string `json:"oldPassword" binding:"required"`
+			NewPassword string `json:"newPassword" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
+			return
+		}
+		refreshToken, err := rctx.AuthCookies.ReadRefresh(c)
+		if err != nil {
+			// Falls back to revoking every session for this user, including
+			// the one making this request (see
+			// AuthService.RevokeAllUserSessionsExceptCurrent) — log it so an
+			// unexpected logout right after a password change is diagnosable.
+			slog.Default().Warn("could not read refresh token while changing password; will revoke all sessions", "userID", user.ID, "error", err)
+		}
+		if err := r.changeOwnPassword.Execute(c.Request.Context(), ChangeOwnPasswordInput{
+			UserID: user.ID, OldPassword: req.OldPassword, NewPassword: req.NewPassword, CurrentRefreshToken: refreshToken,
+		}); err != nil {
+			respondWithAuthError(c, err)
+			return
+		}
+		c.Status(http.StatusNoContent)
 	}
-	var req struct {
-		OldPassword string `json:"oldPassword" binding:"required"`
-		NewPassword string `json:"newPassword" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		respondWithAuthStatusError(c, http.StatusBadRequest, ErrCodeAuthInvalidRequest, errInvalidRequestUserMsg, errInvalidRequestLogMsg)
-		return
-	}
-	if err := r.changeOwnPassword.Execute(c.Request.Context(), ChangeOwnPasswordInput{
-		UserID: user.ID, OldPassword: req.OldPassword, NewPassword: req.NewPassword,
-	}); err != nil {
-		respondWithAuthError(c, err)
-		return
-	}
-	c.Status(http.StatusNoContent)
 }
 
 // handleStartTOTPSetup begins TOTP enrollment for the current user: verifies

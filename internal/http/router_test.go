@@ -4242,6 +4242,171 @@ func TestUpdateUserEndpoint(t *testing.T) {
 
 }
 
+func loginStatus(t *testing.T, router http.Handler, identifier, password string) int {
+	t.Helper()
+	body, _ := json.Marshal(map[string]string{"identifier": identifier, "password": password})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	return rec.Code
+}
+
+func TestUpdateUserEndpoint_NonAdminOnOwnAccount_Forbidden(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	create := `{"username": "jane", "email": "jane@example.com", "password": "secretpassword", "role": "viewer"}`
+	resp := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(create))
+	var user map[string]interface{}
+	_ = json.Unmarshal(resp.Body.Bytes(), &user)
+
+	update := `{"username": "jane", "email": "other@example.com", "password": "otherpassword"}`
+	rec := authenticatedRequestAs(t, router, "jane", "secretpassword", http.MethodPut, "/api/users/"+user["id"].(string), strings.NewReader(update))
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("Expected 403 Forbidden for non-admin user update, got %d - %s", rec.Code, rec.Body.String())
+	}
+	if code := loginStatus(t, router, "jane", "secretpassword"); code != http.StatusOK {
+		t.Fatalf("Expected original password to still work, got %d", code)
+	}
+}
+
+func TestUpdateUserEndpoint_AdminOwnPassword_Rejected(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	meRec := authenticatedRequest(t, router, http.MethodGet, "/api/auth/me", nil)
+	var me map[string]interface{}
+	_ = json.Unmarshal(meRec.Body.Bytes(), &me)
+
+	update, _ := json.Marshal(map[string]string{
+		"username": "admin",
+		"email":    me["email"].(string),
+		"password": "brandnewpassword",
+	})
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/users/"+me["id"].(string), strings.NewReader(string(update)))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("Expected 400 Bad Request for own password via user update, got %d - %s", rec.Code, rec.Body.String())
+	}
+	if code := loginStatus(t, router, "admin", "adminpassword"); code != http.StatusOK {
+		t.Fatalf("Expected original admin password to still work, got %d", code)
+	}
+}
+
+type testSession struct {
+	cookies []*http.Cookie
+	csrf    string
+}
+
+func loginSession(t *testing.T, router http.Handler, identifier, password string) testSession {
+	t.Helper()
+	body, _ := json.Marshal(map[string]string{"identifier": identifier, "password": password})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Failed to login as %s: %d - %s", identifier, rec.Code, rec.Body.String())
+	}
+	res := rec.Result()
+	defer test_utils.WrapCloseWithErrorCheck(res.Body.Close, t)
+	sess := testSession{cookies: res.Cookies(), csrf: rec.Header().Get("X-CSRF-Token")}
+	if sess.csrf == "" {
+		for _, c := range sess.cookies {
+			if c.Name == "leafwiki_csrf" || c.Name == "__Host-leafwiki_csrf" {
+				sess.csrf = c.Value
+			}
+		}
+	}
+	return sess
+}
+
+func (s testSession) do(router http.Handler, method, url, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, url, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	for _, c := range s.cookies {
+		req.AddCookie(c)
+	}
+	req.Header.Set("X-CSRF-Token", s.csrf)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestChangeOwnPasswordEndpoint_RevokesOtherSessionsKeepsCurrent(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	create := `{"username": "jane", "email": "jane@example.com", "password": "secretpassword", "role": "editor"}`
+	authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(create))
+
+	current := loginSession(t, router, "jane", "secretpassword")
+	other := loginSession(t, router, "jane", "secretpassword")
+
+	rec := current.do(router, http.MethodPut, "/api/users/me/password", `{"oldPassword":"secretpassword","newPassword":"newsecretpassword"}`)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("Expected 204 No Content for own password change, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	if rec := other.do(router, http.MethodPost, "/api/auth/refresh-token", ""); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("Expected other session's refresh to be rejected with 422, got %d - %s", rec.Code, rec.Body.String())
+	}
+	if rec := current.do(router, http.MethodPost, "/api/auth/refresh-token", ""); rec.Code != http.StatusOK {
+		t.Fatalf("Expected current session's refresh to still work, got %d - %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestUpdateUserEndpoint_AdminSetsPassword_RevokesTargetSessions(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	create := `{"username": "jane", "email": "jane@example.com", "password": "secretpassword", "role": "editor"}`
+	resp := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(create))
+	var user map[string]interface{}
+	_ = json.Unmarshal(resp.Body.Bytes(), &user)
+
+	jane := loginSession(t, router, "jane", "secretpassword")
+
+	update := `{"username": "jane", "email": "jane@example.com", "password": "adminsetpassword"}`
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/users/"+user["id"].(string), strings.NewReader(update))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for admin password update, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	if rec := jane.do(router, http.MethodPost, "/api/auth/refresh-token", ""); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("Expected target user's refresh to be rejected with 422, got %d - %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestUpdateUserEndpoint_AdminEditsProfileOnly_KeepsTargetSessions(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	create := `{"username": "jane", "email": "jane@example.com", "password": "secretpassword", "role": "editor"}`
+	resp := authenticatedRequest(t, router, http.MethodPost, "/api/users", strings.NewReader(create))
+	var user map[string]interface{}
+	_ = json.Unmarshal(resp.Body.Bytes(), &user)
+
+	jane := loginSession(t, router, "jane", "secretpassword")
+
+	update := `{"username": "jane-renamed", "email": "jane@example.com"}`
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/users/"+user["id"].(string), strings.NewReader(update))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK for admin profile update, got %d - %s", rec.Code, rec.Body.String())
+	}
+
+	if rec := jane.do(router, http.MethodPost, "/api/auth/refresh-token", ""); rec.Code != http.StatusOK {
+		t.Fatalf("Expected target user's session to survive a profile-only edit, got %d - %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestChangeOwnPasswordEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)

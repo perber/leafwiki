@@ -664,6 +664,10 @@ func (a *AuthService) RevokeAllUserSessions(userID string) error {
 	return a.sessions.RevokeAllUserSessions(userID)
 }
 
+func (a *AuthService) RevokeAllUserSessionsExceptCurrent(userID, currentRefreshToken string) error {
+	return a.sessions.RevokeAllUserSessionsExceptCurrent(userID, currentRefreshToken)
+}
+
 func (a *AuthService) ValidateToken(tokenString string) (*User, error) {
 	return a.sessions.ValidateToken(tokenString)
 }

@@ -108,45 +108,6 @@ func RequireCookieSession() gin.HandlerFunc {
 	}
 }
 
-func RequireSelfOrAdmin(authDisabled bool) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Block all user management operations when authentication is disabled
-		if authDisabled {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "User management is not available when authentication is disabled"})
-			return
-		}
-
-		userValue, exists := c.Get("user")
-		if !exists {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": errUserNotAuthenticated})
-			return
-		}
-
-		user, ok := userValue.(*auth.User)
-		if !ok {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Invalid user"})
-			return
-		}
-
-		// Check if user is trying to access their own resource
-		isSelf := user.ID == c.Param("id")
-
-		// Allow users to access their own resources
-		if isSelf {
-			c.Next()
-			return
-		}
-
-		// Check if user has admin privileges for accessing other users
-		if !user.HasRole(auth.RoleAdmin) {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Admin privileges required"})
-			return
-		}
-
-		c.Next()
-	}
-}
-
 // OptionalAuth validates the session cookie if present and stores the user in context,
 // but unlike RequireAuth it does not abort the request for unauthenticated callers.
 // Exception: a token IS present but authService is nil — that is a misconfiguration
