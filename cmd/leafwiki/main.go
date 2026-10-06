@@ -315,6 +315,10 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 			BrandingDir:        filepath.Join(cfg.server.dataDir, "branding"),
 			AvatarsDir:         filepath.Join(cfg.server.dataDir, "avatars"),
 			BrandingConfigFile: filepath.Join(cfg.server.dataDir, "branding.json"),
+			SettingsFiles: []string{
+				filepath.Join(cfg.server.dataDir, "public-access.json"),
+				filepath.Join(cfg.server.dataDir, "toc-display.json"),
+			},
 			SchemaFile:         filepath.Join(cfg.server.dataDir, "schema.json"),
 			UsersDBPath:        filepath.Join(cfg.server.dataDir, "users.db"),
 			APIKeysDBPath:      filepath.Join(cfg.server.dataDir, "api_keys.db"),

@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import LoginPage from '../pages/LoginPage';
 import SnapshotSettingsPage from '../pages/SnapshotSettingsPage';
 import UserManagementPage from '../pages/UserManagementPage';
@@ -56,4 +56,68 @@ test('user management reflects a live restore without a server restart', async (
 
   await users.goto();
   await users.expectUserAbsent(throwawayUsername);
+});
+
+// Instance settings (site name, public access, always-show-TOC) are part of a
+// full backup and are live again right after a restore, without a restart.
+test('a live restore brings back branding, public access and TOC settings', async ({ page }) => {
+  const csrf = async () => {
+    const cookies = await page.context().cookies();
+    const c = cookies.find((x) => x.name.endsWith('leafwiki_csrf'));
+    return { 'X-CSRF-Token': c ? decodeURIComponent(c.value) : '' };
+  };
+  const setSettings = async (siteName: string, enabled: boolean) => {
+    const headers = await csrf();
+    expect(
+      (await page.request.put('/api/branding', { headers, data: { siteName } })).ok(),
+    ).toBeTruthy();
+    expect(
+      (
+        await page.request.put('/api/admin/settings/public-access', { headers, data: { enabled } })
+      ).ok(),
+    ).toBeTruthy();
+    expect(
+      (
+        await page.request.put('/api/admin/settings/toc-display', {
+          headers,
+          data: { alwaysShow: enabled },
+        })
+      ).ok(),
+    ).toBeTruthy();
+  };
+
+  const loginPage = new LoginPage(page);
+  const viewPage = new ViewPage(page);
+  await loginPage.goto();
+  await loginPage.login(user, password);
+  await viewPage.expectUserLoggedIn();
+
+  const originalSiteName = (await (await page.request.get('/api/branding')).json())
+    .siteName as string;
+  const snapshotSiteName = `Snapshot Site ${Date.now()}`;
+
+  try {
+    await setSettings(snapshotSiteName, true);
+
+    const snapshots = new SnapshotSettingsPage(page);
+    await snapshots.goto();
+    await snapshots.createBackup();
+
+    await setSettings('Changed After Backup', false);
+
+    await snapshots.goto();
+    await snapshots.restoreLatest();
+
+    await loginPage.goto();
+    await loginPage.login(user, password);
+    await viewPage.expectUserLoggedIn();
+
+    const branding = await (await page.request.get('/api/branding')).json();
+    expect(branding.siteName).toBe(snapshotSiteName);
+    const config = await (await page.request.get('/api/config')).json();
+    expect(config.publicAccess).toBe(true);
+    expect(config.alwaysShowToc).toBe(true);
+  } finally {
+    await setSettings(originalSiteName, false);
+  }
 });

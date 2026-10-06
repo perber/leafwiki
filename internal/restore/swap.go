@@ -220,7 +220,7 @@ func sanityCheckSQLiteDB(path, table string, columns []string) error {
 // of being restored. "avatars" is a plain per-user-avatar asset directory
 // (like "assets"/"branding") — no hot-swappable service owns it, so it
 // carries no reload/rollback step of its own.
-var swapNames = []string{"root", "assets", "branding", "avatars", "branding.json", "schema.json", "users.db", "api_keys.db", "favorites.db", "usersettings.db"}
+var swapNames = []string{"root", "assets", "branding", "avatars", "branding.json", "public-access.json", "toc-display.json", "schema.json", "users.db", "api_keys.db", "favorites.db", "usersettings.db"}
 
 // walSidecarDBNames lists every WAL-mode database whose stale -wal/-shm
 // sidecars may need cleaning up before a swap — derived from swapNames
