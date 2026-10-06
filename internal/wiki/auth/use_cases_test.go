@@ -14,6 +14,7 @@ import (
 	"github.com/pquerna/otp/totp"
 
 	coreauth "github.com/perber/wiki/internal/core/auth"
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/favorites"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/usersettings"
@@ -94,7 +95,7 @@ func setupUpdateUserUseCase(t *testing.T) (*UpdateUserUseCase, *coreauth.UserSer
 	if err != nil {
 		t.Fatalf("NewUserResolver: %v", err)
 	}
-	return NewUpdateUserUseCase(userSvcFn, resolver, slog.Default()), userSvc
+	return NewUpdateUserUseCase(userSvcFn, resolver, nil, slog.Default()), userSvc
 }
 
 // TestUpdateUser_AdminCanChangeRole verifies that an admin requester can promote
@@ -722,5 +723,86 @@ func TestGetUsersUseCase_ReflectsLiveRestore(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("GetUsersUseCase did not see the post-restore user set — it's still bound to the pre-restore UserService captured at construction time")
+	}
+}
+
+// TestUpdateUser_ShortPassword_ReturnsValidationError verifies that a password
+// set through the user-management update enforces the same minimum length as
+// create, change-own-password and reset.
+func TestUpdateUser_ShortPassword_ReturnsValidationError(t *testing.T) {
+	uc, svc := setupUpdateUserUseCase(t)
+
+	editor, err := svc.CreateUser("ed", "ed@example.com", "secretpassword", coreauth.RoleEditor)
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	_, err = uc.Execute(context.Background(), UpdateUserInput{
+		ID:               editor.ID,
+		Username:         editor.Username,
+		Email:            editor.Email,
+		Password:         "short",
+		RequesterID:      "some-admin-id",
+		RequesterIsAdmin: true,
+	})
+	var ve *sharederrors.ValidationErrors
+	if !errors.As(err, &ve) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+	if _, err := svc.DoesIDAndPasswordMatch(editor.ID, "secretpassword"); err != nil {
+		t.Errorf("password must be unchanged after rejected update: %v", err)
+	}
+}
+
+// TestUpdateUser_OwnPassword_ReturnsValidationError verifies that the
+// user-management update cannot change the requester's own password — that
+// goes through ChangeOwnPassword, which verifies the current password.
+func TestUpdateUser_OwnPassword_ReturnsValidationError(t *testing.T) {
+	uc, svc := setupUpdateUserUseCase(t)
+
+	admin, err := svc.CreateUser("boss", "boss@example.com", "secretpassword", coreauth.RoleAdmin)
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	_, err = uc.Execute(context.Background(), UpdateUserInput{
+		ID:               admin.ID,
+		Username:         admin.Username,
+		Email:            admin.Email,
+		Password:         "anotherpassword",
+		RequesterID:      admin.ID,
+		RequesterIsAdmin: true,
+	})
+	var ve *sharederrors.ValidationErrors
+	if !errors.As(err, &ve) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+	if _, err := svc.DoesIDAndPasswordMatch(admin.ID, "secretpassword"); err != nil {
+		t.Errorf("password must be unchanged after rejected update: %v", err)
+	}
+}
+
+// TestUpdateUser_OwnProfileWithoutPassword_Succeeds verifies that editing the
+// requester's own username/email (no password) keeps working.
+func TestUpdateUser_OwnProfileWithoutPassword_Succeeds(t *testing.T) {
+	uc, svc := setupUpdateUserUseCase(t)
+
+	admin, err := svc.CreateUser("boss", "boss@example.com", "secretpassword", coreauth.RoleAdmin)
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	out, err := uc.Execute(context.Background(), UpdateUserInput{
+		ID:               admin.ID,
+		Username:         "boss-renamed",
+		Email:            admin.Email,
+		RequesterID:      admin.ID,
+		RequesterIsAdmin: true,
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if out.User.Username != "boss-renamed" {
+		t.Errorf("expected username %q, got %q", "boss-renamed", out.User.Username)
 	}
 }

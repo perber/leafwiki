@@ -353,6 +353,7 @@ type UpdateUserInput struct {
 	Email            string
 	Password         string
 	Role             string
+	RequesterID      string
 	RequesterIsAdmin bool
 }
 
@@ -363,11 +364,12 @@ type UpdateUserOutput struct {
 type UpdateUserUseCase struct {
 	user     func() *coreauth.UserService
 	resolver *coreauth.UserResolver
+	auth     *coreauth.AuthService // nil when auth is disabled
 	log      *slog.Logger
 }
 
-func NewUpdateUserUseCase(u func() *coreauth.UserService, r *coreauth.UserResolver, log *slog.Logger) *UpdateUserUseCase {
-	return &UpdateUserUseCase{user: u, resolver: r, log: log}
+func NewUpdateUserUseCase(u func() *coreauth.UserService, r *coreauth.UserResolver, a *coreauth.AuthService, log *slog.Logger) *UpdateUserUseCase {
+	return &UpdateUserUseCase{user: u, resolver: r, auth: a, log: log}
 }
 
 func (uc *UpdateUserUseCase) Execute(_ context.Context, in UpdateUserInput) (*UpdateUserOutput, error) {
@@ -379,6 +381,15 @@ func (uc *UpdateUserUseCase) Execute(_ context.Context, in UpdateUserInput) (*Up
 		ve.Add("email", "Email must not be empty")
 	} else if !emailRegex.MatchString(in.Email) {
 		ve.Add("email", "Email is not valid")
+	}
+	if in.Password != "" {
+		// A user's own password goes through ChangeOwnPasswordUseCase, which
+		// verifies the current one; this path is for setting someone else's.
+		if in.ID == in.RequesterID {
+			ve.Add("password", "Use the account settings to change your own password")
+		} else if len(in.Password) < coreauth.MinPasswordLength {
+			ve.Add("password", fmt.Sprintf("Password must be at least %d characters long", coreauth.MinPasswordLength))
+		}
 	}
 	role := in.Role
 	roleProvided := strings.TrimSpace(in.Role) != ""
@@ -404,23 +415,33 @@ func (uc *UpdateUserUseCase) Execute(_ context.Context, in UpdateUserInput) (*Up
 	if err := uc.resolver.Reload(); err != nil {
 		uc.log.Warn("failed to reload user resolver cache", "error", err)
 	}
+	// A password set by an admin replaces the old credential, so sessions
+	// opened with it must not outlive it (same as a password reset).
+	if in.Password != "" && uc.auth != nil {
+		if err := uc.auth.RevokeAllUserSessions(in.ID); err != nil {
+			uc.log.Warn("failed to revoke sessions after admin password change", "userID", in.ID, "error", err)
+		}
+	}
 	return &UpdateUserOutput{User: user.ToPublicUser()}, nil
 }
 
 // ─── ChangeOwnPasswordUseCase ────────────────────────────────────────────────
 
 type ChangeOwnPasswordInput struct {
-	UserID      string
-	OldPassword string
-	NewPassword string
+	UserID              string
+	OldPassword         string
+	NewPassword         string
+	CurrentRefreshToken string
 }
 
 type ChangeOwnPasswordUseCase struct {
 	user func() *coreauth.UserService
+	auth *coreauth.AuthService // nil when auth is disabled
+	log  *slog.Logger
 }
 
-func NewChangeOwnPasswordUseCase(u func() *coreauth.UserService) *ChangeOwnPasswordUseCase {
-	return &ChangeOwnPasswordUseCase{user: u}
+func NewChangeOwnPasswordUseCase(u func() *coreauth.UserService, a *coreauth.AuthService, log *slog.Logger) *ChangeOwnPasswordUseCase {
+	return &ChangeOwnPasswordUseCase{user: u, auth: a, log: log}
 }
 
 func (uc *ChangeOwnPasswordUseCase) Execute(_ context.Context, in ChangeOwnPasswordInput) error {
@@ -436,7 +457,17 @@ func (uc *ChangeOwnPasswordUseCase) Execute(_ context.Context, in ChangeOwnPassw
 	if ve.HasErrors() {
 		return ve
 	}
-	return uc.user().ChangeOwnPassword(in.UserID, in.OldPassword, in.NewPassword)
+	if err := uc.user().ChangeOwnPassword(in.UserID, in.OldPassword, in.NewPassword); err != nil {
+		return err
+	}
+	// Every other session was opened with the old password; the caller's own
+	// session (identified by its refresh token) stays signed in.
+	if uc.auth != nil {
+		if err := uc.auth.RevokeAllUserSessionsExceptCurrent(in.UserID, in.CurrentRefreshToken); err != nil {
+			uc.log.Warn("failed to revoke other sessions after password change", "userID", in.UserID, "error", err)
+		}
+	}
+	return nil
 }
 
 // ─── DeleteUserUseCase ───────────────────────────────────────────────────────
