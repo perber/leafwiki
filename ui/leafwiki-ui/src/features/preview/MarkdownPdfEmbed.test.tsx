@@ -56,7 +56,7 @@ describe('MarkdownPdfEmbed', () => {
     expect(link.getAttribute('target')).toBe('_blank')
   })
 
-  it('skips the iframe on mobile and only renders an open button', () => {
+  it('shows a file card instead of an iframe on mobile', () => {
     mockIsMobile = true
     render(<MarkdownPdfEmbed src="/assets/manual.pdf" alt="Manual" />)
 
@@ -65,5 +65,17 @@ describe('MarkdownPdfEmbed', () => {
     const link = screen.getByRole('link')
     expect(link.getAttribute('href')).toContain('/assets/manual.pdf')
     expect(link.getAttribute('target')).toBe('_blank')
+    expect(link).toHaveTextContent('Manual')
+    expect(link).toHaveTextContent('manual.pdf')
+    expect(link).toHaveTextContent('Open in new tab')
+  })
+
+  it('uses the decoded file name as card title when there is no alt text', () => {
+    mockIsMobile = true
+    render(<MarkdownPdfEmbed src="/assets/Benutzer%20Handbuch.pdf#page=2" />)
+
+    const link = screen.getByRole('link')
+    expect(link).toHaveTextContent('Benutzer Handbuch.pdf')
+    expect(link.textContent?.match(/Benutzer Handbuch\.pdf/g)).toHaveLength(1)
   })
 })
