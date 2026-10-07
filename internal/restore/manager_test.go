@@ -30,10 +30,10 @@ import (
 // snapshot to restore from — mirroring how cmd/leafwiki/main.go wires these
 // together, so the test exercises the same integration points production does.
 type managerFixture struct {
-	manager     *Manager
-	dataDir     string
-	snapshotID  string
-	authService *auth.AuthService
+	manager      *Manager
+	dataDir      string
+	snapshotID   string
+	authService  *auth.AuthService
 	branding     *branding.BrandingService
 	publicAccess *publicaccess.Service
 	tocDisplay   *tocdisplay.Service
