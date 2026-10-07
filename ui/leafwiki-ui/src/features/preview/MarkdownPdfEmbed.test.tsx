@@ -46,6 +46,16 @@ describe('MarkdownPdfEmbed', () => {
     expect(link.getAttribute('target')).toBe('_blank')
   })
 
+  it('does not iframe a pdf from another origin, only links to it', () => {
+    render(<MarkdownPdfEmbed src="https://example.com/doc.pdf" alt="Doc" />)
+
+    expect(document.querySelector('iframe')).toBeNull()
+
+    const link = screen.getByRole('link')
+    expect(link.getAttribute('href')).toBe('https://example.com/doc.pdf')
+    expect(link.getAttribute('target')).toBe('_blank')
+  })
+
   it('skips the iframe on mobile and only renders an open button', () => {
     mockIsMobile = true
     render(<MarkdownPdfEmbed src="/assets/manual.pdf" alt="Manual" />)

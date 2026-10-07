@@ -13,6 +13,14 @@ type MarkdownPdfEmbedProps = React.ImgHTMLAttributes<HTMLImageElement> & {
 // PDF "open parameter" that Chrome/Firefox/Edge's built-in viewer honors to
 // open on that page — kept intact below through URL/searchParams handling
 // since the fragment is never part of `search`.
+function isSameOrigin(src: string): boolean {
+  try {
+    return new URL(src, location.origin).origin === location.origin
+  } catch {
+    return false
+  }
+}
+
 export function MarkdownPdfEmbed({
   src = '',
   alt,
@@ -32,8 +40,9 @@ export function MarkdownPdfEmbed({
 
   // In-page PDF iframes aren't usable on mobile (no pinch-zoom in most
   // mobile browsers, fixed embed height), so skip the embed there and only
-  // offer the "open" action.
-  if (isMobile) {
+  // offer the "open" action. A PDF from another origin is never framed
+  // either: the page would embed whatever that site serves.
+  if (isMobile || !isSameOrigin(versionedSrc)) {
     return (
       <span className="markdown-pdf-embed" style={{ width: width || '100%' }}>
         <Button asChild variant="outline" className="w-full">
