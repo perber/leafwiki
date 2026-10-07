@@ -2328,6 +2328,32 @@
     @apply text-muted-foreground mt-1 inline-flex items-center gap-1 text-xs no-underline hover:underline;
   }
 
+  .markdown-editor__preview .markdown-pdf-card,
+  .page-viewer__content .markdown-pdf-card,
+  .page-history__preview-body .markdown-pdf-card {
+    @apply border-border bg-surface hover:bg-surface-alt hover:border-brand flex w-full max-w-md items-center gap-3 rounded-md border px-3 py-2 no-underline;
+  }
+
+  .markdown-pdf-card__icon {
+    @apply text-brand shrink-0;
+  }
+
+  .markdown-pdf-card__body {
+    @apply flex min-w-0 flex-col;
+  }
+
+  .markdown-pdf-card__title {
+    @apply text-foreground truncate text-sm font-medium;
+  }
+
+  .markdown-pdf-card__meta {
+    @apply text-muted-foreground truncate text-xs;
+  }
+
+  .markdown-pdf-card__arrow {
+    @apply text-muted-foreground shrink-0;
+  }
+
   .table-wrapper {
     @apply max-w-full overflow-auto;
   }
