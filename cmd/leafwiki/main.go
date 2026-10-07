@@ -138,6 +138,7 @@ func runResetAdminPasswordCommand(cfg *serverConfig) error {
 // the wiki server.
 func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) error {
 	basePath := normalizeBasePath(cfg.server.basePath)
+	publicBaseURL := strings.TrimRight(cfg.server.publicBaseURL, "/")
 	maxAssetUploadSize := mustParseByteSize(cfg.frontend.maxAssetUploadSize, "max asset upload size")
 	restoreUploadMaxSize := mustParseByteSize(cfg.backup.restoreUploadMaxSize, "restore upload max size")
 
@@ -356,6 +357,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		EditorLimit:             cfg.auth.editorLimit,
 		InjectCodeInHeader:      cfg.frontend.injectCodeInHeader,
 		CustomStylesheet:        cfg.frontend.customStylesheet,
+		PublicBaseURL:           publicBaseURL,
 		AllowInsecure:           cfg.server.allowInsecure,
 		HideLinkMetadataSection: cfg.frontend.hideLinkMetadataSection,
 		AccessTokenTimeout:      cfg.auth.accessTokenTimeout,

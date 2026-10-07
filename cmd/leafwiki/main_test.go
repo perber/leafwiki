@@ -66,6 +66,8 @@ func TestRootCommandHelp_DocumentsFlagsAndEnvVars(t *testing.T) {
 		"--data-dir",
 		"--unix-socket",
 		"--log-format",
+		"--public-base-url",
+		"LEAFWIKI_PUBLIC_BASE_URL",
 		"LEAFWIKI_UNIX_SOCKET",
 		"LEAFWIKI_LOG_FORMAT",
 		"LEAFWIKI_ADMIN_USERNAME",
