@@ -18,8 +18,10 @@ import (
 	coreshared "github.com/perber/wiki/internal/core/shared"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/favorites"
+	"github.com/perber/wiki/internal/publicaccess"
 	snapshotSvc "github.com/perber/wiki/internal/snapshot"
 	"github.com/perber/wiki/internal/test_utils"
+	"github.com/perber/wiki/internal/tocdisplay"
 	"github.com/perber/wiki/internal/usersettings"
 )
 
@@ -28,12 +30,14 @@ import (
 // snapshot to restore from — mirroring how cmd/leafwiki/main.go wires these
 // together, so the test exercises the same integration points production does.
 type managerFixture struct {
-	manager     *Manager
-	dataDir     string
-	snapshotID  string
-	authService *auth.AuthService
-	branding    *branding.BrandingService
-	resyncCalls int
+	manager      *Manager
+	dataDir      string
+	snapshotID   string
+	authService  *auth.AuthService
+	branding     *branding.BrandingService
+	publicAccess *publicaccess.Service
+	tocDisplay   *tocdisplay.Service
+	resyncCalls  int
 }
 
 func newManagerFixture(t *testing.T, wikiVersion string) *managerFixture {
@@ -68,14 +72,24 @@ func newManagerFixtureWithBranding(t *testing.T, wikiVersion, brandingJSON strin
 		t.Fatalf("NewBrandingService failed: %v", err)
 	}
 
-	f := &managerFixture{dataDir: dataDir, snapshotID: snapshotID, authService: authService, branding: brandingService}
+	// Live instance has both settings off; the snapshot has both on.
+	publicAccessService, err := publicaccess.NewSettingsManaged(dataDir)
+	if err != nil {
+		t.Fatalf("NewSettingsManaged failed: %v", err)
+	}
+	tocDisplayService, err := tocdisplay.New(dataDir)
+	if err != nil {
+		t.Fatalf("tocdisplay.New failed: %v", err)
+	}
+
+	f := &managerFixture{dataDir: dataDir, snapshotID: snapshotID, authService: authService, branding: brandingService, publicAccess: publicAccessService, tocDisplay: tocDisplayService}
 	f.manager = NewManager(Config{
 		SnapshotManager: snapshotMgr,
 		DataDir:         dataDir,
 		WikiVersion:     wikiVersion,
 		WriteGate:       NewWriteGate(),
 		AuthService:     authService,
-		Reloadables:     []settings.Reloadable{brandingService},
+		Reloadables:     []settings.Reloadable{brandingService, publicAccessService, tocDisplayService},
 		TriggerResync:   func() { f.resyncCalls++ },
 	})
 
@@ -263,6 +277,14 @@ func TestManager_Restore_HappyPath(t *testing.T) {
 	}
 	if brandingCfg.SiteName != "Snapshot Site" {
 		t.Errorf("expected branding reloaded from the restored branding.json, got SiteName=%q", brandingCfg.SiteName)
+	}
+
+	// Instance settings are part of the snapshot too and are live right away.
+	if !f.publicAccess.Enabled() {
+		t.Error("expected public access reloaded from the restored public-access.json")
+	}
+	if !f.tocDisplay.AlwaysShow() {
+		t.Error("expected always-show-TOC reloaded from the restored toc-display.json")
 	}
 }
 

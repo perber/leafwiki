@@ -24,6 +24,8 @@ func newTestConfig(t *testing.T) Config {
 	backupsDir := filepath.Join(base, "backups")
 	usersDBPath := filepath.Join(base, "users.db")
 	brandingConfigFile := test_utils.WriteFile(t, base, "branding.json", `{"siteName":"Test Site"}`)
+	publicAccessFile := test_utils.WriteFile(t, base, "public-access.json", `{"enabled":true}`)
+	tocDisplayFile := test_utils.WriteFile(t, base, "toc-display.json", `{"alwaysShow":true}`)
 
 	test_utils.WriteFile(t, rootDir, "page.md", "# Hello\n")
 	test_utils.WriteFile(t, assetsDir, "image.png", "fake-image-bytes")
@@ -35,6 +37,7 @@ func newTestConfig(t *testing.T) Config {
 		RootDir:            rootDir,
 		AssetsDir:          assetsDir,
 		BrandingConfigFile: brandingConfigFile,
+		SettingsFiles:      []string{publicAccessFile, tocDisplayFile},
 		UsersDBPath:        usersDBPath,
 		WikiVersion:        "v0.0.0-test",
 	}
@@ -158,7 +161,7 @@ func TestCreateSnapshot_ContainsExpectedFiles(t *testing.T) {
 		got[f.Name] = true
 	}
 
-	for _, want := range []string{"root/page.md", "assets/image.png", "users.db", "branding.json", "backup-meta.json"} {
+	for _, want := range []string{"root/page.md", "assets/image.png", "users.db", "branding.json", "public-access.json", "toc-display.json", "backup-meta.json"} {
 		if !got[want] {
 			t.Errorf("zip missing expected entry %q; got entries: %v", want, got)
 		}
@@ -187,6 +190,30 @@ func TestCreateSnapshot_BrandingConfigFileIsOptional(t *testing.T) {
 	for _, f := range r.File {
 		if f.Name == "branding.json" {
 			t.Error("expected no branding.json entry when the source file doesn't exist")
+		}
+	}
+}
+
+func TestCreateSnapshot_MissingSettingsFileIsSkipped(t *testing.T) {
+	// public-access.json / toc-display.json only exist once an admin has
+	// toggled the setting; a missing one must not fail the snapshot.
+	cfg := newTestConfig(t)
+	cfg.SettingsFiles = []string{filepath.Join(t.TempDir(), "public-access.json")}
+
+	id, err := createSnapshot(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("createSnapshot failed: %v", err)
+	}
+
+	r, err := zip.OpenReader(filepath.Join(cfg.BackupsDir, id+".zip"))
+	if err != nil {
+		t.Fatalf("failed to open zip: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(r.Close, t)
+
+	for _, f := range r.File {
+		if f.Name == "public-access.json" {
+			t.Error("expected no public-access.json entry when the source file doesn't exist")
 		}
 	}
 }

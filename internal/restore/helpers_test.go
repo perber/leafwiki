@@ -43,6 +43,8 @@ func fixtureSnapshotWithBranding(t *testing.T, wikiVersion, brandingJSON string)
 	test_utils.WriteFile(t, brandingDir, "logo.png", "fake-logo-bytes")
 	test_utils.WriteFile(t, avatarsDir, "snapshot-user.png", "fake-avatar-bytes")
 	brandingConfigFile := test_utils.WriteFile(t, src, "branding.json", brandingJSON)
+	publicAccessFile := test_utils.WriteFile(t, src, "public-access.json", `{"enabled":true}`)
+	tocDisplayFile := test_utils.WriteFile(t, src, "toc-display.json", `{"alwaysShow":true}`)
 	schemaFile := test_utils.WriteFile(t, src, "schema.json", `{"version":5}`)
 
 	createRealUsersDB(t, src, "snapshot-admin", "snapshot-admin@example.com", "snapshot-password-123")
@@ -55,6 +57,7 @@ func fixtureSnapshotWithBranding(t *testing.T, wikiVersion, brandingJSON string)
 		BrandingDir:        brandingDir,
 		AvatarsDir:         avatarsDir,
 		BrandingConfigFile: brandingConfigFile,
+		SettingsFiles:      []string{publicAccessFile, tocDisplayFile},
 		SchemaFile:         schemaFile,
 		UsersDBPath:        usersDBPath,
 		WikiVersion:        wikiVersion,
