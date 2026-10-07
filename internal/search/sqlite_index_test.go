@@ -1457,3 +1457,73 @@ func TestExtractHeadings_HeadingWithCodeSpan(t *testing.T) {
 		t.Errorf("expected heading words preserved, got %q", got)
 	}
 }
+
+// TestSQLiteIndex_Search_OperatorFieldWithTokenPunctuationDoesNotError guards
+// fields that contain an FTS5 operator character (*, (, )) together with
+// punctuation FTS5 barewords don't allow (- . / #) or with unbalanced
+// parentheses. They used to be passed to MATCH verbatim and fail with a
+// syntax error.
+func TestSQLiteIndex_Search_OperatorFieldWithTokenPunctuationDoesNotError(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "foo-bar-baz report.v2-final c#sharp a/b/c")
+	if err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+
+	queries := []string{
+		"foo-bar*", "report.v2*", "c#*", "a/b*", "foo**", "*foo", "f(x)",
+		"(foo", "foo)", "foo AND (bar", "NEAR(a b", "()", "(*)", "foo*bar",
+	}
+	for _, q := range queries {
+		if _, err := index.Search(q, nil, 0, 10); err != nil {
+			t.Errorf("Search(%q) returned an error instead of a result: %v", q, err)
+		}
+		if _, err := index.SearchPageIDs(q, nil); err != nil {
+			t.Errorf("SearchPageIDs(%q) returned an error instead of a result: %v", q, err)
+		}
+	}
+
+	for _, q := range []string{"foo-bar*", "report.v2*"} {
+		result, err := index.Search(q, nil, 0, 10)
+		if err != nil {
+			t.Fatalf("Search(%q): %v", q, err)
+		}
+		if result.Count != 1 {
+			t.Errorf("Search(%q): expected the alpha page as prefix match, got %d results", q, result.Count)
+		}
+	}
+}
+
+// TestSQLiteIndex_Search_BalancedParenGroupAcrossFieldsStillWorks makes sure
+// deliberate grouping spread over several fields is still trusted.
+func TestSQLiteIndex_Search_BalancedParenGroupAcrossFieldsStillWorks(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	index, err := NewSQLiteIndex(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	if err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "apple banana"); err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+	if err := index.IndexPage("notes/beta", "notes/beta.md", "beta1", "Beta", tree.NodeKindPage, "cherry banana"); err != nil {
+		t.Fatalf("failed to index beta page: %v", err)
+	}
+
+	result, err := index.Search("(apple OR cherry) AND banana", nil, 0, 10)
+	if err != nil {
+		t.Fatalf("Search returned an error: %v", err)
+	}
+	if result.Count != 2 {
+		t.Errorf("expected both pages for a grouped OR query, got %d", result.Count)
+	}
+}

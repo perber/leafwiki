@@ -185,18 +185,16 @@ func sanitizeFTS5Field(fields []string, i int) string {
 		return rewritten
 	}
 
-	// A bare "*"/"("/")" alone is never valid FTS5 syntax on its own — * is
-	// a prefix marker with nothing to prefix, and a lone paren has no
-	// matching partner — so trusting it via the ContainsAny check below
-	// would still crash. "foo*" and "(foo)" are unaffected: they aren't
-	// equal to one of these exact strings.
-	isBareOperatorField := f == "*" || f == "(" || f == ")"
-
-	unsafe := strings.ContainsAny(f, ",'") || strings.Count(f, `"`)%2 != 0
-	if !unsafe && !isBareOperatorField {
-		if strings.ContainsAny(f, "*()") || (isFTS5Keyword(f) && hasRealOperandNeighbors(fields, i)) {
+	// An operator field ("foo*", "(foo", "bar)") is only trusted when it is
+	// well-formed FTS5 syntax on its own and the query's parentheses balance
+	// overall. Anything else ("foo-bar*", "report.v2*", "(foo" without a
+	// partner, a bare "*") goes through the literal path below.
+	if strings.ContainsAny(f, "*()") {
+		if isWellFormedOperatorField(f) && (!strings.ContainsAny(f, "()") || operatorParensBalanced(fields)) {
 			return f
 		}
+	} else if isFTS5Keyword(f) && hasRealOperandNeighbors(fields, i) {
+		return f
 	}
 
 	// Literal text: split it into the same "words" the pages table's
@@ -211,6 +209,70 @@ func sanitizeFTS5Field(fields []string, i int) string {
 	// though both tokenize the same way. AND-ing independent terms doesn't
 	// depend on that adjacency at all.
 	return quoteWordsAsPrefixTerms(splitIntoIndexWords(f))
+}
+
+// isBarewordRune reports whether r may appear in an unquoted FTS5 bareword.
+// The tokenizer's searchTokenChars (- . / # +) are deliberately not
+// included: they are word characters for indexing but not valid query
+// syntax.
+func isBarewordRune(r rune) bool {
+	return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)
+}
+
+// isWellFormedOperatorField reports whether f consists only of barewords,
+// prefix markers and parentheses in a shape FTS5 accepts: "(" only at the
+// start or after another "(", "*" only directly after a word, ")" only after
+// a word, "*" or ")", and nothing following ")" except another ")".
+func isWellFormedOperatorField(f string) bool {
+	var prev rune // 0 = start of field
+	for _, r := range f {
+		switch {
+		case r == '*':
+			if !isBarewordRune(prev) {
+				return false
+			}
+		case r == '(':
+			if prev != 0 && prev != '(' {
+				return false
+			}
+		case r == ')':
+			if !isBarewordRune(prev) && prev != '*' && prev != ')' {
+				return false
+			}
+		case isBarewordRune(r):
+			if prev == '*' || prev == ')' {
+				return false
+			}
+		default:
+			return false
+		}
+		prev = r
+	}
+	return true
+}
+
+// operatorParensBalanced reports whether the parentheses in the query's
+// well-formed operator fields pair up, so a group may span several fields
+// ("(apple OR cherry) AND banana") but a lone "(foo" is not trusted.
+func operatorParensBalanced(fields []string) bool {
+	depth := 0
+	for _, f := range fields {
+		if !isWellFormedOperatorField(f) {
+			continue
+		}
+		for _, r := range f {
+			switch r {
+			case '(':
+				depth++
+			case ')':
+				depth--
+				if depth < 0 {
+					return false
+				}
+			}
+		}
+	}
+	return depth == 0
 }
 
 // quoteWordsAsPrefixTerms wraps each word as its own quoted-phrase-prefix
