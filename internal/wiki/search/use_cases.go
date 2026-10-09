@@ -92,11 +92,6 @@ func (uc *SearchUseCase) searchByTags(pageIDs []string, offset, limit int) (*Sea
 		}, nil
 	}
 
-	excerpts, err := uc.tags.GetExcerptsForPages(pageIDs)
-	if err != nil {
-		return nil, err
-	}
-
 	items := make([]coresearch.SearchResultItem, 0, len(pageIDs))
 	for _, pageID := range pageIDs {
 		node, err := uc.tree.FindPageByID(pageID)
@@ -105,12 +100,11 @@ func (uc *SearchUseCase) searchByTags(pageIDs []string, offset, limit int) (*Sea
 		}
 
 		items = append(items, coresearch.SearchResultItem{
-			PageID:  node.ID,
-			Title:   htmlutil.EscapeText(node.Title),
-			Path:    dto.BuildPathFromNode(node),
-			Kind:    string(node.Kind),
-			Rank:    1,
-			Excerpt: excerpts[pageID],
+			PageID: node.ID,
+			Title:  htmlutil.EscapeText(node.Title),
+			Path:   dto.BuildPathFromNode(node),
+			Kind:   string(node.Kind),
+			Rank:   1,
 		})
 	}
 
@@ -137,6 +131,17 @@ func (uc *SearchUseCase) searchByTags(pageIDs []string, offset, limit int) (*Sea
 		end = count
 	}
 	pagedItems := items[offset:end]
+	displayedIDs := make([]string, len(pagedItems))
+	for i, item := range pagedItems {
+		displayedIDs[i] = item.PageID
+	}
+	excerpts, err := uc.tags.GetExcerptsForPages(displayedIDs)
+	if err != nil {
+		return nil, err
+	}
+	for i := range pagedItems {
+		pagedItems[i].Excerpt = excerpts[pagedItems[i].PageID]
+	}
 	uc.attachTags(pagedItems)
 
 	return &SearchOutput{
