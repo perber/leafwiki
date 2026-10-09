@@ -1598,9 +1598,6 @@ func (t *TreeService) SortPages(parentID string, orderedIDs []string) error {
 		child.Position = i
 	}
 
-	// Reindex the positions
-	t.reindexPositions(parent)
-
 	if err := t.store.SaveChildOrder(parent); err != nil {
 		parent.Children = previousChildren
 		for _, child := range parent.Children {
