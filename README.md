@@ -212,6 +212,13 @@ sudo ./install.sh --non-interactive --env-file ./.env
 
 ### Binary
 
+For 32-bit x86 Linux (i686, including Alpine Linux), download
+`leafwiki-<version>-linux-386` and its `.sha256` file from
+[GitHub Releases](https://github.com/perber/leafwiki/releases). The binary is
+built without CGO and does not require glibc. Rename it to `leafwiki` for the
+commands below. The systemd installer supports amd64/arm64; use the binary
+installation on 32-bit x86. Docker image architectures remain amd64/arm64.
+
 ```bash
 chmod +x leafwiki
 ./leafwiki --jwt-secret=yoursecret --admin-password=yourpassword --allow-insecure=true

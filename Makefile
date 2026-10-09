@@ -10,6 +10,7 @@ LDFLAGS := -X main.Version=$(VERSION) $(EMBED_LDFLAGS)
 
 PLATFORMS := \
   linux/amd64 \
+  linux/386 \
   linux/arm64 \
   windows/amd64 \
   darwin/amd64 \
