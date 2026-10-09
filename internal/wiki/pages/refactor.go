@@ -251,6 +251,7 @@ func (uc *PreviewPageRefactorUseCase) getAffectedPages(oldPath string, pageTitle
 	}
 
 	engine := links.NewMarkdownRefactorEngine()
+	finder := links.CompileWikiLinkFinder(oldPath, pageTitle)
 	items := make([]RefactorAffectedPage, 0, len(grouped))
 	for _, item := range grouped {
 		sourcePage, err := uc.tree.GetPage(item.FromPageID)
@@ -261,7 +262,7 @@ func (uc *PreviewPageRefactorUseCase) getAffectedPages(oldPath string, pageTitle
 		// Replace raw route paths in matchedPaths with their wiki-link syntax
 		// when the page content uses [[Title]] or [[path/hint]] instead of
 		// a standard markdown link.
-		wikiLinks := engine.FindWikiLinksForPath(sourcePage.Content, oldPath, pageTitle)
+		wikiLinks := engine.FindWikiLinksPrecompiled(sourcePage.Content, finder)
 		for _, wl := range wikiLinks {
 			if !containsString(item.MatchedPaths, wl) {
 				item.MatchedPaths = append(item.MatchedPaths, wl)
