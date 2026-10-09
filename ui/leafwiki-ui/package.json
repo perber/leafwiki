@@ -101,6 +101,7 @@
     "vitest": "^5.0.3"
   },
   "overrides": {
+    "postcss-selector-parser": "^7.1.6",
     "lodash-es": "4.18.1",
     "@babel/core": "^7.29.7",
     "katex": "$katex",
