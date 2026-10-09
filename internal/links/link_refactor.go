@@ -159,6 +159,29 @@ func (e *MarkdownRefactorEngine) RewriteWikiLinksPrecompiled(content string, com
 	}
 }
 
+// CompiledWikiLinkFinder reuses title and path patterns across a preview's pages.
+type CompiledWikiLinkFinder struct{ patterns []wikiFindPattern }
+type wikiFindPattern struct {
+	re     *regexp.Regexp
+	syntax string
+}
+
+func CompileWikiLinkFinder(oldPath, pageTitle string) CompiledWikiLinkFinder {
+	finder := CompiledWikiLinkFinder{}
+	oldHint := strings.TrimPrefix(normalizeWikiPath(oldPath), "/")
+	if oldHint != "" {
+		finder.patterns = append(finder.patterns, wikiFindPattern{
+			re: regexp.MustCompile(`\[\[\s*` + regexp.QuoteMeta(oldHint) + `\s*(?:\|[^\]\n]*)?\]\]`), syntax: "[[" + oldHint + "]]",
+		})
+	}
+	if pageTitle != "" {
+		finder.patterns = append(finder.patterns, wikiFindPattern{
+			re: regexp.MustCompile(`(?i)\[\[\s*` + regexp.QuoteMeta(pageTitle) + `\s*(?:\|[^\]\n]*)?\]\]`), syntax: "[[" + pageTitle + "]]",
+		})
+	}
+	return finder
+}
+
 // FindWikiLinksForPath returns the wiki-link texts (e.g. "[[Project Plan]]")
 // found in content that reference the given path via title or path hint.
 // Only occurrences outside fenced code blocks and inline code are reported,
@@ -168,30 +191,21 @@ func (e *MarkdownRefactorEngine) FindWikiLinksForPath(content, oldPath, pageTitl
 	if content == "" {
 		return nil
 	}
+	return e.FindWikiLinksPrecompiled(content, CompileWikiLinkFinder(oldPath, pageTitle))
+}
 
+func (e *MarkdownRefactorEngine) FindWikiLinksPrecompiled(content string, finder CompiledWikiLinkFinder) []string {
+	if content == "" || len(finder.patterns) == 0 {
+		return nil
+	}
 	excludedRanges := e.collectExcludedRanges(content)
-
-	match := func(re *regexp.Regexp) bool {
-		for _, m := range re.FindAllStringIndex(content, -1) {
-			if !isExcludedOffset(m[0], excludedRanges) {
-				return true
-			}
-		}
-		return false
-	}
-
 	var found []string
-	oldHint := strings.TrimPrefix(normalizeWikiPath(oldPath), "/")
-	if oldHint != "" {
-		re := regexp.MustCompile(`\[\[\s*` + regexp.QuoteMeta(oldHint) + `\s*(?:\|[^\]\n]*)?\]\]`)
-		if match(re) {
-			found = append(found, "[["+oldHint+"]]")
-		}
-	}
-	if pageTitle != "" {
-		re := regexp.MustCompile(`(?i)\[\[\s*` + regexp.QuoteMeta(pageTitle) + `\s*(?:\|[^\]\n]*)?\]\]`)
-		if match(re) {
-			found = append(found, "[["+pageTitle+"]]")
+	for _, pattern := range finder.patterns {
+		for _, m := range pattern.re.FindAllStringIndex(content, -1) {
+			if !isExcludedOffset(m[0], excludedRanges) {
+				found = append(found, pattern.syntax)
+				break
+			}
 		}
 	}
 	return found
