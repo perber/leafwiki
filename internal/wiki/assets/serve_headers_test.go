@@ -61,6 +61,9 @@ func TestAssetServeHeaders_ActiveContent_IsForcedDownload(t *testing.T) {
 		if got := rec.Header().Get("Content-Disposition"); !strings.HasPrefix(got, "attachment") {
 			t.Errorf("%s: Content-Disposition = %q, want attachment", p, got)
 		}
+		if got := rec.Header().Get("Content-Security-Policy"); got != "sandbox" {
+			t.Errorf("%s: Content-Security-Policy = %q, want sandbox", p, got)
+		}
 	}
 }
 
@@ -75,8 +78,8 @@ func TestAssetServeHeaders_SafeMedia_StaysInline(t *testing.T) {
 
 	for _, p := range []string{"doc.pdf", "pic.png", "pic.JPG", "vid.mp4", "song.mp3"} {
 		rec := getAsset(engine, "/assets/p1/"+p)
-		if got := rec.Header().Get("Content-Disposition"); got != "" {
-			t.Errorf("%s: Content-Disposition = %q, want none (inline)", p, got)
+		if got := rec.Header().Get("Content-Disposition"); !strings.HasPrefix(got, "inline") {
+			t.Errorf("%s: Content-Disposition = %q, want inline", p, got)
 		}
 		if got := rec.Header().Get("X-Content-Type-Options"); got != "nosniff" {
 			t.Errorf("%s: X-Content-Type-Options = %q, want nosniff", p, got)

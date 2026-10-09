@@ -13,6 +13,7 @@ import (
 	httpinternal "github.com/perber/wiki/internal/http"
 	"github.com/perber/wiki/internal/http/dto"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
+	"github.com/perber/wiki/internal/http/middleware/security"
 )
 
 // Routes is the RouteRegistrar for the revisions domain.
@@ -238,11 +239,7 @@ func (r *Routes) handleGetRevisionAsset(c *gin.Context) {
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
-	disposition := mime.FormatMediaType("inline", map[string]string{"filename": path.Base(assetName)})
-	if disposition == "" {
-		disposition = "inline"
-	}
-	c.Header("Content-Disposition", disposition)
+	security.SetUntrustedFileHeaders(c.Writer.Header(), assetName)
 	c.Writer.Header().Set("Content-Type", contentType)
 	http.ServeContent(c.Writer, c.Request, path.Base(assetName), stat.ModTime(), f)
 }
