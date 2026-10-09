@@ -50,6 +50,13 @@ jobs:
           go test -v -coverprofile=coverage/coverage.out ./...
           go tool cover -func=coverage/coverage.out
 
+      - name: Verify Linux 32-bit x86 build
+        env:
+          CGO_ENABLED: '0'
+          GOOS: linux
+          GOARCH: '386'
+        run: go build -o /tmp/leafwiki-linux-386 ./cmd/leafwiki
+
       - name: Upload coverage report as artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
