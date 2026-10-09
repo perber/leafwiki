@@ -79,3 +79,17 @@ export function preprocessWikilinks(
     .map((segment, i) => (i % 2 === 0 ? replaceWikilinks(segment) : segment))
     .join('')
 }
+
+/** Keeps all matching nodes in tree traversal order, including ambiguous titles. */
+export function buildWikiTitleIndex(
+  byId: Record<string, PageNode>,
+): Map<string, PageNode[]> {
+  const index = new Map<string, PageNode[]>()
+  for (const node of Object.values(byId)) {
+    const title = node.title.toLowerCase()
+    const matches = index.get(title)
+    if (matches) matches.push(node)
+    else index.set(title, [node])
+  }
+  return index
+}

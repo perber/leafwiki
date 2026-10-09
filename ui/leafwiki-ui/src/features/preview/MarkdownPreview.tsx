@@ -2,7 +2,10 @@ import { useDesignModeStore } from '@/features/designtoggle/designmode'
 import { normalizeAssetSrc } from '@/lib/assetSrc'
 import i18next from '@/lib/i18n'
 import { PDF_EXTENSIONS } from '@/lib/config'
-import { preprocessWikilinks } from '@/lib/preprocessWikilinks'
+import {
+  buildWikiTitleIndex,
+  preprocessWikilinks,
+} from '@/lib/preprocessWikilinks'
 import { useTreeStore } from '@/stores/tree'
 import 'katex/dist/katex.min.css'
 import {
@@ -598,19 +601,22 @@ export default function MarkdownPreview({
     [enableHeadlineLinks, markdownLink, resolveAssetUrl, resolvedMode],
   )
 
+  const wikiTitleIndex = useMemo(
+    () => buildWikiTitleIndex(treeById),
+    [treeById],
+  )
+
   const normalizedContent = useMemo(
     () =>
       normalizeMarkdownListIndentation(
         normalizeMarkdownBlocks(
-          preprocessWikilinks(content, (title) => {
-            const lower = title.toLowerCase()
-            return Object.values(treeById).filter(
-              (n) => n.title.toLowerCase() === lower,
-            )
-          }),
+          preprocessWikilinks(
+            content,
+            (title) => wikiTitleIndex.get(title.toLowerCase()) ?? [],
+          ),
         ),
       ),
-    [content, treeById],
+    [content, wikiTitleIndex],
   )
 
   const tocEntries = useMemo(
