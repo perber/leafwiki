@@ -121,11 +121,11 @@ func extractLinksFromMarkdown(content string) []string {
 // [[Target|Alias]] syntax found in content. The returned strings are the raw
 // target values (may be a title or a "Folder/Title" path hint).
 func extractWikiLinksFromMarkdown(content string) []string {
-	excluded := NewMarkdownRefactorEngine().collectExcludedRanges(content)
 	matches := wikiLinkRe.FindAllStringSubmatchIndex(content, -1)
 	if len(matches) == 0 {
 		return nil
 	}
+	excluded := NewMarkdownRefactorEngine().collectExcludedRanges(content)
 	seen := make(map[string]struct{}, len(matches))
 	targets := make([]string, 0, len(matches))
 	for _, m := range matches {
