@@ -106,6 +106,7 @@ export function buildFlatPageSearchItems(
 function scoreItem(
   item: FlatPageSearchItem,
   query: string,
+  queryParts: string[],
   options: SearchScoringOptions,
 ) {
   if (!query) return 0
@@ -130,7 +131,6 @@ function scoreItem(
   if (path.includes(query)) return 450
   if (breadcrumb.includes(query)) return 400
 
-  const queryParts = query.split(/\s+/).filter(Boolean)
   if (
     queryParts.length > 1 &&
     queryParts.every((part) => item.searchText.includes(part))
@@ -157,10 +157,11 @@ export function searchFlatPageSearchItems(
     return items.slice(0, limit)
   }
 
+  const queryParts = normalizedQuery.split(/\s+/).filter(Boolean)
   const results: ScoredSearchItem[] = []
 
   for (const item of items) {
-    const score = scoreItem(item, normalizedQuery, options)
+    const score = scoreItem(item, normalizedQuery, queryParts, options)
     if (score < 0) continue
 
     pushTopResult(results, { item, score }, limit)
