@@ -11,7 +11,8 @@ For engineers and self-hosters who want structured, long-lived documentation. No
 If you've looked at Wiki.js or Outline and thought "this is too much to operate for what I need" — this could fit for you.
 
 → Try it without installing: **[demo.leafwiki.com](https://demo.leafwiki.com)** · `Ctrl+E` edit · `Ctrl+S` save · resets hourly  
-→ If it fits, [a star](https://github.com/perber/leafwiki) helps others find it.
+→ If it fits, [a star](https://github.com/perber/leafwiki) helps others find it.  
+→ Useful to you? [Sponsor on GitHub](https://github.com/sponsors/perber) · [Buy a coffee on Ko-fi](https://ko-fi.com/perber)
 
 ```bash
 docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
@@ -774,8 +775,9 @@ The sort dialog lets you drag items into position, use the ↑ ↓ arrow buttons
 If it's useful to you:
 
 - ⭐ **[Star the repo](https://github.com/perber/leafwiki)** — helps others find it
-- 💛 **[Sponsor on GitHub](https://leafwiki.com/support)** — supports ongoing maintenance, bug fixes, and new features  
-- 🚀 **[Don't want to self-host? Get a free beta spot](https://leafwiki.com/hosted/#waitlist)** — 10 spots, hosted beta starting September 2026, help shape the hosted version
+- 💛 **[Sponsor on GitHub](https://github.com/sponsors/perber)** — supports ongoing maintenance, bug fixes, and new features
+- ☕ **[Buy a coffee on Ko-fi](https://ko-fi.com/perber)** — a one-time thank-you
+- 🚀 **[Don't want to self-host? LeafWiki Hosted](https://leafwiki.com/hosted/)** — managed LeafWiki, your content stays plain Markdown
 
 Need help deploying LeafWiki for your team? [Business support & setup →](https://leafwiki.com/support/)
 
@@ -786,4 +788,4 @@ Need help deploying LeafWiki for your team? [Business support & setup →](https
 Contributions, discussions, and feedback are welcome.  
 Open an issue or start a discussion on GitHub. Follow the repository to get notified about new releases.
 
-**Translations:** the UI currently ships in English, German, and Spanish. Adding another language is a self-contained contribution — [docs/i18n.md](docs/i18n.md) walks through it.
+**Translations:** the UI currently ships in English, German, Spanish, French, and Simplified Chinese. Adding another language is a self-contained contribution — [docs/i18n.md](docs/i18n.md) walks through it.
