@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { act, render } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import type { PageNode } from '@/lib/api/pages'
 import * as assetSrcModule from '@/lib/assetSrc'
@@ -354,5 +354,43 @@ describe('MarkdownPreview wikilinks with a slash in the title', () => {
       'ADR-0011: SMTP as a CLI/ENV-Only Optional Feature',
     )
     expect(container.textContent).not.toContain('](')
+  })
+})
+
+describe('MarkdownPreview title index refresh', () => {
+  it('updates rendered wikilinks when the tree title changes', () => {
+    const page: PageNode = {
+      id: 'rename',
+      title: 'Before',
+      path: 'renamed-page',
+      slug: 'renamed-page',
+      version: 'v1',
+      kind: 'page',
+      children: null,
+    }
+    useTreeStore.setState({
+      byId: { rename: page },
+      byPath: { 'renamed-page': page },
+    })
+    const { container } = render(
+      <MemoryRouter>
+        <TooltipProvider>
+          <MarkdownPreview content="[[Before]] [[After]]" />
+        </TooltipProvider>
+      </MemoryRouter>,
+    )
+    expect(
+      container.querySelector('a[href="/renamed-page"]')?.textContent,
+    ).toBe('Before')
+    const renamed = { ...page, title: 'After' }
+    act(() =>
+      useTreeStore.setState({
+        byId: { rename: renamed },
+        byPath: { 'renamed-page': renamed },
+      }),
+    )
+    expect(
+      container.querySelector('a[href="/renamed-page"]')?.textContent,
+    ).toBe('After')
   })
 })
