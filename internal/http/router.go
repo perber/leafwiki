@@ -276,6 +276,9 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 			c.Data(http.StatusOK, "image/svg+xml", []byte(DefaultFaviconSVG))
 		})
 
+		indexData, indexErr := fs.ReadFile(fsys, "index.html")
+		indexTemplate := string(indexData)
+
 		engine.NoRoute(func(c *gin.Context) {
 			path := c.Request.URL.Path
 			if opts.BasePath != "" {
@@ -296,8 +299,7 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 				!strings.HasPrefix(path, "/branding") {
 
 				c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
-				data, err := fs.ReadFile(fsys, "index.html")
-				if err != nil {
+				if indexErr != nil {
 					c.Status(http.StatusNotFound)
 					return
 				}
@@ -313,7 +315,7 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 					faviconFile = frontendCfg.GetFaviconFile()
 				}
 
-				doc := string(data)
+				doc := indexTemplate
 				escapedBasePath := html.EscapeString(opts.BasePath)
 				doc = strings.ReplaceAll(doc, "{{__SITE_NAME__}}", html.EscapeString(siteName))
 				doc = strings.ReplaceAll(doc, "{{__BASE_PATH__}}", escapedBasePath)
