@@ -34,11 +34,10 @@ test('uploaded assets: images render inline, svg and html download', async () =>
     const resp = await api.get(url);
     expect(resp.status(), `GET ${url}`).toBe(200);
     expect(resp.headers()['x-content-type-options'], c.name).toBe('nosniff');
-    if (c.attachment) {
-      expect(resp.headers()['content-disposition'], c.name).toBe('attachment');
-    } else {
-      expect(resp.headers()['content-disposition'], c.name).toBeUndefined();
-    }
+    const disposition = c.attachment ? 'attachment' : 'inline';
+    expect(resp.headers()['content-disposition'], c.name).toBe(
+      `${disposition}; filename=${c.name}`,
+    );
   }
 
   await api.dispose();
