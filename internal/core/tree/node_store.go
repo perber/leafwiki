@@ -316,15 +316,7 @@ func (f *NodeStore) reconstructTreeRecursive(ctx context.Context, currentPath st
 	}
 	seenSlugs := map[string]string{}
 
-	// stable, deterministic ordering (case-insensitive, with case-sensitive tie-breaker)
-	sort.SliceStable(entries, func(i, j int) bool {
-		li := strings.ToLower(entries[i].Name())
-		lj := strings.ToLower(entries[j].Name())
-		if li == lj {
-			return entries[i].Name() < entries[j].Name()
-		}
-		return li < lj
-	})
+	sortReconstructionEntries(entries)
 
 	for _, entry := range entries {
 		if err := ctx.Err(); err != nil {
@@ -1498,4 +1490,38 @@ func (f *NodeStore) SetPinnedFrontmatter(entry *PageNode, pinned bool) (string, 
 	}
 
 	return mdFile.GetContent(), nil
+}
+
+func sortReconstructionEntries(entries []os.DirEntry) {
+	// os.ReadDir already sorts by name. Most directories use lowercase slugs,
+	// so avoid allocating sort keys when that order also matches case folding.
+	if len(entries) < 2 || sort.SliceIsSorted(entries, func(i, j int) bool {
+		left, right := entries[i].Name(), entries[j].Name()
+		foldedLeft, foldedRight := strings.ToLower(left), strings.ToLower(right)
+		if foldedLeft == foldedRight {
+			return left < right
+		}
+		return foldedLeft < foldedRight
+	}) {
+		return
+	}
+	type keyedEntry struct {
+		entry  os.DirEntry
+		folded string
+	}
+	keyed := make([]keyedEntry, len(entries))
+	for i, entry := range entries {
+		name := entry.Name()
+		keyed[i] = keyedEntry{entry: entry, folded: strings.ToLower(name)}
+	}
+	// Case-sensitive names break ties after Unicode case folding.
+	sort.SliceStable(keyed, func(i, j int) bool {
+		if keyed[i].folded == keyed[j].folded {
+			return keyed[i].entry.Name() < keyed[j].entry.Name()
+		}
+		return keyed[i].folded < keyed[j].folded
+	})
+	for i, entry := range keyed {
+		entries[i] = entry.entry
+	}
 }
