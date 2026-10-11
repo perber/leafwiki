@@ -70,7 +70,7 @@ $(PLATFORMS):
 	 docker cp $$ID:/out/$(BINARY_NAME) $(RELEASE_DIR)/$$OUTPUT ; \
 	 docker rm $$ID ; \
 	 echo "✅ Binary done: $(RELEASE_DIR)/$$OUTPUT" ; \
-	 sha256sum $(RELEASE_DIR)/$$OUTPUT > $(RELEASE_DIR)/$$OUTPUT.sha256 ; \
+	 (cd $(RELEASE_DIR) && sha256sum $$OUTPUT > $$OUTPUT.sha256) ; \
 	 zip -j $(RELEASE_DIR)/$$OUTPUT.zip $(RELEASE_DIR)/$$OUTPUT ; \
 	 tar -czf $(RELEASE_DIR)/$$OUTPUT.tar.gz -C $(RELEASE_DIR) $$OUTPUT ; \
 	 echo "📦 Compressed: zip and tar.gz"
