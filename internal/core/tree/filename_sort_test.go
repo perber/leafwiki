@@ -52,7 +52,9 @@ func TestSortReconstructionEntries_MatchesLegacyComparator(t *testing.T) {
 			entries := []os.DirEntry{namedSortEntry(a), namedSortEntry(z)}
 			sortReconstructionEntries(entries)
 			wantFirst := a
-			if strings.ToLower(z) < strings.ToLower(a) || (strings.ToLower(z) == strings.ToLower(a) && z < a) {
+			// Mirrors the legacy ToLower comparator; EqualFold would fold differently (e.g. "İ").
+			foldedA, foldedZ := strings.ToLower(a), strings.ToLower(z)
+			if foldedZ < foldedA || (foldedZ == foldedA && z < a) {
 				wantFirst = z
 			}
 			if entries[0].Name() != wantFirst {
