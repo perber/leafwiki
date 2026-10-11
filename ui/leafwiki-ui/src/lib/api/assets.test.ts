@@ -8,28 +8,31 @@ vi.mock('./auth', () => ({
 import {
   getPageAttachments,
   invalidatePageAttachments,
-  listNonImageAttachments,
+  listPageAttachments,
   uploadAsset,
 } from './assets'
 
-describe('listNonImageAttachments', () => {
-  it('keeps non-image assets and normalizes URLs', () => {
+describe('listPageAttachments', () => {
+  it('keeps all assets and normalizes URLs', () => {
     expect(
-      listNonImageAttachments(['/assets/p1/notes.pdf', 'assets/p1/guide.docx']),
+      listPageAttachments(['/assets/p1/notes.pdf', 'assets/p1/guide.docx']),
     ).toEqual([
       { name: 'notes.pdf', url: '/assets/p1/notes.pdf' },
       { name: 'guide.docx', url: '/assets/p1/guide.docx' },
     ])
   })
 
-  it('filters out image extensions and deduplicates URLs', () => {
+  it('keeps images and deduplicates URLs', () => {
     expect(
-      listNonImageAttachments([
+      listPageAttachments([
         '/assets/p1/photo.png',
         '/assets/p1/notes.pdf',
         'assets/p1/notes.pdf',
       ]),
-    ).toEqual([{ name: 'notes.pdf', url: '/assets/p1/notes.pdf' }])
+    ).toEqual([
+      { name: 'photo.png', url: '/assets/p1/photo.png' },
+      { name: 'notes.pdf', url: '/assets/p1/notes.pdf' },
+    ])
   })
 })
 

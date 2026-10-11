@@ -21,10 +21,10 @@ import {
   Columns2,
   Eye,
   Highlighter,
-  Image,
   Italic,
   Link,
   MoreHorizontal,
+  Paperclip,
   Rows2,
   Redo,
   Strikethrough,
@@ -349,7 +349,8 @@ export default function MarkdownToolbar({
           <Button
             data-testid="open-asset-manager-button"
             variant="ghost"
-            size="icon"
+            size={isMobile ? 'icon' : 'sm'}
+            aria-label={t('toolbar.imageTooltip')}
             onClick={() =>
               openDialog(DIALOG_ASSET_MANAGER, {
                 pageId,
@@ -360,7 +361,8 @@ export default function MarkdownToolbar({
             }
             className="markdown-toolbar__button"
           >
-            <Image className="markdown-toolbar__icon" />
+            <Paperclip className="markdown-toolbar__icon" />
+            {!isMobile && t('toolbar.attachmentsButton')}
           </Button>
         </TooltipWrapper>
         {!isMobile && (
