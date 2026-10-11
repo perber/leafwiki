@@ -1,4 +1,3 @@
-import { IMAGE_EXTENSIONS } from '@/lib/config'
 import { fetchWithAuth } from './auth'
 
 export type UploadAssetResponse = {
@@ -16,16 +15,14 @@ function normalizeAssetUrl(path: string): string {
   return `/assets/${path}`
 }
 
-export function listNonImageAttachments(files: string[]): PageAttachment[] {
+export function listPageAttachments(files: string[]): PageAttachment[] {
   const seen = new Set<string>()
   const attachments: PageAttachment[] = []
   for (const file of files) {
     const url = normalizeAssetUrl(file)
-    const name = url.split('/').pop() ?? url
-    const ext = name.split('.').pop()?.toLowerCase() ?? ''
-    if (IMAGE_EXTENSIONS.includes(ext) || seen.has(url)) continue
+    if (seen.has(url)) continue
     seen.add(url)
-    attachments.push({ name, url })
+    attachments.push({ name: url.split('/').pop() ?? url, url })
   }
   return attachments
 }
@@ -55,7 +52,7 @@ export async function getPageAttachments(
 
   const request = getAssets(pageId)
     .then((files) => {
-      const attachments = listNonImageAttachments(files)
+      const attachments = listPageAttachments(files)
       attachmentCache.set(pageId, attachments)
       return attachments
     })
