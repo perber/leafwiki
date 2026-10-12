@@ -129,6 +129,9 @@ func Init(cfg Config) (*Repository, error) {
 	if err == nil {
 		slog.Debug("opened existing git repo", "repoDir", repoDir)
 		r.repo = repo
+		if err := r.disablePackDeltas(); err != nil {
+			return nil, err
+		}
 		if err := r.migrateBranchName(); err != nil {
 			return nil, err
 		}
@@ -161,6 +164,9 @@ func Init(cfg Config) (*Repository, error) {
 		if fetchErr == nil {
 			slog.Info("backup: adopted remote history", "remote", redactRemote(cfg.RemoteURL), "branch", cfg.Branch)
 			r.repo = fetched
+			if err := r.disablePackDeltas(); err != nil {
+				return nil, err
+			}
 			// Mark remote HEAD as already-pushed; first RunBackup will only push
 			// genuinely new local changes on top of the fetched history.
 			if head, hErr := fetched.Head(); hErr == nil {
@@ -203,6 +209,9 @@ func Init(cfg Config) (*Repository, error) {
 	}
 	slog.Debug("new git repo initialised", "repoDir", repoDir, "branch", cfg.Branch)
 	r.repo = repo
+	if err := r.disablePackDeltas(); err != nil {
+		return nil, err
+	}
 
 	if err := EnsureGitignore(repoDir); err != nil {
 		return nil, fmt.Errorf(errWriteGitignoreFailed, err)
@@ -214,6 +223,32 @@ func Init(cfg Config) (*Repository, error) {
 	}
 
 	return r, nil
+}
+
+// disablePackDeltas sets pack.window to 0 in the repository config, which
+// turns off go-git's delta search for every pack it writes (push and gc).
+// Unlike C git, go-git has no core.bigFileThreshold and builds each candidate
+// delta in full before rejecting it, so on image-heavy wikis the search diffs
+// every new asset against its neighbours byte by byte — enough to push a few
+// hundred MB of images past the push timeout on every cycle. Assets are
+// already-compressed formats that never deltify usefully; markdown only loses
+// a few KB of pack savings. The setting is persisted so repos created by
+// earlier versions are migrated on their next Init.
+func (r *Repository) disablePackDeltas() error {
+	cfg, err := r.repo.Config()
+	if err != nil {
+		return fmt.Errorf("failed to read repo config: %w", err)
+	}
+	if cfg.Pack.Window == 0 {
+		return nil
+	}
+	previous := cfg.Pack.Window
+	cfg.Pack.Window = 0
+	if err := r.repo.SetConfig(cfg); err != nil {
+		return fmt.Errorf("failed to write repo config: %w", err)
+	}
+	slog.Info("backup: disabled git pack delta compression", "repoDir", r.repoDir, "previousWindow", previous)
+	return nil
 }
 
 // reconcileRemote ensures the stored 'origin' remote URL matches cfg.RemoteURL.
@@ -616,15 +651,26 @@ func (r *Repository) gc() bool {
 		return false
 	}
 
-	deleted := 0
+	// RepackObjects already removed every loose object it packed (all those
+	// reachable from a ref); what is still on disk is unreachable and safe to
+	// prune. Objects already gone are the expected case, not a failure.
+	pruned, failed := 0, 0
 	for _, h := range toDelete {
-		if err := los.DeleteLooseObject(h); err != nil {
-			slog.Warn("backup gc: failed to delete loose object", "hash", h, "error", err)
-		} else {
-			deleted++
+		err := los.DeleteLooseObject(h)
+		switch {
+		case err == nil:
+			pruned++
+		case errors.Is(err, os.ErrNotExist):
+			// packed and removed by RepackObjects
+		default:
+			failed++
+			slog.Debug("backup gc: failed to delete loose object", "hash", h, "error", err)
 		}
 	}
-	slog.Info("backup gc: completed", "packed_and_pruned", deleted)
+	if failed > 0 {
+		slog.Warn("backup gc: some unreachable loose objects could not be deleted", "failed", failed)
+	}
+	slog.Info("backup gc: completed", "loose_objects", len(toDelete), "unreachable_pruned", pruned)
 	return true
 }
 
