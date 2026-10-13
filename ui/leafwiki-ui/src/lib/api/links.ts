@@ -37,7 +37,7 @@ export async function fetchLinkStatus(
 ): Promise<LinkStatusResult> {
   if (!pageId)
     throw new Error(i18next.t('backlinks.pageIdRequired', { ns: 'viewer' }))
-  return (await fetchWithAuth(`/api/pages/${pageId}/links`)) as LinkStatusResult
+  return await fetchWithAuth<LinkStatusResult>(`/api/pages/${pageId}/links`)
 }
 
 export type BrokenLink = {
@@ -53,5 +53,5 @@ export type BrokenLinksResult = {
 }
 
 export async function fetchBrokenLinks(): Promise<BrokenLinksResult> {
-  return (await fetchWithAuth('/api/links/broken')) as BrokenLinksResult
+  return await fetchWithAuth<BrokenLinksResult>('/api/links/broken')
 }

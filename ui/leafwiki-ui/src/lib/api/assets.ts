@@ -70,17 +70,22 @@ export async function uploadAsset(
 ): Promise<UploadAssetResponse> {
   const form = new FormData()
   form.append('file', file)
-  const res = (await fetchWithAuth(`/api/pages/${pageId}/assets`, {
-    method: 'POST',
-    body: form,
-  })) as UploadAssetResponse
+  const res = await fetchWithAuth<UploadAssetResponse>(
+    `/api/pages/${pageId}/assets`,
+    {
+      method: 'POST',
+      body: form,
+    },
+  )
   invalidatePageAttachments(pageId)
   return res
 }
 
 export async function getAssets(pageId: string): Promise<string[]> {
-  const data = await fetchWithAuth(`/api/pages/${pageId}/assets`, {})
-  const typedData = data as { files: string[] }
+  const typedData = await fetchWithAuth<{ files: string[] }>(
+    `/api/pages/${pageId}/assets`,
+    {},
+  )
   return typedData.files
 }
 
@@ -102,7 +107,6 @@ export async function renameAsset(
 ) {
   const res = await fetchWithAuth(`/api/pages/${pageId}/assets/rename`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       old_filename: oldFilename,
       new_filename: newFilename,

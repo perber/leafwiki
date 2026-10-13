@@ -25,7 +25,7 @@ export async function fetchTags(
   for (const tag of selected) {
     params.append('selected', tag)
   }
-  return (await fetchWithAuth(`/api/tags?${params}`)) as TagCount[]
+  return await fetchWithAuth<TagCount[]>(`/api/tags?${params}`)
 }
 
 export async function fetchPagesByTags(
@@ -36,7 +36,7 @@ export async function fetchPagesByTags(
   for (const tag of tags) {
     params.append('tags', tag)
   }
-  return (await fetchWithAuth(`/api/tags/pages?${params}`, {
+  return await fetchWithAuth<TaggedPage[]>(`/api/tags/pages?${params}`, {
     signal,
-  })) as TaggedPage[]
+  })
 }

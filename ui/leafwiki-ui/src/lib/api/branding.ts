@@ -24,10 +24,10 @@ export async function getBranding(): Promise<BrandingConfig> {
 export async function updateBranding(
   config: Partial<BrandingConfig>,
 ): Promise<BrandingConfig> {
-  return (await fetchWithAuth('/api/branding', {
+  return await fetchWithAuth<BrandingConfig>('/api/branding', {
     method: 'PUT',
     body: JSON.stringify(config),
-  })) as BrandingConfig
+  })
 }
 
 export async function uploadBrandingLogo(
@@ -36,11 +36,14 @@ export async function uploadBrandingLogo(
   const formData = new FormData()
   formData.append('file', file)
 
-  return (await fetchWithAuth('/api/branding/logo', {
-    method: 'POST',
-    body: formData,
-    headers: {}, // Let browser set Content-Type for FormData
-  })) as { path: string; branding: BrandingConfig }
+  return await fetchWithAuth<{ path: string; branding: BrandingConfig }>(
+    '/api/branding/logo',
+    {
+      method: 'POST',
+      body: formData,
+      headers: {}, // Let browser set Content-Type for FormData
+    },
+  )
 }
 
 export async function uploadBrandingFavicon(
@@ -49,21 +52,24 @@ export async function uploadBrandingFavicon(
   const formData = new FormData()
   formData.append('file', file)
 
-  return (await fetchWithAuth('/api/branding/favicon', {
-    method: 'POST',
-    body: formData,
-    headers: {}, // Let browser set Content-Type for FormData
-  })) as { path: string; branding: BrandingConfig }
+  return await fetchWithAuth<{ path: string; branding: BrandingConfig }>(
+    '/api/branding/favicon',
+    {
+      method: 'POST',
+      body: formData,
+      headers: {}, // Let browser set Content-Type for FormData
+    },
+  )
 }
 
 export async function deleteBrandingLogo(): Promise<BrandingConfig> {
-  return (await fetchWithAuth('/api/branding/logo', {
+  return await fetchWithAuth<BrandingConfig>('/api/branding/logo', {
     method: 'DELETE',
-  })) as BrandingConfig
+  })
 }
 
 export async function deleteBrandingFavicon(): Promise<BrandingConfig> {
-  return (await fetchWithAuth('/api/branding/favicon', {
+  return await fetchWithAuth<BrandingConfig>('/api/branding/favicon', {
     method: 'DELETE',
-  })) as BrandingConfig
+  })
 }

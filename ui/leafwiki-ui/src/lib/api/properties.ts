@@ -20,9 +20,7 @@ export async function fetchPropertyKeys(
 ): Promise<PropertyKeyCount[]> {
   const params = new URLSearchParams({ limit: String(limit) })
   if (filter) params.set('q', filter)
-  return (await fetchWithAuth(
-    `/api/properties?${params}`,
-  )) as PropertyKeyCount[]
+  return await fetchWithAuth<PropertyKeyCount[]>(`/api/properties?${params}`)
 }
 
 export async function fetchPagesByProperty(
@@ -30,7 +28,5 @@ export async function fetchPagesByProperty(
   value: string,
 ): Promise<PropertyPage[]> {
   const params = new URLSearchParams({ key, value })
-  return (await fetchWithAuth(
-    `/api/properties/pages?${params}`,
-  )) as PropertyPage[]
+  return await fetchWithAuth<PropertyPage[]>(`/api/properties/pages?${params}`)
 }

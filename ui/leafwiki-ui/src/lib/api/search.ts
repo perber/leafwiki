@@ -52,12 +52,9 @@ export async function searchPages(
     params.append('tags', tag)
   }
 
-  const data = await fetchWithAuth(`/api/search?${params}`)
-
-  return data as SearchResult
+  return await fetchWithAuth<SearchResult>(`/api/search?${params}`)
 }
 
 export async function getSearchStatus(): Promise<IndexingStatus> {
-  const res = await fetchWithAuth('/api/search/status')
-  return res as IndexingStatus
+  return await fetchWithAuth<IndexingStatus>('/api/search/status')
 }

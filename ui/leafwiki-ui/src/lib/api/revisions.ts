@@ -65,24 +65,22 @@ export async function listRevisions(
   if (cursor) params.set('cursor', cursor)
   params.set('limit', String(limit))
   const query = params.toString()
-  return (await fetchWithAuth(
+  return await fetchWithAuth<RevisionListResponse>(
     `/api/pages/${pageId}/revisions${query ? `?${query}` : ''}`,
-  )) as RevisionListResponse
+  )
 }
 
 export async function getLatestRevision(pageId: string): Promise<Revision> {
-  return (await fetchWithAuth(
-    `/api/pages/${pageId}/revisions/latest`,
-  )) as Revision
+  return await fetchWithAuth<Revision>(`/api/pages/${pageId}/revisions/latest`)
 }
 
 export async function getRevisionSnapshot(
   pageId: string,
   revisionId: string,
 ): Promise<RevisionSnapshot> {
-  return (await fetchWithAuth(
+  return await fetchWithAuth<RevisionSnapshot>(
     `/api/pages/${pageId}/revisions/${revisionId}`,
-  )) as RevisionSnapshot
+  )
 }
 
 export async function compareRevisions(
@@ -94,9 +92,9 @@ export async function compareRevisions(
     base: baseRevisionId,
     target: targetRevisionId,
   })
-  return (await fetchWithAuth(
+  return await fetchWithAuth<RevisionComparison>(
     `/api/pages/${pageId}/revisions/compare?${params.toString()}`,
-  )) as RevisionComparison
+  )
 }
 
 export async function restoreRevision(pageId: string, revisionId: string) {
