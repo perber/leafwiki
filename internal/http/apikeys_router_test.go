@@ -14,6 +14,9 @@ import (
 	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/wiki"
+	wikibackup "github.com/perber/wiki/internal/wiki/backup"
+	wikirestore "github.com/perber/wiki/internal/wiki/restore"
+	wikisnapshot "github.com/perber/wiki/internal/wiki/snapshot"
 )
 
 // newAPIKeyRouterTest builds a Wiki + router pair mirroring createRouterTestInstance,
@@ -37,6 +40,11 @@ func newAPIKeyRouterTest(t *testing.T) (*wiki.Wiki, http.Handler) {
 		t.Fatalf("Failed to create wiki instance: %v", err)
 	}
 	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(w.Close, t) })
+	// Nil managers: the routes answer 503 when reached, which is enough to test
+	// the guards in front of them.
+	w.SetSnapshotRoutes(wikisnapshot.NewRoutes(nil, nil, w.AuthService(), 0))
+	w.SetRestoreRoutes(wikirestore.NewRoutes(nil, w.AuthService()))
+	w.SetBackupRoutes(wikibackup.NewRoutes(nil, w.AuthService()))
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            publicaccess.NewEnvManaged(false),
 		AllowInsecure:           true,
@@ -50,8 +58,15 @@ func newAPIKeyRouterTest(t *testing.T) (*wiki.Wiki, http.Handler) {
 }
 
 func bearerRequest(method, url, token string) *http.Request {
-	req := httptest.NewRequest(method, url, strings.NewReader(""))
+	return bearerJSONRequest(method, url, token, "")
+}
+
+func bearerJSONRequest(method, url, token, body string) *http.Request {
+	req := httptest.NewRequest(method, url, strings.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+token)
+	if body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	return req
 }
 
@@ -126,10 +141,10 @@ func TestAPIKeys_NonAdminCannotManageKeys(t *testing.T) {
 }
 
 // TestAPIKeys_AdminScopedKeyCannotManageKeys is the regression test for the
-// code-review finding that an admin-scoped API key could list (and, absent
-// CSRF's incidental protection, create/revoke) every key in the system via
-// Bearer auth. RequireCookieSession now closes this explicitly: even an
-// admin-scoped key must be rejected from /api/api-keys, regardless of role.
+// code-review finding that an admin-scoped API key could list, create and
+// revoke every key in the system via Bearer auth. CSRF no longer stops key
+// writes, so RequireCookieSession is what closes this: even an admin-scoped
+// key must be rejected from /api/api-keys, regardless of role.
 func TestAPIKeys_AdminScopedKeyCannotManageKeys(t *testing.T) {
 	w, router := newAPIKeyRouterTest(t)
 
@@ -159,10 +174,7 @@ func TestAPIKeys_AdminScopedKeyCannotManageKeys(t *testing.T) {
 
 // TestAPIKeys_ViewerScopedKeyCanReadButNotWrite is the end-to-end proof of the
 // permission model: a viewer-scoped key can reach a read endpoint, but is
-// rejected on a mutating one. The write attempt is rejected for CSRF reasons
-// before role is even evaluated (a pure Bearer client has no CSRF cookie) —
-// which is a stricter outcome than the role check alone would give, and it
-// means no key, regardless of role, can reach a write route in this phase.
+// rejected on a mutating one by the role guard (a resolved key skips CSRF).
 func TestAPIKeys_ViewerScopedKeyCanReadButNotWrite(t *testing.T) {
 	w, router := newAPIKeyRouterTest(t)
 
@@ -238,5 +250,162 @@ func TestAPIKeys_RevokedKeyIsRejectedImmediately(t *testing.T) {
 	router.ServeHTTP(postRevokeRec, bearerRequest(http.MethodGet, "/api/tree", created.Secret))
 	if postRevokeRec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 after revocation, got %d: %s", postRevokeRec.Code, postRevokeRec.Body.String())
+	}
+}
+
+// createAPIKeyFor creates a key for a fresh user with userRole, scoped to
+// keyRole, via the admin session, and returns the Bearer secret.
+func createAPIKeyFor(t *testing.T, w *wiki.Wiki, router http.Handler, username, userRole, keyRole string) string {
+	t.Helper()
+	owner, err := w.UserService().CreateUser(username, username+"@example.com", "password123", userRole)
+	if err != nil {
+		t.Fatalf("CreateUser err: %v", err)
+	}
+	body := `{"name":"` + username + ` key","userId":"` + owner.ID + `","role":"` + keyRole + `"}`
+	rec := authenticatedRequest(t, router, http.MethodPost, "/api/api-keys", strings.NewReader(body))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201 creating key, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		Secret string `json:"secret"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+		t.Fatalf("unmarshal create response: %v", err)
+	}
+	return created.Secret
+}
+
+// TestAPIKeys_EditorKeyCanWritePages proves a resolved key passes CSRF and
+// then follows the normal role guards: an editor key can create a page with
+// nothing but the Authorization header.
+func TestAPIKeys_EditorKeyCanWritePages(t *testing.T) {
+	w, router := newAPIKeyRouterTest(t)
+	secret := createAPIKeyFor(t, w, router, "editor-agent", coreauth.RoleEditor, coreauth.RoleEditor)
+
+	req := bearerJSONRequest(http.MethodPost, "/api/pages", secret, `{"title":"From key","slug":"from-key"}`)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201 creating a page with an editor key, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestAPIKeys_ViewerKeyOwnedByEditorCannotWrite checks role(user) ∩ role(key):
+// the owner could write, but the viewer-scoped key must not.
+func TestAPIKeys_ViewerKeyOwnedByEditorCannotWrite(t *testing.T) {
+	w, router := newAPIKeyRouterTest(t)
+	secret := createAPIKeyFor(t, w, router, "editor-owner", coreauth.RoleEditor, coreauth.RoleViewer)
+
+	req := bearerJSONRequest(http.MethodPost, "/api/pages", secret, `{"title":"Nope","slug":"nope"}`)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 writing with a viewer-scoped key, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Editor or Admin role required") {
+		t.Fatalf("expected the role guard to reject the write, got: %s", rec.Body.String())
+	}
+}
+
+// TestAPIKeys_SessionWithoutCSRFTokenStillRejected guards against the CSRF
+// skip leaking to cookie sessions: only a resolved key may skip the check.
+func TestAPIKeys_SessionWithoutCSRFTokenStillRejected(t *testing.T) {
+	_, router := newAPIKeyRouterTest(t)
+
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login",
+		strings.NewReader(`{"identifier": "admin", "password": "adminpassword"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRec := httptest.NewRecorder()
+	router.ServeHTTP(loginRec, loginReq)
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("login failed: %d - %s", loginRec.Code, loginRec.Body.String())
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/pages", strings.NewReader(`{"title":"X","slug":"x"}`))
+	req.Header.Set("Content-Type", "application/json")
+	for _, c := range loginRec.Result().Cookies() {
+		req.AddCookie(c)
+	}
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "CSRF") {
+		t.Fatalf("expected a CSRF 403 for a cookie session without token, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestAPIKeys_CredentialRoutesAreSessionOnly ensures an admin-scoped key
+// cannot touch routes that manage credentials, sessions or users.
+func TestAPIKeys_CredentialRoutesAreSessionOnly(t *testing.T) {
+	w, router := newAPIKeyRouterTest(t)
+	secret := createAPIKeyFor(t, w, router, "admin-agent", coreauth.RoleAdmin, coreauth.RoleAdmin)
+
+	routes := []struct{ method, path string }{
+		{http.MethodPost, "/api/auth/logout"},
+		{http.MethodPut, "/api/users/me/password"},
+		{http.MethodPost, "/api/users/me/totp/setup/start"},
+		{http.MethodPost, "/api/users/me/totp/setup/confirm"},
+		{http.MethodPost, "/api/users/me/totp/disable"},
+		{http.MethodPost, "/api/users"},
+		{http.MethodPut, "/api/users/some-id"},
+		{http.MethodDelete, "/api/users/some-id"},
+		{http.MethodPost, "/api/users/invite"},
+		{http.MethodPost, "/api/users/some-id/invite/resend"},
+	}
+	for _, rt := range routes {
+		t.Run(rt.method+" "+rt.path, func(t *testing.T) {
+			req := bearerRequest(rt.method, rt.path, secret)
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusForbidden {
+				t.Fatalf("expected 403, got %d: %s", rec.Code, rec.Body.String())
+			}
+			if !strings.Contains(rec.Body.String(), "requires a browser session") {
+				t.Fatalf("expected the session-only guard to reject the request, got: %s", rec.Body.String())
+			}
+		})
+	}
+}
+
+// TestAPIKeys_InstanceRecoveryRoutesAreSessionOnly covers the admin routes that
+// can replace or exfiltrate the whole instance: restore overwrites users.db and
+// api_keys.db, a snapshot ZIP contains both, and the backup config routes can
+// point the stored git credentials at another server. An admin-scoped key must
+// not reach them, while harmless status routes stay reachable.
+func TestAPIKeys_InstanceRecoveryRoutesAreSessionOnly(t *testing.T) {
+	w, router := newAPIKeyRouterTest(t)
+	secret := createAPIKeyFor(t, w, router, "recovery-agent", coreauth.RoleAdmin, coreauth.RoleAdmin)
+
+	blocked := []struct{ method, path string }{
+		{http.MethodPost, "/api/admin/restore/upload"},
+		{http.MethodPost, "/api/admin/restore/some-id"},
+		{http.MethodPost, "/api/admin/restore/self-restart"},
+		{http.MethodGet, "/api/admin/snapshot/some-id/download"},
+		// Config routes accept a caller-chosen remoteUrl and fill blank secrets
+		// from the stored config, so a key could make the server send the stored
+		// git credentials to a server of its choosing.
+		{http.MethodPost, "/api/admin/backup/config"},
+		{http.MethodPost, "/api/admin/backup/config/test"},
+		{http.MethodPost, "/api/admin/backup/disable"},
+	}
+	for _, rt := range blocked {
+		t.Run(rt.method+" "+rt.path, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, bearerRequest(rt.method, rt.path, secret))
+
+			if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "requires a browser session") {
+				t.Fatalf("expected the session-only guard to reject the key, got %d: %s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, bearerRequest(http.MethodGet, "/api/admin/snapshot/status", secret))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status routes to stay reachable with an admin key, got %d: %s", rec.Code, rec.Body.String())
 	}
 }

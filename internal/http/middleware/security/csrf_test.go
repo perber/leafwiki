@@ -156,3 +156,75 @@ func TestCSRFMiddleware_AllowsPostWithMatchingTokens(t *testing.T) {
 		t.Fatalf("expected status 200 for POST with valid CSRF, got %d", w.Code)
 	}
 }
+
+func TestCSRFMiddleware_SkipsPostWhenAPIKeyResolved(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	csrf := NewCSRFCookie(false, time.Hour)
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set(APIKeyAuthContextKey, true)
+		c.Next()
+	})
+	router.Use(CSRFMiddleware(csrf))
+	router.POST("/protected", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest("POST", "/protected", nil)
+	req.TLS = &tls.ConnectionState{}
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200 for POST with a resolved API key and no CSRF token, got %d", w.Code)
+	}
+}
+
+func TestCSRFMiddleware_DoesNotSkipForBearerHeaderAlone(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	csrf := NewCSRFCookie(false, time.Hour)
+
+	router := gin.New()
+	router.Use(CSRFMiddleware(csrf))
+	router.POST("/protected", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest("POST", "/protected", nil)
+	req.TLS = &tls.ConnectionState{}
+	req.Header.Set("Authorization", "Bearer lw_abcdefgh_secret")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403: a Bearer header that was not resolved to a key must not skip CSRF, got %d", w.Code)
+	}
+}
+
+func TestCSRFMiddleware_DoesNotSkipWhenAPIKeyFlagIsFalse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	csrf := NewCSRFCookie(false, time.Hour)
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set(APIKeyAuthContextKey, false)
+		c.Next()
+	})
+	router.Use(CSRFMiddleware(csrf))
+	router.POST("/protected", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest("POST", "/protected", nil)
+	req.TLS = &tls.ConnectionState{}
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403 when the API key flag is false, got %d", w.Code)
+	}
+}

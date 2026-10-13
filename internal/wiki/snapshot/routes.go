@@ -43,7 +43,9 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	adminGroup.GET("/snapshot/status", r.handleStatus)
 	adminGroup.GET("/snapshot", r.handleList)
 	adminGroup.POST("/snapshot", r.handleTrigger)
-	adminGroup.GET("/snapshot/:id/download", r.handleDownload)
+	// The ZIP contains users.db and api_keys.db (password hashes, TOTP
+	// secrets), so downloading it is browser-session only.
+	adminGroup.GET("/snapshot/:id/download", authmw.RequireCookieSession(), r.handleDownload)
 	adminGroup.DELETE("/snapshot/:id", r.handleDelete)
 }
 

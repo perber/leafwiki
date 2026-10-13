@@ -62,10 +62,8 @@ export function ApiKeyFormDialog() {
         // Role is intentionally omitted — the create dialog only mints
         // viewer-scoped keys for now (see Select removal below); the
         // backend defaults to viewer when role is absent. Editor/admin
-        // roles are accepted by the API for future/direct use, but every
-        // Bearer-authenticated write is currently blocked by CSRF
-        // regardless of role, so offering them here would suggest a
-        // capability the backend can't yet honor.
+        // roles are accepted by the API for direct use; whether to offer
+        // them in this dialog is a separate product decision.
         expiresAt: toExpiresAtRFC3339(expiresAt),
       })
       toast.success(t('create.successToast'))

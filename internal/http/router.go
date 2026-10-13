@@ -202,9 +202,10 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 		// exactly as powerful as role(user) ∩ role(key) everywhere the normal
 		// RequireAuth/RequireAdmin/RequireEditorOrAdmin guards apply — the
 		// same way roles work everywhere else in the app — rather than being
-		// restricted to a curated subset of read routes. Writes are, for now,
-		// separately blocked for Bearer callers by CSRFMiddleware (see
-		// InjectAPIKeyUser's doc comment).
+		// restricted to a curated subset of read routes. CSRFMiddleware skips
+		// requests with a resolved key, so writes follow the same role guards;
+		// routes that manage credentials, sessions or users opt out with
+		// RequireCookieSession (see InjectAPIKeyUser's doc comment).
 		base.Use(auth_middleware.InjectAPIKeyUser(auth_middleware.APIKeyConfig{
 			Service: opts.APIKeyService,
 			// Only failed attempts count toward the limit (NotifyResult

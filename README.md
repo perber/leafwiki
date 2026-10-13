@@ -64,7 +64,7 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
 - Runs on Linux, macOS, Windows, Raspberry Pi (x86_64 and ARM64; 32-bit x86 Linux via standalone binary)
 - Reverse-proxy friendly with `--base-path`
 - Reverse-proxy authentication via trusted HTTP header (v0.10+)
-- API keys for programmatic and agent access, admin-managed, read-only — in development, not yet ready for use
+- API keys for programmatic and agent access, admin-managed, scoped by role — in development, not yet ready for use
 - Three access modes: fully internal, public read with login-only editing, or open editing without login (see [Operating Modes](#operating-modes))
 - Roles: admin, editor, viewer
 
