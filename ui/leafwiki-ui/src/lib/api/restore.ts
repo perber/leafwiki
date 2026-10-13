@@ -14,7 +14,6 @@ export interface RestoreStatus {
 export async function triggerRestore(id: string): Promise<void> {
   await fetchWithAuth(`${RESTORE_URL}/${encodeURIComponent(id)}`, {
     method: 'POST',
-    credentials: 'include',
   })
 }
 
@@ -25,15 +24,11 @@ export async function triggerRestoreFromUpload(file: File): Promise<void> {
     method: 'POST',
     body: formData,
     headers: {}, // Let browser set Content-Type for FormData
-    credentials: 'include',
   })
 }
 
 export async function getRestoreStatus(): Promise<RestoreStatus> {
-  const res = await fetchWithAuth(`${RESTORE_URL}/status`, {
-    credentials: 'include',
-  })
-  return res as RestoreStatus
+  return await fetchWithAuth<RestoreStatus>(`${RESTORE_URL}/status`, {})
 }
 
 // triggerSelfRestart's request is expected to never receive a clean
@@ -44,6 +39,5 @@ export async function getRestoreStatus(): Promise<RestoreStatus> {
 export async function triggerSelfRestart(): Promise<void> {
   await fetchWithAuth(`${RESTORE_URL}/self-restart`, {
     method: 'POST',
-    credentials: 'include',
   })
 }

@@ -2,7 +2,7 @@ import { fetchWithAuth } from './auth'
 import type { Page } from './pages'
 
 export async function getFavorites(): Promise<Page[]> {
-  const res = (await fetchWithAuth('/api/favorites')) as { pages: Page[] }
+  const res = await fetchWithAuth<{ pages: Page[] }>('/api/favorites')
   return res.pages
 }
 

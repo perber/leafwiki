@@ -28,16 +28,16 @@ export type CreateApiKeyResult = {
 }
 
 export async function getApiKeys(): Promise<ApiKey[]> {
-  return (await fetchWithAuth('/api/api-keys')) as ApiKey[]
+  return await fetchWithAuth<ApiKey[]>('/api/api-keys')
 }
 
 export async function createApiKey(
   input: CreateApiKeyInput,
 ): Promise<CreateApiKeyResult> {
-  return (await fetchWithAuth('/api/api-keys', {
+  return await fetchWithAuth<CreateApiKeyResult>('/api/api-keys', {
     method: 'POST',
     body: JSON.stringify(input),
-  })) as CreateApiKeyResult
+  })
 }
 
 export async function deleteApiKey(id: string) {

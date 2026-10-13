@@ -17,14 +17,14 @@ export type UserSettingsPatch = {
 }
 
 export async function getUserSettings(): Promise<UserSettings> {
-  return (await fetchWithAuth('/api/user-settings')) as UserSettings
+  return await fetchWithAuth<UserSettings>('/api/user-settings')
 }
 
 export async function updateUserSettings(
   patch: UserSettingsPatch,
 ): Promise<UserSettings> {
-  return (await fetchWithAuth('/api/user-settings', {
+  return await fetchWithAuth<UserSettings>('/api/user-settings', {
     method: 'PUT',
     body: JSON.stringify(patch),
-  })) as UserSettings
+  })
 }

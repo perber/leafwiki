@@ -51,23 +51,23 @@ export async function createImportPlanFromZip(file: File): Promise<ImportPlan> {
   const formData = new FormData()
   formData.append('file', file)
 
-  return (await fetchWithAuth('/api/import/plan', {
+  return await fetchWithAuth<ImportPlan>('/api/import/plan', {
     method: 'POST',
     body: formData,
     headers: {}, // Let browser set Content-Type for FormData
-  })) as ImportPlan
+  })
 }
 
 export async function getImportPlan(): Promise<ImportPlan> {
-  return (await fetchWithAuth('/api/import/plan', {
+  return await fetchWithAuth<ImportPlan>('/api/import/plan', {
     method: 'GET',
-  })) as ImportPlan
+  })
 }
 
 export async function executeImportPlan(): Promise<ImportPlan> {
-  return (await fetchWithAuth('/api/import/execute', {
+  return await fetchWithAuth<ImportPlan>('/api/import/execute', {
     method: 'POST',
-  })) as ImportPlan
+  })
 }
 
 export async function cancelImportPlan(): Promise<ImportPlan | null> {

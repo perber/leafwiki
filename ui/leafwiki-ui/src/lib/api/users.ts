@@ -22,7 +22,7 @@ export type InviteUserResponse = {
 }
 
 export async function getUsers(): Promise<User[]> {
-  return (await fetchWithAuth('/api/users')) as User[]
+  return await fetchWithAuth<User[]>('/api/users')
 }
 
 export async function createUser(user: UserInput & { password: string }) {
@@ -37,10 +37,10 @@ export async function createUser(user: UserInput & { password: string }) {
 // can be false even on success (user creation never rolls back on a send
 // failure): the caller should offer resendInvite when that happens.
 export async function inviteUser(user: UserInput): Promise<InviteUserResponse> {
-  return (await fetchWithAuth('/api/users/invite', {
+  return await fetchWithAuth<InviteUserResponse>('/api/users/invite', {
     method: 'POST',
     body: JSON.stringify(user),
-  })) as InviteUserResponse
+  })
 }
 
 export async function resendInvite(id: string) {

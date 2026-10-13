@@ -74,7 +74,7 @@ export type PageRefactorPreview = {
 }
 
 export async function fetchTree(): Promise<PageNode> {
-  return (await fetchWithAuth(`/api/tree`)) as PageNode
+  return await fetchWithAuth<PageNode>(`/api/tree`)
 }
 
 export async function suggestSlug(
@@ -84,27 +84,26 @@ export async function suggestSlug(
 ): Promise<string> {
   if (!currentId) currentId = ''
 
-  const data = await fetchWithAuth(
+  const data = await fetchWithAuth<{ slug: string }>(
     `/api/pages/slug-suggestion?parentId=${parentId}&title=${encodeURIComponent(title)}${currentId ? `&currentId=${currentId}` : ''}`,
   )
-  const typedData = data as { slug: string }
-  return typedData.slug
+  return data.slug
 }
 
 export async function getPageByPath(
   path: string,
   signal?: AbortSignal,
 ): Promise<Page> {
-  return (await fetchWithAuth(
+  return await fetchWithAuth<Page>(
     `/api/pages/by-path?path=${encodeURIComponent(path)}`,
     { signal },
-  )) as Page
+  )
 }
 
 export async function getPermalinkTarget(id: string): Promise<PermalinkTarget> {
-  return (await fetchWithAuth(
+  return await fetchWithAuth<PermalinkTarget>(
     `/api/pages/permalink/${encodeURIComponent(id)}`,
-  )) as PermalinkTarget
+  )
 }
 
 export async function createPage({
@@ -122,7 +121,6 @@ export async function createPage({
 
   return await fetchWithAuth(`/api/pages`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title, slug, parentId, kind }),
   })
 }
@@ -136,7 +134,6 @@ export async function copyPage(
   if (targetParentId === '' || targetParentId === 'root') targetParentId = null
   return await fetchWithAuth(`/api/pages/copy/${id}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       targetParentId,
       title: targetTitle,
@@ -154,11 +151,10 @@ export async function updatePage(
   tags: string[],
   properties: Record<string, string>,
 ): Promise<Page | null> {
-  return (await fetchWithAuth(`/api/pages/${id}`, {
+  return await fetchWithAuth<Page | null>(`/api/pages/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ version, title, slug, content, tags, properties }),
-  })) as Page | null
+  })
 }
 
 export async function deletePage(
@@ -188,7 +184,6 @@ export async function movePage(
 
   return await fetchWithAuth(`/api/pages/${id}/move`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(
       position === undefined
         ? { version, parentId }
@@ -210,11 +205,13 @@ export async function previewPageRefactor(
         parentId: string | null
       },
 ): Promise<PageRefactorPreview> {
-  return (await fetchWithAuth(`/api/pages/${id}/refactor/preview`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  })) as PageRefactorPreview
+  return await fetchWithAuth<PageRefactorPreview>(
+    `/api/pages/${id}/refactor/preview`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  )
 }
 
 export async function applyPageRefactor(
@@ -236,11 +233,10 @@ export async function applyPageRefactor(
         position?: number
       },
 ): Promise<Page | null> {
-  return (await fetchWithAuth(`/api/pages/${id}/refactor/apply`, {
+  return await fetchWithAuth<Page | null>(`/api/pages/${id}/refactor/apply`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-  })) as Page | null
+  })
 }
 
 export async function pinPage(
@@ -248,11 +244,10 @@ export async function pinPage(
   version: string,
   pinned: boolean,
 ): Promise<Page> {
-  return (await fetchWithAuth(`/api/pages/${id}/pin`, {
+  return await fetchWithAuth<Page>(`/api/pages/${id}/pin`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ version, pinned }),
-  })) as Page
+  })
 }
 
 export async function sortPages(parentId: string, orderedIDs: string[]) {
@@ -260,7 +255,6 @@ export async function sortPages(parentId: string, orderedIDs: string[]) {
 
   return await fetchWithAuth(`/api/pages/${parentId}/sort`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ orderedIDs }),
   })
 }
@@ -272,7 +266,6 @@ export async function convertPage(
 ) {
   return await fetchWithAuth(`/api/pages/convert/${id}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ targetKind, version }),
   })
 }
@@ -285,20 +278,14 @@ export type PathLookupResult = {
 }
 
 export async function lookupPath(path: string): Promise<PathLookupResult> {
-  return (await fetchWithAuth(
+  return await fetchWithAuth<PathLookupResult>(
     `/api/pages/lookup?path=${encodeURIComponent(path)}`,
-  )) as {
-    path: string
-    exists: boolean
-    canCreate: boolean
-    segments: { slug: string; id?: string; exists: boolean }[]
-  }
+  )
 }
 
 export async function ensurePage(path: string, targetTitle: string) {
   return await fetchWithAuth(`/api/pages/ensure`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path, title: targetTitle }),
   })
 }
