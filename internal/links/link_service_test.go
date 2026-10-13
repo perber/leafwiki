@@ -270,7 +270,7 @@ func createSimpleLinkedPages(t *testing.T, ts *tree.TreeService) (pageAID, pageB
 		t.Fatalf("GetPage a failed: %v", err)
 	}
 	contentA := "Link to B: [Go to B](/b)"
-	if err := ts.UpdateNode("system", aPage.ID, aPage.Title, aPage.Slug, &contentA, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: aPage.ID, Title: aPage.Title, Slug: aPage.Slug, Content: &contentA, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdatePage a failed: %v", err)
 	}
 
@@ -279,7 +279,7 @@ func createSimpleLinkedPages(t *testing.T, ts *tree.TreeService) (pageAID, pageB
 		t.Fatalf("GetPage b failed: %v", err)
 	}
 	contentB := "# Page B\nNo outgoing links."
-	if err := ts.UpdateNode("system", bPage.ID, bPage.Title, bPage.Slug, &contentB, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: bPage.ID, Title: bPage.Title, Slug: bPage.Slug, Content: &contentB, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdatePage b failed: %v", err)
 	}
 
@@ -328,7 +328,7 @@ func TestLinkService_IndexAllPages_ReplacesExistingLinks(t *testing.T) {
 		t.Fatalf("GetPage a failed: %v", err)
 	}
 	var noLinks = "No more links."
-	if err := ts.UpdateNode("system", aPage.ID, aPage.Title, aPage.Slug, &noLinks, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: aPage.ID, Title: aPage.Title, Slug: aPage.Slug, Content: &noLinks, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdatePage a failed: %v", err)
 	}
 
@@ -453,7 +453,7 @@ func TestLinkService_GetOutgoingLinksForPage_NoOutgoings(t *testing.T) {
 	}
 
 	var noLinks = "Just some text, no links."
-	if err := ts.UpdateNode("system", page.ID, page.Title, page.Slug, &noLinks, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: page.ID, Title: page.Title, Slug: page.Slug, Content: &noLinks, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode lonely failed: %v", err)
 	}
 
@@ -495,7 +495,7 @@ func TestLinkService_IndexAllPages_IgnoresAssetLinksInOutgoingAndBrokenSets(t *t
 		t.Fatalf("GetPage a failed: %v", err)
 	}
 	contentA := "Asset: [Manual](/assets/abc/manual.pdf)\nPage: [Go](/b)"
-	if err := ts.UpdateNode("system", pageA.ID, pageA.Title, pageA.Slug, &contentA, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: pageA.ID, Title: pageA.Title, Slug: pageA.Slug, Content: &contentA, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode a failed: %v", err)
 	}
 
@@ -618,7 +618,7 @@ func TestLinkService_LateCreatedTarget_BecomesResolvedAfterReindex(t *testing.T)
 		t.Fatalf("GetPage a failed: %v", err)
 	}
 	var linkToB = "Link to B: [Go](/b)"
-	if err := ts.UpdateNode("system", aPage.ID, aPage.Title, aPage.Slug, &linkToB, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: aPage.ID, Title: aPage.Title, Slug: aPage.Slug, Content: &linkToB, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode a failed: %v", err)
 	}
 
@@ -654,7 +654,7 @@ func TestLinkService_LateCreatedTarget_BecomesResolvedAfterReindex(t *testing.T)
 		t.Fatalf("GetPage b failed: %v", err)
 	}
 	var pageBContent = "# Page B"
-	if err := ts.UpdateNode("system", bPage.ID, bPage.Title, bPage.Slug, &pageBContent, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: bPage.ID, Title: bPage.Title, Slug: bPage.Slug, Content: &pageBContent, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode b failed: %v", err)
 	}
 
@@ -705,7 +705,7 @@ func TestLinkService_HealOnPageCreate_ResolvesBrokenLinksWithoutReindex(t *testi
 		t.Fatalf("GetPage A failed: %v", err)
 	}
 	var linkToB = "Link to B: [Go](/b)"
-	if err := ts.UpdateNode("system", pageA.ID, pageA.Title, pageA.Slug, &linkToB, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: pageA.ID, Title: pageA.Title, Slug: pageA.Slug, Content: &linkToB, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode A failed: %v", err)
 	}
 
@@ -804,7 +804,7 @@ func TestLinksStore_GetBrokenIncomingForPath_ReturnsBrokenLinks(t *testing.T) {
 		t.Fatalf("GetPage A failed: %v", err)
 	}
 	var linkToMissing = "Link: [Missing](/nonexistent)"
-	if err := ts.UpdateNode("system", pageA.ID, pageA.Title, pageA.Slug, &linkToMissing, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: pageA.ID, Title: pageA.Title, Slug: pageA.Slug, Content: &linkToMissing, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode A failed: %v", err)
 	}
 
@@ -812,7 +812,7 @@ func TestLinksStore_GetBrokenIncomingForPath_ReturnsBrokenLinks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPage B failed: %v", err)
 	}
-	if err := ts.UpdateNode("system", pageB.ID, pageB.Title, pageB.Slug, &linkToMissing, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: pageB.ID, Title: pageB.Title, Slug: pageB.Slug, Content: &linkToMissing, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode B failed: %v", err)
 	}
 
@@ -822,7 +822,7 @@ func TestLinksStore_GetBrokenIncomingForPath_ReturnsBrokenLinks(t *testing.T) {
 		t.Fatalf("GetPage C failed: %v", err)
 	}
 	var linkToOther = "Link: [Other](/other-missing)"
-	if err := ts.UpdateNode("system", pageC.ID, pageC.Title, pageC.Slug, &linkToOther, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: pageC.ID, Title: pageC.Title, Slug: pageC.Slug, Content: &linkToOther, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode C failed: %v", err)
 	}
 
@@ -886,7 +886,7 @@ func TestLinkService_GetBrokenLinks_ReturnsBrokenLinksWithResolvedFromPath(t *te
 		t.Fatalf("GetPage A failed: %v", err)
 	}
 	linkToMissing := "Link: [Missing](/nonexistent)"
-	if err := ts.UpdateNode("system", pageA.ID, pageA.Title, pageA.Slug, &linkToMissing, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: pageA.ID, Title: pageA.Title, Slug: pageA.Slug, Content: &linkToMissing, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode A failed: %v", err)
 	}
 
@@ -938,7 +938,7 @@ func TestLinksStore_GetBrokenIncomingForPath_FiltersByPath(t *testing.T) {
 		t.Fatalf("GetPage A failed: %v", err)
 	}
 	var linkToMissing1 = "Link: [Missing1](/missing1)"
-	if err := ts.UpdateNode("system", pageA.ID, pageA.Title, pageA.Slug, &linkToMissing1, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: pageA.ID, Title: pageA.Title, Slug: pageA.Slug, Content: &linkToMissing1, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode A failed: %v", err)
 	}
 
@@ -948,7 +948,7 @@ func TestLinksStore_GetBrokenIncomingForPath_FiltersByPath(t *testing.T) {
 		t.Fatalf("GetPage B failed: %v", err)
 	}
 	var linkToMissing2 = "Link: [Missing2](/missing2)"
-	if err := ts.UpdateNode("system", pageB.ID, pageB.Title, pageB.Slug, &linkToMissing2, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: pageB.ID, Title: pageB.Title, Slug: pageB.Slug, Content: &linkToMissing2, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode B failed: %v", err)
 	}
 
@@ -1003,7 +1003,7 @@ func TestLinksStore_GetBrokenIncomingForPath_EmptyWhenNoBrokenLinks(t *testing.T
 		t.Fatalf("GetPage A failed: %v", err)
 	}
 	var linkToB = "Link: [To B](/b)"
-	if err := ts.UpdateNode("system", pageA.ID, pageA.Title, pageA.Slug, &linkToB, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: pageA.ID, Title: pageA.Title, Slug: pageA.Slug, Content: &linkToB, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode A failed: %v", err)
 	}
 
@@ -1059,7 +1059,7 @@ func TestLinksStore_GetBrokenIncomingForPath_OrdersByFromTitle(t *testing.T) {
 			t.Fatalf("GetPage(%s) failed: %v", id, err)
 		}
 		var linkToMissing = "Link: [Missing](/missing)"
-		if err := ts.UpdateNode("system", page.ID, page.Title, page.Slug, &linkToMissing, tree.VersionUnchecked, nil, nil, false); err != nil {
+		if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: page.ID, Title: page.Title, Slug: page.Slug, Content: &linkToMissing, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 			t.Fatalf("UpdateNode(%s) failed: %v", id, err)
 		}
 	}
@@ -1102,7 +1102,7 @@ func TestLinksStore_GetBrokenIncomingForPath_OnlyReturnsBrokenNotResolved(t *tes
 		t.Fatalf("GetPage A failed: %v", err)
 	}
 	var linkToB = "Link: [To B](/b)"
-	if err := ts.UpdateNode("system", pageA.ID, pageA.Title, pageA.Slug, &linkToB, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: pageA.ID, Title: pageA.Title, Slug: pageA.Slug, Content: &linkToB, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode A failed: %v", err)
 	}
 
@@ -1132,7 +1132,7 @@ func TestLinksStore_GetBrokenIncomingForPath_OnlyReturnsBrokenNotResolved(t *tes
 		t.Fatalf("GetPage B failed: %v", err)
 	}
 	var contentB = "# Page B"
-	if err := ts.UpdateNode("system", pageB.ID, pageB.Title, pageB.Slug, &contentB, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: pageB.ID, Title: pageB.Title, Slug: pageB.Slug, Content: &contentB, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode B failed: %v", err)
 	}
 
@@ -1183,7 +1183,7 @@ func TestLinkService_UpdateLinksAndHealForPages_UpdatesAndHealsMultiplePages(t *
 		t.Fatalf("GetPage A failed: %v", err)
 	}
 	contentA := "Link: [B](/b)"
-	if err := ts.UpdateNode("system", pageA.ID, pageA.Title, pageA.Slug, &contentA, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: pageA.ID, Title: pageA.Title, Slug: pageA.Slug, Content: &contentA, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode A failed: %v", err)
 	}
 
@@ -1192,7 +1192,7 @@ func TestLinkService_UpdateLinksAndHealForPages_UpdatesAndHealsMultiplePages(t *
 		t.Fatalf("GetPage C failed: %v", err)
 	}
 	contentC := "Link: [D](/d)"
-	if err := ts.UpdateNode("system", pageC.ID, pageC.Title, pageC.Slug, &contentC, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: pageC.ID, Title: pageC.Title, Slug: pageC.Slug, Content: &contentC, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode C failed: %v", err)
 	}
 
@@ -1271,7 +1271,7 @@ func TestLinkService_UpdateLinksAndHealForPages_ReindexesOutgoingForSourcePages(
 		t.Fatalf("GetPage source failed: %v", err)
 	}
 	oldContent := "Link: [Old](/old-target)"
-	if err := ts.UpdateNode("system", source.ID, source.Title, source.Slug, &oldContent, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: source.ID, Title: source.Title, Slug: source.Slug, Content: &oldContent, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode source failed: %v", err)
 	}
 
@@ -1286,7 +1286,7 @@ func TestLinkService_UpdateLinksAndHealForPages_ReindexesOutgoingForSourcePages(
 	newTargetID := *newTargetIDPtr
 
 	updatedContent := "Link: [New](/new-target)"
-	if err := ts.UpdateNode("system", source.ID, source.Title, source.Slug, &updatedContent, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: source.ID, Title: source.Title, Slug: source.Slug, Content: &updatedContent, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode source (rewrite) failed: %v", err)
 	}
 

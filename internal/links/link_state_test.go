@@ -310,7 +310,7 @@ func TestLinkService_UpdateRewrittenLinks_TitleRuleMovesWikilinkRow(t *testing.T
 
 	kafka, _ := ts.GetPage(kafkaID)
 	content := kafka.Content
-	if err := ts.UpdateNode("system", kafkaID, "Streams", kafka.Slug, &content, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: kafkaID, Title: "Streams", Slug: kafka.Slug, Content: &content, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode rename: %v", err)
 	}
 
