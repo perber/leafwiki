@@ -39,7 +39,7 @@
     "tableInsertAriaLabel": "Insérer un tableau {{col}} x {{row}}",
     "codeBlockTooltip": "Bloc de code",
     "inlineCodeTooltip": "Code en ligne (Ctrl+`)",
-    "imageTooltip": "Gestionnaire de ressources",
+    "imageTooltip": "Gestionnaire de fichiers",
     "attachmentsButton": "Pièces jointes",
     "undoTooltip": "Annuler",
     "redoTooltip": "Rétablir",
