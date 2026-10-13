@@ -809,32 +809,32 @@ func TestEnsurePathUseCase_EmptyPath_ReturnsValidationError(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GetPageUseCase
+// PageQueries.GetPage
 // ─────────────────────────────────────────────────────────────────────────────
 
-func TestGetPageUseCase_HappyPath(t *testing.T) {
+func TestPageQueries_GetPage_HappyPath(t *testing.T) {
 	deps := newTestDeps(t)
 	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default(), nil)
-	getUC := pages.NewGetPageUseCase(deps.tree)
+	queries := pages.NewPageQueries(deps.tree)
 
 	created, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1", Title: "Home", Slug: "home", Kind: pageKind(),
 	})
 
-	out, err := getUC.Execute(context.Background(), pages.GetPageInput{ID: created.Page.ID})
+	page, err := queries.GetPage(created.Page.ID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if out.Page.ID != created.Page.ID {
-		t.Errorf("expected ID %q, got %q", created.Page.ID, out.Page.ID)
+	if page.ID != created.Page.ID {
+		t.Errorf("expected ID %q, got %q", created.Page.ID, page.ID)
 	}
 }
 
-func TestGetPageUseCase_NotFound_ReturnsError(t *testing.T) {
+func TestPageQueries_GetPage_NotFound_ReturnsError(t *testing.T) {
 	deps := newTestDeps(t)
-	getUC := pages.NewGetPageUseCase(deps.tree)
+	queries := pages.NewPageQueries(deps.tree)
 
-	_, err := getUC.Execute(context.Background(), pages.GetPageInput{ID: "nonexistent"})
+	_, err := queries.GetPage("nonexistent")
 	if err == nil {
 		t.Fatal("expected error for non-existent page, got nil")
 	}
@@ -975,10 +975,10 @@ func TestDeletePageUseCase_EmptyID_ReturnsError(t *testing.T) {
 	}
 }
 
-func TestFindByPathUseCase_HappyPath(t *testing.T) {
+func TestPageQueries_FindByPath_HappyPath(t *testing.T) {
 	deps := newTestDeps(t)
 	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default(), nil)
-	findUC := pages.NewFindByPathUseCase(deps.tree)
+	queries := pages.NewPageQueries(deps.tree)
 
 	if _, err := createUC.Execute(context.Background(), pages.CreatePageInput{
 		UserID: "user1", Title: "Company", Slug: "company", Kind: pageKind(),
@@ -986,20 +986,20 @@ func TestFindByPathUseCase_HappyPath(t *testing.T) {
 		t.Fatalf("unexpected error creating page: %v", err)
 	}
 
-	out, err := findUC.Execute(context.Background(), pages.FindByPathInput{RoutePath: "company"})
+	page, err := queries.FindByPath("company")
 	if err != nil {
 		t.Fatalf("unexpected error finding page: %v", err)
 	}
-	if out.Page.Slug != "company" {
-		t.Errorf("expected slug 'company', got %q", out.Page.Slug)
+	if page.Slug != "company" {
+		t.Errorf("expected slug 'company', got %q", page.Slug)
 	}
 }
 
-func TestFindByPathUseCase_NotFound_ReturnsError(t *testing.T) {
+func TestPageQueries_FindByPath_NotFound_ReturnsError(t *testing.T) {
 	deps := newTestDeps(t)
-	findUC := pages.NewFindByPathUseCase(deps.tree)
+	queries := pages.NewPageQueries(deps.tree)
 
-	_, err := findUC.Execute(context.Background(), pages.FindByPathInput{RoutePath: "does/not/exist"})
+	_, err := queries.FindByPath("does/not/exist")
 	if err == nil {
 		t.Fatal("expected error for invalid path, got nil")
 	}
