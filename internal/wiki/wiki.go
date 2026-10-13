@@ -806,59 +806,6 @@ For more information, visit the [LeafWiki GitHub repository](https://github.com/
 	return nil
 }
 
-// ReloadFromFS reruns the startup-time filesystem reconciliation without
-// restarting the process. It serializes concurrent callers (signal handler +
-// HTTP endpoint) so indexes are never rebuilt from two goroutines at once.
-//
-// What is reloaded: page tree, link index, tag/property indexes, search index.
-// What is NOT reloaded: assets (served directly from disk), auth/users
-// (SQLite-based), revisions (stored per-page, no re-baseline).
-func (w *Wiki) ReloadFromFS() error {
-	return w.ReloadFromFSContext(context.Background())
-}
-
-func (w *Wiki) ReloadFromFSContext(ctx context.Context) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	w.reloadMu.Lock()
-	defer w.reloadMu.Unlock()
-
-	w.log.Info("filesystem reload started")
-
-	if err := w.tree.ReconstructTreeFromFSContext(ctx); err != nil {
-		return fmt.Errorf("tree reconstruction failed: %w", err)
-	}
-
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	if err := w.links.IndexAllPagesContext(ctx); err != nil {
-		w.log.Warn("link re-index failed during reload", "error", err)
-	}
-
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	w.bootstrapTagsAndProperties()
-
-	w.status.Start()
-	defer w.status.Finish()
-	searchEffect := pagesave.NewSearchIndexSideEffect(w.searchIndex, w.tree, w.log, w.metrics)
-	if err := searchEffect.IndexAllPagesContext(ctx); err != nil {
-		w.log.Warn("search re-index failed during reload", "error", err)
-		w.status.Fail()
-		return fmt.Errorf("search re-index failed: %w", err)
-	}
-
-	w.status.Success()
-	w.log.Info("filesystem reload completed")
-	return nil
-}
-
 // launchReloadWithProgress adds to reloadWG and starts reloadWithProgress in a goroutine.
 // The caller is responsible for having already called resyncJob.Start().
 func (w *Wiki) launchReloadWithProgress() {
@@ -869,8 +816,14 @@ func (w *Wiki) launchReloadWithProgress() {
 	}()
 }
 
-// reloadWithProgress runs the filesystem reload while updating resyncJob phases.
+// reloadWithProgress reruns the startup-time filesystem reconciliation while
+// updating resyncJob phases. reloadMu serializes it so indexes are never
+// rebuilt from two goroutines at once.
 // Must only be called via launchReloadWithProgress (which tracks the WG).
+//
+// What is reloaded: page tree, link index, tag/property indexes, search index.
+// What is NOT reloaded: assets (served directly from disk), auth/users
+// (SQLite-based), revisions (stored per-page, no re-baseline).
 func (w *Wiki) reloadWithProgress(ctx context.Context) {
 	job := w.resyncJob
 	started := time.Now()
@@ -894,33 +847,36 @@ func (w *Wiki) reloadWithProgress(ctx context.Context) {
 
 	w.log.Info("filesystem reload started (async)")
 
+	finishErr = w.runReloadPhases(ctx, job)
+	if finishErr == nil {
+		w.log.Info("filesystem reload completed (async)")
+	}
+	job.Finish(finishErr)
+}
+
+// runReloadPhases rebuilds the tree and every derived index in order,
+// reporting each phase on job. A failed link re-index is logged and the
+// reload continues; tree and search failures and cancellation abort it.
+func (w *Wiki) runReloadPhases(ctx context.Context, job *wikiresync.ResyncJob) error {
 	job.SetPhase(wikiresync.PhaseTree)
 	if err := w.tree.ReconstructTreeFromFSContext(ctx); err != nil {
-		finishErr = fmt.Errorf("tree reconstruction failed: %w", err)
-		job.Finish(finishErr)
-		return
+		return fmt.Errorf("tree reconstruction failed: %w", err)
 	}
 
-	if ctx.Err() != nil {
-		finishErr = ctx.Err()
-		job.Finish(finishErr)
-		return
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	job.SetPhase(wikiresync.PhaseLinks)
 	if err := w.links.IndexAllPagesContext(ctx); err != nil {
 		if ctx.Err() != nil {
-			finishErr = ctx.Err()
-			job.Finish(finishErr)
-			return
+			return ctx.Err()
 		}
 		w.log.Warn("link re-index failed during reload", "error", err)
 	}
 
-	if ctx.Err() != nil {
-		finishErr = ctx.Err()
-		job.Finish(finishErr)
-		return
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	job.SetPhase(wikiresync.PhaseTags)
@@ -933,16 +889,11 @@ func (w *Wiki) reloadWithProgress(ctx context.Context) {
 		w.log.Warn("search re-index failed during reload", "error", err)
 		w.status.Fail()
 		w.status.Finish()
-		finishErr = fmt.Errorf("search re-index failed: %w", err)
-		job.Finish(finishErr)
-		return
+		return fmt.Errorf("search re-index failed: %w", err)
 	}
 	w.status.Success()
 	w.status.Finish()
-
-	w.log.Info("filesystem reload completed (async)")
-	finishErr = nil
-	job.Finish(nil)
+	return nil
 }
 
 // TriggerResyncAsync starts a background filesystem reload if none is already running.

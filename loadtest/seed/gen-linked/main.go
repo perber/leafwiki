@@ -10,7 +10,7 @@
 // (internal/links, LinkIndexSideEffect / the boot-time IndexAllPagesContext
 // pass) — not written by this tool, which only writes the raw markdown
 // containing the wikilink syntax. The server's normal startup indexing
-// (ReloadFromFS -> IndexAllPagesContext for links) picks these up on first
+// (link indexing in initLinkService) picks these up on first
 // boot the same way it would for any other page, no special handling
 // needed here.
 package main
