@@ -85,7 +85,7 @@ func TestLinkIndexSideEffect_TitleOnlyRename_ReconcilesOldAndNewTitle(t *testing
 
 	before, _ := ts.GetPage(kafkaID)
 	content := before.Content
-	if err := ts.UpdateNode("system", kafkaID, "Streams", before.Slug, &content, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: kafkaID, Title: "Streams", Slug: before.Slug, Content: &content, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode: %v", err)
 	}
 	after, _ := ts.GetPage(kafkaID)
@@ -222,7 +222,7 @@ func TestLinkIndexSideEffect_IncrementalState_EqualsFullRebuild(t *testing.T) {
 	// from the tree, so persist it first.
 	src, _ := ts.GetPage(sourceID)
 	content := "[[Kafka]] [[Streams]] [[Ghost]]"
-	if err := ts.UpdateNode("system", sourceID, src.Title, src.Slug, &content, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: sourceID, Title: src.Title, Slug: src.Slug, Content: &content, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode source: %v", err)
 	}
 	check("initial")
@@ -237,7 +237,7 @@ func TestLinkIndexSideEffect_IncrementalState_EqualsFullRebuild(t *testing.T) {
 	// title-only rename of the first Kafka to Streams
 	before, _ := ts.GetPage(kafkaID)
 	kc := before.Content
-	if err := ts.UpdateNode("system", kafkaID, "Streams", before.Slug, &kc, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: kafkaID, Title: "Streams", Slug: before.Slug, Content: &kc, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode rename: %v", err)
 	}
 	after, _ := ts.GetPage(kafkaID)

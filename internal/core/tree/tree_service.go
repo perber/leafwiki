@@ -664,49 +664,66 @@ func (t *TreeService) DeleteNode(userID string, id string, recursive bool, expec
 	return err
 }
 
+// UpdateNodeInput describes an update of a node's title, slug and optionally
+// its content.
+//
+// Content mode, when Content is non-nil:
+//   - PreserveFrontmatter: Content is raw markdown with embedded frontmatter
+//     (UpsertContentPreservingFrontmatter). It wins over Tags/Properties;
+//     callers must not set both.
+//   - Tags or Properties non-nil: UI-originated edit; Content is a plain body
+//     and the structured metadata is written alongside it
+//     (UpsertContentAndMetadata).
+//   - otherwise Content is a plain body update (UpsertContent).
+type UpdateNodeInput struct {
+	UserID              string
+	ID                  string
+	Title               string
+	Slug                string
+	Content             *string
+	ExpectedVersion     string
+	Tags                []string
+	Properties          map[string]string
+	PreserveFrontmatter bool
+}
+
 // UpdateNode updates a node (page/section) in the tree and syncs disk state via NodeStore.
-// tags and properties are used for UI-originated edits: when either is non-nil
-// the content is treated as a plain body string and the provided structured
-// metadata is written alongside it via UpsertContentAndMetadata.
-// When preserveFrontmatter is true the content is treated as raw markdown with
-// embedded frontmatter (UpsertContentPreservingFrontmatter).
-// When both are absent, content is a plain body update (UpsertContent).
-func (t *TreeService) UpdateNode(userID string, id string, title string, slug string, content *string, expectedVersion string, tags []string, properties map[string]string, preserveFrontmatter bool) error {
+func (t *TreeService) UpdateNode(in UpdateNodeInput) error {
 	return t.withLockedTree(func() error {
 		if t.tree == nil {
 			return ErrTreeNotLoaded
 		}
 
 		// Find node
-		node := t.getNodeByIDLocked(id)
+		node := t.getNodeByIDLocked(in.ID)
 		if node == nil {
 			return ErrPageNotFound
 		}
 
-		if err := checkNodeVersion(node, expectedVersion); err != nil {
+		if err := checkNodeVersion(node, in.ExpectedVersion); err != nil {
 			return err
 		}
 
 		// Slug must be unique under same parent (when changed)
-		if slug != node.Slug && node.Parent != nil {
-			existing := t.findChildBySlugInParentLocked(node.Parent, slug)
+		if in.Slug != node.Slug && node.Parent != nil {
+			existing := t.findChildBySlugInParentLocked(node.Parent, in.Slug)
 			if existing != nil && existing.ID != node.ID {
 				return ErrPageAlreadyExists
 			}
 		}
 
 		// Content update?
-		if content != nil {
+		if in.Content != nil {
 			t.log.Info("updating node content", "nodeID", node.ID)
 			var upsertErr error
-			// Priority: preserveFrontmatter wins over tags/properties; callers must not set both.
+			// Priority: PreserveFrontmatter wins over Tags/Properties; callers must not set both.
 			switch {
-			case preserveFrontmatter:
-				upsertErr = t.store.UpsertContentPreservingFrontmatter(node, *content)
-			case tags != nil || properties != nil:
-				upsertErr = t.store.UpsertContentAndMetadata(node, *content, tags, properties)
+			case in.PreserveFrontmatter:
+				upsertErr = t.store.UpsertContentPreservingFrontmatter(node, *in.Content)
+			case in.Tags != nil || in.Properties != nil:
+				upsertErr = t.store.UpsertContentAndMetadata(node, *in.Content, in.Tags, in.Properties)
 			default:
-				upsertErr = t.store.UpsertContent(node, *content)
+				upsertErr = t.store.UpsertContent(node, *in.Content)
 			}
 			if upsertErr != nil {
 				return fmt.Errorf("could not upsert content: %w", upsertErr)
@@ -714,12 +731,12 @@ func (t *TreeService) UpdateNode(userID string, id string, title string, slug st
 		}
 
 		// Rename slug on disk (must happen while node still has old slug)
-		if slug != node.Slug {
-			t.log.Info("renaming node slug", "nodeID", node.ID, "oldSlug", node.Slug, "newSlug", slug)
-			if err := t.store.RenameNode(node, slug); err != nil {
+		if in.Slug != node.Slug {
+			t.log.Info("renaming node slug", "nodeID", node.ID, "oldSlug", node.Slug, "newSlug", in.Slug)
+			if err := t.store.RenameNode(node, in.Slug); err != nil {
 				return fmt.Errorf("could not rename node: %w", err)
 			}
-			node.Slug = slug
+			node.Slug = in.Slug
 			if node.Parent != nil {
 				t.rebuildChildSlugIndexForParentLocked(node.Parent)
 			}
@@ -727,12 +744,12 @@ func (t *TreeService) UpdateNode(userID string, id string, title string, slug st
 
 		// Update title in tree
 		t.removeTitleIndexForNodeLocked(node)
-		node.Title = title
+		node.Title = in.Title
 		t.addTitleIndexForNodeLocked(node)
 
 		// Update metadata
 		node.Metadata.UpdatedAt = time.Now().UTC()
-		node.Metadata.LastAuthorID = userID
+		node.Metadata.LastAuthorID = in.UserID
 
 		// Keep frontmatter in sync *if file exists* (important when title changed but content == nil)
 		if err := t.store.SyncFrontmatterIfExists(node); err != nil {

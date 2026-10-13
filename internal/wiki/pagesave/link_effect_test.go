@@ -60,7 +60,7 @@ func TestLinkIndexSideEffect_Rename_HealsPreexistingBrokenWikilinks(t *testing.T
 		t.Fatalf("GetPage linker: %v", err)
 	}
 	content := "See [[Alpha]] for details."
-	if err := ts.UpdateNode("system", linkerPage.ID, linkerPage.Title, linkerPage.Slug, &content, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: linkerPage.ID, Title: linkerPage.Title, Slug: linkerPage.Slug, Content: &content, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode linker: %v", err)
 	}
 	linkerPage, err = ts.GetPage(linkerID)
@@ -81,7 +81,7 @@ func TestLinkIndexSideEffect_Rename_HealsPreexistingBrokenWikilinks(t *testing.T
 	}
 
 	// Rename "Alpha" → "Beta" in the tree (UpdateNode mutates the live node).
-	if err := ts.UpdateNode("system", alphaID, "Beta", "beta", nil, tree.VersionUnchecked, nil, nil, false); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: alphaID, Title: "Beta", Slug: "beta", Content: nil, ExpectedVersion: tree.VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode rename alpha→beta: %v", err)
 	}
 	afterPage, err := ts.GetPage(alphaID)

@@ -356,7 +356,7 @@ func createPageWithContent(t *testing.T, ts *tree.TreeService, title, slug, cont
 	if err != nil {
 		t.Fatalf("CreateNode %q: %v", slug, err)
 	}
-	if err := ts.UpdateNode("system", *idPtr, title, slug, &content, tree.VersionUnchecked, nil, nil, true); err != nil {
+	if err := ts.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: *idPtr, Title: title, Slug: slug, Content: &content, ExpectedVersion: tree.VersionUnchecked, PreserveFrontmatter: true}); err != nil {
 		t.Fatalf("UpdateNode %q: %v", slug, err)
 	}
 	return *idPtr

@@ -624,7 +624,15 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 			pageID,
 		)
 	}
-	if err := s.pages.UpdateNode(authorID, pageID, rev.Title, beforeState.Slug, &restoredContent, tree.VersionUnchecked, nil, nil, restorePreserveFrontmatter); err != nil {
+	if err := s.pages.UpdateNode(tree.UpdateNodeInput{
+		UserID:              authorID,
+		ID:                  pageID,
+		Title:               rev.Title,
+		Slug:                beforeState.Slug,
+		Content:             &restoredContent,
+		ExpectedVersion:     tree.VersionUnchecked,
+		PreserveFrontmatter: restorePreserveFrontmatter,
+	}); err != nil {
 		return sharederrors.NewLocalizedError(
 			"revision_restore_failed",
 			errFailedToRestorePage,
@@ -641,7 +649,15 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 			restoreRollbackContent = beforeState.Content
 			rollbackPreserveFrontmatter = false
 		}
-		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent, tree.VersionUnchecked, nil, nil, rollbackPreserveFrontmatter); rollbackErr != nil {
+		if rollbackErr := s.pages.UpdateNode(tree.UpdateNodeInput{
+			UserID:              authorID,
+			ID:                  pageID,
+			Title:               beforeState.Title,
+			Slug:                beforeState.Slug,
+			Content:             &restoreRollbackContent,
+			ExpectedVersion:     tree.VersionUnchecked,
+			PreserveFrontmatter: rollbackPreserveFrontmatter,
+		}); rollbackErr != nil {
 			s.log.Warn("failed to rollback restored content", "pageID", pageID, "error", rollbackErr)
 		}
 		if rollbackErr := s.restoreAssets(pageID, beforeState.Assets); rollbackErr != nil {
@@ -663,7 +679,15 @@ func (s *Service) RestoreRevision(pageID, revisionID, authorID string) error {
 			restoreRollbackContent = beforeState.Content
 			rollbackPreserveFrontmatter = false
 		}
-		if rollbackErr := s.pages.UpdateNode(authorID, pageID, beforeState.Title, beforeState.Slug, &restoreRollbackContent, tree.VersionUnchecked, nil, nil, rollbackPreserveFrontmatter); rollbackErr != nil {
+		if rollbackErr := s.pages.UpdateNode(tree.UpdateNodeInput{
+			UserID:              authorID,
+			ID:                  pageID,
+			Title:               beforeState.Title,
+			Slug:                beforeState.Slug,
+			Content:             &restoreRollbackContent,
+			ExpectedVersion:     tree.VersionUnchecked,
+			PreserveFrontmatter: rollbackPreserveFrontmatter,
+		}); rollbackErr != nil {
 			s.log.Warn("failed to rollback restored content", "pageID", pageID, "error", rollbackErr)
 		}
 		if rollbackErr := s.restoreAssets(pageID, beforeState.Assets); rollbackErr != nil {
