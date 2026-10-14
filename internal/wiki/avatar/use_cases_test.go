@@ -39,48 +39,70 @@ func solidSquarePNG(t *testing.T) []byte {
 	return buf.Bytes()
 }
 
-func setupAvatarUseCases(t *testing.T) (*UploadAvatarUseCase, *DeleteAvatarUseCase, string) {
+// avatarFixture holds both avatar use cases over one AvatarService rooted in a temp dir.
+type avatarFixture struct {
+	upload *UploadAvatarUseCase
+	del    *DeleteAvatarUseCase
+	dir    string
+}
+
+func newAvatarFixture(t *testing.T) *avatarFixture {
 	t.Helper()
 	dir := t.TempDir()
 	svc, err := coreavatar.NewAvatarService(dir)
 	if err != nil {
 		t.Fatalf("NewAvatarService: %v", err)
 	}
-	return NewUploadAvatarUseCase(svc), NewDeleteAvatarUseCase(svc), dir
+	return &avatarFixture{upload: NewUploadAvatarUseCase(svc), del: NewDeleteAvatarUseCase(svc), dir: dir}
+}
+
+// uploadPNG uploads a valid PNG named filename as the avatar of userID.
+func (f *avatarFixture) uploadPNG(t *testing.T, userID, filename string) error {
+	t.Helper()
+	return f.upload.Execute(context.Background(), UploadAvatarInput{
+		UserID:   userID,
+		File:     newMultipartFile(solidSquarePNG(t)),
+		Filename: filename,
+	})
+}
+
+// avatarPath is where AvatarService stores the PNG avatar of userID.
+func (f *avatarFixture) avatarPath(userID string) string {
+	return filepath.Join(f.dir, "avatars", userID+".png")
 }
 
 func TestUploadAvatarUseCase_Execute_ValidImage_WritesAvatarFile(t *testing.T) {
-	upload, _, dir := setupAvatarUseCases(t)
+	f := newAvatarFixture(t)
 
-	if err := upload.Execute(context.Background(), UploadAvatarInput{UserID: "user-1", File: newMultipartFile(solidSquarePNG(t)), Filename: "avatar.png"}); err != nil {
+	if err := f.uploadPNG(t, "user-1", "avatar.png"); err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(dir, "avatars", "user-1.png")); err != nil {
+	if _, err := os.Stat(f.avatarPath("user-1")); err != nil {
 		t.Fatalf("expected avatar file to exist: %v", err)
 	}
 }
 
 func TestUploadAvatarUseCase_Execute_InvalidExtension_ReturnsError(t *testing.T) {
-	upload, _, _ := setupAvatarUseCases(t)
+	f := newAvatarFixture(t)
 
-	if err := upload.Execute(context.Background(), UploadAvatarInput{UserID: "user-1", File: newMultipartFile(solidSquarePNG(t)), Filename: "avatar.bmp"}); err == nil {
+	if err := f.uploadPNG(t, "user-1", "avatar.bmp"); err == nil {
 		t.Fatal("expected an error for a disallowed extension")
 	}
 }
 
 func TestDeleteAvatarUseCase_Execute_RemovesUploadedAvatar(t *testing.T) {
-	upload, del, dir := setupAvatarUseCases(t)
+	f := newAvatarFixture(t)
 
-	if err := upload.Execute(context.Background(), UploadAvatarInput{UserID: "user-1", File: newMultipartFile(solidSquarePNG(t)), Filename: "avatar.png"}); err != nil {
+	if err := f.uploadPNG(t, "user-1", "avatar.png"); err != nil {
 		t.Fatalf("Execute (upload): %v", err)
 	}
-	path := filepath.Join(dir, "avatars", "user-1.png")
+	path := f.avatarPath("user-1")
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("expected avatar file to exist before delete: %v", err)
 	}
 
-	if err := del.Execute(context.Background(), DeleteAvatarInput{UserID: "user-1"}); err != nil {
+	if err := f.del.Execute(context.Background(), DeleteAvatarInput{UserID: "user-1"}); err != nil {
 		t.Fatalf("Execute (delete): %v", err)
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
@@ -89,9 +111,9 @@ func TestDeleteAvatarUseCase_Execute_RemovesUploadedAvatar(t *testing.T) {
 }
 
 func TestDeleteAvatarUseCase_Execute_NothingUploaded_NoOp(t *testing.T) {
-	_, del, _ := setupAvatarUseCases(t)
+	f := newAvatarFixture(t)
 
-	if err := del.Execute(context.Background(), DeleteAvatarInput{UserID: "user-with-no-avatar"}); err != nil {
+	if err := f.del.Execute(context.Background(), DeleteAvatarInput{UserID: "user-with-no-avatar"}); err != nil {
 		t.Fatalf("expected no error deleting a nonexistent avatar, got: %v", err)
 	}
 }
