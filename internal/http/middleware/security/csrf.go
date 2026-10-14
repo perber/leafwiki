@@ -8,6 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// APIKeyAuthContextKey is the Gin context key InjectAPIKeyUser sets to true
+// once a Bearer API key has been resolved to a user. It lives here, not in the
+// auth middleware package, because auth imports security.
+const APIKeyAuthContextKey = "apiKeyAuth"
+
 // CSRFMiddleware is a Gin middleware that protects against CSRF attacks.
 func CSRFMiddleware(csrf *CSRFCookie) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -15,6 +20,16 @@ func CSRFMiddleware(csrf *CSRFCookie) gin.HandlerFunc {
 
 		// Only protect mutating methods (POST, PUT, PATCH, DELETE)
 		if method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions {
+			c.Next()
+			return
+		}
+
+		// A request authenticated with a resolved API key carries no browser
+		// credentials: browsers never attach an Authorization header on their
+		// own, so it cannot be forged cross-site. This keys off the flag set
+		// by InjectAPIKeyUser after a successful key lookup, never off the
+		// mere presence of the header.
+		if resolved, _ := c.Get(APIKeyAuthContextKey); resolved == true {
 			c.Next()
 			return
 		}

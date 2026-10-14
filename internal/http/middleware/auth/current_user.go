@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/core/auth"
+	"github.com/perber/wiki/internal/http/middleware/security"
 )
 
 // MustGetUser returns the authenticated user from context or aborts the request.
@@ -41,7 +42,7 @@ func TryGetUser(c *gin.Context) *auth.User {
 // a Bearer API key (set by InjectAPIKeyUser) rather than a normal cookie/JWT
 // session or reverse-proxy header.
 func IsAPIKeyAuth(c *gin.Context) bool {
-	v, _ := c.Get("apiKeyAuth")
+	v, _ := c.Get(security.APIKeyAuthContextKey)
 	b, _ := v.(bool)
 	return b
 }

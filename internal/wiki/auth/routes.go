@@ -137,30 +137,35 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 	authGroup := ctx.APIAuthGroup(r.authService)
 
-	authGroup.POST("/auth/logout", r.handleLogout(ctx))
+	// Routes that manage credentials, sessions or users stay browser-session
+	// only: an API key skips CSRF, so without this a key could create accounts
+	// or change credentials and turn itself into a permanent login.
+	sessionOnly := authmw.RequireCookieSession()
 
-	authGroup.POST("/users", authmw.RequireAdmin(opts.AuthDisabled), r.handleCreateUser)
+	authGroup.POST("/auth/logout", sessionOnly, r.handleLogout(ctx))
+
+	authGroup.POST("/users", sessionOnly, authmw.RequireAdmin(opts.AuthDisabled), r.handleCreateUser)
 	authGroup.GET("/users", authmw.RequireAdmin(opts.AuthDisabled), r.handleGetUsers)
-	authGroup.PUT("/users/:id", authmw.RequireAdmin(opts.AuthDisabled), r.handleUpdateUser)
-	authGroup.DELETE("/users/:id", authmw.RequireAdmin(opts.AuthDisabled), r.handleDeleteUser)
+	authGroup.PUT("/users/:id", sessionOnly, authmw.RequireAdmin(opts.AuthDisabled), r.handleUpdateUser)
+	authGroup.DELETE("/users/:id", sessionOnly, authmw.RequireAdmin(opts.AuthDisabled), r.handleDeleteUser)
 	// Invite is only ever meaningful with SMTP configured — the underlying
 	// use cases already short-circuit on ErrEmailDisabled when emailTokens()
 	// is nil (SMTP off or auth disabled), so registering these unconditionally
 	// (mirroring POST /users above) just means that case surfaces as a clean
 	// 403 instead of a 404.
-	authGroup.POST("/users/invite", authmw.RequireAdmin(opts.AuthDisabled), r.handleInviteUser)
-	authGroup.POST("/users/:id/invite/resend", authmw.RequireAdmin(opts.AuthDisabled), r.handleResendInvite)
+	authGroup.POST("/users/invite", sessionOnly, authmw.RequireAdmin(opts.AuthDisabled), r.handleInviteUser)
+	authGroup.POST("/users/:id/invite/resend", sessionOnly, authmw.RequireAdmin(opts.AuthDisabled), r.handleResendInvite)
 
 	if !opts.AuthDisabled {
-		authGroup.PUT("/users/me/password", r.handleChangeOwnPassword(ctx))
+		authGroup.PUT("/users/me/password", sessionOnly, r.handleChangeOwnPassword(ctx))
 
 		// Setup/confirm/disable all guess a secret (password, TOTP code, or
 		// recovery code); share one rate-limit budget separate from the
 		// pre-auth login endpoints above.
 		totpSetupRateLimiter := security.NewRateLimiter(10, 5*time.Minute, true)
-		authGroup.POST("/users/me/totp/setup/start", totpSetupRateLimiter, r.handleStartTOTPSetup)
-		authGroup.POST("/users/me/totp/setup/confirm", totpSetupRateLimiter, r.handleConfirmTOTPSetup(ctx))
-		authGroup.POST("/users/me/totp/disable", totpSetupRateLimiter, r.handleDisableTOTP(ctx))
+		authGroup.POST("/users/me/totp/setup/start", sessionOnly, totpSetupRateLimiter, r.handleStartTOTPSetup)
+		authGroup.POST("/users/me/totp/setup/confirm", sessionOnly, totpSetupRateLimiter, r.handleConfirmTOTPSetup(ctx))
+		authGroup.POST("/users/me/totp/disable", sessionOnly, totpSetupRateLimiter, r.handleDisableTOTP(ctx))
 		authGroup.GET("/users/me/totp/status", r.handleTOTPStatus)
 
 		// Pre-auth password-reset/invite-accept endpoints: like login, these
