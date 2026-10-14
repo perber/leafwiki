@@ -34,7 +34,7 @@ import {
   History,
   Loader2,
 } from 'lucide-react'
-import { useLinkStatusStore } from '../links/linkstatus_store'
+import { useLinkStatusStore } from '../links/linkStatusStore'
 import { AssetPreviewTooltip } from '../assets/AssetPreviewTooltip'
 import MarkdownPreview from '../preview/MarkdownPreview'
 import { useViewerStore } from '../viewer/viewer'
