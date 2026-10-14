@@ -15,8 +15,8 @@
 @theme {
   /* Typography + Radii */
   --font-sans:
-    InterVariable, system-ui, 'Segoe UI Emoji', 'Apple Color Emoji',
-    'Noto Color Emoji', sans-serif;
+    Inter, system-ui, 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji',
+    sans-serif;
   --radius: 0.5rem;
   --radius-lg: 0.5rem;
   --radius-md: 0.375rem;
@@ -2496,13 +2496,14 @@
   .markdown-editor__preview .markdown-shoutout,
   .page-viewer__content .markdown-shoutout,
   .page-history__preview-body .markdown-shoutout {
-    @apply border-border/70 bg-surface-alt text-page-text my-6 rounded-lg border px-4 py-3;
+    @apply border-border bg-surface-alt text-page-text my-6 rounded-r-lg border-l-[3px] px-5 py-4;
+    overflow-wrap: anywhere;
   }
 
   .markdown-editor__preview .markdown-shoutout__title,
   .page-viewer__content .markdown-shoutout__title,
   .page-history__preview-body .markdown-shoutout__title {
-    @apply mt-0 mb-2 text-sm font-semibold tracking-[0.08em] uppercase;
+    @apply text-page-text mt-0 mb-2 text-sm font-semibold;
   }
 
   .markdown-editor__preview .markdown-shoutout__content > :first-child,
@@ -2520,97 +2521,80 @@
   .markdown-editor__preview .markdown-shoutout--info,
   .page-viewer__content .markdown-shoutout--info,
   .page-history__preview-body .markdown-shoutout--info {
-    @apply border-brand/30 bg-brand/5;
-  }
-
-  .markdown-editor__preview .markdown-shoutout--info .markdown-shoutout__title,
-  .page-viewer__content .markdown-shoutout--info .markdown-shoutout__title,
-  .page-history__preview-body
-    .markdown-shoutout--info
-    .markdown-shoutout__title {
-    @apply text-brand;
+    @apply border-brand/70 bg-brand/5;
   }
 
   .markdown-editor__preview .markdown-shoutout--success,
   .page-viewer__content .markdown-shoutout--success,
   .page-history__preview-body .markdown-shoutout--success {
-    @apply border-success/30 bg-success/5;
-  }
-
-  .markdown-editor__preview
-    .markdown-shoutout--success
-    .markdown-shoutout__title,
-  .page-viewer__content .markdown-shoutout--success .markdown-shoutout__title,
-  .page-history__preview-body
-    .markdown-shoutout--success
-    .markdown-shoutout__title {
-    @apply text-success;
+    @apply border-success/70 bg-success/5;
   }
 
   .markdown-editor__preview .markdown-shoutout--warning,
   .page-viewer__content .markdown-shoutout--warning,
   .page-history__preview-body .markdown-shoutout--warning {
-    @apply border-warning/30 bg-warning/10;
-  }
-
-  .markdown-editor__preview
-    .markdown-shoutout--warning
-    .markdown-shoutout__title,
-  .page-viewer__content .markdown-shoutout--warning .markdown-shoutout__title,
-  .page-history__preview-body
-    .markdown-shoutout--warning
-    .markdown-shoutout__title {
-    @apply text-warning;
+    @apply border-warning/70 bg-warning/10;
   }
 
   .markdown-editor__preview .markdown-shoutout--error,
   .page-viewer__content .markdown-shoutout--error,
   .page-history__preview-body .markdown-shoutout--error {
-    @apply border-error/30 bg-error/5;
-  }
-
-  .markdown-editor__preview .markdown-shoutout--error .markdown-shoutout__title,
-  .page-viewer__content .markdown-shoutout--error .markdown-shoutout__title,
-  .page-history__preview-body
-    .markdown-shoutout--error
-    .markdown-shoutout__title {
-    @apply text-error;
+    @apply border-error/70 bg-error/5;
   }
 
   .markdown-editor__preview .markdown-shoutout--blue,
   .page-viewer__content .markdown-shoutout--blue,
   .page-history__preview-body .markdown-shoutout--blue {
-    @apply border-blue-500/30 bg-blue-500/10;
+    @apply border-blue-500/70 bg-blue-500/10;
   }
 
   .markdown-editor__preview .markdown-shoutout--red,
   .page-viewer__content .markdown-shoutout--red,
   .page-history__preview-body .markdown-shoutout--red {
-    @apply border-red-500/30 bg-red-500/10;
+    @apply border-red-500/70 bg-red-500/10;
   }
 
   .markdown-editor__preview .markdown-shoutout--green,
   .page-viewer__content .markdown-shoutout--green,
   .page-history__preview-body .markdown-shoutout--green {
-    @apply border-green-500/30 bg-green-500/10;
+    @apply border-green-500/70 bg-green-500/10;
   }
 
   .markdown-editor__preview .markdown-shoutout--orange,
   .page-viewer__content .markdown-shoutout--orange,
   .page-history__preview-body .markdown-shoutout--orange {
-    @apply border-orange-500/30 bg-orange-500/10;
+    @apply border-orange-500/70 bg-orange-500/10;
   }
 
   .markdown-editor__preview .markdown-collapsible,
   .page-viewer__content .markdown-collapsible,
   .page-history__preview-body .markdown-collapsible {
-    @apply border-border/70 bg-surface-alt text-page-text my-6 rounded-lg border px-4 py-3;
+    @apply border-border/70 bg-surface-alt/60 text-page-text my-6 rounded-r-lg border-l-[3px] px-5 py-3;
+    overflow-wrap: anywhere;
   }
 
   .markdown-editor__preview .markdown-collapsible > summary,
   .page-viewer__content .markdown-collapsible > summary,
   .page-history__preview-body .markdown-collapsible > summary {
-    @apply -mx-4 -my-3 flex cursor-pointer list-none items-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold select-none;
+    @apply m-0 flex min-h-7 cursor-pointer list-none items-center gap-3 rounded-sm py-1 text-sm leading-6 font-semibold;
+  }
+
+  .markdown-editor__preview .markdown-collapsible > summary:hover,
+  .page-viewer__content .markdown-collapsible > summary:hover,
+  .page-history__preview-body .markdown-collapsible > summary:hover {
+    @apply bg-brand/5;
+  }
+
+  .markdown-editor__preview .markdown-collapsible > summary:focus-visible,
+  .page-viewer__content .markdown-collapsible > summary:focus-visible,
+  .page-history__preview-body .markdown-collapsible > summary:focus-visible {
+    @apply outline-brand outline-2 outline-offset-4;
+  }
+
+  .markdown-editor__preview .markdown-collapsible[open],
+  .page-viewer__content .markdown-collapsible[open],
+  .page-history__preview-body .markdown-collapsible[open] {
+    @apply pb-5;
   }
 
   .markdown-editor__preview
@@ -2627,7 +2611,7 @@
   .page-viewer__content .markdown-collapsible > summary::before,
   .page-history__preview-body .markdown-collapsible > summary::before {
     content: '';
-    @apply border-muted h-1.5 w-1.5 shrink-0 -rotate-45 border-r-2 border-b-2 transition-transform duration-200;
+    @apply border-muted h-1.5 w-1.5 shrink-0 -rotate-45 border-r-2 border-b-2 transition-transform duration-200 motion-reduce:transition-none;
   }
 
   .markdown-editor__preview .markdown-collapsible[open] > summary::before,
@@ -2639,7 +2623,7 @@
   .markdown-editor__preview .markdown-collapsible > summary + *,
   .page-viewer__content .markdown-collapsible > summary + *,
   .page-history__preview-body .markdown-collapsible > summary + * {
-    @apply mt-3;
+    @apply mt-4;
   }
 
   .markdown-editor__preview .markdown-collapsible > :last-child,

@@ -466,6 +466,12 @@ favorites load/clear), `App.css`/`index.css` (global styles), `useApplyDesignMod
 `vite-env.d.ts`. `layout/AppLayout.tsx` is the single shared page chrome (toolbar + sidebar +
 content area) wrapping all routes.
 
+`main.tsx` bundles self-hosted Inter font faces from `@fontsource/inter`: normal
+weights 400–900 for body text, UI labels and prose headings, plus italic
+400–700 for emphasis, bold emphasis and blockquotes. `index.css` selects their
+`Inter` family through the `--font-sans` theme token. Font files ship with the
+frontend; no external font service is needed.
+
 ## Not covered here
 
 `e2e/` (Playwright end-to-end tests) is a separate concern from this map.
