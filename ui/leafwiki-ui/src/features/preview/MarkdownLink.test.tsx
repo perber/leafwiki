@@ -121,3 +121,122 @@ describe('MarkdownLink wikilink-notfound', () => {
     })
   })
 })
+
+describe('MarkdownLink web URLs', () => {
+  beforeEach(() => {
+    useDialogsStore.setState({ dialogType: null, dialogProps: null })
+    useTreeStore.setState({ byId: {}, byPath: {} })
+  })
+
+  it.each([
+    {
+      name: 'same-origin page',
+      href: `${window.location.origin}/view/docs/page`,
+    },
+    {
+      name: 'base path, query and fragment',
+      href: `${window.location.origin}/wiki/view/docs/page?mode=read#heading`,
+    },
+    {
+      name: 'same-origin resource',
+      href: `${window.location.origin}/assets/file.pdf?download=1#page=2`,
+    },
+    {
+      name: 'uppercase scheme',
+      href: `${window.location.origin.toUpperCase()}/view/docs/page`,
+    },
+    {
+      name: 'protocol-relative same origin',
+      href: `//${window.location.host}/wiki/view/docs/page?mode=read#heading`,
+    },
+  ])('opens $name in the current tab without a tree lookup', ({ href }) => {
+    render(
+      <MemoryRouter>
+        <MarkdownLink href={href} target="_blank">
+          Page
+        </MarkdownLink>
+      </MemoryRouter>,
+    )
+
+    const link = screen.getByRole('link', { name: 'Page' })
+    expect(link).toHaveAttribute('href', href)
+    expect(link).not.toHaveAttribute('target')
+    expect(useDialogsStore.getState().dialogType).toBeNull()
+  })
+
+  it.each([
+    {
+      name: 'external HTTPS',
+      href: 'https://example.com/wiki/page?mode=read#heading',
+    },
+    { name: 'external HTTP', href: 'http://example.com/page' },
+    { name: 'uppercase external scheme', href: 'HTTPS://example.com/page' },
+    { name: 'protocol-relative external URL', href: '//example.com/wiki/page' },
+    {
+      name: 'different port',
+      href: `${window.location.protocol}//${window.location.hostname}:12345/page`,
+    },
+    {
+      name: 'different protocol',
+      href: `${window.location.protocol === 'http:' ? 'https:' : 'http:'}//${window.location.host}/page`,
+    },
+    {
+      name: 'hostname suffix',
+      href: `${window.location.protocol}//${window.location.hostname}.example.com/page`,
+    },
+    {
+      name: 'credentials before external host',
+      href: `${window.location.protocol}//${window.location.host}@example.com/page`,
+    },
+    { name: 'malformed web URL', href: 'https://[invalid/page' },
+    { name: 'malformed uppercase URL', href: 'HTTPS://[invalid/page' },
+    { name: 'malformed protocol-relative URL', href: '//[invalid/page' },
+  ])('keeps $name in a protected new tab', ({ href }) => {
+    render(
+      <MemoryRouter>
+        <MarkdownLink href={href}>External</MarkdownLink>
+      </MemoryRouter>,
+    )
+
+    const link = screen.getByRole('link', { name: 'External' })
+    expect(link).toHaveAttribute('href', href)
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+
+  it('preserves relative wiki navigation', () => {
+    const page = makePage('page', 'docs/current/child', null)
+    useTreeStore.setState({
+      byId: { page },
+      byPath: { 'docs/current/child': page },
+    })
+
+    render(
+      <MemoryRouter>
+        <MarkdownLink href="child" path="docs/current">
+          Child
+        </MarkdownLink>
+      </MemoryRouter>,
+    )
+
+    const link = screen.getByRole('link', { name: 'Child' })
+    expect(link).toHaveAttribute('href', '/docs/current/child')
+    expect(link).not.toHaveAttribute('target')
+  })
+
+  it.each([
+    { name: 'relative asset', href: 'assets/file.pdf' },
+    { name: 'root-relative asset', href: '/assets/file.pdf' },
+  ])('keeps $name in a protected new tab', ({ href }) => {
+    render(
+      <MemoryRouter>
+        <MarkdownLink href={href}>File</MarkdownLink>
+      </MemoryRouter>,
+    )
+
+    const link = screen.getByRole('link', { name: 'File' })
+    expect(link).toHaveAttribute('href', '/assets/file.pdf')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+})
