@@ -5,6 +5,27 @@ describe what the code already does; where the code doesn't follow a rule yet, t
 listed and has a cleanup plan. **When in doubt, read two neighbouring files in the same package
 and copy their shape. A new pattern needs an [ADR](./adr/README.md).**
 
+> **The rules that matter most** — if you read nothing else:
+>
+> 1. **Open/Closed:** new features plug into an extension point; shared code registers
+>    features, it never grows `if feature` branches. No fitting seam → add the seam first.
+> 2. **Layers:** dependencies point down the [layer table](#layers-and-where-code-goes).
+>    *Enforced by `internal/architecture_test.go`.*
+> 3. **Cross-cutting rules** (visibility, drafts, access control) live in one layer above the
+>    tree, never in `core/tree` or single handlers.
+> 4. **Tests first;** a bug gets a failing regression test before the fix.
+> 5. **UI changes are tested by a person** in the browser before they count as done.
+> 6. **Use cases** take `Execute(ctx, in XxxInput)`; domain errors are `LocalizedError` with
+>    `<domain>_<reason>` codes.
+> 7. **Every UI string through i18n**, in every locale (*enforced by `i18n.test.ts`*); form
+>    controls are shadcn primitives.
+> 8. **No raw HTML sinks** (`innerHTML`, `dangerouslySetInnerHTML`, …). *Enforced by ESLint.*
+> 9. **Reuse:** the same logic a second time gets extracted, placed by its dependencies.
+> 10. **PRs:** ≤ 400–500 lines of production code, one topic, `main` always works (unfinished
+>     work behind a default-off flag).
+>
+> Everything below is reference: look up the section for the area you are working in.
+
 ## Goal
 
 A codebase that stays maintainable while it gains features. When rules pull in different
@@ -177,6 +198,11 @@ response. Business rules live in the use case or below.
 Package doc → imports → constants and error codes → exported types → constructor → exported
 methods → unexported helpers. Exported identifiers have a doc comment.
 
+### Small idioms
+
+- Ignored close/cleanup errors are explicit: `defer func() { _ = f.Close() }()`.
+- No testify; stdlib `testing` only (see [Tests](#tests)).
+
 ### Long-running work
 
 Accept a `ctx`, check `ctx.Err()` between phases and return it (see `runReloadPhases` in
@@ -288,6 +314,18 @@ the slice you are in, don't invent a new one.
   exception gets `eslint-disable-next-line` plus a comment explaining why the input is safe.
 - Reuse `components/` (`BaseDialog`, `ListView`, `FormInput`, …) and `components/ui/` before
   building something new. Strings via i18n, form controls via shadcn (see `AGENTS.md`).
+
+## Cross-platform
+
+LeafWiki ships for Linux (amd64, 386, arm64), Windows, macOS and Raspberry Pi as one binary.
+
+- `filepath` for OS paths, `path` for URL and slug paths; never hardcode `/` or `\`.
+- Don't assume a case-sensitive filesystem (Windows and macOS aren't): two names that differ
+  only in case are the same file.
+- OS-specific code goes into build-tagged files (`cmd/leafwiki/signals_unix.go` vs
+  `signals_windows.go`, `internal/restore/selfrestart_*.go`).
+- No cgo. Keep memory and CPU use reasonable for a Raspberry Pi.
+- Check that it builds for Windows: `GOOS=windows go build ./...`.
 
 ## Naming
 
@@ -492,6 +530,8 @@ a sign to split it.
 
 ### Other rules
 
+- **Bugs get a regression test first:** reproduce the bug with a test, confirm it fails for
+  the right reason, then fix it. The test stays as the guard.
 - Names: `Test<Type>_<Scenario>_<Expectation>` in Go; `describe('<unit>')` + `it('<does what>
   when <condition>')` in TS.
 - No mass snapshots; they pin implementation details. Assert the behaviour that matters.
@@ -532,3 +572,5 @@ the convention, remove dead helpers. Constraints:
   `main` never advertises an unreleased feature. Reference docs under `docs/` that belong to a
   change go in the same PR as the code.
 - One topic per PR; refactoring and behaviour changes in separate PRs.
+- Conventional Commits (`type(scope): description`); one logical change per commit. Run
+  `npm run format` in `ui/leafwiki-ui` (and `e2e` if touched) before committing.
