@@ -1033,9 +1033,8 @@ func TestBuildFuzzyQuery_NeverProducesSyntaxErrorForMixedPunctuationAndOperators
 		// parenthesized group followed by any other juxtaposed term (with no
 		// explicit AND/OR) is already a syntax error before this fix too,
 		// since the pre-#1577 code trusted anything containing "(" and
-		// passed it through unescaped. Tracked separately (see pleaf issue
-		// "Search Queries Combining Parentheses With Another Bareword Term
-		// Always Crash").
+		// passed it through unescaped. It needs its own fix in the query
+		// sanitizer, so it is left out of this regression test.
 	}
 
 	for _, q := range queries {

@@ -66,8 +66,9 @@ jobs:
       # No docker/login-action, no packages: write, no GHCR_GITHUB_TOKEN
       # anywhere above or below this line — this job builds the PR's own
       # (possibly forked, untrusted) code and must never hold registry
-      # credentials while doing so. See pleaf issue
-      # build-image-pr-pwn-request-pattern.md.
+      # credentials while doing so. Pushing happens in a separate job that
+      # never checks out PR code (split in #1591), so a malicious PR can't
+      # exfiltrate the token.
       - name: Build image (no push)
         run: |
           docker buildx build \
