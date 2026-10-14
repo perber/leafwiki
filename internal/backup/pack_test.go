@@ -145,8 +145,19 @@ func TestRunBackup_PushedPack_ContainsNoDeltas(t *testing.T) {
 	bareDir := initBareRemote(t)
 	// file:// pushes run the real git-receive-pack, which explodes small packs
 	// into loose objects; keep them as received so the encoding is inspectable.
-	if out, err := exec.Command("git", "-C", bareDir, "config", "receive.unpackLimit", "1").CombinedOutput(); err != nil {
-		t.Fatalf("git config: %v: %s", err, out)
+	// Keeping every push as its own pack can make receive-pack start automatic
+	// gc/maintenance in the background (newer git repacks once there are two
+	// packs), which would rewrite the packs under test and still be writing
+	// into the temp dir while the test cleans it up — so turn that off.
+	for _, kv := range [][2]string{
+		{"receive.unpackLimit", "1"},
+		{"receive.autogc", "false"},
+		{"gc.auto", "0"},
+		{"maintenance.auto", "false"},
+	} {
+		if out, err := exec.Command("git", "-C", bareDir, "config", kv[0], kv[1]).CombinedOutput(); err != nil {
+			t.Fatalf("git config %s: %v: %s", kv[0], err, out)
+		}
 	}
 	repo, rootDir := newRepoWithRemote(t, bareDir)
 	assetsDir := filepath.Join(filepath.Dir(rootDir), "assets")
