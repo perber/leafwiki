@@ -52,7 +52,7 @@ func setupAvatarUseCases(t *testing.T) (*UploadAvatarUseCase, *DeleteAvatarUseCa
 func TestUploadAvatarUseCase_Execute_ValidImage_WritesAvatarFile(t *testing.T) {
 	upload, _, dir := setupAvatarUseCases(t)
 
-	if err := upload.Execute(context.Background(), "user-1", newMultipartFile(solidSquarePNG(t)), "avatar.png"); err != nil {
+	if err := upload.Execute(context.Background(), UploadAvatarInput{UserID: "user-1", File: newMultipartFile(solidSquarePNG(t)), Filename: "avatar.png"}); err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
 
@@ -64,7 +64,7 @@ func TestUploadAvatarUseCase_Execute_ValidImage_WritesAvatarFile(t *testing.T) {
 func TestUploadAvatarUseCase_Execute_InvalidExtension_ReturnsError(t *testing.T) {
 	upload, _, _ := setupAvatarUseCases(t)
 
-	if err := upload.Execute(context.Background(), "user-1", newMultipartFile(solidSquarePNG(t)), "avatar.bmp"); err == nil {
+	if err := upload.Execute(context.Background(), UploadAvatarInput{UserID: "user-1", File: newMultipartFile(solidSquarePNG(t)), Filename: "avatar.bmp"}); err == nil {
 		t.Fatal("expected an error for a disallowed extension")
 	}
 }
@@ -72,7 +72,7 @@ func TestUploadAvatarUseCase_Execute_InvalidExtension_ReturnsError(t *testing.T)
 func TestDeleteAvatarUseCase_Execute_RemovesUploadedAvatar(t *testing.T) {
 	upload, del, dir := setupAvatarUseCases(t)
 
-	if err := upload.Execute(context.Background(), "user-1", newMultipartFile(solidSquarePNG(t)), "avatar.png"); err != nil {
+	if err := upload.Execute(context.Background(), UploadAvatarInput{UserID: "user-1", File: newMultipartFile(solidSquarePNG(t)), Filename: "avatar.png"}); err != nil {
 		t.Fatalf("Execute (upload): %v", err)
 	}
 	path := filepath.Join(dir, "avatars", "user-1.png")
@@ -80,7 +80,7 @@ func TestDeleteAvatarUseCase_Execute_RemovesUploadedAvatar(t *testing.T) {
 		t.Fatalf("expected avatar file to exist before delete: %v", err)
 	}
 
-	if err := del.Execute(context.Background(), "user-1"); err != nil {
+	if err := del.Execute(context.Background(), DeleteAvatarInput{UserID: "user-1"}); err != nil {
 		t.Fatalf("Execute (delete): %v", err)
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
@@ -91,7 +91,7 @@ func TestDeleteAvatarUseCase_Execute_RemovesUploadedAvatar(t *testing.T) {
 func TestDeleteAvatarUseCase_Execute_NothingUploaded_NoOp(t *testing.T) {
 	_, del, _ := setupAvatarUseCases(t)
 
-	if err := del.Execute(context.Background(), "user-with-no-avatar"); err != nil {
+	if err := del.Execute(context.Background(), DeleteAvatarInput{UserID: "user-with-no-avatar"}); err != nil {
 		t.Fatalf("expected no error deleting a nonexistent avatar, got: %v", err)
 	}
 }
