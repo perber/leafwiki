@@ -88,7 +88,26 @@ export function resolveWikiLinkPath(
   const base = new URL(folderBase, 'https://leafwiki.local')
   const url = new URL(href, base)
 
-  return normalizeWikiRoutePath(url.pathname)
+  return canonicalWikiPageRoute(normalizeWikiRoutePath(url.pathname))
+}
+
+/**
+ * Maps a resolved link path to the canonical route of the page it
+ * addresses: a trailing ".md" is ignored for lookup, and a trailing
+ * "index" segment addresses the section landing page itself — a folder's
+ * index.md IS the folder's page, so no page ever lives at ".../index".
+ * Mirrors canonicalPagePath in internal/links/helpers.go.
+ */
+export function canonicalWikiPageRoute(path: string): string {
+  const withoutMd = path.endsWith('.md') ? path.slice(0, -'.md'.length) : path
+  const normalized = normalizeWikiRoutePath(withoutMd)
+  if (normalized === '/index') {
+    return '/'
+  }
+  if (normalized.endsWith('/index')) {
+    return normalizeWikiRoutePath(normalized.slice(0, -'/index'.length))
+  }
+  return normalized
 }
 
 /**

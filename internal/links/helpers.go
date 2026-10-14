@@ -331,6 +331,21 @@ func parentWikiPath(p string) string {
 	return "/"
 }
 
+// canonicalPagePath maps a resolved link path to the canonical route of the
+// page it addresses: a trailing ".md" is ignored for lookup, and a trailing
+// "index" segment addresses the section landing page itself — a folder's
+// index.md IS the folder's page, so there is never a page at ".../index".
+func canonicalPagePath(p string) string {
+	p = strings.TrimSuffix(p, ".md")
+	if p == "index" {
+		return ""
+	}
+	if strings.HasSuffix(p, "/index") {
+		p = p[:len(p)-len("/index")]
+	}
+	return p
+}
+
 func resolveTargetLinks(tree *tree.TreeService, currentPath string, links []string) []TargetLink {
 	if !tree.IsLoaded() {
 		return nil
@@ -349,11 +364,14 @@ func resolveTargetLinks(tree *tree.TreeService, currentPath string, links []stri
 			continue
 		}
 
-		// normalize for lookup (by stripping leading "/")
-		normalizedForLookup := strings.TrimPrefix(resolvedPath, "/")
+		// canonicalize for lookup: ignore a trailing ".md" and map a
+		// trailing "index" segment to the section route itself
+		normalizedForLookup := canonicalPagePath(strings.TrimPrefix(resolvedPath, "/"))
 		if normalizedForLookup == "" {
-			continue
+			continue // the root page is not addressable by lookup path
 		}
+		// store the canonical path so broken-link healing and the UI agree
+		resolvedPath = "/" + normalizedForLookup
 
 		// find page by route path
 		page, err := tree.FindPageByRoutePath(normalizedForLookup)

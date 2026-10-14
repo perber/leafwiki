@@ -52,6 +52,28 @@ func TestResolveURLPath_FilesystemMode(t *testing.T) {
 	}
 }
 
+func TestCanonicalPagePath(t *testing.T) {
+	cases := map[string]string{
+		// ".md" tails are ignored for lookup
+		"docs/guide.md": "docs/guide",
+		"docs/guide":    "docs/guide",
+		// a trailing index segment addresses the section landing page
+		"docs/accounts/index.md": "docs/accounts",
+		"docs/accounts/index":    "docs/accounts",
+		"docs/accounts":          "docs/accounts",
+		// root index addresses the root page (not addressable by path)
+		"index":    "",
+		"index.md": "",
+		// nested lookups keep deeper structure
+		"a/b/c/index.md": "a/b/c",
+	}
+	for in, want := range cases {
+		if got := canonicalPagePath(in); got != want {
+			t.Errorf("canonicalPagePath(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestSetRelativeLinkMode_UnknownFallsBack(t *testing.T) {
 	SetRelativeLinkMode("bogus")
 	t.Cleanup(func() { SetRelativeLinkMode(LinkModePageFolder) })

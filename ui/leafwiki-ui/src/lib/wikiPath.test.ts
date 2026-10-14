@@ -82,6 +82,21 @@ describe('resolveWikiLinkPath', () => {
       '/docs/guide/setup',
     )
   })
+
+  it('canonicalizes ".md" tails and trailing index segments to the section route', () => {
+    expect(
+      resolveWikiLinkPath('/docs/guide', 'sibling.md', 'filesystem'),
+    ).toBe('/docs/sibling')
+    expect(
+      resolveWikiLinkPath('/docs/guide', 'accounts/index.md', 'filesystem'),
+    ).toBe('/docs/accounts')
+    expect(resolveWikiLinkPath('/docs/guide', 'index.md', 'filesystem')).toBe(
+      '/docs',
+    )
+    expect(
+      resolveWikiLinkPath('/docs/guide', 'setup/index', 'page-folder'),
+    ).toBe('/docs/guide/setup')
+  })
 })
 
 describe('getParentWikiRoutePath', () => {
