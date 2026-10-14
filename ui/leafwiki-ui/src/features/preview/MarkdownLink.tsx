@@ -140,8 +140,22 @@ export function MarkdownLink({
     )
   }
 
+  const isWebLink = /^(https?:|\/\/)/i.test(href)
+  let isSameOrigin = false
+  if (isWebLink) {
+    try {
+      const url = new URL(href, window.location.href)
+      isSameOrigin =
+        (url.protocol === 'http:' || url.protocol === 'https:') &&
+        url.origin === window.location.origin
+    } catch {
+      // Malformed web URLs must not enter wiki path resolution.
+    }
+  }
+
   const isInternal =
     href &&
+    !isWebLink &&
     !href.startsWith('http') &&
     !href.startsWith('mailto:') &&
     !href.startsWith('#')
@@ -238,7 +252,7 @@ export function MarkdownLink({
     <a
       href={href}
       {...props}
-      target={href.startsWith('#') ? undefined : '_blank'}
+      target={isSameOrigin || href.startsWith('#') ? undefined : '_blank'}
       rel="noopener noreferrer"
       className="text-brand hover:text-brand-dark no-underline hover:underline"
     >
