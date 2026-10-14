@@ -289,7 +289,10 @@ light/dark mode application).
 - **`features/branding`** — branding settings form (`BrandingSettings.tsx`).
 - **`features/designtoggle`** — light/dark mode toggle (`DesignToggle.tsx`, `designmode.ts`).
 - **`features/editor`** — the markdown editor, the single biggest feature folder:
-  `MarkdownEditor.tsx`/`MarkdownCodeEditor.tsx` (CodeMirror-based), `MarkdownToolbar.tsx`,
+  `MarkdownEditor.tsx`/`MarkdownCodeEditor.tsx` (CodeMirror-based; `MarkdownEditor` composes
+  `useEditorFileUpload.ts` for paste/drop uploads, `useSplitPaneResize.ts` for the persisted
+  editor/preview split and `usePreviewScrollSync.ts` for cursor-to-preview scrolling),
+  `MarkdownToolbar.tsx`,
   `pageEditorStore.ts` (feature-local Zustand store owning draft content/dirty state),
   `useAutoSave.ts` (drives the fixed-window revision coalescing from
   [ADR-0003: Revision Coalescing (Fixed Window)](./adr/0003-revision-coalescing-fixed-window.md)), `useNavigationGuard.tsx`/
