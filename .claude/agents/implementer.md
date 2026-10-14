@@ -20,8 +20,8 @@ Rules:
   `it.each`) with a name per row, the package's fixture instead of copied setup, the right
   layer (HTTP vs. use case vs. domain).
 - **Leave the touched test files better:** tidy the tests around your change — merge
-  copy-pasted cases into tables, reuse the fixture, fix names — as a **separate change set**
-  (it becomes its own commit `test: tidy <area>`; list its files separately in your report),
+  copy-pasted cases into tables, reuse the fixture, fix names — as a **separate commit**
+  `test: tidy <area>`,
   behaviour-preserving: no production code, no weaker assertion, no lost
   case. Record `go test -cover` (or `npm run test:coverage`) for the package before and after;
   it must not drop. Don't restructure files you don't otherwise touch.
@@ -34,7 +34,10 @@ Rules:
 - Before you finish, run what applies: `go test ./...`, `golangci-lint run`, and in
   `ui/leafwiki-ui` `npm run build`, `npm run lint -- --max-warnings=0`, `npm test`,
   `npm run format`.
-- Do not commit or push.
+- **Commit locally, cleanly separated** (in your worktree): first the production change with
+  the minimal test/call-site updates it forces (`refactor(...)`/`fix(...)`/`feat(...)`), then
+  `test: tidy <area>` if you tidied tests. Conventional Commits, formatters run, tests green
+  before each commit. No `Co-Authored-By` unless the overlay says otherwise. **Do not push.**
 
 Report: what changed (files), test results with the commands you ran, deviations from the
 plan, and anything you noticed out of scope.
