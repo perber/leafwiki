@@ -2,8 +2,7 @@ import type { PageNode } from '@/lib/api/pages'
 import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
-import { act, render, screen } from '@testing-library/react'
-import { fireEvent } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MarkdownLink } from './MarkdownLink'
@@ -61,19 +60,38 @@ describe('MarkdownLink wikilink-notfound', () => {
     useTreeStore.setState({ byId: {}, byPath: {} })
   })
 
-  it('creates the new page in the current page folder, not the root', async () => {
-    const folder = makeFolder('folder-1', 'docs')
-    const currentPage = makePage('page-1', 'docs/current', 'folder-1')
+  it.each([
+    {
+      name: 'creates the new page in the current page folder, not the root',
+      folder: makeFolder('folder-1', 'docs'),
+      currentPage: makePage('page-1', 'docs/current', 'folder-1'),
+      title: 'TCP/IP',
+      slug: 'tcp-ip',
+      initialPath: 'docs/tcp-ip',
+    },
+    {
+      name: 'creates the new page at the root when the current page is top-level',
+      folder: null,
+      currentPage: makePage('page-2', 'root-page', null),
+      title: 'Foo',
+      slug: 'foo',
+      initialPath: 'foo',
+    },
+  ])('$name', async ({ folder, currentPage, title, slug, initialPath }) => {
+    const pages = folder ? [folder, currentPage] : [currentPage]
     useTreeStore.setState({
-      byId: { 'folder-1': folder, 'page-1': currentPage },
-      byPath: { docs: folder, 'docs/current': currentPage },
+      byId: Object.fromEntries(pages.map((page) => [page.id, page])),
+      byPath: Object.fromEntries(pages.map((page) => [page.path, page])),
     })
-    mockSuggestSlug.mockResolvedValue('tcp-ip')
+    mockSuggestSlug.mockResolvedValue(slug)
 
     render(
       <MemoryRouter>
-        <MarkdownLink href="wikilink-notfound:TCP%2FIP" path="docs/current">
-          TCP/IP
+        <MarkdownLink
+          href={`wikilink-notfound:${encodeURIComponent(title)}`}
+          path={currentPage.path}
+        >
+          {title}
         </MarkdownLink>
       </MemoryRouter>,
     )
@@ -83,41 +101,13 @@ describe('MarkdownLink wikilink-notfound', () => {
       await Promise.resolve()
     })
 
-    expect(mockSuggestSlug).toHaveBeenCalledWith('folder-1', 'TCP/IP')
+    expect(mockSuggestSlug).toHaveBeenCalledWith(folder?.id ?? '', title)
     expect(useDialogsStore.getState().dialogType).toBe(
       DIALOG_CREATE_PAGE_BY_PATH,
     )
     expect(useDialogsStore.getState().dialogProps).toMatchObject({
-      initialPath: 'docs/tcp-ip',
-      initialTitle: 'TCP/IP',
-    })
-  })
-
-  it('creates the new page at the root when the current page is top-level', async () => {
-    const currentPage = makePage('page-2', 'root-page', null)
-    useTreeStore.setState({
-      byId: { 'page-2': currentPage },
-      byPath: { 'root-page': currentPage },
-    })
-    mockSuggestSlug.mockResolvedValue('foo')
-
-    render(
-      <MemoryRouter>
-        <MarkdownLink href="wikilink-notfound:Foo" path="root-page">
-          Foo
-        </MarkdownLink>
-      </MemoryRouter>,
-    )
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button'))
-      await Promise.resolve()
-    })
-
-    expect(mockSuggestSlug).toHaveBeenCalledWith('', 'Foo')
-    expect(useDialogsStore.getState().dialogProps).toMatchObject({
-      initialPath: 'foo',
-      initialTitle: 'Foo',
+      initialPath,
+      initialTitle: title,
     })
   })
 })
