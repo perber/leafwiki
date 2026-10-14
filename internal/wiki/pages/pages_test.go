@@ -54,6 +54,11 @@ func newTestDeps(t *testing.T) *testDeps {
 		t.Fatalf("failed to create links store: %v", err)
 	}
 	linkService := links.NewLinkService(storageDir, treeService, linksStore)
+	t.Cleanup(func() {
+		if err := linkService.Close(); err != nil {
+			t.Errorf("failed to close link service: %v", err)
+		}
+	})
 
 	revService := revision.NewService(
 		storageDir, treeService, slog.Default(),
@@ -172,56 +177,41 @@ func TestCreatePageUseCase_HappyPath_WithParent(t *testing.T) {
 	}
 }
 
-func TestCreatePageUseCase_EmptyTitle_ReturnsValidationError(t *testing.T) {
-	deps := newTestDeps(t)
-	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default(), nil)
-
-	_, err := uc.Execute(context.Background(), pages.CreatePageInput{
-		UserID: "user1",
-		Title:  "",
-		Slug:   "home",
-		Kind:   pageKind(),
-	})
-	if err == nil {
-		t.Fatal("expected validation error, got nil")
+func TestCreatePageUseCase_InvalidInput_ReturnsError(t *testing.T) {
+	cases := []struct {
+		name                 string
+		input                pages.CreatePageInput
+		wantValidationErrors bool
+	}{
+		{
+			name:                 "EmptyTitle",
+			input:                pages.CreatePageInput{UserID: "user1", Title: "", Slug: "home", Kind: pageKind()},
+			wantValidationErrors: true,
+		},
+		{
+			name:                 "ReservedSlug",
+			input:                pages.CreatePageInput{UserID: "user1", Title: "Reserved", Slug: "e", Kind: pageKind()}, // too short / reserved
+			wantValidationErrors: true,
+		},
+		{
+			name:  "NilKind",
+			input: pages.CreatePageInput{UserID: "user1", Title: "Test", Slug: "test", Kind: nil},
+		},
 	}
-	var ve *sharederrors.ValidationErrors
-	if !errors.As(err, &ve) {
-		t.Fatalf("expected ValidationErrors, got %T: %v", err, err)
-	}
-}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			deps := newTestDeps(t)
+			uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default(), nil)
 
-func TestCreatePageUseCase_ReservedSlug_ReturnsValidationError(t *testing.T) {
-	deps := newTestDeps(t)
-	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default(), nil)
-
-	_, err := uc.Execute(context.Background(), pages.CreatePageInput{
-		UserID: "user1",
-		Title:  "Reserved",
-		Slug:   "e", // too short / reserved
-		Kind:   pageKind(),
-	})
-	if err == nil {
-		t.Fatal("expected error for reserved slug, got nil")
-	}
-	var ve *sharederrors.ValidationErrors
-	if !errors.As(err, &ve) {
-		t.Fatalf("expected ValidationErrors, got %T: %v", err, err)
-	}
-}
-
-func TestCreatePageUseCase_NilKind_ReturnsValidationError(t *testing.T) {
-	deps := newTestDeps(t)
-	uc := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default(), nil)
-
-	_, err := uc.Execute(context.Background(), pages.CreatePageInput{
-		UserID: "user1",
-		Title:  "Test",
-		Slug:   "test",
-		Kind:   nil,
-	})
-	if err == nil {
-		t.Fatal("expected error for nil kind, got nil")
+			_, err := uc.Execute(context.Background(), tc.input)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			var ve *sharederrors.ValidationErrors
+			if tc.wantValidationErrors && !errors.As(err, &ve) {
+				t.Fatalf("expected ValidationErrors, got %T: %v", err, err)
+			}
+		})
 	}
 }
 

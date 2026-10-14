@@ -8,10 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/perber/wiki/internal/core/assets"
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	httpinternal "github.com/perber/wiki/internal/http"
-	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/wiki"
 	wikibackup "github.com/perber/wiki/internal/wiki/backup"
@@ -45,14 +43,9 @@ func newAPIKeyRouterTest(t *testing.T) (*wiki.Wiki, http.Handler) {
 	w.SetSnapshotRoutes(wikisnapshot.NewRoutes(nil, nil, w.AuthService(), 0))
 	w.SetRestoreRoutes(wikirestore.NewRoutes(nil, w.AuthService()))
 	w.SetBackupRoutes(wikibackup.NewRoutes(nil, w.AuthService()))
-	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		PublicAccess:            publicaccess.NewEnvManaged(false),
-		AllowInsecure:           true,
-		AccessTokenTimeout:      15 * time.Minute,
-		RefreshTokenTimeout:     7 * 24 * time.Hour,
-		MaxAssetUploadSizeBytes: assets.DefaultMaxUploadSizeBytes,
-		APIKeyService:           w.APIKeyService(),
-		EnableAPIKeyManagement:  true,
+	router := newTestRouter(w, func(o *httpinternal.RouterOptions) {
+		o.APIKeyService = w.APIKeyService()
+		o.EnableAPIKeyManagement = true
 	})
 	return w, router
 }

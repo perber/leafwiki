@@ -101,6 +101,41 @@ describe('MarkdownToolbar paste controls', () => {
     expect(screen.getByTestId('paste-plain-button')).toBeInTheDocument()
   })
 
+  it('labels the asset manager button with visible text on desktop', () => {
+    render(
+      <MarkdownToolbar
+        editorRef={editorRef}
+        pageId="page-1"
+        previewVisible={false}
+        previewStacked={false}
+        onTogglePreview={vi.fn()}
+        onTogglePreviewLayout={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('open-asset-manager-button')).toHaveTextContent(
+      'toolbar.attachmentsButton',
+    )
+  })
+
+  it('shows the asset manager button as icon only on mobile', () => {
+    mockIsMobile = true
+    render(
+      <MarkdownToolbar
+        editorRef={editorRef}
+        pageId="page-1"
+        previewVisible={false}
+        previewStacked={false}
+        onTogglePreview={vi.fn()}
+        onTogglePreviewLayout={vi.fn()}
+      />,
+    )
+
+    const button = screen.getByTestId('open-asset-manager-button')
+    expect(button).not.toHaveTextContent('toolbar.attachmentsButton')
+    expect(button).toHaveAttribute('aria-label', 'toolbar.imageTooltip')
+  })
+
   it('keeps paste actions only inside the mobile dropdown', async () => {
     mockIsMobile = true
 
