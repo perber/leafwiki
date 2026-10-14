@@ -1,6 +1,6 @@
 ---
 name: develop
-description: Run a LeafWiki change through the full agent workflow — plan, architecture check, implement test-first, independent architecture and code review, independent test, independent security review — with a human gate before implementation and before commit. Use for any feature, refactor or non-trivial bug fix; pass the issue number or a description as argument.
+description: Run a LeafWiki change through the full agent workflow — plan, architecture check, implement test-first, independent architecture and code review, independent test, independent security review — with a human gate before implementation (tier feature) and before push. Use for any feature, refactor or non-trivial bug fix; pass the issue number or a description as argument.
 ---
 
 # Develop a change
@@ -77,9 +77,10 @@ a note for the person, not a fix round.
 
 ## 6. Hand over
 
-Propose the commit split to the person (the agents don't commit): the production change with its
-minimal call-site/test updates first, then `test: tidy <area>`, then tests the tester added
-(`test(<area>): …`). If a docs file under `docs/development/` states something this change makes
+Check the commit history before hand-over: the implementer commits the production change (with
+the minimal call-site/test updates it forces) and `test: tidy <area>` separately; tests the
+tester added go into their own commit (`test(<area>): …`). Squash fix-round commits into the
+commit they fix, so the history reads as clean, separate steps. If a docs file under `docs/development/` states something this change makes
 untrue (e.g. a listed exception), fix it in the same PR or note the order dependency with the
 docs PR.
 
@@ -94,5 +95,5 @@ Stop after three fix rounds without convergence and ask the person. Otherwise re
   local overlay says (without one: in the PR description) so repeated friction turns into a
   rule change.
 
-Do not commit, push or open a PR without the person's explicit OK. After the PR is merged,
+Local commits are fine; do not push, open a PR or comment on GitHub without the person's explicit OK. After the PR is merged,
 remove its worktree (`git worktree remove <path>`), see the `worktree-cleanup` skill.

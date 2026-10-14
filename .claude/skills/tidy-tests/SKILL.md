@@ -39,8 +39,8 @@ Show the plan to the person if it touches more than one package.
 ## 3. Restructure in small steps
 
 One kind of change per step, each meant to become its own commit (`test: split router tests by slice`, `test: table-drive slug
-validation`, …), the suite green after each. Ask the person once whether you may commit these steps locally;
-otherwise hand them over as separate change sets. The PR is capped at ~1,000 changed lines; a big
+validation`, …), the suite green after each. Commit each step locally (Conventional Commits, suite green before each);
+don't push. The PR is capped at ~1,000 changed lines; a big
 file is split over several PRs.
 
 ## 4. Prove nothing was lost
@@ -61,4 +61,4 @@ go test ./<pkg>/... -count=1 -coverprofile=after.cov && go tool cover -func=afte
 ## 5. Review
 
 Run the `reviewer` agent on the diff with the before/after case lists and coverage numbers.
-A lost case or lower coverage is blocking. Do not commit or push without the person's OK.
+A lost case or lower coverage is blocking. Don't push or open a PR without the person's OK.
