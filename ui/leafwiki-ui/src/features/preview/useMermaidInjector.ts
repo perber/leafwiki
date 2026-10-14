@@ -139,7 +139,11 @@ export function useMermaidInjector({
         // <foreignObject> nodes do not cause a parseerror element to be
         // injected into the DOM (raw XML error visible to the user).
         // Use <template> to keep the fragment inert (no side-effect fetches).
+        // XSS: the SVG comes from mermaid.render with securityLevel 'antiscript',
+        // which runs HTML labels through DOMPurify. Keep that level (or stricter)
+        // when changing the mermaid config.
         const template = document.createElement('template')
+        // eslint-disable-next-line no-restricted-syntax
         template.innerHTML = svg
         const newSvg = template.content.querySelector(
           'svg',
