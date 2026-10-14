@@ -371,6 +371,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--default-language`             | Default UI language code (`en`, `de`, `es`)                             | `""`          | v0.13.0 |
 | `--inject-code-in-header`        | Raw HTML/JS injected into `<head>`                                      | `""`          | v0.6.0  |
 | `--hide-link-metadata-section`   | Hide backlinks and link status panel                                    | `false`       | –       |
+| `--relative-link-mode`           | How relative Markdown links resolve: `page-folder` (the current page's path acts as the folder) or `filesystem` (relative to the page's parent directory, like files on disk) | `page-folder` | – |
 | `--enable-revision`              | Enable revision history                                                 | `false`       | v0.9.0  |
 | `--enable-link-refactor`         | Enable link rewriting on rename/move                                    | `false`       | v0.9.0  |
 | `--max-revision-history`         | Max revisions per page; `0` = unlimited                                 | `100`         | v0.9.0  |
@@ -444,6 +445,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_DEFAULT_LANGUAGE`             | Default UI language code (`en`, `de`, `es`)          | `""`          | v0.13.0 |
 | `LEAFWIKI_INJECT_CODE_IN_HEADER`        | HTML/JS injected into `<head>`                       | `""`          | v0.6.0  |
 | `LEAFWIKI_HIDE_LINK_METADATA_SECTION`   | Hide backlinks and link status panel                 | `false`       | –       |
+| `LEAFWIKI_RELATIVE_LINK_MODE`           | Relative link resolution mode (`page-folder` or `filesystem`) | `page-folder` | – |
 | `LEAFWIKI_ENABLE_REVISION`              | Revision history                                     | `false`       | v0.9.0  |
 | `LEAFWIKI_ENABLE_LINK_REFACTOR`         | Link rewriting on rename/move                        | `false`       | v0.9.0  |
 | `LEAFWIKI_MAX_REVISION_HISTORY`         | Max revisions per page; `0` = unlimited              | `100`         | v0.9.0  |
@@ -737,6 +739,8 @@ Press `Ctrl+/` / `Cmd+/` in the app for the full in-product shortcuts list.
 LeafWiki resolves relative page links with **page-as-folder** semantics: the current page path is treated as a folder, so `[Setup](setup)` on `/docs/guide` resolves to `/docs/guide/setup`, not a sibling `/docs/setup`.
 
 A trailing `.md` suffix in a link target is ignored for page lookup (for example `setup.md` → `setup`), which matches common filesystem / Obsidian-style Markdown.
+
+The default `page-folder` semantics are LeafWiki's own. For wikis authored **outside** LeafWiki — editors, Git pipelines, static-site generators — whose links are already **filesystem-relative**, set `--relative-link-mode=filesystem` (`LEAFWIKI_RELATIVE_LINK_MODE=filesystem`): relative targets then resolve against the page's parent directory, exactly like files on disk (`[x](a)` on `/docs/guide` → `/docs/a`). The mode applies to the server-side link index and the frontend alike; after changing it, trigger a resync (admin Refresh or `SIGUSR1`) so stored link targets are recomputed.
 
 ## External Edits & Resync
 

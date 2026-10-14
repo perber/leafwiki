@@ -32,6 +32,7 @@ import (
 	httpinternal "github.com/perber/wiki/internal/http"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
+	"github.com/perber/wiki/internal/links"
 	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/restore"
 	"github.com/perber/wiki/internal/snapshot"
@@ -354,6 +355,10 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		w.SetRestoreRoutes(wikirestore.NewRoutes(restoreManager, w.AuthService()))
 	}
 
+	// Relative link resolution mode — must be applied before the wiki loads
+	// pages and indexes links (set once, read-only afterwards).
+	links.SetRelativeLinkMode(links.RelativeLinkMode(cfg.frontend.relativeLinkMode))
+
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            publicAccessService,
 		AlwaysShowToc:           tocDisplayService,
@@ -370,6 +375,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		EnableRevision:          cfg.frontend.enableRevision,
 		EnableLinkRefactor:      cfg.frontend.enableLinkRefactor,
 		EnableAPIKeyManagement:  cfg.frontend.enableAPIKeyManagement,
+		RelativeLinkMode:        cfg.frontend.relativeLinkMode,
 		Metrics:                 metrics,
 		GitBackupEnabled:        backupManager.Enabled(),
 		GitBackupEnvManaged:     backupManager.EnvManaged(),

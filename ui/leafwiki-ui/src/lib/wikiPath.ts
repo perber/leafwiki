@@ -56,15 +56,34 @@ export function getWikiTargetRoutePath(pathname: string): string {
 }
 
 /**
+ * How relative Markdown links resolve against the current page's path.
+ * Mirrors RelativeLinkMode in internal/links/helpers.go; both sides are fed
+ * from the same flag via GET /api/config.
+ *
+ * - `page-folder` (default): the current page's path acts as a folder —
+ *   `setup` on `/docs/guide` resolves to `/docs/guide/setup`.
+ * - `filesystem`: relative to the page's parent directory, like files on
+ *   disk — `setup` on `/docs/guide` resolves to `/docs/setup`. Fits wikis
+ *   authored outside LeafWiki with filesystem-relative links.
+ */
+export type RelativeLinkMode = 'page-folder' | 'filesystem'
+
+/**
  * Resolves a relative Markdown link against the current wiki page path.
  *
  * The result is always an absolute wiki route/path without query or hash.
  */
-export function resolveWikiLinkPath(currentPath: string, href: string): string {
+export function resolveWikiLinkPath(
+  currentPath: string,
+  href: string,
+  mode: RelativeLinkMode = 'page-folder',
+): string {
   const normalizedCurrentPath = normalizeWikiRoutePath(currentPath)
-  const folderBase = normalizedCurrentPath.endsWith('/')
-    ? normalizedCurrentPath
-    : `${normalizedCurrentPath}/`
+  const baseDir =
+    mode === 'filesystem'
+      ? getParentWikiRoutePath(normalizedCurrentPath)
+      : normalizedCurrentPath
+  const folderBase = baseDir.endsWith('/') ? baseDir : `${baseDir}/`
 
   const base = new URL(folderBase, 'https://leafwiki.local')
   const url = new URL(href, base)

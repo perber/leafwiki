@@ -57,6 +57,31 @@ describe('resolveWikiLinkPath', () => {
   it('resolves absolute wiki paths from the site root', () => {
     expect(resolveWikiLinkPath('/docs/guide', '/root-page')).toBe('/root-page')
   })
+
+  it('resolves relative links with filesystem semantics when requested', () => {
+    expect(resolveWikiLinkPath('/docs/guide', 'sibling', 'filesystem')).toBe(
+      '/docs/sibling',
+    )
+    expect(resolveWikiLinkPath('/docs/guide', '../other', 'filesystem')).toBe(
+      '/other',
+    )
+    expect(resolveWikiLinkPath('/docs/guide', './child', 'filesystem')).toBe(
+      '/docs/child',
+    )
+    expect(
+      resolveWikiLinkPath('/docs/nested/guide', '../other', 'filesystem'),
+    ).toBe('/docs/other')
+    // absolute wiki paths are unaffected by the mode
+    expect(resolveWikiLinkPath('/docs/guide', '/root-page', 'filesystem')).toBe(
+      '/root-page',
+    )
+  })
+
+  it('defaults to page-folder semantics when no mode is passed', () => {
+    expect(resolveWikiLinkPath('/docs/guide', 'setup')).toBe(
+      '/docs/guide/setup',
+    )
+  })
 })
 
 describe('getParentWikiRoutePath', () => {

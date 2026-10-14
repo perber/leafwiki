@@ -31,6 +31,9 @@ export type Config = {
   enableRevision: boolean
   enableLinkRefactor: boolean
   enableApiKeyManagement: boolean
+  // How relative Markdown links resolve: 'page-folder' (default) or
+  // 'filesystem' — see lib/wikiPath.ts (resolveWikiLinkPath).
+  relativeLinkMode: string
   gitBackupEnabled: boolean
   gitBackupEnvManaged: boolean
   gitBackupConfigured: boolean

@@ -214,6 +214,42 @@ func collectTargetsFromContent(treeService *tree.TreeService, pagePath string, c
 	return append(mdTargets, wikiResolved...)
 }
 
+// RelativeLinkMode selects how relative Markdown link targets resolve
+// against the current page's path. The UI mirrors this selection in
+// ui/leafwiki-ui/src/lib/wikiPath.ts (resolveWikiLinkPath); both sides are
+// fed from the same flag via GET /api/config.
+type RelativeLinkMode string
+
+const (
+	// LinkModePageFolder treats the current page's path as a folder:
+	// [x](a) on /docs/guide resolves to /docs/guide/a. Default.
+	LinkModePageFolder RelativeLinkMode = "page-folder"
+	// LinkModeFilesystem resolves relative targets against the page's
+	// parent directory, like files on disk: [x](a) on /docs/guide
+	// resolves to /docs/a. Fits wikis authored outside LeafWiki with
+	// filesystem-relative links (editors, Git pipelines, generators).
+	LinkModeFilesystem RelativeLinkMode = "filesystem"
+)
+
+// relativeLinkMode is set once at startup via SetRelativeLinkMode (before
+// any goroutine resolves links) and read-only afterwards.
+var relativeLinkMode = LinkModePageFolder
+
+// SetRelativeLinkMode sets the process-wide relative link resolution mode.
+// Unknown or empty values fall back to LinkModePageFolder.
+func SetRelativeLinkMode(mode RelativeLinkMode) {
+	if mode == LinkModeFilesystem {
+		relativeLinkMode = LinkModeFilesystem
+		return
+	}
+	relativeLinkMode = LinkModePageFolder
+}
+
+// ActiveRelativeLinkMode reports the currently active mode (for tests).
+func ActiveRelativeLinkMode() RelativeLinkMode {
+	return relativeLinkMode
+}
+
 // normalizeWikiPath normalizes a wiki path:
 // - removes query/hash (if any)
 // - ensures leading "/"
@@ -248,12 +284,23 @@ func normalizeWikiPath(p string) string {
 	return p
 }
 
-// resolveURLPath resolves href against currentPath using "page is folder" semantics.
+// resolveURLPath resolves href against currentPath.
+//
+// The base directory depends on the configured RelativeLinkMode:
+//   - page-folder (default): the current page's path is treated as a folder
+//     ("page is folder" semantics — [x](a) on /docs/guide -> /docs/guide/a)
+//   - filesystem: the page's parent directory, like files on disk
+//     ([x](a) on /docs/guide -> /docs/a)
 func resolveURLPath(currentPath, href string) (string, error) {
 	currentPath = normalizeWikiPath(currentPath)
 
-	// treat currentPath as folder by forcing trailing slash
-	folderBase := currentPath
+	baseDir := currentPath
+	if relativeLinkMode == LinkModeFilesystem {
+		baseDir = parentWikiPath(currentPath)
+	}
+
+	// force trailing slash so the base acts as a folder
+	folderBase := baseDir
 	if !strings.HasSuffix(folderBase, "/") {
 		folderBase += "/"
 	}
@@ -272,6 +319,16 @@ func resolveURLPath(currentPath, href string) (string, error) {
 
 	// normalize result path (strip trailing slash etc.)
 	return normalizeWikiPath(resolved.Path), nil
+}
+
+// parentWikiPath returns the parent directory of a wiki path:
+// "/docs/guide" -> "/docs", "/guide" -> "/". Unlike getParentWikiRoutePath
+// in the UI it operates on already-normalized server paths.
+func parentWikiPath(p string) string {
+	if i := strings.LastIndex(p, "/"); i > 0 {
+		return p[:i]
+	}
+	return "/"
 }
 
 func resolveTargetLinks(tree *tree.TreeService, currentPath string, links []string) []TargetLink {

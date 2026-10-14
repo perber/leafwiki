@@ -223,6 +223,7 @@ func (r *Routes) handleConfig(ctx httpinternal.RouterContext) gin.HandlerFunc {
 			"enableRevision":           opts.EnableRevision,
 			"enableLinkRefactor":       opts.EnableLinkRefactor,
 			"enableApiKeyManagement":   opts.EnableAPIKeyManagement,
+			"relativeLinkMode":         opts.RelativeLinkMode,
 			"gitBackupEnabled":         opts.GitBackupEnabled,
 			"gitBackupEnvManaged":      opts.GitBackupEnvManaged,
 			"gitBackupConfigured":      opts.GitBackupConfigured,

@@ -16,6 +16,7 @@ import {
 import { suggestSlug } from '@/lib/api/pages'
 import { useAppMode } from '@/lib/useAppMode'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
+import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { AnchorHTMLAttributes, ReactNode } from 'react'
@@ -60,6 +61,7 @@ export function MarkdownLink({
 }: MarkdownLinkProps) {
   void node
   const { t } = useTranslation('viewer')
+  const relativeLinkMode = useConfigStore((s) => s.relativeLinkMode)
   const openDialog = useDialogsStore((s) => s.openDialog)
   const getPageByPath = useTreeStore((s) => s.getPageByPath)
   const getPageById = useTreeStore((s) => s.getPageById)
@@ -198,7 +200,11 @@ export function MarkdownLink({
       normalizedHref = normalizeWikiRoutePath(href)
     } else {
       // Relative link (e.g. "../stoff/change", "child-page", "./foo")
-      normalizedHref = resolveWikiLinkPath(getCurrentWikiPath(), href)
+      normalizedHref = resolveWikiLinkPath(
+        getCurrentWikiPath(),
+        href,
+        relativeLinkMode,
+      )
     }
 
     /**
