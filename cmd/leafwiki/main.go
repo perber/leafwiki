@@ -215,6 +215,11 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		slog.Default().Info("Data directory created", "path", cfg.server.dataDir)
 	}
 
+	// Relative link resolution mode — must be applied before the wiki is
+	// constructed (NewWiki loads the tree and indexes links), and stays
+	// read-only afterwards.
+	links.SetRelativeLinkMode(links.RelativeLinkMode(cfg.frontend.relativeLinkMode))
+
 	publicAccessService := buildPublicAccessService(cmd, cfg)
 
 	tocDisplayService, err := tocdisplay.New(cfg.server.dataDir)
@@ -354,10 +359,6 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		defer restoreManager.Wait()
 		w.SetRestoreRoutes(wikirestore.NewRoutes(restoreManager, w.AuthService()))
 	}
-
-	// Relative link resolution mode — must be applied before the wiki loads
-	// pages and indexes links (set once, read-only afterwards).
-	links.SetRelativeLinkMode(links.RelativeLinkMode(cfg.frontend.relativeLinkMode))
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            publicAccessService,

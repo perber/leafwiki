@@ -245,8 +245,8 @@ func SetRelativeLinkMode(mode RelativeLinkMode) {
 	relativeLinkMode = LinkModePageFolder
 }
 
-// ActiveRelativeLinkMode reports the currently active mode (for tests).
-func ActiveRelativeLinkMode() RelativeLinkMode {
+// activeRelativeLinkMode reports the currently active mode (for tests).
+func activeRelativeLinkMode() RelativeLinkMode {
 	return relativeLinkMode
 }
 
@@ -284,7 +284,11 @@ func normalizeWikiPath(p string) string {
 	return p
 }
 
-// resolveURLPath resolves href against currentPath.
+// resolveURLPath resolves href against currentPath. Tree-less variant used
+// by the refactor engine, which rewrites stored destinations on page
+// moves/renames and has no tree access: in filesystem mode it always
+// strips to the parent directory and is NOT section-aware (a section's
+// index.md would resolve against the section itself — see linkBaseDir).
 //
 // The base directory depends on the configured RelativeLinkMode:
 //   - page-folder (default): the current page's path is treated as a folder
@@ -377,13 +381,15 @@ func resolveTargetLinks(tree *tree.TreeService, currentPath string, links []stri
 
 	var targetLinks []TargetLink
 
+	baseDir := linkBaseDir(tree, currentPath)
+
 	for _, link := range links {
 		if isAssetLinkDestination(link) {
 			continue
 		}
 
 		// resolve link against the current page's base directory
-		resolvedPath, err := resolveURLPathFromBase(linkBaseDir(tree, currentPath), link)
+		resolvedPath, err := resolveURLPathFromBase(baseDir, link)
 		if err != nil || resolvedPath == "" {
 			continue
 		}
