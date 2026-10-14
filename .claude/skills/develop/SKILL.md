@@ -88,7 +88,11 @@ Stop after three fix rounds without convergence and ask the person. Otherwise re
 - the diff summary and changed-lines count (code only, ≤ 400–500),
 - test, review and security results,
 - the manual test checklist for UI changes — **a UI change is not done until a person ran it**,
-- anything noticed out of scope (as follow-up issues).
+- anything noticed out of scope (as follow-up issues),
+- **process feedback:** where the workflow or a rule got in the way, was unclear or missed
+  something. These rules are expected to change as we learn; record the observation where the
+  local overlay says (without one: in the PR description) so repeated friction turns into a
+  rule change.
 
 Do not commit, push or open a PR without the person's explicit OK. After the PR is merged,
 remove its worktree (`git worktree remove <path>`), see the `worktree-cleanup` skill.
