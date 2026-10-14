@@ -199,11 +199,17 @@ export function MarkdownLink({
       // Already absolute (e.g. "/stoff/change")
       normalizedHref = normalizeWikiRoutePath(href)
     } else {
-      // Relative link (e.g. "../stoff/change", "child-page", "./foo")
+      // Relative link (e.g. "../stoff/change", "child-page", "./foo").
+      // In filesystem mode a section (index) page's directory is the
+      // section itself — like wiki/foo/index.md lives in wiki/foo/.
+      const currentWikiPath = getCurrentWikiPath()
+      const currentIsSection =
+        getPageByPath(toWikiLookupPath(currentWikiPath))?.kind === 'section'
       normalizedHref = resolveWikiLinkPath(
-        getCurrentWikiPath(),
+        currentWikiPath,
         href,
         relativeLinkMode,
+        currentIsSection,
       )
     }
 

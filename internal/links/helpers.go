@@ -299,6 +299,11 @@ func resolveURLPath(currentPath, href string) (string, error) {
 		baseDir = parentWikiPath(currentPath)
 	}
 
+	return resolveURLPathFromBase(baseDir, href)
+}
+
+// resolveURLPathFromBase resolves href against the given base directory.
+func resolveURLPathFromBase(baseDir, href string) (string, error) {
 	// force trailing slash so the base acts as a folder
 	folderBase := baseDir
 	if !strings.HasSuffix(folderBase, "/") {
@@ -319,6 +324,25 @@ func resolveURLPath(currentPath, href string) (string, error) {
 
 	// normalize result path (strip trailing slash etc.)
 	return normalizeWikiPath(resolved.Path), nil
+}
+
+// linkBaseDir returns the directory that relative links on the page at
+// currentPath resolve against.
+//
+//   - page-folder mode: the page's own path (the page "is" a folder).
+//   - filesystem mode: the page's parent directory — EXCEPT for section
+//     (index) pages: wiki/foo/index.md lives IN wiki/foo/, so the section's
+//     own path is its directory. Section-ness is decided via the tree; when
+//     the page cannot be resolved, fall back to parent-directory semantics.
+func linkBaseDir(treeSvc *tree.TreeService, currentPath string) string {
+	currentPath = normalizeWikiPath(currentPath)
+	if relativeLinkMode != LinkModeFilesystem {
+		return currentPath
+	}
+	if page, err := treeSvc.FindPageByRoutePath(strings.TrimPrefix(currentPath, "/")); err == nil && page != nil && page.Kind == tree.NodeKindSection {
+		return currentPath
+	}
+	return parentWikiPath(currentPath)
 }
 
 // parentWikiPath returns the parent directory of a wiki path:
@@ -358,8 +382,8 @@ func resolveTargetLinks(tree *tree.TreeService, currentPath string, links []stri
 			continue
 		}
 
-		// resolve link against current path
-		resolvedPath, err := resolveURLPath(currentPath, link)
+		// resolve link against the current page's base directory
+		resolvedPath, err := resolveURLPathFromBase(linkBaseDir(tree, currentPath), link)
 		if err != nil || resolvedPath == "" {
 			continue
 		}

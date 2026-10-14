@@ -77,10 +77,11 @@ export function resolveWikiLinkPath(
   currentPath: string,
   href: string,
   mode: RelativeLinkMode = 'page-folder',
+  currentIsSection = false,
 ): string {
   const normalizedCurrentPath = normalizeWikiRoutePath(currentPath)
   const baseDir =
-    mode === 'filesystem'
+    mode === 'filesystem' && !currentIsSection
       ? getParentWikiRoutePath(normalizedCurrentPath)
       : normalizedCurrentPath
   const folderBase = baseDir.endsWith('/') ? baseDir : `${baseDir}/`

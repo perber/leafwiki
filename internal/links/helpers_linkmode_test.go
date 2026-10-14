@@ -31,6 +31,7 @@ func TestResolveURLPath_FilesystemMode(t *testing.T) {
 	cases := []struct{ current, href, want string }{
 		// a link to a sibling page/file resolves against the parent dir
 		{"/docs/guide", "sibling", "/docs/sibling"},
+		// (section pages resolve against themselves — see TestLinkBaseDir)
 		{"/docs/guide", "sibling/page", "/docs/sibling/page"},
 		// parent-directory targets need one ../ less than page-folder semantics
 		{"/docs/nested/guide", "../other", "/docs/other"},

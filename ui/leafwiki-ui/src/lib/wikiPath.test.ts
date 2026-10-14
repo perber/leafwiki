@@ -83,10 +83,30 @@ describe('resolveWikiLinkPath', () => {
     )
   })
 
-  it('canonicalizes ".md" tails and trailing index segments to the section route', () => {
+  it('treats section (index) pages as their own directory in filesystem mode', () => {
+    // wiki/foo/index.md lives IN wiki/foo/: links from a section page
+    // resolve against the section itself, not its parent
     expect(
-      resolveWikiLinkPath('/docs/guide', 'sibling.md', 'filesystem'),
+      resolveWikiLinkPath('/docs/tools', 'usage.md', 'filesystem', true),
+    ).toBe('/docs/tools/usage')
+    expect(
+      resolveWikiLinkPath(
+        '/docs/decisions',
+        '../policies/index.md',
+        'filesystem',
+        true,
+      ),
+    ).toBe('/docs/policies')
+    // leaf pages still resolve against the parent
+    expect(
+      resolveWikiLinkPath('/docs/guide', 'sibling', 'filesystem', false),
     ).toBe('/docs/sibling')
+  })
+
+  it('canonicalizes ".md" tails and trailing index segments to the section route', () => {
+    expect(resolveWikiLinkPath('/docs/guide', 'sibling.md', 'filesystem')).toBe(
+      '/docs/sibling',
+    )
     expect(
       resolveWikiLinkPath('/docs/guide', 'accounts/index.md', 'filesystem'),
     ).toBe('/docs/accounts')
