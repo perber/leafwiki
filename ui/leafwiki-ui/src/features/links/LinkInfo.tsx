@@ -6,7 +6,7 @@ import { Link2Off, Paperclip } from 'lucide-react'
 import { useEffect } from 'react'
 import { Link } from 'react-router'
 import { useViewerStore } from '../viewer/viewer'
-import { useLinkStatusStore } from './linkstatus_store'
+import { useLinkStatusStore } from './linkStatusStore'
 
 const t = (key: string, opts?: Record<string, unknown>) =>
   i18next.t(key, { ...opts, ns: 'viewer' })
