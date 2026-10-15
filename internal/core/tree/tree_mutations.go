@@ -1,0 +1,904 @@
+package tree
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/perber/wiki/internal/core/shared"
+)
+
+type createNodeResult struct {
+	id                 string
+	entry              *PageNode
+	parent             *PageNode
+	parentWasConverted bool
+}
+
+type createNodeOptions struct {
+	existingID string
+}
+
+// Create Node adds a new node to the tree
+func (t *TreeService) CreateNode(userID string, parentID *string, title string, slug string, nodeKind *NodeKind) (*string, error) {
+	var result *string
+	err := t.withLockedTree(func() error {
+		created, err := t.createNodeLocked(userID, parentID, title, slug, nodeKind, createNodeOptions{})
+		if err != nil {
+			return err
+		}
+		result = &created.id
+
+		return nil
+	})
+
+	return result, err
+}
+
+func (t *TreeService) RestoreNode(userID, id string, parentID *string, title, slug string, nodeKind NodeKind, content string, metadata PageMetadata) (*Page, error) {
+	var restored *Page
+	err := t.withLockedTree(func() error {
+		kind := nodeKind
+		created, err := t.createNodeLocked(userID, parentID, title, slug, &kind, createNodeOptions{existingID: id})
+		if err != nil {
+			return err
+		}
+
+		if err := t.store.UpsertContent(created.entry, content); err != nil {
+			return fmt.Errorf("could not restore content: %w", err)
+		}
+
+		created.entry.Metadata = metadata
+		created.entry.Metadata.UpdatedAt = metadata.UpdatedAt.UTC()
+		created.entry.Metadata.CreatedAt = metadata.CreatedAt.UTC()
+		created.entry.Metadata.CreatorID = strings.TrimSpace(metadata.CreatorID)
+		created.entry.Metadata.LastAuthorID = strings.TrimSpace(metadata.LastAuthorID)
+		if err := t.store.SyncFrontmatterIfExists(created.entry); err != nil {
+			return fmt.Errorf("could not sync restored frontmatter: %w", err)
+		}
+
+		restored = &Page{PageNode: created.entry, Content: content}
+		return nil
+	})
+	return restored, err
+}
+
+// createNodeLocked creates a new node under the given parent.
+// Lock must be held by the caller.
+func (t *TreeService) createNodeLocked(userID string, parentID *string, title string, slug string, kind *NodeKind, opts createNodeOptions) (*createNodeResult, error) {
+	if t.tree == nil {
+		return nil, ErrTreeNotLoaded
+	}
+
+	// Decide which kind we create
+	k := NodeKindPage
+	if kind != nil {
+		k = *kind
+	}
+
+	// Resolve the parent
+	parent := t.tree
+	if parentID != nil && *parentID != "" && *parentID != "root" {
+		parent = t.getNodeByIDLocked(*parentID)
+		if parent == nil {
+			return nil, ErrParentNotFound
+		}
+	}
+
+	// Check if a child with the same slug already exists
+	if t.findChildBySlugInParentLocked(parent, slug) != nil {
+		return nil, ErrPageAlreadyExists
+	}
+
+	parentWasConverted := false
+
+	// Check if the current parent is a section
+	// if not, we need to convert it to a section
+	if parent.Kind != NodeKindSection && parent.ID != "root" {
+		t.log.Info("converting parent to section", "parentID", parent.ID, "oldKind", parent.Kind, "newKind", NodeKindSection)
+		if err := t.store.ConvertNode(parent, NodeKindSection); err != nil {
+			return nil, fmt.Errorf("could not convert parent node: %w", err)
+		}
+		parent.Kind = NodeKindSection
+		parentWasConverted = true
+	}
+
+	if parent.Kind != NodeKindSection {
+		return nil, fmt.Errorf("cannot add child to non-section parent, got %q", parent.Kind)
+	}
+
+	id := strings.TrimSpace(opts.existingID)
+	if id == "" {
+		var err error
+		id, err = shared.GenerateUniqueID()
+		if err != nil {
+			return nil, fmt.Errorf("could not generate unique ID: %w", err)
+		}
+	} else if existing := t.getNodeByIDLocked(id); existing != nil {
+		return nil, fmt.Errorf("page id already exists: %s", id)
+	}
+
+	now := time.Now().UTC()
+
+	entry := &PageNode{
+		ID:       id,
+		Title:    title,
+		Parent:   parent,
+		Slug:     slug,
+		Kind:     k,
+		Position: len(parent.Children), // Set the position to the end of the list
+		Children: []*PageNode{},
+		Metadata: PageMetadata{
+			CreatedAt:    now,
+			UpdatedAt:    now,
+			CreatorID:    userID,
+			LastAuthorID: userID,
+		},
+	}
+
+	// Create on disk depending on kind
+	switch k {
+	case NodeKindPage:
+		if err := t.store.CreatePage(parent, entry); err != nil {
+			return nil, fmt.Errorf("could not create page entry: %w", err)
+		}
+	case NodeKindSection:
+		if err := t.store.CreateSection(parent, entry); err != nil {
+			return nil, fmt.Errorf("could not create section entry: %w", err)
+		}
+	}
+
+	// Add the new page to the parent
+	parent.Children = append(parent.Children, entry)
+	t.indexNodeLocked(entry)
+	if err := t.store.SaveChildOrder(parent); err != nil {
+		rollbackErr := t.rollbackCreatedNodeLocked(parent, entry, parentWasConverted)
+		if rollbackErr != nil {
+			return nil, errors.Join(fmt.Errorf(errPersistChildOrderFailed, err), fmt.Errorf("rollback created node: %w", rollbackErr))
+		}
+		return nil, fmt.Errorf(errPersistChildOrderFailed, err)
+	}
+	return &createNodeResult{
+		id:                 entry.ID,
+		entry:              entry,
+		parent:             parent,
+		parentWasConverted: parentWasConverted,
+	}, nil
+}
+
+func (t *TreeService) rollbackCreatedNodeLocked(parent *PageNode, entry *PageNode, parentWasConverted bool) error {
+	if parent == nil || entry == nil {
+		return nil
+	}
+
+	for i, child := range parent.Children {
+		if child == entry {
+			parent.Children = append(parent.Children[:i], parent.Children[i+1:]...)
+			break
+		}
+	}
+	t.removeNodeIndexLocked(entry)
+
+	switch entry.Kind {
+	case NodeKindSection:
+		if err := t.store.DeleteSection(entry); err != nil {
+			return err
+		}
+	case NodeKindPage:
+		if err := t.store.DeletePage(entry); err != nil {
+			return err
+		}
+	}
+
+	if parentWasConverted && len(parent.Children) == 0 {
+		orderPath, err := t.store.dirPathForNode(parent)
+		if err != nil {
+			return err
+		}
+		if err := os.Remove(filepath.Join(orderPath, orderFilename)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("remove parent order file before fold-back: %w", err)
+		}
+		if err := t.store.ConvertNode(parent, NodeKindPage); err != nil {
+			return err
+		}
+		parent.Kind = NodeKindPage
+	}
+
+	return nil
+}
+
+// DeleteNode deletes a node from the tree
+func (t *TreeService) DeleteNode(userID string, id string, recursive bool, expectedVersion string) error {
+	err := t.withLockedTree(func() error {
+		if t.tree == nil {
+			return ErrTreeNotLoaded
+		}
+
+		// Find the node to delete
+		node := t.getNodeByIDLocked(id)
+		if node == nil {
+			return ErrPageNotFound
+		}
+
+		if err := checkNodeVersion(node, expectedVersion); err != nil {
+			return err
+		}
+
+		// Check if node has children
+		if node.HasChildren() && !recursive {
+			return ErrPageHasChildren
+		}
+
+		// Delete the node from the parent
+		parent := node.Parent
+		if parent == nil {
+			return ErrParentNotFound
+		}
+
+		switch node.Kind {
+		case NodeKindSection:
+			if err := t.store.DeleteSection(node); err != nil {
+				return fmt.Errorf("could not delete section entry: %w", err)
+			}
+		case NodeKindPage:
+			if node.HasChildren() {
+				// This should not happen due to earlier check, but just in case
+				// Convert to section and delete recursively
+				t.log.Info("converting page to section for recursive delete", "pageID", node.ID)
+				if err := t.store.ConvertNode(node, NodeKindSection); err != nil {
+					return fmt.Errorf("could not convert page to section: %w", err)
+				}
+				node.Kind = NodeKindSection
+				if err := t.store.DeleteSection(node); err != nil {
+					return fmt.Errorf("could not delete section entry: %w", err)
+				}
+			} else {
+				if err := t.store.DeletePage(node); err != nil {
+					return fmt.Errorf("could not delete page entry: %w", err)
+				}
+			}
+		default:
+			return fmt.Errorf("unknown node kind: %v", node.Kind)
+		}
+
+		// Remove the page from the parent
+		for i, e := range parent.Children {
+			if e.ID == id {
+				parent.Children = append(parent.Children[:i], parent.Children[i+1:]...)
+				break
+			}
+		}
+		t.removeNodeIndexLocked(node)
+
+		t.reindexPositions(parent)
+		if err := t.store.SaveChildOrder(parent); err != nil {
+			return fmt.Errorf(errPersistChildOrderFailed, err)
+		}
+		return nil
+	})
+	return err
+}
+
+// UpdateNodeInput describes an update of a node's title, slug and optionally
+// its content.
+//
+// Content mode, when Content is non-nil:
+//   - PreserveFrontmatter: Content is raw markdown with embedded frontmatter
+//     (UpsertContentPreservingFrontmatter). It wins over Tags/Properties;
+//     callers must not set both.
+//   - Tags or Properties non-nil: UI-originated edit; Content is a plain body
+//     and the structured metadata is written alongside it
+//     (UpsertContentAndMetadata).
+//   - otherwise Content is a plain body update (UpsertContent).
+type UpdateNodeInput struct {
+	UserID              string
+	ID                  string
+	Title               string
+	Slug                string
+	Content             *string
+	ExpectedVersion     string
+	Tags                []string
+	Properties          map[string]string
+	PreserveFrontmatter bool
+}
+
+// UpdateNode updates a node (page/section) in the tree and syncs disk state via NodeStore.
+func (t *TreeService) UpdateNode(in UpdateNodeInput) error {
+	return t.withLockedTree(func() error {
+		if t.tree == nil {
+			return ErrTreeNotLoaded
+		}
+
+		// Find node
+		node := t.getNodeByIDLocked(in.ID)
+		if node == nil {
+			return ErrPageNotFound
+		}
+
+		if err := checkNodeVersion(node, in.ExpectedVersion); err != nil {
+			return err
+		}
+
+		// Slug must be unique under same parent (when changed)
+		if in.Slug != node.Slug && node.Parent != nil {
+			existing := t.findChildBySlugInParentLocked(node.Parent, in.Slug)
+			if existing != nil && existing.ID != node.ID {
+				return ErrPageAlreadyExists
+			}
+		}
+
+		// Content update?
+		if in.Content != nil {
+			t.log.Info("updating node content", "nodeID", node.ID)
+			var upsertErr error
+			// Priority: PreserveFrontmatter wins over Tags/Properties; callers must not set both.
+			switch {
+			case in.PreserveFrontmatter:
+				upsertErr = t.store.UpsertContentPreservingFrontmatter(node, *in.Content)
+			case in.Tags != nil || in.Properties != nil:
+				upsertErr = t.store.UpsertContentAndMetadata(node, *in.Content, in.Tags, in.Properties)
+			default:
+				upsertErr = t.store.UpsertContent(node, *in.Content)
+			}
+			if upsertErr != nil {
+				return fmt.Errorf("could not upsert content: %w", upsertErr)
+			}
+		}
+
+		// Rename slug on disk (must happen while node still has old slug)
+		if in.Slug != node.Slug {
+			t.log.Info("renaming node slug", "nodeID", node.ID, "oldSlug", node.Slug, "newSlug", in.Slug)
+			if err := t.store.RenameNode(node, in.Slug); err != nil {
+				return fmt.Errorf("could not rename node: %w", err)
+			}
+			node.Slug = in.Slug
+			if node.Parent != nil {
+				t.rebuildChildSlugIndexForParentLocked(node.Parent)
+			}
+		}
+
+		// Update title in tree
+		t.removeTitleIndexForNodeLocked(node)
+		node.Title = in.Title
+		t.addTitleIndexForNodeLocked(node)
+
+		// Update metadata
+		node.Metadata.UpdatedAt = time.Now().UTC()
+		node.Metadata.LastAuthorID = in.UserID
+
+		// Keep frontmatter in sync *if file exists* (important when title changed but content == nil)
+		if err := t.store.SyncFrontmatterIfExists(node); err != nil {
+			return fmt.Errorf("could not sync frontmatter: %w", err)
+		}
+
+		// Save tree
+		return nil
+	})
+
+}
+
+func (t *TreeService) ConvertNode(userID string, id string, kind NodeKind, expectedVersion string) error {
+	return t.withLockedTree(func() error {
+		if t.tree == nil {
+			return ErrTreeNotLoaded
+		}
+
+		// Find node
+		node := t.getNodeByIDLocked(id)
+		if node == nil {
+			return ErrPageNotFound
+		}
+
+		if err := checkNodeVersion(node, expectedVersion); err != nil {
+			return err
+		}
+
+		if node.Kind == kind {
+			// No change
+			return nil
+		}
+
+		// Section -> Page only allowed if no children
+		if node.Kind == NodeKindSection && kind == NodeKindPage && node.HasChildren() {
+			return ErrPageHasChildren
+		}
+
+		t.log.Info("changing node kind", "nodeID", node.ID, "oldKind", node.Kind, "newKind", kind)
+
+		if err := t.store.ConvertNode(node, kind); err != nil {
+			return fmt.Errorf("could not convert node: %w", err)
+		}
+		node.Kind = kind
+
+		// Update metadata
+		node.Metadata.UpdatedAt = time.Now().UTC()
+		node.Metadata.LastAuthorID = userID
+
+		// Keep frontmatter in sync *if file exists* (important when kind changed but content == nil)
+		if err := t.store.SyncFrontmatterIfExists(node); err != nil {
+			return fmt.Errorf("could not sync frontmatter: %w", err)
+		}
+
+		// Save tree
+		return nil
+	})
+}
+
+// BulkContentUpdate is a single item for BulkUpdateContent.
+type BulkContentUpdate struct {
+	ID      string
+	Content string
+}
+
+// BulkUpdateContent updates content for multiple pages under a single write lock,
+// running disk writes in parallel. Returns per-item errors; nil means success.
+// Only content and metadata timestamps are updated; slug and title are unchanged.
+func (t *TreeService) BulkUpdateContent(userID string, updates []BulkContentUpdate) []error {
+	errs := make([]error, len(updates))
+	if len(updates) == 0 {
+		return errs
+	}
+
+	type task struct {
+		index       int
+		node        *PageNode
+		content     string
+		oldMetadata PageMetadata
+	}
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.tree == nil {
+		for i := range errs {
+			errs[i] = ErrTreeNotLoaded
+		}
+		return errs
+	}
+
+	now := time.Now().UTC()
+	tasks := make([]task, 0, len(updates))
+	for i, u := range updates {
+		node := t.getNodeByIDLocked(u.ID)
+		if node == nil {
+			errs[i] = ErrPageNotFound
+			continue
+		}
+		oldMetadata := node.Metadata
+		// Update in-memory metadata before disk write so UpsertContent writes the correct timestamps.
+		node.Metadata.UpdatedAt = now
+		node.Metadata.LastAuthorID = userID
+		tasks = append(tasks, task{index: i, node: node, content: u.Content, oldMetadata: oldMetadata})
+	}
+
+	if len(tasks) == 0 {
+		return errs
+	}
+
+	// Each page lives in its own file — writes are independent and safe to parallelise.
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	wg.Add(len(tasks))
+	for _, tk := range tasks {
+		go func(tk task) {
+			defer wg.Done()
+			if err := t.store.UpsertContent(tk.node, tk.content); err != nil {
+				mu.Lock()
+				errs[tk.index] = err
+				mu.Unlock()
+			}
+		}(tk)
+	}
+	wg.Wait()
+
+	for _, tk := range tasks {
+		if errs[tk.index] != nil {
+			tk.node.Metadata = tk.oldMetadata
+		}
+	}
+
+	return errs
+}
+
+// EnsurePagePath ensures that a given path exists in the tree
+// It creates any missing segments as needed
+// Returns the final page node and a list of created nodes
+func (t *TreeService) EnsurePagePath(userID string, p string, targetTitle string, kind *NodeKind) (*EnsurePathResult, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.tree == nil {
+		return nil, ErrTreeNotLoaded
+	}
+
+	created := []*PageNode{}
+
+	lookup, err := t.lookupPagePathLocked(p)
+	if err != nil {
+		return nil, fmt.Errorf("could not lookup page path: %w", err)
+	}
+
+	// Path exists -> return existing
+	if lookup.Exists {
+		last := lookup.Segments[len(lookup.Segments)-1]
+		page := t.getNodeByIDLocked(*last.ID)
+		if page == nil {
+			return nil, fmt.Errorf("could not find existing page by ID: %w", ErrPageNotFound)
+		}
+		return &EnsurePathResult{Exists: true, Page: page}, nil
+	}
+
+	// Create missing segments
+	var currentID *string // nil means root
+	for i, segment := range lookup.Segments {
+		if segment.Exists {
+			currentID = segment.ID
+			continue
+		}
+
+		// Title
+		segTitle := segment.Slug
+		if i == len(lookup.Segments)-1 {
+			segTitle = targetTitle
+		}
+
+		// Kind: intermediate segments are sections, last segment uses provided kind (or page/section default)
+		kindToUse := NodeKindSection
+		if i == len(lookup.Segments)-1 && kind != nil {
+			kindToUse = *kind
+		}
+
+		createdNode, err := t.createNodeLocked(userID, currentID, segTitle, segment.Slug, &kindToUse, createNodeOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("could not create segment %q: %w", segment.Slug, err)
+		}
+		currentID = &createdNode.id
+
+		created = append(created, &PageNode{
+			ID:    createdNode.id,
+			Slug:  segment.Slug,
+			Title: segTitle,
+			Kind:  kindToUse,
+		})
+	}
+
+	// Resolve final page
+	if currentID == nil {
+		return nil, fmt.Errorf("could not ensure page path")
+	}
+	page := t.getNodeByIDLocked(*currentID)
+	if page == nil {
+		return nil, fmt.Errorf("could not find created page by ID: %w", ErrPageNotFound)
+	}
+
+	// Save once
+	return &EnsurePathResult{
+		Exists:  true,
+		Page:    page,
+		Created: created,
+	}, nil
+}
+
+// MoveNode moves a node to another parent (root if parentID is empty/"root"),
+// appending it at the end of the new parent's children.
+func (t *TreeService) MoveNode(userID string, id string, parentID string, expectedVersion string) error {
+	return t.MoveNodeToPosition(userID, id, parentID, expectedVersion, -1)
+}
+
+// MoveNodeToPosition moves a node to another parent (root if parentID is empty/"root")
+// and inserts it at the given index among the new parent's children.
+// A negative or out-of-range position appends at the end.
+func (t *TreeService) MoveNodeToPosition(userID string, id string, parentID string, expectedVersion string, position int) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.tree == nil {
+		return ErrTreeNotLoaded
+	}
+
+	// Find node to move
+	node := t.getNodeByIDLocked(id)
+	if node == nil {
+		return ErrPageNotFound
+	}
+
+	if err := checkNodeVersion(node, expectedVersion); err != nil {
+		return err
+	}
+
+	oldParent := node.Parent
+	if oldParent == nil {
+		return fmt.Errorf("old parent not found: %w", ErrParentNotFound)
+	}
+
+	// Resolve destination parent (default root)
+	newParent := t.tree
+	if parentID != "" && parentID != "root" {
+		newParent = t.getNodeByIDLocked(parentID)
+		if newParent == nil {
+			return fmt.Errorf("new parent not found: %w", ErrParentNotFound)
+		}
+	}
+
+	// Same slug collision under new parent
+	if existing := t.findChildBySlugInParentLocked(newParent, node.Slug); existing != nil && existing.ID != node.ID {
+		return fmt.Errorf("child with the same slug already exists: %w", ErrPageAlreadyExists)
+	}
+
+	// Can't move into itself
+	if node.ID == newParent.ID {
+		return fmt.Errorf("page cannot be moved to itself: %w", ErrPageCannotBeMovedToItself)
+	}
+
+	// Circular reference guard: node cannot be moved under its own descendants
+	if node.IsChildOf(newParent.ID, true) {
+		return fmt.Errorf("circular reference detected: %w", ErrMovePageCircularReference)
+	}
+
+	newParentWasConverted := false
+	if newParent.ID != "root" && newParent.Kind == NodeKindPage {
+		if err := t.store.ConvertNode(newParent, NodeKindSection); err != nil {
+			return fmt.Errorf("could not auto-convert new parent page to section: %w", err)
+		}
+		newParent.Kind = NodeKindSection
+		newParentWasConverted = true
+	}
+
+	if newParent.Kind != NodeKindSection {
+		return fmt.Errorf("destination parent must be a section, got %q", newParent.Kind)
+	}
+
+	previousOldChildren := append([]*PageNode(nil), oldParent.Children...)
+	previousOldPositions := snapshotChildPositions(oldParent.Children)
+	previousNewChildren := append([]*PageNode(nil), newParent.Children...)
+	previousNewPositions := snapshotChildPositions(newParent.Children)
+	previousPosition := node.Position
+	previousMetadata := node.Metadata
+
+	if err := t.store.MoveNode(node, newParent); err != nil {
+		return fmt.Errorf("could not move node on disk: %w", err)
+	}
+
+	for i, e := range oldParent.Children {
+		if e.ID == id {
+			oldParent.Children = append(oldParent.Children[:i], oldParent.Children[i+1:]...)
+			break
+		}
+	}
+
+	insertAt := len(newParent.Children)
+	if position >= 0 && position < len(newParent.Children) {
+		insertAt = position
+	}
+	newParent.Children = append(newParent.Children, nil)
+	copy(newParent.Children[insertAt+1:], newParent.Children[insertAt:])
+	newParent.Children[insertAt] = node
+	node.Position = insertAt
+	node.Parent = newParent
+	t.rebuildChildSlugIndexForParentLocked(oldParent)
+	t.rebuildChildSlugIndexForParentLocked(newParent)
+	node.Metadata.UpdatedAt = time.Now().UTC()
+	node.Metadata.LastAuthorID = userID
+
+	t.reindexPositions(newParent)
+	t.reindexPositions(oldParent)
+
+	if err := t.store.SaveChildOrder(oldParent); err != nil {
+		rollbackErr := t.rollbackMovedNodeLocked(node, oldParent, newParent, previousOldChildren, previousOldPositions, previousNewChildren, previousNewPositions, previousPosition, previousMetadata, newParentWasConverted)
+		if rollbackErr != nil {
+			return errors.Join(fmt.Errorf("could not persist source child order: %w", err), fmt.Errorf(errRollbackMovedNodeFailed, rollbackErr))
+		}
+		return fmt.Errorf("could not persist source child order: %w", err)
+	}
+	if newParent != oldParent {
+		if err := t.store.SaveChildOrder(newParent); err != nil {
+			rollbackErr := t.rollbackMovedNodeLocked(node, oldParent, newParent, previousOldChildren, previousOldPositions, previousNewChildren, previousNewPositions, previousPosition, previousMetadata, newParentWasConverted)
+			if rollbackErr != nil {
+				return errors.Join(fmt.Errorf("could not persist destination child order: %w", err), fmt.Errorf(errRollbackMovedNodeFailed, rollbackErr))
+			}
+			return fmt.Errorf("could not persist destination child order: %w", err)
+		}
+	}
+
+	if err := t.store.SyncFrontmatterIfExists(node); err != nil {
+		rollbackErr := t.rollbackMovedNodeLocked(node, oldParent, newParent, previousOldChildren, previousOldPositions, previousNewChildren, previousNewPositions, previousPosition, previousMetadata, newParentWasConverted)
+		if rollbackErr != nil {
+			return errors.Join(fmt.Errorf("could not sync moved node frontmatter: %w", err), fmt.Errorf(errRollbackMovedNodeFailed, rollbackErr))
+		}
+		return fmt.Errorf("could not sync moved node frontmatter: %w", err)
+	}
+
+	return nil
+}
+
+func snapshotChildPositions(children []*PageNode) map[string]int {
+	positions := make(map[string]int, len(children))
+	for _, child := range children {
+		if child == nil {
+			continue
+		}
+		positions[child.ID] = child.Position
+	}
+	return positions
+}
+
+func restoreChildSnapshot(parent *PageNode, children []*PageNode, positions map[string]int) {
+	if parent == nil {
+		return
+	}
+
+	parent.Children = append([]*PageNode(nil), children...)
+	for _, child := range parent.Children {
+		if child == nil {
+			continue
+		}
+		child.Parent = parent
+		if pos, ok := positions[child.ID]; ok {
+			child.Position = pos
+		}
+	}
+}
+
+func (t *TreeService) rollbackMovedNodeLocked(node *PageNode, oldParent *PageNode, newParent *PageNode, previousOldChildren []*PageNode, previousOldPositions map[string]int, previousNewChildren []*PageNode, previousNewPositions map[string]int, previousPosition int, previousMetadata PageMetadata, newParentWasConverted bool) error {
+	var rollbackErr error
+
+	if moveErr := t.store.MoveNode(node, oldParent); moveErr != nil {
+		rollbackErr = errors.Join(rollbackErr, fmt.Errorf("move node back on disk: %w", moveErr))
+	}
+
+	restoreChildSnapshot(oldParent, previousOldChildren, previousOldPositions)
+	if newParent != oldParent {
+		restoreChildSnapshot(newParent, previousNewChildren, previousNewPositions)
+	}
+	t.rebuildChildSlugIndexForParentLocked(oldParent)
+	if newParent != oldParent {
+		t.rebuildChildSlugIndexForParentLocked(newParent)
+	}
+	node.Parent = oldParent
+	node.Position = previousPosition
+	node.Metadata = previousMetadata
+
+	if newParentWasConverted && newParent != nil && newParent.ID != "root" && len(newParent.Children) == 0 {
+		newParentDir, dirErr := t.store.dirPathForNode(newParent)
+		if dirErr != nil {
+			rollbackErr = errors.Join(rollbackErr, fmt.Errorf("resolve converted parent dir: %w", dirErr))
+		} else {
+			if removeErr := os.RemoveAll(filepath.Join(newParentDir, orderFilename)); removeErr != nil {
+				rollbackErr = errors.Join(rollbackErr, fmt.Errorf("remove child order before parent rollback: %w", removeErr))
+			}
+		}
+		if convertErr := t.store.ConvertNode(newParent, NodeKindPage); convertErr != nil {
+			rollbackErr = errors.Join(rollbackErr, fmt.Errorf("convert destination parent back to page: %w", convertErr))
+		} else {
+			newParent.Kind = NodeKindPage
+		}
+	}
+
+	if err := t.store.SaveChildOrder(oldParent); err != nil {
+		rollbackErr = errors.Join(rollbackErr, fmt.Errorf("restore source child order: %w", err))
+	}
+	if newParent != oldParent && newParent.Kind == NodeKindSection {
+		if err := t.store.SaveChildOrder(newParent); err != nil {
+			rollbackErr = errors.Join(rollbackErr, fmt.Errorf("restore destination child order: %w", err))
+		}
+	}
+
+	return rollbackErr
+}
+
+// SetPinned updates the leafwiki_pinned frontmatter field and in-memory Pinned flag.
+func (t *TreeService) SetPinned(id string, version string, pinned bool) (*Page, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.tree == nil {
+		return nil, ErrTreeNotLoaded
+	}
+
+	node := t.getNodeByIDLocked(id)
+	if node == nil {
+		return nil, ErrPageNotFound
+	}
+
+	if err := checkNodeVersion(node, version); err != nil {
+		return nil, err
+	}
+
+	content, err := t.store.SetPinnedFrontmatter(node, pinned)
+	if err != nil {
+		return nil, fmt.Errorf("set pinned: %w", err)
+	}
+
+	node.Pinned = pinned
+	return &Page{PageNode: node, Content: content}, nil
+}
+
+func (t *TreeService) SortPages(parentID string, orderedIDs []string) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.tree == nil {
+		return ErrTreeNotLoaded
+	}
+
+	parent := t.tree
+
+	if parentID != "" && parentID != "root" {
+		parent = t.getNodeByIDLocked(parentID)
+		if parent == nil {
+			return ErrParentNotFound
+		}
+	}
+
+	// Check if the number of orderedIDs is the same as the number of children
+	if len(orderedIDs) != len(parent.Children) {
+		return fmt.Errorf("number of ordered IDs does not match the number of children: %w", ErrInvalidSortOrder)
+	}
+
+	// Check if all IDs in the sort order are valid
+	existingIDs := make(map[string]bool)
+	for _, child := range parent.Children {
+		existingIDs[child.ID] = true
+	}
+	for _, id := range orderedIDs {
+		if !existingIDs[id] {
+			return fmt.Errorf("invalid ID in sort order, ID: %s - %w", id, ErrInvalidSortOrder)
+		}
+	}
+
+	seen := make(map[string]bool)
+	for _, id := range orderedIDs {
+		if seen[id] {
+			return fmt.Errorf("duplicate ID in sort order: %s", id)
+		}
+		seen[id] = true
+	}
+
+	previousChildren := append([]*PageNode(nil), parent.Children...)
+	previousPositions := make(map[string]int, len(parent.Children))
+	for _, child := range parent.Children {
+		previousPositions[child.ID] = child.Position
+	}
+
+	// Create a map to store the position of each page
+	positions := make(map[string]int)
+	for i, id := range orderedIDs {
+		positions[id] = i
+	}
+
+	// Sort the children of the parent
+	sort.SliceStable(parent.Children, func(i, j int) bool {
+		return positions[parent.Children[i].ID] < positions[parent.Children[j].ID]
+	})
+
+	// write postion index to children
+	for i, child := range parent.Children {
+		child.Position = i
+	}
+
+	if err := t.store.SaveChildOrder(parent); err != nil {
+		parent.Children = previousChildren
+		for _, child := range parent.Children {
+			if pos, ok := previousPositions[child.ID]; ok {
+				child.Position = pos
+			}
+		}
+		return fmt.Errorf(errPersistChildOrderFailed, err)
+	}
+
+	return nil
+}
+
+func (t *TreeService) reindexPositions(parent *PageNode) {
+	sort.SliceStable(parent.Children, func(i, j int) bool {
+		return parent.Children[i].Position < parent.Children[j].Position
+	})
+	for i, child := range parent.Children {
+		child.Position = i
+	}
+}
