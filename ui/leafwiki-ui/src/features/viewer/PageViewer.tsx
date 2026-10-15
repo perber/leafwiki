@@ -174,7 +174,7 @@ export default function PageViewer() {
   const alwaysShowToc = useConfigStore((s) => s.alwaysShowToc)
   const showToc = shouldShowToc(tocEntries.length, alwaysShowToc)
   // Contentful TOC/downloads (dropdown + scroll-spy entries). Separate from
-  // reserving the desktop right pane — see shouldReserveTocPane (#1549).
+  // reserving the desktop right pane: see shouldReserveTocPane (#1549).
   const showTocContent = showToc || attachments.length > 0
   const reserveTocPane = shouldReserveTocPane()
   // Single scroll spy for both the dropdown and the side panel.
