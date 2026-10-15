@@ -320,6 +320,9 @@ light/dark mode application).
   `normalizeMarkdownListIndentation.ts`), syntax highlighting (`syntaxHighlightLanguages.ts`,
   `splitHighlightedLines.ts`), and the table of contents (`extractTocEntries.ts`,
   `TocSidePanel.tsx`, `TocDropdownButton.tsx`, `useTocScrollSpy.ts`, `tocVisibility.ts`).
+  Shared Markdown typography lives in `src/index.css`: screen prose is limited to 680px,
+  with 16px text on phones and 17px from the `sm` breakpoint. Media, code and table
+  blocks retain the available surface width; print keeps its separate layout rules.
 - **`features/progressbar`** — top-of-page loading progress bar (`progressbarStore.ts`, driven
   today by manual `setLoading` calls; a planned TanStack Query migration would drive this from
   `useIsFetching` instead — not yet implemented).
