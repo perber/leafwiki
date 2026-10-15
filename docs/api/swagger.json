@@ -1,0 +1,89 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Development API of LeafWiki. This documentation is incomplete, experimental and may change before v1; only a few operations are described so far.\nAPI keys (Bearer authentication) are available only when LeafWiki runs with `--enable-api-key-management` and authentication enabled. Existing browser API routes are not newly hidden behind that flag.\nBrowser sessions use the access and refresh cookies (`__Host-leafwiki_at` and `__Host-leafwiki_rt` on secure connections, unprefixed names for allowed insecure development). Session writes are protected by CSRF double-submit: send the `X-CSRF-Token` header matching the CSRF cookie (the `csrf_token` form field is accepted as a fallback).\nThe documented base path is the default mount. A deployment started with `--base-path=/wiki` prepends `/wiki` to every documented URL.",
+        "title": "LeafWiki API",
+        "contact": {},
+        "license": {
+            "name": "MIT",
+            "url": "https://github.com/perber/leafwiki/blob/main/LICENSE"
+        },
+        "version": "0.x"
+    },
+    "basePath": "/api",
+    "paths": {
+        "/health": {
+            "get": {
+                "description": "Public liveness and readiness probe; no authentication is required. A 401 or 429 is possible only when invalid authentication is supplied or API-key attempts are throttled by global middleware.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Check instance health",
+                "responses": {
+                    "200": {
+                        "description": "All checks passed (ongoing search indexing still counts as healthy)",
+                        "schema": {
+                            "$ref": "#/definitions/health.HealthResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid API key or session supplied",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    },
+                    "429": {
+                        "description": "API-key attempts throttled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    },
+                    "503": {
+                        "description": "Degraded: the body is a HealthResponse with failed checks. If API-key resolution cannot reach its store, the body is a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object.",
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "dto.LegacyError": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "description": "Error is the human-readable error message.",
+                    "type": "string"
+                }
+            }
+        },
+        "health.HealthResponse": {
+            "type": "object",
+            "properties": {
+                "checks": {
+                    "description": "Checks maps each check name (sqlite, data_dir, search) to its result:\n\"ok\" or \"failed\" for sqlite and data_dir; \"ok\", \"indexing\" or \"failed\" for search.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "status": {
+                    "description": "Status is \"ok\" when every check passes, otherwise \"degraded\".",
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "API key sent as the entire header value `Bearer lw_\u003cprefix\u003e_\u003csecret\u003e`, not just the secret. A request authenticated by a resolved key acts with the effective role of the lesser of the key owner's role and the key's role. A resolved key skips CSRF checks; a header merely being present does not. Routes that reject API-key authentication are browser-session only and say so. Cookies remain an alternative authentication path and are described in prose because Swagger 2.0 cannot express them.",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

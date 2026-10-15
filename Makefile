@@ -39,6 +39,10 @@ build-api:
 run:
 	go run -ldflags "-X main.Version=$(VERSION)" $(CMD_DIR)
 
+# Regenerate the experimental Swagger 2.0 spec in docs/api (pinned swag, not a go.mod dependency).
+api-docs:
+	go run github.com/swaggo/swag/cmd/swag@v1.16.6 init --generalInfo api_docs.go --dir ./cmd/leafwiki,./internal --parseInternal --output ./docs/api --outputTypes json,yaml
+
 clean:
 	rm -f $(BINARY_NAME)
 	rm -rf $(RELEASE_DIR)
@@ -128,6 +132,7 @@ help:
 	@echo "  make ui                   – Build frontend into internal/http/dist for embedding"
 	@echo "  make release              – Cross-compile binaries for all platforms (via Docker)"
 	@echo "  make clean                – Clean all generated files"
+	@echo "  make api-docs             – Regenerate the experimental Swagger spec in docs/api"
 	@echo "  make test                 – Run all Go tests"
 	@echo "  make bench                – Run Go benchmarks for links and revision"
 	@echo "  make run-e2e              – Run end-to-end tests (using Docker)"
@@ -139,4 +144,4 @@ help:
 	@echo "  make docker-build-publish – Build and push multi-arch Docker image"
 	@echo "  make changelog            – Generate changelog"
 
-.PHONY: all build build-api ui run clean test bench fmt lint help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
+.PHONY: all build build-api ui run api-docs clean test bench fmt lint help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
