@@ -136,10 +136,11 @@ that matter more when code is generated:
 - **Say so in the PR.** Tick the AI box in the PR template and name the tool. This doesn't make a
   PR less welcome; it helps review.
 - **Test it yourself, by hand.** Generated code often passes its own tests and still does the
-  wrong thing. For **UI changes**, click through the change in the browser (light/dark mode,
-  mobile width where relevant) and tick the "tested manually" box in the PR template. A
-  screenshot or short recording is welcome but not required. UI PRs without the box ticked will
-  be asked to test before review.
+  wrong thing. For **UI changes**, cover the behaviour with automated tests (e2e, component or
+  unit) wherever possible, then click through at least what tests can't show — how it looks in
+  light/dark mode and at mobile width, real-browser specifics — and tick both UI boxes in the
+  PR template. A screenshot or short recording is welcome but not required. UI PRs without the
+  boxes ticked will be asked to test before review.
 - **Same scope rules.** One focused change per PR, linked to an issue. No drive-by refactors or
   reformatting the agent decided to do on the side.
 - **Don't paste unverified AI output into issues or security reports.** Reproduce the problem
