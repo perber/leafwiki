@@ -34,9 +34,12 @@ info:
 paths:
   /health:
     get:
-      description: Public liveness and readiness probe; no authentication is required.
-        A 401 or 429 is possible only when invalid authentication is supplied or API-key
-        attempts are throttled by global middleware.
+      description: 'Public liveness and readiness probe; no authentication is required
+        and session cookies are never validated. Global middleware can still reject
+        a request before the handler runs: 401 for an invalid, revoked or expired
+        API key (only when API-key management is enabled) or for an identity asserted
+        by a trusted reverse proxy that LeafWiki rejects (only when reverse-proxy
+        authentication is enabled), and 429 when API-key attempts are throttled.'
       produces:
       - application/json
       responses:
@@ -46,7 +49,9 @@ paths:
           schema:
             $ref: '#/definitions/health.HealthResponse'
         "401":
-          description: Invalid API key or session supplied
+          description: 'Invalid, revoked or expired API key (when API-key management
+            is enabled), or a rejected trusted-proxy identity: unknown user or auto-provisioning
+            email conflict (when reverse-proxy authentication is enabled)'
           schema:
             $ref: '#/definitions/dto.LegacyError'
         "429":

@@ -109,8 +109,11 @@ Standard failures, and where they apply:
 | 503 | `InjectAPIKeyUser`: key store suspended during a live restore | flat | every route, only when key management is enabled and a key-shaped Bearer token reaches key resolution (same bypasses as the 401 row) |
 | 503 | write gate while a live restore runs | localized | methods other than GET, HEAD and OPTIONS, except the restore endpoints and login (including TOTP login), logout and refresh-token; never GET routes such as health |
 
-Health does not require authentication, so it documents 401 and 429 only as consequences of
-invalid or throttled *supplied* credentials, and no 403.
+Health does not require authentication and never validates session cookies, so it documents 401
+and 429 only as consequences of global middleware: an invalid, revoked or expired *supplied*
+API key (key management enabled), a trusted-proxy identity that LeafWiki rejects (unknown user
+or auto-provisioning email conflict, reverse-proxy auth enabled), or throttled key attempts. It
+documents no 403.
 
 ### Same-status alternatives (the 503 limitation)
 

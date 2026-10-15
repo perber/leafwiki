@@ -16,7 +16,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	coreauth "github.com/perber/wiki/internal/core/auth"
 	httpinternal "github.com/perber/wiki/internal/http"
+	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/tocdisplay"
@@ -223,7 +225,6 @@ func assertProperty(t *testing.T, model map[string]any, name, wantType string) {
 		t.Errorf("property %q type = %q, want %q", name, got, wantType)
 	}
 }
-
 func TestAPIDocs_Output_HasNoGeneratedGo(t *testing.T) {
 	matches, err := filepath.Glob(filepath.Join(apiDocsDir(t), "*.go"))
 	if err != nil {
@@ -407,6 +408,13 @@ func parseAPIRouteExceptions(literal map[string]string) (map[apiRoute]string, er
 // conditional on another option, enable it here in the same PR.
 func newAPIDocsRouter(t *testing.T) (*wiki.Wiki, *gin.Engine) {
 	t.Helper()
+	return newAPIDocsRouterWith(t, nil)
+}
+
+// newAPIDocsRouterWith is newAPIDocsRouter with extra router options, for
+// scenarios about global middleware such as reverse-proxy authentication.
+func newAPIDocsRouterWith(t *testing.T, override func(*httpinternal.RouterOptions, *wiki.Wiki)) (*wiki.Wiki, *gin.Engine) {
+	t.Helper()
 	w, err := wiki.NewWiki(&wiki.WikiOptions{
 		StorageDir:             t.TempDir(),
 		AdminPassword:          "adminpassword",
@@ -440,6 +448,9 @@ func newAPIDocsRouter(t *testing.T) (*wiki.Wiki, *gin.Engine) {
 		o.APIKeyService = w.APIKeyService()
 		o.GitBackupEnabled = true
 		o.SnapshotEnabled = true
+		if override != nil {
+			override(o, w)
+		}
 	})
 	return w, router
 }
@@ -485,6 +496,43 @@ func TestAPIDocs_Routes_AreDocumentedOrExplicitlyExcepted(t *testing.T) {
 	}
 }
 
+// getHealth requests GET /api/health; edit, when non-nil, adjusts the request
+// (headers, cookies, remote address) before it is served.
+func getHealth(t *testing.T, router http.Handler, edit func(*http.Request)) (int, map[string]any) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+	if edit != nil {
+		edit(req)
+	}
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode %d body %q: %v", rec.Code, rec.Body.String(), err)
+	}
+	return rec.Code, body
+}
+
+func assertFlatError(t *testing.T, code, wantCode int, body map[string]any) {
+	t.Helper()
+	if code != wantCode {
+		t.Errorf("status = %d, want %d (body %v)", code, wantCode, body)
+	}
+	if msg, ok := body["error"].(string); len(body) != 1 || !ok || msg == "" {
+		t.Errorf("body = %v, want only a non-empty string error", body)
+	}
+}
+
+func assertHealthChecks(t *testing.T, code int, body map[string]any) {
+	t.Helper()
+	if code != http.StatusOK {
+		t.Errorf("status = %d, want 200 (body %v)", code, body)
+	}
+	if _, ok := body["checks"].(map[string]any); !ok {
+		t.Errorf("body = %v, want a checks object", body)
+	}
+}
+
 // TestAPIDocs_Health_GlobalAuthenticationCanReturnFlatErrors pins why the
 // public health operation documents 401 and 503 LegacyError bodies: the global
 // API-key middleware runs before the handler. Throttling (429) stays covered
@@ -499,47 +547,87 @@ func TestAPIDocs_Health_GlobalAuthenticationCanReturnFlatErrors(t *testing.T) {
 		}
 	})
 
-	get := func(token string) (int, map[string]any) {
-		t.Helper()
-		req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
-		if token != "" {
-			req.Header.Set("Authorization", "Bearer "+token)
-		}
-		rec := httptest.NewRecorder()
-		router.ServeHTTP(rec, req)
-		var body map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-			t.Fatalf("decode %d body %q: %v", rec.Code, rec.Body.String(), err)
-		}
-		return rec.Code, body
-	}
-	assertFlatError := func(code, wantCode int, body map[string]any) {
-		t.Helper()
-		if code != wantCode {
-			t.Errorf("status = %d, want %d (body %v)", code, wantCode, body)
-		}
-		if msg, ok := body["error"].(string); len(body) != 1 || !ok || msg == "" {
-			t.Errorf("body = %v, want only a non-empty string error", body)
-		}
+	withKey := func(token string) func(*http.Request) {
+		return func(req *http.Request) { req.Header.Set("Authorization", "Bearer "+token) }
 	}
 
-	code, body := get("")
-	if code != http.StatusOK {
-		t.Errorf("anonymous status = %d, want 200 (body %v)", code, body)
-	}
-	if _, ok := body["checks"].(map[string]any); !ok {
-		t.Errorf("anonymous body = %v, want a checks object", body)
-	}
+	code, body := getHealth(t, router, nil)
+	assertHealthChecks(t, code, body)
 
 	unknownKey := "lw_00000000_" + strings.Repeat("0", 64)
-	code, body = get(unknownKey)
-	assertFlatError(code, http.StatusUnauthorized, body)
+	code, body = getHealth(t, router, withKey(unknownKey))
+	assertFlatError(t, code, http.StatusUnauthorized, body)
 
 	if err := w.APIKeyService().PauseForSwap(); err != nil {
 		t.Fatalf("PauseForSwap: %v", err)
 	}
-	code, body = get(unknownKey)
-	assertFlatError(code, http.StatusServiceUnavailable, body)
+	code, body = getHealth(t, router, withKey(unknownKey))
+	assertFlatError(t, code, http.StatusServiceUnavailable, body)
+}
+
+// TestAPIDocs_Health_InvalidSessionCookiesAreNotValidated pins why the 401
+// description names no session failure: health sits behind neither
+// RequireAuth nor OptionalAuth, so cookies are never inspected.
+func TestAPIDocs_Health_InvalidSessionCookiesAreNotValidated(t *testing.T) {
+	_, router := newAPIDocsRouter(t)
+
+	code, body := getHealth(t, router, func(req *http.Request) {
+		for _, name := range []string{"leafwiki_at", "leafwiki_rt", "__Host-leafwiki_at", "__Host-leafwiki_rt"} {
+			req.AddCookie(&http.Cookie{Name: name, Value: "invalid-or-expired"})
+		}
+	})
+	assertHealthChecks(t, code, body)
+}
+
+// TestAPIDocs_Health_RejectedProxyIdentityReturnsFlatError pins the other 401
+// source of the public health operation: global reverse-proxy middleware
+// rejecting the identity a trusted proxy asserts, before the handler runs.
+func TestAPIDocs_Health_RejectedProxyIdentityReturnsFlatError(t *testing.T) {
+	const trustedAddr = "127.0.0.1:1234"
+	proxyRouter := func(autoCreate bool) *gin.Engine {
+		_, router := newAPIDocsRouterWith(t, func(o *httpinternal.RouterOptions, w *wiki.Wiki) {
+			trusted, err := authmw.ParseTrustedProxies("127.0.0.1")
+			if err != nil {
+				t.Fatalf("ParseTrustedProxies: %v", err)
+			}
+			o.HTTPRemoteUser = httpinternal.HTTPRemoteUserConfig{
+				Enabled:         true,
+				HeaderName:      "Remote-User",
+				AutoCreate:      autoCreate,
+				EmailHeaderName: "Remote-Email",
+				DefaultRole:     coreauth.RoleViewer,
+				TrustedProxies:  trusted,
+				UserService:     w.UserService,
+			}
+		})
+		return router
+	}
+	asProxy := func(headers map[string]string) func(*http.Request) {
+		return func(req *http.Request) {
+			req.RemoteAddr = trustedAddr
+			for k, v := range headers {
+				req.Header.Set(k, v)
+			}
+		}
+	}
+
+	t.Run("trusted proxy without identity header stays public", func(t *testing.T) {
+		code, body := getHealth(t, proxyRouter(false), asProxy(nil))
+		assertHealthChecks(t, code, body)
+	})
+	t.Run("unknown user", func(t *testing.T) {
+		code, body := getHealth(t, proxyRouter(false), asProxy(map[string]string{"Remote-User": "nobody"}))
+		assertFlatError(t, code, http.StatusUnauthorized, body)
+	})
+	t.Run("auto-provisioning email conflict", func(t *testing.T) {
+		// admin@localhost is the default admin's email, so provisioning
+		// "newperson" with it conflicts with a different user.
+		code, body := getHealth(t, proxyRouter(true), asProxy(map[string]string{
+			"Remote-User":  "newperson",
+			"Remote-Email": "admin@localhost",
+		}))
+		assertFlatError(t, code, http.StatusUnauthorized, body)
+	})
 }
 
 // ─── Route coverage helpers: tests ──────────────────────────────────────────
