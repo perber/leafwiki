@@ -2,13 +2,29 @@ package http_test
 
 import (
 	"encoding/json"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/gin-gonic/gin"
+	httpinternal "github.com/perber/wiki/internal/http"
+	"github.com/perber/wiki/internal/publicaccess"
+	"github.com/perber/wiki/internal/test_utils"
+	"github.com/perber/wiki/internal/tocdisplay"
+	"github.com/perber/wiki/internal/wiki"
+	wikibackup "github.com/perber/wiki/internal/wiki/backup"
+	wikiinstancesettings "github.com/perber/wiki/internal/wiki/instancesettings"
+	wikirestore "github.com/perber/wiki/internal/wiki/restore"
+	wikisnapshot "github.com/perber/wiki/internal/wiki/snapshot"
 	"gopkg.in/yaml.v3"
 )
 
@@ -223,5 +239,481 @@ func TestAPIDocs_JSONAndYAML_DescribeTheSameDocument(t *testing.T) {
 	fromYAML := readAPIDocument(t, "swagger.yaml")
 	if !reflect.DeepEqual(fromJSON, fromYAML) {
 		t.Error("swagger.json and swagger.yaml differ; regenerate with `make api-docs`")
+	}
+}
+
+// ─── Route coverage helpers ─────────────────────────────────────────────────
+
+// apiRoute is one HTTP operation in canonical form: an upper-case method and a
+// path under /api with Swagger-style {param} segments.
+type apiRoute struct {
+	Method, Path string
+}
+
+func (r apiRoute) String() string { return r.Method + " " + r.Path }
+
+// swaggerOperations maps the Path Item fields that are HTTP operations in
+// Swagger 2.0 to their method. Every other Path Item field ($ref, parameters,
+// x-*) is metadata, never an operation.
+var swaggerOperations = map[string]string{
+	"get":     "GET",
+	"put":     "PUT",
+	"post":    "POST",
+	"delete":  "DELETE",
+	"options": "OPTIONS",
+	"head":    "HEAD",
+	"patch":   "PATCH",
+}
+
+// canonicalAPIRoute strips the deployment base path (NewRouter mounts every
+// route under engine.Group(BasePath)) and reports whether the remaining path
+// is /api or below it; that check also rejects partial-segment prefixes such
+// as /wikimedia for base path /wiki. Gin :param and *param segments become
+// Swagger {param} segments.
+func canonicalAPIRoute(method, routePath, deploymentBasePath string) (apiRoute, bool) {
+	p, ok := strings.CutPrefix(routePath, strings.TrimSuffix(deploymentBasePath, "/"))
+	if !ok || (p != "/api" && !strings.HasPrefix(p, "/api/")) {
+		return apiRoute{}, false
+	}
+	segments := strings.Split(p, "/")
+	for i, seg := range segments {
+		if len(seg) > 1 && (seg[0] == ':' || seg[0] == '*') {
+			segments[i] = "{" + seg[1:] + "}"
+		}
+	}
+	return apiRoute{Method: method, Path: strings.Join(segments, "/")}, true
+}
+
+// actualAPIRoutes is the canonical API inventory of a built router.
+func actualAPIRoutes(engine *gin.Engine, deploymentBasePath string) map[apiRoute]struct{} {
+	routes := make(map[apiRoute]struct{})
+	for _, info := range engine.Routes() {
+		if r, ok := canonicalAPIRoute(info.Method, info.Path, deploymentBasePath); ok {
+			routes[r] = struct{}{}
+		}
+	}
+	return routes
+}
+
+// specAPIRoutes lists the operations of a decoded Swagger 2.0 document, each
+// path joined to basePath. Malformed fields are errors, so a broken document
+// can never pass as one that documents nothing.
+func specAPIRoutes(doc map[string]any) (map[apiRoute]struct{}, error) {
+	basePath := ""
+	if raw, present := doc["basePath"]; present {
+		s, ok := raw.(string)
+		if !ok || !strings.HasPrefix(s, "/") {
+			return nil, fmt.Errorf("basePath must be an absolute path string, got %v", raw)
+		}
+		basePath = strings.TrimSuffix(s, "/")
+	}
+	paths, ok := doc["paths"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("paths must be an object, got %T", doc["paths"])
+	}
+
+	routes := make(map[apiRoute]struct{})
+	for path, rawItem := range paths {
+		if !strings.HasPrefix(path, "/") {
+			return nil, fmt.Errorf("path %q must start with /", path)
+		}
+		item, ok := rawItem.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("path item %q must be an object, got %T", path, rawItem)
+		}
+		for field, rawOp := range item {
+			method, isOperation := swaggerOperations[field]
+			switch {
+			case isOperation:
+				if _, ok := rawOp.(map[string]any); !ok {
+					return nil, fmt.Errorf("operation %s %s must be an object, got %T", field, path, rawOp)
+				}
+				routes[apiRoute{Method: method, Path: basePath + path}] = struct{}{}
+			case field == "$ref", field == "parameters", strings.HasPrefix(field, "x-"):
+				// Path Item metadata, not an operation.
+			default:
+				return nil, fmt.Errorf("path item %q has unknown field %q", path, field)
+			}
+		}
+	}
+	return routes, nil
+}
+
+// checkAPICoverage returns sorted diagnostics for every real operation that is
+// neither documented nor excepted, every exception without a real route, every
+// exception for an already documented operation, and every documented
+// operation without a real route.
+func checkAPICoverage(actual, documented map[apiRoute]struct{}, exceptions map[apiRoute]string) []string {
+	var diags []string
+	for r := range actual {
+		_, isDocumented := documented[r]
+		_, isExcepted := exceptions[r]
+		if !isDocumented && !isExcepted {
+			diags = append(diags, "missing "+r.String()+": neither documented nor excepted")
+		}
+	}
+	for r := range exceptions {
+		if _, ok := actual[r]; !ok {
+			diags = append(diags, "stale exception "+r.String()+": no such route")
+		}
+		if _, ok := documented[r]; ok {
+			diags = append(diags, "documented exception "+r.String()+": remove the exception")
+		}
+	}
+	for r := range documented {
+		if _, ok := actual[r]; !ok {
+			diags = append(diags, "phantom documented "+r.String()+": no such route")
+		}
+	}
+	sort.Strings(diags)
+	return diags
+}
+
+// parseAPIRouteExceptions turns the handwritten exception literal (keys like
+// "GET /api/tags", values like "tags: pending package documentation") into
+// routes. The literal is keyed by constant strings so the compiler rejects
+// duplicates; this only validates its shape and never derives entries.
+func parseAPIRouteExceptions(literal map[string]string) (map[apiRoute]string, error) {
+	exceptions := make(map[apiRoute]string, len(literal))
+	for key, value := range literal {
+		parts := strings.Split(key, " ")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("exception %q: want exactly %q", key, "METHOD /api/path")
+		}
+		method, path := parts[0], parts[1]
+		if _, ok := swaggerOperations[strings.ToLower(method)]; !ok || method != strings.ToUpper(method) {
+			return nil, fmt.Errorf("exception %q: unknown or non-upper-case method %q", key, method)
+		}
+		route, ok := canonicalAPIRoute(method, path, "")
+		if !ok || route.Path != path || strings.HasSuffix(path, "/") {
+			return nil, fmt.Errorf("exception %q: path must be a canonical /api path with {param} segments", key)
+		}
+		pkg, reason, ok := strings.Cut(value, ": ")
+		if !ok || strings.TrimSpace(pkg) == "" || strings.TrimSpace(reason) == "" {
+			return nil, fmt.Errorf("exception %q: value %q must be %q", key, value, "<package>: <reason>")
+		}
+		exceptions[route] = value
+	}
+	return exceptions, nil
+}
+
+// ─── Route coverage against the real router ─────────────────────────────────
+
+// newAPIDocsRouter builds the production router with every optional route
+// group registered, mirroring cmd/leafwiki's wiring: auth on, revisions, link
+// refactor, API keys, backup, snapshot, restore and instance settings. The
+// managers behind backup/snapshot/restore are nil: registration needs none of
+// them, and inventory never sends requests. If route registration becomes
+// conditional on another option, enable it here in the same PR.
+func newAPIDocsRouter(t *testing.T) (*wiki.Wiki, *gin.Engine) {
+	t.Helper()
+	w, err := wiki.NewWiki(&wiki.WikiOptions{
+		StorageDir:             t.TempDir(),
+		AdminPassword:          "adminpassword",
+		JWTSecret:              "secretkey",
+		AccessTokenTimeout:     15 * time.Minute,
+		RefreshTokenTimeout:    7 * 24 * time.Hour,
+		EnableRevision:         true,
+		EnableAPIKeyManagement: true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance: %v", err)
+	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(w.Close, t) })
+
+	w.SetBackupRoutes(wikibackup.NewRoutes(nil, w.AuthService()))
+	w.SetSnapshotRoutes(wikisnapshot.NewRoutes(nil, nil, w.AuthService(), 0))
+	w.SetRestoreRoutes(wikirestore.NewRoutes(nil, w.AuthService()))
+	publicAccess := publicaccess.NewEnvManaged(false)
+	tocDisplay, err := tocdisplay.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("tocdisplay.New: %v", err)
+	}
+	w.SetInstanceSettingsRoutes(wikiinstancesettings.NewRoutes(publicAccess, tocDisplay, w.AuthService(), slog.Default()))
+
+	router := newTestRouter(w, func(o *httpinternal.RouterOptions) {
+		o.PublicAccess = publicAccess
+		o.AlwaysShowToc = tocDisplay
+		o.EnableRevision = true
+		o.EnableLinkRefactor = true
+		o.EnableAPIKeyManagement = true
+		o.APIKeyService = w.APIKeyService()
+		o.GitBackupEnabled = true
+		o.SnapshotEnabled = true
+	})
+	return w, router
+}
+
+func TestAPIDocs_RouterFixture_IncludesOptionalOperations(t *testing.T) {
+	_, router := newAPIDocsRouter(t)
+	actual := actualAPIRoutes(router, "")
+
+	for _, want := range []apiRoute{
+		{"GET", "/api/pages/{id}/revisions"},
+		{"POST", "/api/pages/{id}/refactor/apply"},
+		{"GET", "/api/api-keys"},
+		{"POST", "/api/admin/backup/config/test"},
+		{"GET", "/api/admin/snapshot/{id}/download"},
+		{"POST", "/api/admin/restore/self-restart"},
+		{"PUT", "/api/admin/settings/public-access"},
+		{"PUT", "/api/admin/settings/toc-display"},
+		{"PUT", "/api/users/me/password"},
+		{"POST", "/api/auth/password/forgot"},
+		{"GET", "/api/user-settings"},
+		{"POST", "/api/user/avatar"},
+	} {
+		if _, ok := actual[want]; !ok {
+			t.Errorf("router fixture is missing %s; enable its registrar or option in newAPIDocsRouter", want)
+		}
+	}
+}
+
+func TestAPIDocs_Routes_AreDocumentedOrExplicitlyExcepted(t *testing.T) {
+	if undocumentedAPIRoutesErr != nil {
+		t.Fatalf("api_docs_allowlist_test.go: %v", undocumentedAPIRoutesErr)
+	}
+	documented, err := specAPIRoutes(readAPIDocument(t, "swagger.json"))
+	if err != nil {
+		t.Fatalf("docs/api/swagger.json: %v", err)
+	}
+	_, router := newAPIDocsRouter(t)
+
+	if diags := checkAPICoverage(actualAPIRoutes(router, ""), documented, undocumentedAPIRoutes); len(diags) > 0 {
+		t.Errorf("API documentation drift (%d). Document new operations with swag annotations and run `make api-docs`, "+
+			"or add a reviewed exception to api_docs_allowlist_test.go; remove exceptions once an operation is documented "+
+			"or gone:\n  %s", len(diags), strings.Join(diags, "\n  "))
+	}
+}
+
+// TestAPIDocs_Health_GlobalAuthenticationCanReturnFlatErrors pins why the
+// public health operation documents 401 and 503 LegacyError bodies: the global
+// API-key middleware runs before the handler. Throttling (429) stays covered
+// by the middleware's own tests.
+func TestAPIDocs_Health_GlobalAuthenticationCanReturnFlatErrors(t *testing.T) {
+	w, router := newAPIDocsRouter(t)
+	// Registered after the fixture's Close, so it runs first even when an
+	// assertion fails: Close then shuts a live store, not a suspended one.
+	t.Cleanup(func() {
+		if err := w.APIKeyService().Replace(w.GetStorageDir()); err != nil {
+			t.Errorf("restore API key store: %v", err)
+		}
+	})
+
+	get := func(token string) (int, map[string]any) {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		var body map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			t.Fatalf("decode %d body %q: %v", rec.Code, rec.Body.String(), err)
+		}
+		return rec.Code, body
+	}
+	assertFlatError := func(code, wantCode int, body map[string]any) {
+		t.Helper()
+		if code != wantCode {
+			t.Errorf("status = %d, want %d (body %v)", code, wantCode, body)
+		}
+		if msg, ok := body["error"].(string); len(body) != 1 || !ok || msg == "" {
+			t.Errorf("body = %v, want only a non-empty string error", body)
+		}
+	}
+
+	code, body := get("")
+	if code != http.StatusOK {
+		t.Errorf("anonymous status = %d, want 200 (body %v)", code, body)
+	}
+	if _, ok := body["checks"].(map[string]any); !ok {
+		t.Errorf("anonymous body = %v, want a checks object", body)
+	}
+
+	unknownKey := "lw_00000000_" + strings.Repeat("0", 64)
+	code, body = get(unknownKey)
+	assertFlatError(code, http.StatusUnauthorized, body)
+
+	if err := w.APIKeyService().PauseForSwap(); err != nil {
+		t.Fatalf("PauseForSwap: %v", err)
+	}
+	code, body = get(unknownKey)
+	assertFlatError(code, http.StatusServiceUnavailable, body)
+}
+
+// ─── Route coverage helpers: tests ──────────────────────────────────────────
+
+func routeSet(routes ...apiRoute) map[apiRoute]struct{} {
+	set := make(map[apiRoute]struct{}, len(routes))
+	for _, r := range routes {
+		set[r] = struct{}{}
+	}
+	return set
+}
+
+func TestAPIDocs_CanonicalRoute_NormalizesOnlyAPIOperations(t *testing.T) {
+	cases := []struct {
+		method, path, basePath string
+		want                   apiRoute
+		included               bool
+	}{
+		{"GET", "/api/pages/:id", "", apiRoute{"GET", "/api/pages/{id}"}, true},
+		{"GET", "/wiki/api/pages/:id/revisions/:revisionId/assets/*name", "/wiki",
+			apiRoute{"GET", "/api/pages/{id}/revisions/{revisionId}/assets/{name}"}, true},
+		{"POST", "/api/pages", "", apiRoute{"POST", "/api/pages"}, true},
+		{"GET", "/api", "", apiRoute{"GET", "/api"}, true},
+		{"GET", "/wiki/api", "/wiki", apiRoute{"GET", "/api"}, true},
+		{"GET", "/apiary", "", apiRoute{}, false},
+		{"GET", "/static/file", "", apiRoute{}, false},
+		{"GET", "/assets/file", "", apiRoute{}, false},
+		{"GET", "/wikimedia/api/tree", "/wiki", apiRoute{}, false},
+		{"GET", "/wiki/apiary", "/wiki", apiRoute{}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.method+" "+tc.path+" base="+tc.basePath, func(t *testing.T) {
+			got, ok := canonicalAPIRoute(tc.method, tc.path, tc.basePath)
+			if ok != tc.included || got != tc.want {
+				t.Errorf("canonicalAPIRoute = %v, %v; want %v, %v", got, ok, tc.want, tc.included)
+			}
+		})
+	}
+}
+
+func TestAPIDocs_Coverage_RejectsDrift(t *testing.T) {
+	health := apiRoute{"GET", "/api/health"}
+	getPages := apiRoute{"GET", "/api/pages"}
+	postPages := apiRoute{"POST", "/api/pages"}
+	tags := apiRoute{"GET", "/api/tags"}
+	deleted := apiRoute{"GET", "/api/deleted"}
+	phantom := apiRoute{"GET", "/api/phantom"}
+	none := map[apiRoute]string{}
+	except := func(routes ...apiRoute) map[apiRoute]string {
+		m := make(map[apiRoute]string, len(routes))
+		for _, r := range routes {
+			m[r] = "test: reason"
+		}
+		return m
+	}
+
+	cases := []struct {
+		name       string
+		actual     map[apiRoute]struct{}
+		documented map[apiRoute]struct{}
+		exceptions map[apiRoute]string
+		want       []string
+	}{
+		{"documented route", routeSet(health), routeSet(health), none, nil},
+		{"verb on shared path undocumented", routeSet(getPages, postPages), routeSet(getPages), none,
+			[]string{"missing POST /api/pages: neither documented nor excepted"}},
+		{"excepted route", routeSet(tags), routeSet(), except(tags), nil},
+		{"stale exception", routeSet(), routeSet(), except(deleted),
+			[]string{"stale exception GET /api/deleted: no such route"}},
+		{"exception for documented route", routeSet(tags), routeSet(tags), except(tags),
+			[]string{"documented exception GET /api/tags: remove the exception"}},
+		{"phantom documented route", routeSet(), routeSet(phantom), none,
+			[]string{"phantom documented GET /api/phantom: no such route"}},
+		{"multiple failures are sorted",
+			routeSet(health, postPages, getPages, tags),
+			routeSet(health, phantom, tags),
+			except(deleted, tags),
+			[]string{
+				"documented exception GET /api/tags: remove the exception",
+				"missing GET /api/pages: neither documented nor excepted",
+				"missing POST /api/pages: neither documented nor excepted",
+				"phantom documented GET /api/phantom: no such route",
+				"stale exception GET /api/deleted: no such route",
+			}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := checkAPICoverage(tc.actual, tc.documented, tc.exceptions)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("diagnostics:\n got %q\nwant %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestAPIDocs_CoverageSpecRoutes_IgnoresPathItemMetadata(t *testing.T) {
+	doc := map[string]any{
+		"basePath": "/api",
+		"paths": map[string]any{
+			"/pages/{id}": map[string]any{
+				"parameters": []any{map[string]any{"name": "id", "in": "path"}},
+				"x-owner":    "pages",
+				"$ref":       "#/x-shared",
+				"get":        map[string]any{},
+				"delete":     map[string]any{},
+			},
+			"/health": map[string]any{"get": map[string]any{}},
+		},
+	}
+	got, err := specAPIRoutes(doc)
+	if err != nil {
+		t.Fatalf("specAPIRoutes: %v", err)
+	}
+	want := routeSet(
+		apiRoute{"GET", "/api/pages/{id}"},
+		apiRoute{"DELETE", "/api/pages/{id}"},
+		apiRoute{"GET", "/api/health"},
+	)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("specAPIRoutes = %v, want %v", got, want)
+	}
+}
+
+func TestAPIDocs_CoverageSpecRoutes_RejectsMalformedDocument(t *testing.T) {
+	cases := map[string]map[string]any{
+		"missing paths":        {"basePath": "/api"},
+		"paths not an object":  {"basePath": "/api", "paths": []any{}},
+		"basePath not string":  {"basePath": 1.0, "paths": map[string]any{}},
+		"basePath relative":    {"basePath": "api", "paths": map[string]any{}},
+		"path without slash":   {"basePath": "/api", "paths": map[string]any{"health": map[string]any{}}},
+		"path item not object": {"basePath": "/api", "paths": map[string]any{"/health": "get"}},
+		"operation not object": {"basePath": "/api", "paths": map[string]any{"/health": map[string]any{"get": true}}},
+		"unknown field":        {"basePath": "/api", "paths": map[string]any{"/health": map[string]any{"trace": map[string]any{}}}},
+	}
+	for name, doc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got, err := specAPIRoutes(doc); err == nil {
+				t.Errorf("expected a parse error, got routes %v", got)
+			}
+		})
+	}
+}
+
+func TestAPIDocs_CoverageExceptions_RejectMalformedEntries(t *testing.T) {
+	cases := map[string]string{
+		"GET  /api/tags":     "tags: pending package documentation",
+		"GET/api/tags":       "tags: pending package documentation",
+		"get /api/tags":      "tags: pending package documentation",
+		"TRACE /api/tags":    "tags: pending package documentation",
+		"GET /tags":          "tags: pending package documentation",
+		"GET /apiary":        "tags: pending package documentation",
+		"GET /api/pages/:id": "pages: pending package documentation",
+		"GET /api/tags ":     "tags: pending package documentation",
+		"GET /api/tags/":     "tags: pending package documentation",
+		"GET /api/search":    "pending package documentation",
+		"GET /api/branding":  ": pending package documentation",
+		"GET /api/config":    "auth: ",
+	}
+	for key, value := range cases {
+		t.Run(key+" => "+value, func(t *testing.T) {
+			if got, err := parseAPIRouteExceptions(map[string]string{key: value}); err == nil {
+				t.Errorf("expected an error, got %v", got)
+			}
+		})
+	}
+
+	got, err := parseAPIRouteExceptions(map[string]string{
+		"GET /api/pages/{id}": "pages: pending package documentation",
+	})
+	if err != nil {
+		t.Fatalf("valid entry rejected: %v", err)
+	}
+	want := map[apiRoute]string{{"GET", "/api/pages/{id}"}: "pages: pending package documentation"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("parseAPIRouteExceptions = %v, want %v", got, want)
 	}
 }
