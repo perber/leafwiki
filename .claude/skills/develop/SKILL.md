@@ -9,6 +9,11 @@ Each phase runs as its **own agent with a fresh context** (`.claude/agents/<role
 agents that check the work (architecture-reviewer, reviewer, tester, security-reviewer) get only the plan and the
 diff, never the implementer's reasoning, so they judge the code and not the intent.
 
+**Keep the orchestrating session small.** Its whole context is re-read on every turn, including
+every wake-up from a background task. Leave long test runs, waiting and browser checks
+(screenshots) to the roles and take back only their short reports. Once a PR step is handed over,
+continue in a fresh session; the plan and state live where the local overlay says, not in the chat.
+
 ## 0. Pick the tier
 
 The process scales with the change. The planner proposes the tier; the person can raise it,
