@@ -38,8 +38,5 @@ func (r *Routes) handleHealth(c *gin.Context) {
 		code = http.StatusServiceUnavailable
 	}
 
-	c.JSON(code, gin.H{
-		"status": status,
-		"checks": checks,
-	})
+	c.JSON(code, HealthResponse{Status: status, Checks: checks})
 }
