@@ -44,8 +44,10 @@ filesystem-canonical (`tree`, `revision`) and SQLite-derived (`links`, `tags`, `
 - **`internal/core/tree`** — the canonical in-memory page tree plus its on-disk representation
   (markdown files + frontmatter under `root/`). `tree_service.go` (`TreeService`, guarded by a
   single `sync.RWMutex`) is the one component allowed to mutate the tree: create/move/delete/copy
-  pages and sections. `node_store.go` reconstructs the tree from disk (walks `root/`, reads
-  `leafwiki_id` frontmatter). `schema.go` tracks an on-disk schema version (`CurrentSchemaVersion`,
+  pages and sections. `node_store.go` holds the `NodeStore` type, page reads and the path/metadata
+  helpers; `node_store_reconstruct.go` rebuilds the tree from disk (walks `root/`, reads
+  `leafwiki_id` frontmatter); `node_store_write.go` holds the file write paths.
+  `schema.go` tracks an on-disk schema version (`CurrentSchemaVersion`,
   currently 5) used to gate one-time migrations. `slug_service.go` handles slug generation/collision
   suggestions. `migration_adapter.go` bridges to `internal/core/treemigration` for legacy-format
   upgrades.
