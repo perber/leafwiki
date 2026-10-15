@@ -52,9 +52,10 @@ Contributor rules are in [docs/api/README.md](../../api/README.md).
 
 - **Handwritten OpenAPI file**: no coupling to the handlers, so it drifts silently; the
   route-coverage test could only check paths, never shapes.
-- **swag as a module dependency or `tool` directive**: puts the generator and its transitive
-  dependencies into every build, `go mod download` and the vulnerability scans for a tool the
-  binary does not use.
+- **swag as a module dependency or `tool` directive**: adds the generator and its transitive
+  dependencies to the module graph, `go mod download` and the vulnerability scans for a tool
+  the binary does not use. The compiled binary only contains packages it actually imports, so
+  this is about footprint and review surface, not binary contents.
 - **swag v2 / OpenAPI 3.x now**: would express `oneOf` and cookies better, but it is a
   larger migration than a skeleton warrants. Revisit when the documentation has grown enough
   for the limits of Swagger 2.0 to hurt.
