@@ -38,6 +38,7 @@ import MarkdownPreview from '../preview/MarkdownPreview'
 import { TocDropdownButton } from '../preview/TocDropdownButton'
 import { TocSidePanel } from '../preview/TocSidePanel'
 import { shouldShowToc } from '../preview/tocVisibility'
+import { shouldReserveTocPane } from '../preview/tocPaneReserve'
 import { useTocScrollSpy } from '../preview/useTocScrollSpy'
 import Breadcrumbs from './Breadcrumbs'
 import EmptySectionChildrenList from './EmptySectionChildrenList'
@@ -172,7 +173,10 @@ export default function PageViewer() {
 
   const alwaysShowToc = useConfigStore((s) => s.alwaysShowToc)
   const showToc = shouldShowToc(tocEntries.length, alwaysShowToc)
-  const showRightPane = showToc || attachments.length > 0
+  // Contentful TOC/downloads (dropdown + scroll-spy entries). Separate from
+  // reserving the desktop right pane — see shouldReserveTocPane (#1549).
+  const showTocContent = showToc || attachments.length > 0
+  const reserveTocPane = shouldReserveTocPane()
   // Single scroll spy for both the dropdown and the side panel.
   const tocActiveId = useTocScrollSpy(showToc ? tocEntries : [])
 
@@ -180,7 +184,7 @@ export default function PageViewer() {
   const tocCollapsed = useTocPanelStore((state) => state.collapsed)
 
   useEffect(() => {
-    if (!showRightPane) return
+    if (!reserveTocPane) return
 
     const tocToggleHotkey = createHotkeyDefinition(
       'viewer.toc.toggle',
@@ -189,7 +193,7 @@ export default function PageViewer() {
     registerHotkey(tocToggleHotkey)
 
     return () => unregisterHotkey(tocToggleHotkey.keyCombo)
-  }, [showRightPane, toggleTocCollapsed, registerHotkey, unregisterHotkey])
+  }, [reserveTocPane, toggleTocCollapsed, registerHotkey, unregisterHotkey])
 
   const editorName = displayUser(page?.metadata?.lastAuthor)
   const updatedRelative = formatRelativeTime(page?.metadata?.updatedAt)
@@ -203,7 +207,7 @@ export default function PageViewer() {
           <div
             className={cn(
               'page-viewer__subheader print:hidden',
-              showRightPane &&
+              reserveTocPane &&
                 (tocCollapsed
                   ? 'page-viewer__subheader--toc-reserved-collapsed'
                   : 'page-viewer__subheader--toc-reserved'),
@@ -236,7 +240,7 @@ export default function PageViewer() {
                   />
                 )}
               </div>
-              {showRightPane && (
+              {showTocContent && (
                 <div className="page-viewer__toc-button">
                   <TocDropdownButton
                     entries={showToc ? tocEntries : []}
@@ -253,7 +257,7 @@ export default function PageViewer() {
       : null
 
   const tocPane =
-    showRightPane && page && !error && tocPaneRoot
+    reserveTocPane && page && !error && tocPaneRoot
       ? createPortal(
           <TocSidePanel
             entries={showToc ? tocEntries : []}

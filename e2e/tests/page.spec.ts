@@ -1845,7 +1845,9 @@ Content.`;
     await viewPage.goto(`/${plainSlug}`);
     const subheader = page.locator('.page-viewer__subheader');
     await subheader.waitFor({ state: 'visible' });
-    await expect(subheader).not.toHaveClass(/toc-reserved/);
+    // Desktop always reserves the TOC column (#1549) so Safari does not
+    // desync breadcrumbs when the pane later gains entries.
+    await expect(subheader).toHaveClass(/toc-reserved/);
     await page.waitForTimeout(300);
 
     const windowMs = 2000;
