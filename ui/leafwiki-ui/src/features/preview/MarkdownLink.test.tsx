@@ -318,12 +318,15 @@ describe('MarkdownLink tree updates', () => {
       }))
     })
 
+    // Runs before Testing Library's cleanup, so the component is still mounted.
     afterEach(() => {
-      useConfigStore.setState({
-        publicAccess: config.publicAccess,
-        authDisabled: config.authDisabled,
+      act(() => {
+        useConfigStore.setState({
+          publicAccess: config.publicAccess,
+          authDisabled: config.authDisabled,
+        })
+        useSessionStore.setState({ user: session.user })
       })
-      useSessionStore.setState({ user: session.user })
     })
 
     it('shows broken text when the target disappears after render (read-only)', () => {
