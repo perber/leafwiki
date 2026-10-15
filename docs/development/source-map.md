@@ -301,7 +301,8 @@ light/dark mode application).
 - **`features/history`** — page revision history viewer + restore dialog
   (`PageHistoryContent.tsx`, `RestoreRevisionDialog.tsx`, `pageHistory.ts`).
 - **`features/imagepreview`** — click-to-zoom image preview dialog for content images.
-- **`features/importer`** — bulk-import UI (`Importer.tsx`) driving `internal/wiki/importer`'s
+- **`features/importer`** — bulk-import UI (`Importer.tsx`, view-state derivation in
+  `importerState.ts`) driving `internal/wiki/importer`'s
   plan create/execute flow.
 - **`features/links`** — backlink/outgoing-link status panel (`LinkInfo.tsx`,
   `linkStatusStore.ts`).
