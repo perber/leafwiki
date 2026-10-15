@@ -129,15 +129,9 @@ func TestAPIDocs_Metadata_DescribesExperimentalAPI(t *testing.T) {
 	if got := docString(doc, "basePath"); got != "/api" {
 		t.Errorf("basePath = %q, want /api", got)
 	}
-	if got := docString(doc, "host"); got != "" {
-		t.Errorf("host = %q, want absent", got)
-	}
-	if schemes, ok := doc["schemes"].([]any); ok && len(schemes) > 0 {
-		t.Errorf("schemes = %v, want absent", schemes)
-	}
-	if sec, ok := doc["security"].([]any); ok && len(sec) > 0 {
-		t.Errorf("root security = %v, want absent", sec)
-	}
+	assertAbsentOrEmpty(t, doc, "host", "")
+	assertAbsentOrEmpty(t, doc, "schemes", []any{})
+	assertAbsentOrEmpty(t, doc, "security", []any{})
 
 	bearer := docObject(t, doc, "securityDefinitions", "BearerAuth")
 	if docString(bearer, "type") != "apiKey" || docString(bearer, "in") != "header" || docString(bearer, "name") != "Authorization" {
@@ -187,8 +181,7 @@ func TestAPIDocs_Health_IsTheOnlyDocumentedOperation(t *testing.T) {
 	if !strings.HasSuffix(name, "HealthResponse") {
 		t.Errorf("200 references %q, want the HealthResponse model", name)
 	}
-	assertProperty(t, health, "status", "string")
-	assertProperty(t, health, "checks", "object")
+	assertProperties(t, health, map[string]string{"status": "string", "checks": "object"})
 	if add := docObject(t, docObject(t, health, "properties", "checks"), "additionalProperties"); docString(add, "type") != "string" {
 		t.Errorf("checks additionalProperties = %v, want string", add)
 	}
@@ -199,7 +192,7 @@ func TestAPIDocs_Health_IsTheOnlyDocumentedOperation(t *testing.T) {
 		if !strings.HasSuffix(name, "LegacyError") {
 			t.Errorf("%s references %q, want the LegacyError model", status, name)
 		}
-		assertProperty(t, legacy, "error", "string")
+		assertProperties(t, legacy, map[string]string{"error": "string"})
 	}
 
 	// 503 -> intentionally broad object that names both real shapes.
@@ -218,13 +211,34 @@ func TestAPIDocs_Health_IsTheOnlyDocumentedOperation(t *testing.T) {
 	}
 }
 
-func assertProperty(t *testing.T, model map[string]any, name, wantType string) {
+// assertProperties requires the model to have exactly the wanted properties
+// (name -> type): an extra field is a wire-format change that the annotation
+// must not hide.
+func assertProperties(t *testing.T, model map[string]any, want map[string]string) {
 	t.Helper()
-	prop := docObject(t, model, "properties", name)
-	if got := docString(prop, "type"); got != wantType {
-		t.Errorf("property %q type = %q, want %q", name, got, wantType)
+	props := docObject(t, model, "properties")
+	for name := range props {
+		if _, ok := want[name]; !ok {
+			t.Errorf("unexpected property %q", name)
+		}
+	}
+	for name, wantType := range want {
+		prop := docObject(t, props, name)
+		if got := docString(prop, "type"); got != wantType {
+			t.Errorf("property %q type = %q, want %q", name, got, wantType)
+		}
 	}
 }
+
+// assertAbsentOrEmpty accepts a missing key or the supported empty value and
+// rejects anything else, including a value of an unexpected type.
+func assertAbsentOrEmpty(t *testing.T, doc map[string]any, key string, empty any) {
+	t.Helper()
+	if raw, present := doc[key]; present && !reflect.DeepEqual(raw, empty) {
+		t.Errorf("%s = %#v, want absent or empty", key, raw)
+	}
+}
+
 func TestAPIDocs_Output_HasNoGeneratedGo(t *testing.T) {
 	matches, err := filepath.Glob(filepath.Join(apiDocsDir(t), "*.go"))
 	if err != nil {
