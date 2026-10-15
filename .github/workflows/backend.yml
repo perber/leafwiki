@@ -54,6 +54,35 @@ jobs:
           GOARCH: '386'
         run: go test ./...
 
+  # The experimental API specification is generated and committed. Regenerate
+  # on the host platform and fail if the committed files are stale. The
+  # generator runs only here, never inside the go test jobs.
+  api-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.x'
+
+      - name: Generate API documentation
+        run: make api-docs
+
+      - name: Verify committed API documentation is up to date
+        run: git diff --exit-code -- docs/api
+
+      - name: Upload API documentation as artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: api-docs
+          path: |
+            docs/api/swagger.json
+            docs/api/swagger.yaml
+          if-no-files-found: error
+
   test-go:
     runs-on: ubuntu-latest
     steps:

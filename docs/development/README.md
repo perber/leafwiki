@@ -8,6 +8,8 @@ are in [CONTRIBUTING.md](../../CONTRIBUTING.md); agent instructions in [AGENTS.m
   state), auth model, Markdown rendering pipeline.
 - [Processes](./processes.md): core workflows end to end: page save, revisioning, wikilink
   resolution, resync, editor auto-save, tree rename/move, auth.
+- [API documentation](../api/README.md): the experimental generated Swagger 2.0 spec, how to
+  regenerate it and how to document a package.
 - [Architecture decision records](./adr/README.md): why things are the way they are, when to
   write a new ADR, and the template.
 
