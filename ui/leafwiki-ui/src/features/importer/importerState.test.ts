@@ -8,6 +8,7 @@ import {
   getNextActionKey,
   getStatusLabelKey,
   getStatusPillClass,
+  type ResultFilter,
 } from './importerState'
 
 function plan(overrides: Partial<ImportPlan> = {}): ImportPlan {
@@ -191,5 +192,104 @@ describe('importer view state', () => {
     expect(paths(filterResultItems(result.items, 'skipped', 'a.md'))).toEqual(
       [],
     )
+  })
+})
+
+describe('importer view state edge cases', () => {
+  // Statuses outside the typed union can still arrive from an older/newer server.
+  const unknown = plan({
+    execution_status: 'queued' as unknown as ImportPlan['execution_status'],
+  })
+
+  it('falls back for an unknown execution status', () => {
+    expect(getImportStep(unknown, null)).toBe(2)
+    expect(getStatusLabelKey(unknown.execution_status)).toBe('status.idle')
+    expect(getStatusPillClass(unknown.execution_status)).toBe(
+      'settings__pill settings__pill-success',
+    )
+    expect(getNextActionKey(unknown)).toBe('nextAction.selectZipToBegin')
+    expect(getClearButtonLabelKey(unknown)).toBe('run.clearImportPlan')
+    for (const [file, locale] of Object.entries(importerLocales)) {
+      expect(
+        typeof lookup(locale, 'nextAction.selectZipToBegin'),
+        `${file}: nextAction.selectZipToBegin`,
+      ).toBe('string')
+    }
+  })
+
+  it('ignores cancel_requested unless the import is running', () => {
+    for (const status of [
+      'planned',
+      'completed',
+      'failed',
+      'canceled',
+    ] as const) {
+      const p = plan({ execution_status: status, cancel_requested: true })
+      expect(getClearButtonLabelKey(p)).toBe('run.clearImportPlan')
+      expect(getNextActionKey(p)).not.toBe('nextAction.cancellationRequested')
+    }
+    expect(
+      getImportStep(
+        plan({ execution_status: 'running', cancel_requested: true }),
+        null,
+      ),
+    ).toBe(3)
+  })
+
+  it.each([
+    [0, 5, '0/5', 0],
+    [2, 3, '2/3', 67],
+    [1, 200, '1/200', 1],
+    [1, 201, '1/201', 0],
+    [5, 5, '5/5', 100],
+    [5, 4, '5/4', 125],
+  ])('progress %i/%i -> %s, %i%%', (processed, total, label, percent) => {
+    expect(
+      getImportProgress(
+        plan({ processed_items: processed, total_items: total }),
+      ),
+    ).toEqual({ label, percent })
+  })
+
+  const items: ImportResult['items'] = [
+    {
+      source_path: 'Ärger/Über.md',
+      target_path: '/aerger/ueber',
+      action: 'created',
+    },
+    {
+      source_path: 'win\\dir\\a.b.md',
+      target_path: '/win/dir/a-b',
+      action: 'updated',
+    },
+    {
+      source_path: 'c.md',
+      target_path: '/c',
+      action: 'created',
+      error: 'write failed',
+    },
+    { source_path: 'd.md', target_path: '/d', action: 'conflicted' },
+  ]
+  const paths = (list: ImportResult['items']) => list.map((i) => i.source_path)
+
+  it.each<[ResultFilter, string, string[]]>([
+    ['all', '   ', ['Ärger/Über.md', 'win\\dir\\a.b.md', 'c.md', 'd.md']],
+    ['all', 'ärger/ÜBER', ['Ärger/Über.md']],
+    ['all', 'dir\\A.B', ['win\\dir\\a.b.md']],
+    ['all', '.*', []],
+    ['all', 'conflicted', ['d.md']],
+    ['all', 'x'.repeat(10_000), []],
+    ['failed', '', ['c.md']],
+    ['created', '', ['Ärger/Über.md', 'c.md']],
+    ['skipped', '', []],
+  ])('filter %s with search %j', (filter, search, expected) => {
+    expect(paths(filterResultItems(items, filter, search))).toEqual(expected)
+  })
+
+  it('does not mutate the input and handles an empty list', () => {
+    const copy = structuredClone(items)
+    filterResultItems(items, 'failed', 'c')
+    expect(items).toEqual(copy)
+    expect(filterResultItems([], 'all', 'a')).toEqual([])
   })
 })
