@@ -7,14 +7,15 @@ type ErrorResponse struct {
 	Error ErrorDetail `json:"error"`
 }
 
-// ErrorDetail describes one localizable error. The client translates by Code
-// and falls back to Template, substituting Args.
+// ErrorDetail describes one localizable error. Code is machine-readable;
+// Template is the localization key the client translates, substituting Args.
 type ErrorDetail struct {
 	// Code is the stable machine-readable error code, e.g. "page_not_found".
 	Code string `json:"code"`
 	// Message is the English human-readable message.
 	Message string `json:"message"`
-	// Template is the message template used for client-side localization.
+	// Template is the localization key the client translates; it doubles as
+	// the fallback message when no translation exists.
 	Template string `json:"template"`
 	// Args are the values substituted into Template; omitted when empty.
 	Args []string `json:"args,omitempty"`
