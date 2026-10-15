@@ -299,7 +299,9 @@ light/dark mode application).
 - **`features/favorites`** — per-user favorite star toggle and sidebar list
   (`FavoriteToggleButton.tsx`, `FavoritesSection.tsx`, `FavoriteItem.tsx`).
 - **`features/history`** — page revision history viewer + restore dialog
-  (`PageHistoryContent.tsx`, `RestoreRevisionDialog.tsx`, `pageHistory.ts`).
+  (`PageHistoryContent.tsx`, `RevisionDetailPanels.tsx` for the changes/diff, preview,
+  raw-text and assets panels, `lineDiff.ts` for the line diff, `RestoreRevisionDialog.tsx`,
+  `pageHistory.ts`).
 - **`features/imagepreview`** — click-to-zoom image preview dialog for content images.
 - **`features/importer`** — bulk-import UI (`Importer.tsx`) driving `internal/wiki/importer`'s
   plan create/execute flow.
