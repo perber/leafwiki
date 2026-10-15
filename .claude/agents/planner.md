@@ -23,7 +23,8 @@ Produce a plan with exactly these sections (one screen; detail belongs in the PR
    `main` working. Multi-PR features: name the default-off feature flag. README changes are a
    separate PR at release time.
 5. **Tests** — which tests are written first (for a bug: the failing regression test), unit /
-   integration / e2e, and the manual browser checks for UI changes.
+   integration / e2e, and the manual browser checks for UI changes — only for what e2e,
+   component or unit tests can't cover (visual look, real-browser specifics), with a reason.
 6. **Risks** — data/format compatibility, API compatibility (API keys make the API external),
    performance on a Raspberry Pi, cross-platform (Windows paths, case-insensitive filesystems,
    OS-specific files), logging decisions (ADR-0008).

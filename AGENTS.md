@@ -43,8 +43,10 @@ A fresh worktree has no `node_modules`: run `npm ci --ignore-scripts` in `ui/lea
    impact. Architecture decisions get an ADR.
 3. **Tests first.** New behaviour needs a test; a bug gets a failing regression test before the
    fix. Leave the tests you touch better (separate `test: tidy …` commit, no lost case).
-4. **UI changes are tested by a person.** End UI work with a manual test checklist; it is not
-   done until someone has clicked through it.
+4. **Automate UI tests; a manual click test is required only where automation can't reach.**
+   Behaviour gets e2e, component or unit tests. A manual checklist covers only the rest (visual
+   look, light/dark, mobile width, real-browser specifics); UI work with such items is not done
+   until someone has run them. Clicking through by hand on top is always welcome.
 5. **Stay in scope.** Notice a bug elsewhere → report it, don't fix it silently. Keep
    `docs/`, `README.md` and `.env.example` in sync with what you change.
 6. **Comments explain why** and reference only GitHub issues or ADRs — never private notes,
