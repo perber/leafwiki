@@ -100,14 +100,14 @@ Standard failures, and where they apply:
 
 | Status | Emitted by | Shape | Applies to |
 |---|---|---|---|
-| 401 | `InjectAPIKeyUser`: invalid, revoked or expired key | flat | every route, only when key management is enabled and a key-shaped Bearer token is sent |
+| 401 | `InjectAPIKeyUser`: invalid, revoked or expired key | flat | every route, only when key management is enabled and a key-shaped Bearer token reaches key resolution (no `Authorization` header, a non-key Bearer value, or an identity already resolved upstream, such as by reverse-proxy auth, bypasses it) |
 | 401 | `RequireAuth`: missing or invalid access token | flat | routes behind the auth groups |
 | 401 | reverse-proxy auth: unknown user | flat | every route, only when reverse-proxy auth is enabled |
-| 403 | `CSRFMiddleware`: missing or mismatching token | flat | non-GET routes behind the CSRF middleware (not login/refresh) |
+| 403 | `CSRFMiddleware`: missing or mismatching token | flat | methods other than GET, HEAD and OPTIONS on routes behind the CSRF middleware (not login/refresh); skipped for requests authenticated by a resolved API key |
 | 403 | `RequireCookieSession`, `RequireAdmin`, `RequireEditorOrAdmin`, `RequireSelf` | flat | only routes carrying that guard |
-| 429 | `InjectAPIKeyUser`: too many failed key attempts | flat | every route, only when key management is enabled |
-| 503 | `InjectAPIKeyUser`: key store suspended during a live restore | flat | every route, only when key management is enabled |
-| 503 | write gate while a live restore runs | localized | non-GET routes, except the restore endpoints and login, logout and refresh-token; not GET routes such as health |
+| 429 | `InjectAPIKeyUser`: too many failed key attempts | flat | every route, only when key management is enabled and a key-shaped Bearer token reaches the rate limiter (same bypasses as the 401 row) |
+| 503 | `InjectAPIKeyUser`: key store suspended during a live restore | flat | every route, only when key management is enabled and a key-shaped Bearer token reaches key resolution (same bypasses as the 401 row) |
+| 503 | write gate while a live restore runs | localized | methods other than GET, HEAD and OPTIONS, except the restore endpoints and login (including TOTP login), logout and refresh-token; never GET routes such as health |
 
 Health does not require authentication, so it documents 401 and 429 only as consequences of
 invalid or throttled *supplied* credentials, and no 403.
