@@ -13,9 +13,11 @@ import {
   resolveWikiLinkPath,
   toWikiLookupPath,
 } from '@/lib/wikiPath'
+import { isContentFileRoutePath } from './useContentFileResolver'
 import { suggestSlug } from '@/lib/api/pages'
 import { useAppMode } from '@/lib/useAppMode'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
+import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { AnchorHTMLAttributes, ReactNode } from 'react'
@@ -60,6 +62,7 @@ export function MarkdownLink({
 }: MarkdownLinkProps) {
   void node
   const { t } = useTranslation('viewer')
+  const relativeLinkMode = useConfigStore((s) => s.relativeLinkMode)
   const openDialog = useDialogsStore((s) => s.openDialog)
   const getPageByPath = useTreeStore((s) => s.getPageByPath)
   const getPageById = useTreeStore((s) => s.getPageById)
@@ -197,12 +200,40 @@ export function MarkdownLink({
       // Already absolute (e.g. "/stoff/change")
       normalizedHref = normalizeWikiRoutePath(href)
     } else {
-      // Relative link (e.g. "../stoff/change", "child-page", "./foo")
-      normalizedHref = resolveWikiLinkPath(getCurrentWikiPath(), href)
+      // Relative link (e.g. "../stoff/change", "child-page", "./foo").
+      // In filesystem mode a section (index) page's directory is the
+      // section itself — like wiki/foo/index.md lives in wiki/foo/.
+      const currentWikiPath = getCurrentWikiPath()
+      const currentIsSection =
+        getPageByPath(toWikiLookupPath(currentWikiPath))?.kind === 'section'
+      normalizedHref = resolveWikiLinkPath(
+        currentWikiPath,
+        href,
+        relativeLinkMode,
+        currentIsSection,
+      )
+    }
+
+    // A link that resolves to a media file (e.g. [deck](files/deck.pdf),
+    // [shot](img/run.png)) addresses content served by the /files route,
+    // not a wiki page — never offer page creation for it.
+    if (isContentFileRoutePath(normalizedHref)) {
+      const fileHref = withBasePath(`/files${normalizedHref}`)
+      return (
+        <a
+          href={fileHref}
+          {...props}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-brand hover:text-brand-dark no-underline hover:underline"
+        >
+          {children}
+        </a>
+      )
     }
 
     /**
-     *  When a page link is internal and not an asset link and the page doesn't exist yet,
+      *  When a page link is internal and not an asset link and the page doesn't exist yet,
      * we will color the link in red and offer to create the page. Via the CreatePageByPathDialog.
      * we should handle and calculate relative paths here as well.
      * normalizedHref contains now the absolute path. We can use it directly.

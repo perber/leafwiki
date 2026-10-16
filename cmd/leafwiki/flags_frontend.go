@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
+	"github.com/perber/wiki/internal/links"
 	"github.com/urfave/cli/v3"
 )
 
@@ -12,6 +14,7 @@ type frontendOptions struct {
 	injectCodeInHeader      string
 	customStylesheet        string
 	hideLinkMetadataSection bool
+	relativeLinkMode        string
 	maxAssetUploadSize      string
 	enableRevision          bool
 	enableLinkRefactor      bool
@@ -55,6 +58,16 @@ func (o *frontendOptions) Flags() []cli.Flag {
 			Category:    catFrontend,
 			Usage:       "hide the link metadata section in the frontend UI",
 			Sources:     envBoolVars("LEAFWIKI_HIDE_LINK_METADATA_SECTION"),
+		},
+		&cli.StringFlag{
+			Name:        "relative-link-mode",
+			Destination: &o.relativeLinkMode,
+			Category:    catFrontend,
+			Usage:       "how relative Markdown links resolve: page-folder (the current page's path acts as the folder, default) or filesystem (relative to the page's parent directory, like files on disk — for wikis authored outside LeafWiki)",
+			Value:       "page-folder",
+			Sources:     envVars("LEAFWIKI_RELATIVE_LINK_MODE"),
+			Validator:   validateRelativeLinkMode,
+			Config:      trimmed,
 		},
 		&cli.StringFlag{
 			Name:             "max-asset-upload-size",
@@ -106,4 +119,12 @@ func (o *frontendOptions) Flags() []cli.Flag {
 			DefaultText: "5m",
 		},
 	}
+}
+
+func validateRelativeLinkMode(v string) error {
+	switch links.RelativeLinkMode(v) {
+	case links.LinkModePageFolder, links.LinkModeFilesystem:
+		return nil
+	}
+	return fmt.Errorf(`must be "page-folder" or "filesystem"`)
 }

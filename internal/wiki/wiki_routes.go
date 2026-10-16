@@ -11,6 +11,7 @@ import (
 	wikiavatar "github.com/perber/wiki/internal/wiki/avatar"
 	wikibackup "github.com/perber/wiki/internal/wiki/backup"
 	wikibranding "github.com/perber/wiki/internal/wiki/branding"
+	wikicontentfiles "github.com/perber/wiki/internal/wiki/contentfiles"
 	wikihealth "github.com/perber/wiki/internal/wiki/health"
 	wikiimporter "github.com/perber/wiki/internal/wiki/importer"
 	wikiinstancesettings "github.com/perber/wiki/internal/wiki/instancesettings"
@@ -31,6 +32,7 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 	w.pagesRoutes = w.buildPagesRoutes()
 	w.authRoutes = w.buildAuthRoutes()
 	w.assetsRoutes = w.buildAssetsRoutes()
+	w.contentFilesRoutes = w.buildContentFilesRoutes()
 	w.revisionsRoutes = w.buildRevisionsRoutes()
 	w.searchRoutes = w.buildSearchRoutes()
 	w.linksRoutes = w.buildLinksRoutes()
@@ -125,6 +127,14 @@ func (w *Wiki) buildAssetsRoutes() *wikiassets.Routes {
 		Delete:      wikiassets.NewDeleteAssetUseCase(w.tree, w.asset, w.revision, w.log),
 		AuthService: w.auth,
 		AssetsDir:   w.asset.GetAssetsDir(),
+		Log:         w.log,
+	})
+}
+
+func (w *Wiki) buildContentFilesRoutes() *wikicontentfiles.Routes {
+	return wikicontentfiles.NewRoutes(wikicontentfiles.RoutesConfig{
+		AuthService: w.auth,
+		RootDir:     filepath.Join(w.storageDir, "root"),
 		Log:         w.log,
 	})
 }
@@ -242,6 +252,7 @@ func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
 		w.authRoutes,
 		w.pagesRoutes,
 		w.assetsRoutes,
+		w.contentFilesRoutes,
 		w.revisionsRoutes,
 		w.searchRoutes,
 		w.linksRoutes,

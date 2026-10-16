@@ -25,6 +25,7 @@ type ConfigStore = {
   enableRevision: boolean
   enableLinkRefactor: boolean
   enableApiKeyManagement: boolean
+  relativeLinkMode: 'page-folder' | 'filesystem'
   gitBackupEnabled: boolean
   gitBackupEnvManaged: boolean
   gitBackupConfigured: boolean
@@ -80,6 +81,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
   enableRevision: false,
   enableLinkRefactor: false,
   enableApiKeyManagement: false,
+  relativeLinkMode: 'page-folder',
   gitBackupEnabled: false,
   gitBackupEnvManaged: false,
   gitBackupConfigured: false,
@@ -131,6 +133,10 @@ export const useConfigStore = create<ConfigStore>((set) => ({
           enableRevision: config.enableRevision ?? false,
           enableLinkRefactor: config.enableLinkRefactor ?? false,
           enableApiKeyManagement: config.enableApiKeyManagement ?? false,
+          relativeLinkMode:
+            config.relativeLinkMode === 'filesystem'
+              ? 'filesystem'
+              : 'page-folder',
           gitBackupEnabled: config.gitBackupEnabled ?? false,
           gitBackupEnvManaged: config.gitBackupEnvManaged ?? false,
           gitBackupConfigured: config.gitBackupConfigured ?? false,

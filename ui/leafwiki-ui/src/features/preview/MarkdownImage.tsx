@@ -2,9 +2,12 @@ import { versionAssetSrc } from '@/lib/assetSrc'
 import { DIALOG_IMAGE_PREVIEW } from '@/lib/registries'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useMemo } from 'react'
+import { useContentFileResolver } from './useContentFileResolver'
 
 type MarkdownImageProps = React.ImgHTMLAttributes<HTMLImageElement> & {
   resolveAssetUrl?: (src: string) => string
+  /** Wiki route path of the page being rendered (content-file resolution). */
+  path?: string
 }
 
 function shouldOpenPreview(e: React.MouseEvent<HTMLImageElement>) {
@@ -23,12 +26,15 @@ export function MarkdownImage({
   alt,
   width,
   resolveAssetUrl,
+  path,
   ...rest
 }: MarkdownImageProps) {
   const openDialog = useDialogsStore((s) => s.openDialog)
+  const resolveContentSrc = useContentFileResolver()
+  const assetSrc = resolveAssetUrl?.(src) ?? src
   const resolvedSrc = useMemo(
-    () => resolveAssetUrl?.(src) ?? src,
-    [resolveAssetUrl, src],
+    () => resolveContentSrc(assetSrc, path),
+    [resolveContentSrc, assetSrc, path],
   )
   const versionedSrc = useMemo(
     () => versionAssetSrc(resolvedSrc),

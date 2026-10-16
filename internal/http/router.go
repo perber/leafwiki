@@ -114,6 +114,7 @@ type RouterOptions struct {
 	EnableRevision          bool                     // Whether the revision / page history feature is enabled
 	EnableLinkRefactor      bool                     // Whether the link refactoring feature is enabled in the frontend
 	EnableAPIKeyManagement  bool                     // Whether the experimental API key management feature is enabled
+	RelativeLinkMode        string                   // How relative Markdown links resolve: "page-folder" (default) or "filesystem"; surfaced to the frontend via /api/config and applied to the links engine at startup
 	Metrics                 *httpmetrics.HTTPMetrics // Optional Prometheus HTTP metrics collector; nil disables request instrumentation
 	GitBackupEnabled        bool                     // Whether git backup is currently running (surfaced to admin UI via /api/config)
 	GitBackupEnvManaged     bool                     // Whether git backup is configured via flags/env (settings UI is status-only); surfaced via /api/config

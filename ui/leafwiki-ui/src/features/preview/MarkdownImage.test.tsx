@@ -1,12 +1,35 @@
+import type { PageNode } from '@/lib/api/pages'
 import { DIALOG_IMAGE_PREVIEW } from '@/lib/registries'
+import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
+import { useTreeStore } from '@/stores/tree'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { MarkdownImage } from './MarkdownImage'
+
+function makeSection(path: string): PageNode {
+  return {
+    id: `section-${path}`,
+    title: path,
+    slug: path,
+    path,
+    version: 'v1',
+    children: null,
+    kind: 'section',
+    parentId: null,
+  }
+}
 
 describe('MarkdownImage', () => {
   beforeEach(() => {
     useDialogsStore.setState({ dialogType: null, dialogProps: null })
+    useTreeStore.setState({ byId: {}, byPath: {} })
+    window.history.pushState({}, '', '/')
+  })
+
+  afterEach(() => {
+    useConfigStore.setState({ relativeLinkMode: 'page-folder' })
+    useTreeStore.setState({ byId: {}, byPath: {} })
   })
 
   it('appends a ?v= cache-busting param to an /assets/ src', () => {
@@ -15,6 +38,30 @@ describe('MarkdownImage', () => {
     const src = screen.getByAltText('foo').getAttribute('src') ?? ''
     expect(src).toContain('/assets/foo.png')
     expect(src).toMatch(/\?v=\d+$/)
+  })
+
+  it('rewrites a relative src to the /files route in filesystem mode', () => {
+    useConfigStore.setState({ relativeLinkMode: 'filesystem' })
+    window.history.pushState({}, '', '/e/docs/guide')
+
+    render(<MarkdownImage src="img/run2-06-reset-1-signin.png" alt="shot" />)
+
+    const src = screen.getByAltText('shot').getAttribute('src') ?? ''
+    expect(src).toBe('/files/docs/img/run2-06-reset-1-signin.png')
+  })
+
+  it('resolves a relative src against the section itself for index pages', () => {
+    useConfigStore.setState({ relativeLinkMode: 'filesystem' })
+    window.history.pushState({}, '', '/e/docs')
+    useTreeStore.setState({
+      byId: { 'section-docs': makeSection('docs') },
+      byPath: { docs: makeSection('docs') },
+    })
+
+    render(<MarkdownImage src="img/shot.png" path="/docs" alt="shot" />)
+
+    const src = screen.getByAltText('shot').getAttribute('src') ?? ''
+    expect(src).toBe('/files/docs/img/shot.png')
   })
 
   it('opens the image preview dialog when not wrapped in a link', () => {

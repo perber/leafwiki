@@ -56,20 +56,85 @@ export function getWikiTargetRoutePath(pathname: string): string {
 }
 
 /**
+ * How relative Markdown links resolve against the current page's path.
+ * Mirrors RelativeLinkMode in internal/links/helpers.go; both sides are fed
+ * from the same flag via GET /api/config.
+ *
+ * - `page-folder` (default): the current page's path acts as a folder —
+ *   `setup` on `/docs/guide` resolves to `/docs/guide/setup`.
+ * - `filesystem`: relative to the page's parent directory, like files on
+ *   disk — `setup` on `/docs/guide` resolves to `/docs/setup`. Fits wikis
+ *   authored outside LeafWiki with filesystem-relative links.
+ */
+export type RelativeLinkMode = 'page-folder' | 'filesystem'
+
+/**
  * Resolves a relative Markdown link against the current wiki page path.
  *
  * The result is always an absolute wiki route/path without query or hash.
  */
-export function resolveWikiLinkPath(currentPath: string, href: string): string {
+export function resolveWikiLinkPath(
+  currentPath: string,
+  href: string,
+  mode: RelativeLinkMode = 'page-folder',
+  currentIsSection = false,
+): string {
   const normalizedCurrentPath = normalizeWikiRoutePath(currentPath)
-  const folderBase = normalizedCurrentPath.endsWith('/')
-    ? normalizedCurrentPath
-    : `${normalizedCurrentPath}/`
+  const baseDir =
+    mode === 'filesystem' && !currentIsSection
+      ? getParentWikiRoutePath(normalizedCurrentPath)
+      : normalizedCurrentPath
+  const folderBase = baseDir.endsWith('/') ? baseDir : `${baseDir}/`
 
   const base = new URL(folderBase, 'https://leafwiki.local')
   const url = new URL(href, base)
 
+  return canonicalWikiPageRoute(normalizeWikiRoutePath(url.pathname))
+}
+
+/**
+ * Resolves a relative Markdown media reference (image/video/audio/PDF src,
+ * e.g. `img/shot.png`) against the current page path — like
+ * resolveWikiLinkPath, but WITHOUT page canonicalization: the target is a
+ * plain file, so every path segment is literal and the extension must
+ * survive. The result is served by the backend /files route.
+ */
+export function resolveContentFilePath(
+  currentPath: string,
+  src: string,
+  mode: RelativeLinkMode = 'page-folder',
+  currentIsSection = false,
+): string {
+  const normalizedCurrentPath = normalizeWikiRoutePath(currentPath)
+  const baseDir =
+    mode === 'filesystem' && !currentIsSection
+      ? getParentWikiRoutePath(normalizedCurrentPath)
+      : normalizedCurrentPath
+  const folderBase = baseDir.endsWith('/') ? baseDir : `${baseDir}/`
+
+  const base = new URL(folderBase, 'https://leafwiki.local')
+  const url = new URL(src, base)
+
   return normalizeWikiRoutePath(url.pathname)
+}
+
+/**
+ * Maps a resolved link path to the canonical route of the page it
+ * addresses: a trailing ".md" is ignored for lookup, and a trailing
+ * "index" segment addresses the section landing page itself — a folder's
+ * index.md IS the folder's page, so no page ever lives at ".../index".
+ * Mirrors canonicalPagePath in internal/links/helpers.go.
+ */
+export function canonicalWikiPageRoute(path: string): string {
+  const withoutMd = path.endsWith('.md') ? path.slice(0, -'.md'.length) : path
+  const normalized = normalizeWikiRoutePath(withoutMd)
+  if (normalized === '/index') {
+    return '/'
+  }
+  if (normalized.endsWith('/index')) {
+    return normalizeWikiRoutePath(normalized.slice(0, -'/index'.length))
+  }
+  return normalized
 }
 
 /**

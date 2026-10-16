@@ -47,6 +47,7 @@ import MarkdownCodeBlock from './MarkdownCodeBlock'
 import MarkdownInlineCode from './MarkdownInlineCode'
 import { MarkdownImage } from './MarkdownImage'
 import { MarkdownLink } from './MarkdownLink'
+import { useContentFileResolver } from './useContentFileResolver'
 import { MarkdownPdfEmbed } from './MarkdownPdfEmbed'
 import './markdownPreviewCodeTheme.css'
 import MermaidBlock from './MermaidBlock'
@@ -281,6 +282,7 @@ export default function MarkdownPreview({
 }: Props) {
   const treeById = useTreeStore((s) => s.byId)
   const designMode = useDesignModeStore((state) => state.mode)
+  const resolveContentSrc = useContentFileResolver()
   const prefersLight = useSyncExternalStore(
     (onStoreChange) => {
       if (typeof window === 'undefined' || designMode !== 'system') {
@@ -335,10 +337,16 @@ export default function MarkdownPreview({
         void node
         if (isPdfSrc(props.src)) {
           return (
-            <MarkdownPdfEmbed {...props} resolveAssetUrl={resolveAssetUrl} />
+            <MarkdownPdfEmbed
+              {...props}
+              resolveAssetUrl={resolveAssetUrl}
+              path={path}
+            />
           )
         }
-        return <MarkdownImage {...props} resolveAssetUrl={resolveAssetUrl} />
+        return (
+          <MarkdownImage {...props} resolveAssetUrl={resolveAssetUrl} path={path} />
+        )
       },
       audio: ({
         node,
@@ -346,10 +354,11 @@ export default function MarkdownPreview({
       }: MarkdownNodeProp & AudioHTMLAttributes<HTMLAudioElement>) => {
         void node
         const resolvedSrc = resolveAssetUrl?.(props.src ?? '') ?? props.src
+        const contentSrc = resolveContentSrc(resolvedSrc ?? '', path)
         return (
           <audio
             {...props}
-            src={resolvedSrc ? normalizeAssetSrc(resolvedSrc) : resolvedSrc}
+            src={contentSrc ? normalizeAssetSrc(contentSrc) : contentSrc}
           />
         )
       },
@@ -359,10 +368,11 @@ export default function MarkdownPreview({
       }: MarkdownNodeProp & VideoHTMLAttributes<HTMLVideoElement>) => {
         void node
         const resolvedSrc = resolveAssetUrl?.(props.src ?? '') ?? props.src
+        const contentSrc = resolveContentSrc(resolvedSrc ?? '', path)
         return (
           <video
             {...props}
-            src={resolvedSrc ? normalizeAssetSrc(resolvedSrc) : resolvedSrc}
+            src={contentSrc ? normalizeAssetSrc(contentSrc) : contentSrc}
           />
         )
       },
@@ -598,7 +608,7 @@ export default function MarkdownPreview({
         )
       },
     }),
-    [enableHeadlineLinks, markdownLink, resolveAssetUrl, resolvedMode],
+    [enableHeadlineLinks, markdownLink, resolveAssetUrl, resolveContentSrc, resolvedMode],
   )
 
   const wikiTitleIndex = useMemo(

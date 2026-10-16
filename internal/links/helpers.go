@@ -214,6 +214,42 @@ func collectTargetsFromContent(treeService *tree.TreeService, pagePath string, c
 	return append(mdTargets, wikiResolved...)
 }
 
+// RelativeLinkMode selects how relative Markdown link targets resolve
+// against the current page's path. The UI mirrors this selection in
+// ui/leafwiki-ui/src/lib/wikiPath.ts (resolveWikiLinkPath); both sides are
+// fed from the same flag via GET /api/config.
+type RelativeLinkMode string
+
+const (
+	// LinkModePageFolder treats the current page's path as a folder:
+	// [x](a) on /docs/guide resolves to /docs/guide/a. Default.
+	LinkModePageFolder RelativeLinkMode = "page-folder"
+	// LinkModeFilesystem resolves relative targets against the page's
+	// parent directory, like files on disk: [x](a) on /docs/guide
+	// resolves to /docs/a. Fits wikis authored outside LeafWiki with
+	// filesystem-relative links (editors, Git pipelines, generators).
+	LinkModeFilesystem RelativeLinkMode = "filesystem"
+)
+
+// relativeLinkMode is set once at startup via SetRelativeLinkMode (before
+// any goroutine resolves links) and read-only afterwards.
+var relativeLinkMode = LinkModePageFolder
+
+// SetRelativeLinkMode sets the process-wide relative link resolution mode.
+// Unknown or empty values fall back to LinkModePageFolder.
+func SetRelativeLinkMode(mode RelativeLinkMode) {
+	if mode == LinkModeFilesystem {
+		relativeLinkMode = LinkModeFilesystem
+		return
+	}
+	relativeLinkMode = LinkModePageFolder
+}
+
+// activeRelativeLinkMode reports the currently active mode (for tests).
+func activeRelativeLinkMode() RelativeLinkMode {
+	return relativeLinkMode
+}
+
 // normalizeWikiPath normalizes a wiki path:
 // - removes query/hash (if any)
 // - ensures leading "/"
@@ -248,12 +284,32 @@ func normalizeWikiPath(p string) string {
 	return p
 }
 
-// resolveURLPath resolves href against currentPath using "page is folder" semantics.
+// resolveURLPath resolves href against currentPath. Tree-less variant used
+// by the refactor engine, which rewrites stored destinations on page
+// moves/renames and has no tree access: in filesystem mode it always
+// strips to the parent directory and is NOT section-aware (a section's
+// index.md would resolve against the section itself — see linkBaseDir).
+//
+// The base directory depends on the configured RelativeLinkMode:
+//   - page-folder (default): the current page's path is treated as a folder
+//     ("page is folder" semantics — [x](a) on /docs/guide -> /docs/guide/a)
+//   - filesystem: the page's parent directory, like files on disk
+//     ([x](a) on /docs/guide -> /docs/a)
 func resolveURLPath(currentPath, href string) (string, error) {
 	currentPath = normalizeWikiPath(currentPath)
 
-	// treat currentPath as folder by forcing trailing slash
-	folderBase := currentPath
+	baseDir := currentPath
+	if relativeLinkMode == LinkModeFilesystem {
+		baseDir = parentWikiPath(currentPath)
+	}
+
+	return resolveURLPathFromBase(baseDir, href)
+}
+
+// resolveURLPathFromBase resolves href against the given base directory.
+func resolveURLPathFromBase(baseDir, href string) (string, error) {
+	// force trailing slash so the base acts as a folder
+	folderBase := baseDir
 	if !strings.HasSuffix(folderBase, "/") {
 		folderBase += "/"
 	}
@@ -274,6 +330,50 @@ func resolveURLPath(currentPath, href string) (string, error) {
 	return normalizeWikiPath(resolved.Path), nil
 }
 
+// linkBaseDir returns the directory that relative links on the page at
+// currentPath resolve against.
+//
+//   - page-folder mode: the page's own path (the page "is" a folder).
+//   - filesystem mode: the page's parent directory — EXCEPT for section
+//     (index) pages: wiki/foo/index.md lives IN wiki/foo/, so the section's
+//     own path is its directory. Section-ness is decided via the tree; when
+//     the page cannot be resolved, fall back to parent-directory semantics.
+func linkBaseDir(treeSvc *tree.TreeService, currentPath string) string {
+	currentPath = normalizeWikiPath(currentPath)
+	if relativeLinkMode != LinkModeFilesystem {
+		return currentPath
+	}
+	if page, err := treeSvc.FindPageByRoutePath(strings.TrimPrefix(currentPath, "/")); err == nil && page != nil && page.Kind == tree.NodeKindSection {
+		return currentPath
+	}
+	return parentWikiPath(currentPath)
+}
+
+// parentWikiPath returns the parent directory of a wiki path:
+// "/docs/guide" -> "/docs", "/guide" -> "/". Unlike getParentWikiRoutePath
+// in the UI it operates on already-normalized server paths.
+func parentWikiPath(p string) string {
+	if i := strings.LastIndex(p, "/"); i > 0 {
+		return p[:i]
+	}
+	return "/"
+}
+
+// canonicalPagePath maps a resolved link path to the canonical route of the
+// page it addresses: a trailing ".md" is ignored for lookup, and a trailing
+// "index" segment addresses the section landing page itself — a folder's
+// index.md IS the folder's page, so there is never a page at ".../index".
+func canonicalPagePath(p string) string {
+	p = strings.TrimSuffix(p, ".md")
+	if p == "index" {
+		return ""
+	}
+	if strings.HasSuffix(p, "/index") {
+		p = p[:len(p)-len("/index")]
+	}
+	return p
+}
+
 func resolveTargetLinks(tree *tree.TreeService, currentPath string, links []string) []TargetLink {
 	if !tree.IsLoaded() {
 		return nil
@@ -281,22 +381,27 @@ func resolveTargetLinks(tree *tree.TreeService, currentPath string, links []stri
 
 	var targetLinks []TargetLink
 
+	baseDir := linkBaseDir(tree, currentPath)
+
 	for _, link := range links {
 		if isAssetLinkDestination(link) {
 			continue
 		}
 
-		// resolve link against current path
-		resolvedPath, err := resolveURLPath(currentPath, link)
+		// resolve link against the current page's base directory
+		resolvedPath, err := resolveURLPathFromBase(baseDir, link)
 		if err != nil || resolvedPath == "" {
 			continue
 		}
 
-		// normalize for lookup (by stripping leading "/")
-		normalizedForLookup := strings.TrimPrefix(resolvedPath, "/")
+		// canonicalize for lookup: ignore a trailing ".md" and map a
+		// trailing "index" segment to the section route itself
+		normalizedForLookup := canonicalPagePath(strings.TrimPrefix(resolvedPath, "/"))
 		if normalizedForLookup == "" {
-			continue
+			continue // the root page is not addressable by lookup path
 		}
+		// store the canonical path so broken-link healing and the UI agree
+		resolvedPath = "/" + normalizedForLookup
 
 		// find page by route path
 		page, err := tree.FindPageByRoutePath(normalizedForLookup)

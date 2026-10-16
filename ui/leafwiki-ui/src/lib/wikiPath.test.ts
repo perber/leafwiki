@@ -4,6 +4,7 @@ import {
   getParentWikiRoutePath,
   getWikiTargetRoutePath,
   normalizeWikiRoutePath,
+  resolveContentFilePath,
   resolveWikiLinkPath,
   toWikiLookupPath,
 } from './wikiPath'
@@ -43,6 +44,35 @@ describe('getWikiTargetRoutePath', () => {
   })
 })
 
+describe('resolveContentFilePath', () => {
+  it('keeps file segments and extensions intact', () => {
+    expect(
+      resolveContentFilePath('/docs/guide', 'img/run2-06-reset-1-signin.png'),
+    ).toBe('/docs/guide/img/run2-06-reset-1-signin.png')
+  })
+
+  it('resolves against the parent directory in filesystem mode', () => {
+    expect(
+      resolveContentFilePath('/docs/guide', 'img/shot.png', 'filesystem'),
+    ).toBe('/docs/img/shot.png')
+    expect(
+      resolveContentFilePath('/docs/guide', '../assets/logo.svg', 'filesystem'),
+    ).toBe('/assets/logo.svg')
+  })
+
+  it('resolves against the section itself for index pages', () => {
+    expect(
+      resolveContentFilePath('/docs', 'img/shot.png', 'filesystem', true),
+    ).toBe('/docs/img/shot.png')
+  })
+
+  it('supports parent traversal at the root', () => {
+    expect(
+      resolveContentFilePath('/top', '../img/shot.png', 'filesystem'),
+    ).toBe('/img/shot.png')
+  })
+})
+
 describe('resolveWikiLinkPath', () => {
   it('resolves relative links with page-as-folder semantics', () => {
     expect(resolveWikiLinkPath('/docs/guide', 'setup')).toBe(
@@ -56,6 +86,66 @@ describe('resolveWikiLinkPath', () => {
 
   it('resolves absolute wiki paths from the site root', () => {
     expect(resolveWikiLinkPath('/docs/guide', '/root-page')).toBe('/root-page')
+  })
+
+  it('resolves relative links with filesystem semantics when requested', () => {
+    expect(resolveWikiLinkPath('/docs/guide', 'sibling', 'filesystem')).toBe(
+      '/docs/sibling',
+    )
+    expect(resolveWikiLinkPath('/docs/guide', '../other', 'filesystem')).toBe(
+      '/other',
+    )
+    expect(resolveWikiLinkPath('/docs/guide', './child', 'filesystem')).toBe(
+      '/docs/child',
+    )
+    expect(
+      resolveWikiLinkPath('/docs/nested/guide', '../other', 'filesystem'),
+    ).toBe('/docs/other')
+    // absolute wiki paths are unaffected by the mode
+    expect(resolveWikiLinkPath('/docs/guide', '/root-page', 'filesystem')).toBe(
+      '/root-page',
+    )
+  })
+
+  it('defaults to page-folder semantics when no mode is passed', () => {
+    expect(resolveWikiLinkPath('/docs/guide', 'setup')).toBe(
+      '/docs/guide/setup',
+    )
+  })
+
+  it('treats section (index) pages as their own directory in filesystem mode', () => {
+    // wiki/foo/index.md lives IN wiki/foo/: links from a section page
+    // resolve against the section itself, not its parent
+    expect(
+      resolveWikiLinkPath('/docs/tools', 'usage.md', 'filesystem', true),
+    ).toBe('/docs/tools/usage')
+    expect(
+      resolveWikiLinkPath(
+        '/docs/decisions',
+        '../policies/index.md',
+        'filesystem',
+        true,
+      ),
+    ).toBe('/docs/policies')
+    // leaf pages still resolve against the parent
+    expect(
+      resolveWikiLinkPath('/docs/guide', 'sibling', 'filesystem', false),
+    ).toBe('/docs/sibling')
+  })
+
+  it('canonicalizes ".md" tails and trailing index segments to the section route', () => {
+    expect(resolveWikiLinkPath('/docs/guide', 'sibling.md', 'filesystem')).toBe(
+      '/docs/sibling',
+    )
+    expect(
+      resolveWikiLinkPath('/docs/guide', 'accounts/index.md', 'filesystem'),
+    ).toBe('/docs/accounts')
+    expect(resolveWikiLinkPath('/docs/guide', 'index.md', 'filesystem')).toBe(
+      '/docs',
+    )
+    expect(
+      resolveWikiLinkPath('/docs/guide', 'setup/index', 'page-folder'),
+    ).toBe('/docs/guide/setup')
   })
 })
 

@@ -32,6 +32,7 @@ import (
 	httpinternal "github.com/perber/wiki/internal/http"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
+	"github.com/perber/wiki/internal/links"
 	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/restore"
 	"github.com/perber/wiki/internal/snapshot"
@@ -214,6 +215,11 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		slog.Default().Info("Data directory created", "path", cfg.server.dataDir)
 	}
 
+	// Relative link resolution mode — must be applied before the wiki is
+	// constructed (NewWiki loads the tree and indexes links), and stays
+	// read-only afterwards.
+	links.SetRelativeLinkMode(links.RelativeLinkMode(cfg.frontend.relativeLinkMode))
+
 	publicAccessService := buildPublicAccessService(cmd, cfg)
 
 	tocDisplayService, err := tocdisplay.New(cfg.server.dataDir)
@@ -370,6 +376,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		EnableRevision:          cfg.frontend.enableRevision,
 		EnableLinkRefactor:      cfg.frontend.enableLinkRefactor,
 		EnableAPIKeyManagement:  cfg.frontend.enableAPIKeyManagement,
+		RelativeLinkMode:        cfg.frontend.relativeLinkMode,
 		Metrics:                 metrics,
 		GitBackupEnabled:        backupManager.Enabled(),
 		GitBackupEnvManaged:     backupManager.EnvManaged(),
