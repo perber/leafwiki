@@ -93,6 +93,32 @@ export function resolveWikiLinkPath(
 }
 
 /**
+ * Resolves a relative Markdown media reference (image/video/audio/PDF src,
+ * e.g. `img/shot.png`) against the current page path — like
+ * resolveWikiLinkPath, but WITHOUT page canonicalization: the target is a
+ * plain file, so every path segment is literal and the extension must
+ * survive. The result is served by the backend /files route.
+ */
+export function resolveContentFilePath(
+  currentPath: string,
+  src: string,
+  mode: RelativeLinkMode = 'page-folder',
+  currentIsSection = false,
+): string {
+  const normalizedCurrentPath = normalizeWikiRoutePath(currentPath)
+  const baseDir =
+    mode === 'filesystem' && !currentIsSection
+      ? getParentWikiRoutePath(normalizedCurrentPath)
+      : normalizedCurrentPath
+  const folderBase = baseDir.endsWith('/') ? baseDir : `${baseDir}/`
+
+  const base = new URL(folderBase, 'https://leafwiki.local')
+  const url = new URL(src, base)
+
+  return normalizeWikiRoutePath(url.pathname)
+}
+
+/**
  * Maps a resolved link path to the canonical route of the page it
  * addresses: a trailing ".md" is ignored for lookup, and a trailing
  * "index" segment addresses the section landing page itself — a folder's

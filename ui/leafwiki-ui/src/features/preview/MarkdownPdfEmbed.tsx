@@ -3,9 +3,12 @@ import i18next from '@/lib/i18n'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { ExternalLink, FileText } from 'lucide-react'
 import { useMemo } from 'react'
+import { useContentFileResolver } from './useContentFileResolver'
 
 type MarkdownPdfEmbedProps = React.ImgHTMLAttributes<HTMLImageElement> & {
   resolveAssetUrl?: (src: string) => string
+  /** Wiki route path of the page being rendered (content-file resolution). */
+  path?: string
 }
 
 // A `#page=N` fragment on the source (e.g. `manual.pdf#page=3`) is a standard
@@ -37,10 +40,13 @@ export function MarkdownPdfEmbed({
   alt,
   width,
   resolveAssetUrl,
+  path,
 }: MarkdownPdfEmbedProps) {
+  const resolveContentSrc = useContentFileResolver()
+  const assetSrc = resolveAssetUrl?.(src) ?? src
   const resolvedSrc = useMemo(
-    () => resolveAssetUrl?.(src) ?? src,
-    [resolveAssetUrl, src],
+    () => resolveContentSrc(assetSrc, path),
+    [resolveContentSrc, assetSrc, path],
   )
   const versionedSrc = useMemo(
     () => versionAssetSrc(resolvedSrc),

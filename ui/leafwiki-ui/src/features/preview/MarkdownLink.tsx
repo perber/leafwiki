@@ -13,6 +13,7 @@ import {
   resolveWikiLinkPath,
   toWikiLookupPath,
 } from '@/lib/wikiPath'
+import { isContentFileRoutePath } from './useContentFileResolver'
 import { suggestSlug } from '@/lib/api/pages'
 import { useAppMode } from '@/lib/useAppMode'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
@@ -213,8 +214,26 @@ export function MarkdownLink({
       )
     }
 
+    // A link that resolves to a media file (e.g. [deck](files/deck.pdf),
+    // [shot](img/run.png)) addresses content served by the /files route,
+    // not a wiki page — never offer page creation for it.
+    if (isContentFileRoutePath(normalizedHref)) {
+      const fileHref = withBasePath(`/files${normalizedHref}`)
+      return (
+        <a
+          href={fileHref}
+          {...props}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-brand hover:text-brand-dark no-underline hover:underline"
+        >
+          {children}
+        </a>
+      )
+    }
+
     /**
-     *  When a page link is internal and not an asset link and the page doesn't exist yet,
+      *  When a page link is internal and not an asset link and the page doesn't exist yet,
      * we will color the link in red and offer to create the page. Via the CreatePageByPathDialog.
      * we should handle and calculate relative paths here as well.
      * normalizedHref contains now the absolute path. We can use it directly.

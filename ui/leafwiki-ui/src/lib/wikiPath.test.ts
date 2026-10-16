@@ -4,6 +4,7 @@ import {
   getParentWikiRoutePath,
   getWikiTargetRoutePath,
   normalizeWikiRoutePath,
+  resolveContentFilePath,
   resolveWikiLinkPath,
   toWikiLookupPath,
 } from './wikiPath'
@@ -40,6 +41,35 @@ describe('getWikiTargetRoutePath', () => {
     expect(getWikiTargetRoutePath('/history/docs/guide')).toBe('/docs/guide')
     expect(getWikiTargetRoutePath('/history')).toBe('/')
     expect(getWikiTargetRoutePath('/docs/guide')).toBe('/docs/guide')
+  })
+})
+
+describe('resolveContentFilePath', () => {
+  it('keeps file segments and extensions intact', () => {
+    expect(
+      resolveContentFilePath('/docs/guide', 'img/run2-06-reset-1-signin.png'),
+    ).toBe('/docs/guide/img/run2-06-reset-1-signin.png')
+  })
+
+  it('resolves against the parent directory in filesystem mode', () => {
+    expect(
+      resolveContentFilePath('/docs/guide', 'img/shot.png', 'filesystem'),
+    ).toBe('/docs/img/shot.png')
+    expect(
+      resolveContentFilePath('/docs/guide', '../assets/logo.svg', 'filesystem'),
+    ).toBe('/assets/logo.svg')
+  })
+
+  it('resolves against the section itself for index pages', () => {
+    expect(
+      resolveContentFilePath('/docs', 'img/shot.png', 'filesystem', true),
+    ).toBe('/docs/img/shot.png')
+  })
+
+  it('supports parent traversal at the root', () => {
+    expect(
+      resolveContentFilePath('/top', '../img/shot.png', 'filesystem'),
+    ).toBe('/img/shot.png')
   })
 })
 

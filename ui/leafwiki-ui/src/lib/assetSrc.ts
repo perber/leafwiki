@@ -14,7 +14,7 @@ function isAssetSrc(src: string): boolean {
  * sources (external URLs, data URIs) are returned unchanged.
  */
 export function normalizeAssetSrc(src: string): string {
-  if (src.startsWith('/assets/') || src.startsWith('/api/')) {
+  if (src.startsWith('/assets/') || src.startsWith('/api/') || src.startsWith('/files/')) {
     return withBasePath(src)
   }
 
