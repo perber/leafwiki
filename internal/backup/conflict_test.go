@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -201,4 +202,130 @@ func TestConflict_RemoteAheadPlusLocalChanges(t *testing.T) {
 	if snap.LastBackupAt == nil {
 		t.Error("expected LastBackupAt to be set")
 	}
+}
+
+// incomingPages are pages an external client adds to the remote in the same
+// pull as a conflicting edit. Several of them, because the pull visits paths
+// in map order: with only one, a half-applying pull could pass by luck.
+var incomingPages = map[string]string{
+	"root/a.md": "a\n",
+	"root/b.md": "b\n",
+	"root/c.md": "c\n",
+	"root/d.md": "d\n",
+	"root/e.md": "e\n",
+}
+
+// TestConflict_FileConflict_LeavesLiveDirUntouched tests that a file conflict
+// stops the pull before it writes anything: none of the remote's other changes
+// land on disk and the local branch stays where it was, so a later Force Push
+// cannot mistake half-applied pages for local content.
+func TestConflict_FileConflict_LeavesLiveDirUntouched(t *testing.T) {
+	for i := range 10 {
+		bareDir := initBareRemote(t)
+		repo, rootDir := newRepoWithRemote(t, bareDir)
+		headBefore := headCommit(t, repo).Hash
+
+		incoming := map[string]string{"root/page.md": "version B from remote\n"}
+		for p, c := range incomingPages {
+			incoming[p] = c
+		}
+		commitFilesToRemote(t, bareDir, incoming)
+		writeFileHelper(t, rootDir, "page.md", "version C local\n")
+
+		err := repo.RunBackup()
+		if !errors.Is(err, errPullConflict) {
+			t.Fatalf("run %d: RunBackup err = %v, want errPullConflict", i, err)
+		}
+		if !repo.Status().NeedsIntervention {
+			t.Errorf("run %d: expected NeedsIntervention = true", i)
+		}
+		for p := range incomingPages {
+			if _, statErr := os.Stat(filepath.Join(filepath.Dir(rootDir), filepath.FromSlash(p))); !os.IsNotExist(statErr) {
+				t.Errorf("run %d: %s was written despite the conflict (stat err = %v)", i, p, statErr)
+			}
+		}
+		readFileEqual(t, filepath.Join(rootDir, "page.md"), "version C local\n")
+		if got := headCommit(t, repo).Hash; got != headBefore {
+			t.Errorf("run %d: HEAD moved to %s, want it to stay at %s", i, got, headBefore)
+		}
+	}
+}
+
+// TestConflict_ConflictOnlyInAssets_LeavesRootUntouched tests that the pull
+// checks every content directory before it writes to any of them: a conflict
+// under assets/ also keeps the remote's root/ changes off the disk.
+func TestConflict_ConflictOnlyInAssets_LeavesRootUntouched(t *testing.T) {
+	bareDir := initBareRemote(t)
+	repo, rootDir := newRepoWithRemote(t, bareDir)
+	assetsDir := repo.cfg.AssetsDir
+	writeFileHelper(t, assetsDir, "logo.svg", "<svg/>\n")
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup (commit asset): %v", err)
+	}
+
+	commitFilesToRemote(t, bareDir, map[string]string{
+		"root/from-remote.md": "remote page\n",
+		"assets/logo.svg":     "<svg>remote</svg>\n",
+	})
+	writeFileHelper(t, assetsDir, "logo.svg", "<svg>local</svg>\n")
+
+	if err := repo.RunBackup(); !errors.Is(err, errPullConflict) {
+		t.Fatalf("RunBackup err = %v, want errPullConflict", err)
+	}
+	if _, err := os.Stat(filepath.Join(rootDir, "from-remote.md")); !os.IsNotExist(err) {
+		t.Errorf("root/from-remote.md was written despite the assets conflict (stat err = %v)", err)
+	}
+	readFileEqual(t, filepath.Join(assetsDir, "logo.svg"), "<svg>local</svg>\n")
+}
+
+// TestConflict_ResolvedByMatchingRemote_Clears tests that a conflict clears
+// once the live file equals the remote version: a file that already holds
+// what the remote has is applied, not a conflict, so the next cycle pulls the
+// rest and pushes.
+func TestConflict_ResolvedByMatchingRemote_Clears(t *testing.T) {
+	bareDir := initBareRemote(t)
+	repo, rootDir := newRepoWithRemote(t, bareDir)
+
+	commitFilesToRemote(t, bareDir, map[string]string{
+		"root/page.md":        "version B from remote\n",
+		"root/from-remote.md": "remote page\n",
+	})
+	writeFileHelper(t, rootDir, "page.md", "version C local\n")
+	if err := repo.RunBackup(); !errors.Is(err, errPullConflict) {
+		t.Fatalf("first RunBackup err = %v, want errPullConflict", err)
+	}
+
+	// The admin resolves the conflict by adopting the remote version.
+	writeFileHelper(t, rootDir, "page.md", "version B from remote\n")
+
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup after adopting the remote version: %v", err)
+	}
+	if snap := repo.Status(); snap.NeedsIntervention || snap.LastError != "" {
+		t.Errorf("expected a clean status, got NeedsIntervention=%v LastError=%q", snap.NeedsIntervention, snap.LastError)
+	}
+	readFileEqual(t, filepath.Join(rootDir, "from-remote.md"), "remote page\n")
+	remote := remoteHeadCommit(t, bareDir)
+	assertFileInCommit(t, remote, "root/page.md", "version B from remote\n")
+	assertFileInCommit(t, remote, "root/from-remote.md", "remote page\n")
+}
+
+// TestConflict_RemoteAhead_RemoteTreeKeepsIncomingPages tests that a pull of
+// remote-only pages next to an unrelated local edit keeps both on the remote:
+// the backup commit must not drop the pages it just pulled.
+func TestConflict_RemoteAhead_RemoteTreeKeepsIncomingPages(t *testing.T) {
+	bareDir := initBareRemote(t)
+	repo, rootDir := newRepoWithRemote(t, bareDir)
+
+	commitFilesToRemote(t, bareDir, incomingPages)
+	writeFileHelper(t, rootDir, "page.md", "local edit\n")
+
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup: %v", err)
+	}
+	remote := remoteHeadCommit(t, bareDir)
+	for p, want := range incomingPages {
+		assertFileInCommit(t, remote, p, want)
+	}
+	assertFileInCommit(t, remote, "root/page.md", "local edit\n")
 }
