@@ -8,6 +8,10 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	gogit "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/filemode"
 )
 
 // TestPull_FastForward tests that Pull merges new remote commits into the
@@ -556,13 +560,16 @@ func TestPull_UnbornLocalHead_WritesMissingFilesAndConverges(t *testing.T) {
 // component, a backslash path, .git) fails the pull before anything is
 // written: no file appears inside root/ or next to it, an existing file next
 // to root/ keeps its content, HEAD stays, and the failure is logged once with
-// the entry name and its parent directory.
+// the entry name and its parent directory. A valid remote change pulled in
+// the same cycle is not written either.
 func TestPull_InvalidRemoteTreeEntry_FailsWithoutWriting(t *testing.T) {
 	tests := []struct {
-		name   string
-		parent string
-		entry  string
-		files  map[string]string
+		name      string
+		top       string // content directory in the repository; "" means root
+		parent    string
+		entry     string
+		files     map[string]string
+		validFile string // repository path of a valid file the remote adds first
 	}{
 		{
 			name:  "dot-dot directory",
@@ -578,6 +585,39 @@ func TestPull_InvalidRemoteTreeEntry_FailsWithoutWriting(t *testing.T) {
 		{name: "backslash dot-dot file", entry: `..\outside.txt`},
 		{name: "backslash dot-dot in the middle", entry: `x\..\..\outside.txt`},
 		{name: "dot git directory", entry: ".git", files: map[string]string{"config": "new"}},
+		{
+			name:   "deeply nested dot-dot directory",
+			parent: "a/b",
+			entry:  "..",
+			files:  map[string]string{"outside.txt": "new"},
+		},
+		{
+			name:  "dot-dot directory under assets",
+			top:   "assets",
+			entry: "..",
+			files: map[string]string{"outside.txt": "new", "existing.txt": "changed"},
+		},
+		{name: "backslash dot-dot file under assets", top: "assets", entry: `..\outside.txt`},
+		{
+			name:   "nested dot-dot directory under assets",
+			top:    "assets",
+			parent: "pageid",
+			entry:  "..",
+			files:  map[string]string{"outside.txt": "new"},
+		},
+		{
+			name:      "dot-dot directory after a valid remote change",
+			entry:     "..",
+			files:     map[string]string{"outside.txt": "new"},
+			validFile: "root/added.md",
+		},
+		{
+			name:      "dot-dot directory under assets after a valid root change",
+			top:       "assets",
+			entry:     "..",
+			files:     map[string]string{"outside.txt": "new"},
+			validFile: "root/added.md",
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -586,7 +626,18 @@ func TestPull_InvalidRemoteTreeEntry_FailsWithoutWriting(t *testing.T) {
 			dataDir := filepath.Dir(rootDir)
 			writeFileHelper(t, dataDir, "existing.txt", "original")
 			headBefore := headCommit(t, repo).Hash
-			pushRawRootEntryToRemote(t, bareDir, tc.parent, tc.entry, tc.files)
+			if tc.validFile != "" {
+				commitToRemote(t, bareDir, tc.validFile, "valid\n")
+			}
+			top := tc.top
+			if top == "" {
+				top = "root"
+			}
+			parent := top
+			if tc.parent != "" {
+				parent += "/" + tc.parent
+			}
+			pushRawEntryToRemote(t, bareDir, rawEntry{parent: parent, name: tc.entry, files: tc.files})
 			logs := captureLogs(t)
 
 			err := repo.RunBackup()
@@ -620,6 +671,9 @@ func TestPull_InvalidRemoteTreeEntry_FailsWithoutWriting(t *testing.T) {
 			if len(entries) != 1 || entries[0].Name() != "page.md" {
 				t.Errorf("root/ holds %v after a refused pull, want only page.md", entries)
 			}
+			if entries, err := os.ReadDir(filepath.Join(dataDir, "assets")); err != nil || len(entries) != 0 {
+				t.Errorf("assets/ holds %v after a refused pull (err %v), want nothing", entries, err)
+			}
 			if n := strings.Count(logs.String(), "level=ERROR"); n != 1 || !strings.Contains(logs.String(), "remote=") {
 				t.Errorf("want exactly one error log with the remote, got %d:\n%s", n, logs.String())
 			}
@@ -651,5 +705,175 @@ func TestInit_FirstContactInvalidRemoteTreeEntry_FailsWithoutWriting(t *testing.
 	readFileEqual(t, filepath.Join(dataDir, "existing.txt"), "original")
 	if _, err := os.Lstat(filepath.Join(dataDir, "outside.txt")); !os.IsNotExist(err) {
 		t.Errorf("outside.txt was written next to root/ (err %v)", err)
+	}
+}
+
+// TestPull_InvalidRemoteTreeEntryResetAway_NextCycleRecovers tests that a
+// pull refused for an invalid entry name is not stuck once the remote branch
+// is reset to the commit before that entry: the next cycle pushes the local
+// edit made meanwhile and clears the error.
+//
+// Removing the entry in a new commit on top is not enough: go-git refuses to
+// push from a history that still holds the entry, so every later push fails.
+func TestPull_InvalidRemoteTreeEntryResetAway_NextCycleRecovers(t *testing.T) {
+	bareDir := initBareRemote(t)
+	repo, rootDir := newRepoWithRemote(t, bareDir)
+	before := remoteHeadCommit(t, bareDir).Hash
+	pushRawEntryToRemote(t, bareDir, rawEntry{parent: "root/sub", name: "..", files: map[string]string{"outside.txt": "new"}})
+	if err := repo.RunBackup(); err == nil {
+		t.Fatal("expected RunBackup to fail on an invalid remote tree entry")
+	}
+	if repo.Status().LastError == "" {
+		t.Fatal("expected LastError after the refused pull")
+	}
+
+	writeFileHelper(t, rootDir, "page.md", "local edit\n")
+	bare, err := gogit.PlainOpen(bareDir)
+	if err != nil {
+		t.Fatalf("PlainOpen: %v", err)
+	}
+	if err := bare.Storer.SetReference(plumbing.NewHashReference(plumbing.NewBranchReferenceName("main"), before)); err != nil {
+		t.Fatalf("reset remote branch: %v", err)
+	}
+
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup after the remote was reset: %v", err)
+	}
+	if snap := repo.Status(); snap.NeedsIntervention || snap.LastError != "" {
+		t.Errorf("NeedsIntervention=%v LastError=%q after recovery, want both cleared", snap.NeedsIntervention, snap.LastError)
+	}
+	remote := remoteHeadCommit(t, bareDir)
+	assertFileInCommit(t, remote, "root/page.md", "local edit\n")
+	if got := headCommit(t, repo).Hash; got != remote.Hash {
+		t.Errorf("local HEAD = %s, want the remote head %s", got, remote.Hash)
+	}
+	if _, err := os.Lstat(filepath.Join(filepath.Dir(rootDir), "outside.txt")); !os.IsNotExist(err) {
+		t.Errorf("outside.txt was written next to root/ (err %v)", err)
+	}
+}
+
+// TestPull_SymlinkRemoteTreeEntry_WrittenAsRegularFile tests that a symlink
+// entry from the remote lands as a regular file holding the link target, so
+// the pull never creates a link that points out of the content directory, and
+// that the following cycles keep succeeding.
+func TestPull_SymlinkRemoteTreeEntry_WrittenAsRegularFile(t *testing.T) {
+	for _, target := range []string{"../outside.txt", "/etc/hostname", "sub/../../outside.txt"} {
+		t.Run(target, func(t *testing.T) {
+			bareDir := initBareRemote(t)
+			repo, rootDir := newRepoWithRemote(t, bareDir)
+			dataDir := filepath.Dir(rootDir)
+			writeFileHelper(t, dataDir, "outside.txt", "original")
+			pushRawEntryToRemote(t, bareDir, rawEntry{parent: "root", name: "link.md", mode: filemode.Symlink, content: target})
+
+			if err := repo.RunBackup(); err != nil {
+				t.Fatalf("RunBackup: %v", err)
+			}
+			info, err := os.Lstat(filepath.Join(rootDir, "link.md"))
+			if err != nil {
+				t.Fatalf("Lstat link.md: %v", err)
+			}
+			if !info.Mode().IsRegular() {
+				t.Errorf("link.md has mode %v, want a regular file", info.Mode())
+			}
+			readFileEqual(t, filepath.Join(rootDir, "link.md"), target)
+			readFileEqual(t, filepath.Join(dataDir, "outside.txt"), "original")
+
+			writeFileHelper(t, rootDir, "page.md", "after\n")
+			if err := repo.RunBackup(); err != nil {
+				t.Fatalf("second RunBackup: %v", err)
+			}
+			assertFileInCommit(t, remoteHeadCommit(t, bareDir), "root/page.md", "after\n")
+		})
+	}
+}
+
+// TestPull_LongRemoteEntryNames_PulledOrFailedCleanly tests names at and past
+// the usual 255-byte file name limit: a name that fits is pulled, one that
+// does not fails the cycle as an error (not a conflict) without moving HEAD,
+// and the backup resumes once the remote drops it.
+func TestPull_LongRemoteEntryNames_PulledOrFailedCleanly(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows counts the limit in UTF-16 units and the full path length")
+	}
+	tests := []struct {
+		name    string
+		entry   string
+		wantErr bool
+	}{
+		{name: "255 ASCII bytes", entry: strings.Repeat("a", 252) + ".md"},
+		{name: "254 bytes of two-byte runes", entry: strings.Repeat("ü", 125) + ".md"},
+		{name: "256 ASCII bytes", entry: strings.Repeat("a", 253) + ".md", wantErr: true},
+		{name: "4096 ASCII bytes", entry: strings.Repeat("a", 4093) + ".md", wantErr: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			bareDir := initBareRemote(t)
+			repo, rootDir := newRepoWithRemote(t, bareDir)
+			headBefore := headCommit(t, repo).Hash
+			pushRawEntryToRemote(t, bareDir, rawEntry{parent: "root/sec", name: tc.entry, content: "long\n"})
+
+			err := repo.RunBackup()
+			if !tc.wantErr {
+				if err != nil {
+					t.Fatalf("RunBackup: %v", err)
+				}
+				readFileEqual(t, filepath.Join(rootDir, "sec", tc.entry), "long\n")
+				return
+			}
+			if err == nil {
+				t.Fatal("expected RunBackup to fail on a name the file system cannot hold")
+			}
+			if errors.Is(err, errPullConflict) {
+				t.Fatalf("a too long name was reported as a conflict: %v", err)
+			}
+			if got := headCommit(t, repo).Hash; got != headBefore {
+				t.Errorf("HEAD moved to %s after a failed pull, want %s", got, headBefore)
+			}
+
+			pushRawEntryToRemote(t, bareDir, rawEntry{parent: "root/sec", name: tc.entry, remove: true})
+			commitToRemote(t, bareDir, "root/ext.md", "ext\n")
+			if err := repo.RunBackup(); err != nil {
+				t.Fatalf("RunBackup after the remote dropped the name: %v", err)
+			}
+			readFileEqual(t, filepath.Join(rootDir, "ext.md"), "ext\n")
+			if snap := repo.Status(); snap.LastError != "" {
+				t.Errorf("LastError = %q after recovery, want it cleared", snap.LastError)
+			}
+		})
+	}
+}
+
+// TestPull_UnusualValidRemoteNames_Pulled tests that names close to the
+// refused ones, but valid git tree paths, are pulled and backed up unchanged.
+func TestPull_UnusualValidRemoteNames_Pulled(t *testing.T) {
+	bareDir := initBareRemote(t)
+	repo, rootDir := newRepoWithRemote(t, bareDir)
+	files := map[string]string{
+		"root/..foo":           "a\n",
+		"root/foo..bar.md":     "b\n",
+		"root/.gitignore":      "*.tmp\n",
+		"root/.github/x.md":    "c\n",
+		"root/git~2/y.md":      "d\n",
+		"root/.gitx":           "e\n",
+		"root/über ñ.md":       "f\n",
+		"assets/id1/..img.png": "g\n",
+	}
+	commitFilesToRemote(t, bareDir, files)
+
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup: %v", err)
+	}
+	dataDir := filepath.Dir(rootDir)
+	for rel, content := range files {
+		readFileEqual(t, filepath.Join(dataDir, filepath.FromSlash(rel)), content)
+	}
+	writeFileHelper(t, rootDir, "page.md", "after\n")
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("second RunBackup: %v", err)
+	}
+	remote := remoteHeadCommit(t, bareDir)
+	assertFileInCommit(t, remote, "root/page.md", "after\n")
+	for rel, content := range files {
+		assertFileInCommit(t, remote, rel, content)
 	}
 }
