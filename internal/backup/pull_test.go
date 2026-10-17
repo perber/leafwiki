@@ -1,8 +1,10 @@
 package backup
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -374,5 +376,175 @@ func TestPull_RecoversFromPriorConflict(t *testing.T) {
 	}
 	if snap.LastBackupAt == nil || !snap.LastBackupAt.Equal(lastBackupBefore) {
 		t.Errorf("expected LastBackupAt to be unchanged by a mere pull, before=%v after=%v", lastBackupBefore, snap.LastBackupAt)
+	}
+}
+
+// TestPull_RemoteDeletesFileAlreadyMissingLocally tests that a remote delete of
+// a file the wiki has already deleted too counts as applied: no conflict, the
+// remote's other changes land, and the backup keeps the file deleted.
+func TestPull_RemoteDeletesFileAlreadyMissingLocally(t *testing.T) {
+	bareDir := initBareRemote(t)
+	repo, rootDir := newRepoWithRemote(t, bareDir)
+	writeFileHelper(t, rootDir, "gone.md", "to be deleted\n")
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup (seed): %v", err)
+	}
+
+	commitChangesToRemote(t, bareDir, map[string]string{"root/new.md": "remote new\n"}, []string{"root/gone.md"})
+	if err := os.Remove(filepath.Join(rootDir, "gone.md")); err != nil {
+		t.Fatalf("Remove: %v", err)
+	}
+
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup: %v", err)
+	}
+	readFileEqual(t, filepath.Join(rootDir, "new.md"), "remote new\n")
+	remote := remoteHeadCommit(t, bareDir)
+	assertFileInCommit(t, remote, "root/new.md", "remote new\n")
+	if _, err := remote.File("root/gone.md"); err == nil {
+		t.Error("root/gone.md is back on the remote after both sides deleted it")
+	}
+}
+
+// TestPull_RepeatedCyclesConverge tests that once a pull and backup succeeded,
+// further cycles neither commit, pull nor raise a conflict.
+func TestPull_RepeatedCyclesConverge(t *testing.T) {
+	bareDir := initBareRemote(t)
+	repo, rootDir := newRepoWithRemote(t, bareDir)
+
+	commitFilesToRemote(t, bareDir, map[string]string{
+		"root/a.md":     "a\n",
+		"root/sub/b.md": "b\n",
+	})
+	writeFileHelper(t, rootDir, "local.md", "local\n")
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("first RunBackup: %v", err)
+	}
+	settled := remoteHeadCommit(t, bareDir).Hash
+
+	for i := range 3 {
+		if err := repo.RunBackup(); err != nil {
+			t.Fatalf("cycle %d: RunBackup: %v", i, err)
+		}
+		if got := remoteHeadCommit(t, bareDir).Hash; got != settled {
+			t.Fatalf("cycle %d: remote moved to %s, want it to stay at %s", i, got, settled)
+		}
+		if got := headCommit(t, repo).Hash; got != settled {
+			t.Fatalf("cycle %d: local HEAD = %s, want %s", i, got, settled)
+		}
+		if snap := repo.Status(); snap.NeedsIntervention || snap.LastError != "" {
+			t.Fatalf("cycle %d: NeedsIntervention=%v LastError=%q", i, snap.NeedsIntervention, snap.LastError)
+		}
+	}
+	remote := remoteHeadCommit(t, bareDir)
+	assertFileInCommit(t, remote, "root/a.md", "a\n")
+	assertFileInCommit(t, remote, "root/sub/b.md", "b\n")
+	assertFileInCommit(t, remote, "root/local.md", "local\n")
+}
+
+// TestPull_IOFailureMidApply_NextCycleConverges tests the documented guarantee
+// for an I/O failure during the apply pass: the files written before the
+// failure stay, HEAD does not move, it is reported as an error rather than a
+// conflict, and the next cycle accepts those files as applied and finishes.
+func TestPull_IOFailureMidApply_NextCycleConverges(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("directory permissions do not block file creation on Windows")
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores directory permissions")
+	}
+	bareDir := initBareRemote(t)
+	repo, rootDir := newRepoWithRemote(t, bareDir)
+	headBefore := headCommit(t, repo).Hash
+
+	// Writes run in sorted order: a.md lands, z/b.md fails on the read-only z/.
+	commitFilesToRemote(t, bareDir, map[string]string{
+		"root/a.md":   "a\n",
+		"root/z/b.md": "b\n",
+	})
+	locked := filepath.Join(rootDir, "z")
+	if err := os.Mkdir(locked, 0o555); err != nil {
+		t.Fatalf("Mkdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+
+	err := repo.RunBackup()
+	if err == nil {
+		t.Fatal("expected RunBackup to fail while z/ is read-only")
+	}
+	if errors.Is(err, errPullConflict) {
+		t.Fatalf("an I/O failure was reported as a conflict: %v", err)
+	}
+	snap := repo.Status()
+	if snap.NeedsIntervention || snap.LastError == "" {
+		t.Errorf("want LastError set and no NeedsIntervention, got NeedsIntervention=%v LastError=%q", snap.NeedsIntervention, snap.LastError)
+	}
+	readFileEqual(t, filepath.Join(rootDir, "a.md"), "a\n")
+	if got := headCommit(t, repo).Hash; got != headBefore {
+		t.Errorf("HEAD moved to %s after a failed apply, want %s", got, headBefore)
+	}
+
+	if err := os.Chmod(locked, 0o755); err != nil {
+		t.Fatalf("Chmod: %v", err)
+	}
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup after the I/O problem is gone: %v", err)
+	}
+	readFileEqual(t, filepath.Join(rootDir, "z", "b.md"), "b\n")
+	if snap := repo.Status(); snap.NeedsIntervention || snap.LastError != "" {
+		t.Errorf("expected a clean status, got NeedsIntervention=%v LastError=%q", snap.NeedsIntervention, snap.LastError)
+	}
+	remote := remoteHeadCommit(t, bareDir)
+	assertFileInCommit(t, remote, "root/a.md", "a\n")
+	assertFileInCommit(t, remote, "root/z/b.md", "b\n")
+}
+
+// TestPull_UnbornLocalHead_WritesMissingFilesAndConverges tests the unborn
+// branch path end to end: the pull adds the remote files absent locally, keeps
+// the local version of a file present on both sides, and the following backup
+// pushes that local version on top, after which cycles are no-ops.
+func TestPull_UnbornLocalHead_WritesMissingFilesAndConverges(t *testing.T) {
+	bareDir := initBareRemote(t)
+	tmpDir := t.TempDir()
+	rootDir := filepath.Join(tmpDir, "root")
+	assetsDir := filepath.Join(tmpDir, "assets")
+	for _, d := range []string{rootDir, assetsDir} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatalf("MkdirAll: %v", err)
+		}
+	}
+	repo, err := Init(Config{
+		RootDir: rootDir, AssetsDir: assetsDir,
+		AuthorName: "Test", AuthorEmail: "t@t.com",
+		Branch: "main", RemoteURL: "file://" + bareDir, SSHKey: testSSHKeyPEM,
+	})
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	writeFileHelper(t, rootDir, "welcome.md", "local welcome\n")
+	pushFirstCommitToRemote(t, bareDir, "main", "root/welcome.md", "remote welcome\n")
+	commitFilesToRemote(t, bareDir, map[string]string{
+		"root/a.md":         "a\n",
+		"root/sec/b.md":     "b\n",
+		"assets/x/logo.svg": "<svg/>\n",
+	})
+
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup: %v", err)
+	}
+	readFileEqual(t, filepath.Join(rootDir, "welcome.md"), "local welcome\n")
+	readFileEqual(t, filepath.Join(rootDir, "a.md"), "a\n")
+	readFileEqual(t, filepath.Join(rootDir, "sec", "b.md"), "b\n")
+	readFileEqual(t, filepath.Join(assetsDir, "x", "logo.svg"), "<svg/>\n")
+	remote := remoteHeadCommit(t, bareDir)
+	assertFileInCommit(t, remote, "root/welcome.md", "local welcome\n")
+	assertFileInCommit(t, remote, "root/a.md", "a\n")
+
+	settled := remote.Hash
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("second RunBackup: %v", err)
+	}
+	if got := remoteHeadCommit(t, bareDir).Hash; got != settled {
+		t.Errorf("remote moved to %s on an idle cycle, want %s", got, settled)
 	}
 }
