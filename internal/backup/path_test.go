@@ -9,38 +9,36 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
-func TestNormalizeBackupPath(t *testing.T) {
-	cases := []struct {
+// TestNormalizeBackupPath_Prefixes_CleansOrRejects tests how a user-supplied
+// backup prefix is cleaned and which prefixes are rejected.
+func TestNormalizeBackupPath_Prefixes_CleansOrRejects(t *testing.T) {
+	tests := []struct {
+		name    string
 		in      string
 		want    string
 		wantErr bool
 	}{
-		{"", "", false},
-		{"docs/wiki", "docs/wiki", false},
-		{"docs\\wiki", "docs/wiki", false},
-		{"  docs/wiki  ", "docs/wiki", false},
-		{"docs//wiki", "docs/wiki", false},
-		{"docs/./wiki", "docs/wiki", false},
-		{"/abs", "", true},
-		{"../up", "", true},
-		{"docs/../wiki", "", true},
-		{".", "", true},
+		{name: "empty means top level", in: "", want: ""},
+		{name: "slash separated", in: "docs/wiki", want: "docs/wiki"},
+		{name: "backslash separated", in: "docs\\wiki", want: "docs/wiki"},
+		{name: "surrounding spaces trimmed", in: "  docs/wiki  ", want: "docs/wiki"},
+		{name: "double slash collapsed", in: "docs//wiki", want: "docs/wiki"},
+		{name: "dot segment removed", in: "docs/./wiki", want: "docs/wiki"},
+		{name: "absolute", in: "/abs", wantErr: true},
+		{name: "leading dot dot", in: "../up", wantErr: true},
+		{name: "inner dot dot", in: "docs/../wiki", wantErr: true},
+		{name: "dot only", in: ".", wantErr: true},
 	}
-	for _, tc := range cases {
-		got, err := normalizeBackupPath(tc.in)
-		if tc.wantErr {
-			if err == nil {
-				t.Errorf("normalizeBackupPath(%q) expected error, got %q", tc.in, got)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := normalizeBackupPath(tc.in)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("normalizeBackupPath(%q) = %q, %v, wantErr %v", tc.in, got, err, tc.wantErr)
 			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("normalizeBackupPath(%q) unexpected error: %v", tc.in, err)
-			continue
-		}
-		if got != tc.want {
-			t.Errorf("normalizeBackupPath(%q) = %q, want %q", tc.in, got, tc.want)
-		}
+			if got != tc.want {
+				t.Errorf("normalizeBackupPath(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
 	}
 }
 
