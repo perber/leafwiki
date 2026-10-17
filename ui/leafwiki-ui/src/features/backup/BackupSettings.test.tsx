@@ -126,3 +126,124 @@ describe('BackupSettings', () => {
     expect(toast.error).toHaveBeenCalledWith('force push refused')
   })
 })
+
+// Server-side template for the 409 (internal/wiki/backup/routes.go); the route
+// test pins the same string.
+const FORCE_PUSH_CONFLICT_TEMPLATE =
+  'force push refused: the remote has changes the local backup has not applied yet'
+
+const errorLocales = import.meta.glob<{ default: Record<string, string> }>(
+  '../../locales/*/errors.json',
+  { eager: true },
+)
+const errorsByLang = Object.entries(errorLocales).map(([path, mod]) => ({
+  lang: /locales\/([^/]+)\/errors\.json$/.exec(path)![1],
+  translation: mod.default[FORCE_PUSH_CONFLICT_TEMPLATE],
+}))
+
+describe('BackupSettings conflict edge cases', () => {
+  beforeEach(() => {
+    vi.mocked(toast.error).mockClear()
+  })
+
+  it('falls back to the file-conflict explanation (no Force Push) when the server sends no conflictKind', () => {
+    storeState = makeState({
+      needsIntervention: true,
+      conflictKind: null,
+      conflictDetails: 'details from an older server',
+    })
+    render(<BackupSettings />)
+    expect(screen.getByText('fileConflictTitle')).toBeInTheDocument()
+    expect(screen.getByText('details from an older server')).toBeInTheDocument()
+    expect(screen.queryByText('forcePushButton')).not.toBeInTheDocument()
+  })
+
+  it.each(['diverged', 'fileConflict'])(
+    'shows no conflict panel for a stale %s kind once needsIntervention is false',
+    (conflictKind) => {
+      storeState = makeState({ needsIntervention: false, conflictKind })
+      render(<BackupSettings />)
+      for (const key of [
+        'conflictTitle',
+        'fileConflictTitle',
+        'forcePushButton',
+      ]) {
+        expect(screen.queryByText(key)).not.toBeInTheDocument()
+      }
+    },
+  )
+
+  it('renders a long file-conflict list in full as the server sent it', () => {
+    const details =
+      'pull conflict: changed both on the remote and locally: ' +
+      Array.from({ length: 10 }, (_, i) => `root/Über uns/seite-${i}.md`).join(
+        ', ',
+      ) +
+      ' and 15 more; make each file match on both sides'
+    storeState = makeState({
+      needsIntervention: true,
+      conflictKind: 'fileConflict',
+      conflictDetails: details,
+    })
+    render(<BackupSettings />)
+    expect(screen.getByText(details)).toBeInTheDocument()
+  })
+
+  it.each(errorsByLang)(
+    'toasts the translated 409 refusal in $lang',
+    async ({ lang, translation }) => {
+      expect(
+        translation,
+        `locales/${lang}/errors.json lacks the force push refusal`,
+      ).toBeTruthy()
+      const i18next = (await import('@/lib/i18n')).default
+      await i18next.changeLanguage(lang)
+      try {
+        storeState = makeState({
+          needsIntervention: true,
+          conflictKind: 'diverged',
+          forcePush: vi.fn().mockRejectedValue(
+            new ApiLocalizedError({
+              code: 'backup_force_push_conflict',
+              message: 'raw server message',
+              template: FORCE_PUSH_CONFLICT_TEMPLATE,
+            }),
+          ),
+        })
+        render(<BackupSettings />)
+        fireEvent.click(screen.getByText('forcePushButton'))
+        await waitFor(() =>
+          expect(toast.error).toHaveBeenCalledWith(translation),
+        )
+      } finally {
+        await i18next.changeLanguage('en')
+      }
+    },
+  )
+
+  it('shows the raw message and does not reload the status for other force push failures', async () => {
+    const loadStatus = vi.fn()
+    storeState = makeState({
+      needsIntervention: true,
+      conflictKind: 'diverged',
+      loadStatus,
+      forcePush: vi.fn().mockRejectedValue(
+        new ApiLocalizedError({
+          code: 'backup_internal_error',
+          message: 'force push failed: network down',
+          template: 'backup internal error',
+        }),
+      ),
+    })
+    render(<BackupSettings />)
+    loadStatus.mockClear()
+    fireEvent.click(screen.getByText('forcePushButton'))
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        'force push failed: network down',
+      ),
+    )
+    expect(loadStatus).not.toHaveBeenCalled()
+    expect(screen.getByText('forcePushButton')).toBeInTheDocument()
+  })
+})

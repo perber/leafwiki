@@ -1,6 +1,9 @@
 package backup
 
 import (
+	"encoding/json"
+	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -97,4 +100,72 @@ func TestStatus_ConcurrentAccess(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+func TestFileConflictMessage_CapsListedPaths(t *testing.T) {
+	paths := func(n int) []string {
+		out := make([]string, n)
+		for i := range out {
+			out[i] = fmt.Sprintf("root/p%02d.md", i)
+		}
+		return out
+	}
+	tests := []struct {
+		name     string
+		paths    []string
+		wantMore string // "" means no "and N more" suffix
+		lastShow string
+		hidden   string
+	}{
+		{"one path", paths(1), "", "root/p00.md", ""},
+		{"exactly the cap", paths(10), "", "root/p09.md", ""},
+		{"one over the cap", paths(11), " and 1 more", "root/p09.md", "root/p10.md"},
+		{"many over the cap", paths(25), " and 15 more", "root/p09.md", "root/p24.md"},
+		{"unicode and spaces", []string{"root/Über uns/ä ö.md"}, "", "root/Über uns/ä ö.md", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			msg := fileConflictMessage(tt.paths)
+			if !strings.Contains(msg, tt.lastShow) {
+				t.Errorf("message %q does not name %q", msg, tt.lastShow)
+			}
+			if tt.hidden != "" && strings.Contains(msg, tt.hidden) {
+				t.Errorf("message %q names %q beyond the cap", msg, tt.hidden)
+			}
+			if tt.wantMore == "" {
+				if strings.Contains(msg, " more") {
+					t.Errorf("message %q has an unexpected 'more' suffix", msg)
+				}
+			} else if !strings.Contains(msg, tt.lastShow+tt.wantMore+";") {
+				t.Errorf("message %q, want %q right after the last listed path", msg, tt.wantMore)
+			}
+		})
+	}
+}
+
+func TestStatusSnapshot_ConflictKindJSON(t *testing.T) {
+	tests := []struct {
+		name string
+		kind ConflictKind
+		want string // "" means the field must be omitted
+	}{
+		{"diverged", ConflictKindDiverged, `"conflictKind":"diverged"`},
+		{"fileConflict", ConflictKindFileConflict, `"conflictKind":"fileConflict"`},
+		{"cleared", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b, err := json.Marshal(StatusSnapshot{NeedsIntervention: tt.kind != "", ConflictKind: tt.kind})
+			if err != nil {
+				t.Fatalf("Marshal: %v", err)
+			}
+			got := string(b)
+			if tt.want == "" && strings.Contains(got, "conflictKind") {
+				t.Errorf("JSON %s, want conflictKind omitted", got)
+			}
+			if tt.want != "" && !strings.Contains(got, tt.want) {
+				t.Errorf("JSON %s, want it to contain %s", got, tt.want)
+			}
+		})
+	}
 }

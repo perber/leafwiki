@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -206,6 +207,7 @@ func newFileConflictRoutes(t *testing.T) *Routes {
 // code, so the UI can explain it instead of showing a generic failure.
 func TestHandleForcePush_RemoteAhead_Returns409(t *testing.T) {
 	routes := newFileConflictRoutes(t)
+	statusBefore, _ := routes.mgr.Status()
 	c, rec := newTestGinContext()
 
 	routes.handleForcePush(c)
@@ -222,6 +224,30 @@ func TestHandleForcePush_RemoteAhead_Returns409(t *testing.T) {
 	}
 	if body.Error.Template == "" {
 		t.Error("expected a template so the frontend can translate the refusal")
+	}
+	// The frontend looks the template up verbatim in locales/*/errors.json
+	// (BackupSettings.test.tsx checks every locale for this exact key).
+	const wantTemplate = "force push refused: the remote has changes the local backup has not applied yet"
+	if body.Error.Template != wantTemplate {
+		t.Errorf("template = %q, want %q", body.Error.Template, wantTemplate)
+	}
+	if body.Error.Message != backupSvc.ErrForcePushRemoteAhead.Error() {
+		t.Errorf("message = %q, want %q", body.Error.Message, backupSvc.ErrForcePushRemoteAhead.Error())
+	}
+	if len(body.Error.Args) != 0 {
+		t.Errorf("args = %v, want none", body.Error.Args)
+	}
+	var raw map[string]map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &raw); err != nil {
+		t.Fatalf("unmarshal raw body: %v", err)
+	}
+	for _, key := range []string{"code", "message", "template"} {
+		if _, ok := raw["error"][key]; !ok {
+			t.Errorf("response body %s lacks error.%s", rec.Body.String(), key)
+		}
+	}
+	if statusAfter, _ := routes.mgr.Status(); !reflect.DeepEqual(statusAfter, statusBefore) {
+		t.Errorf("refused force push changed the status:\nbefore %+v\nafter  %+v", statusBefore, statusAfter)
 	}
 }
 
