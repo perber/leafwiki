@@ -75,7 +75,9 @@ func TestRemoveSQLiteFiles(t *testing.T) {
 		}
 	}
 
-	RemoveSQLiteFiles(dbPath)
+	if err := RemoveSQLiteFiles(dbPath); err != nil {
+		t.Fatalf("RemoveSQLiteFiles: %v", err)
+	}
 
 	for _, path := range paths {
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
@@ -88,12 +90,37 @@ func TestRemoveSQLiteFiles_NoOpWhenMissing(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "missing.db")
 
-	RemoveSQLiteFiles(dbPath)
+	if err := RemoveSQLiteFiles(dbPath); err != nil {
+		t.Fatalf("RemoveSQLiteFiles: %v", err)
+	}
 
 	for _, path := range []string{dbPath, dbPath + "-journal", dbPath + "-wal", dbPath + "-shm"} {
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
 			t.Fatalf("expected %q to remain absent, err=%v", path, err)
 		}
+	}
+}
+
+func TestRemoveSQLiteFiles_ReportsFailureAndRemovesTheRest(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "search.db")
+	for _, path := range []string{dbPath, dbPath + "-journal", dbPath + "-shm"} {
+		if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
+			t.Fatalf("failed to create %q: %v", path, err)
+		}
+	}
+	blockRemoval(t, dbPath+"-wal")
+
+	if err := RemoveSQLiteFiles(dbPath); err == nil {
+		t.Fatal("RemoveSQLiteFiles: expected an error for an undeletable -wal, got nil")
+	}
+
+	for _, path := range []string{dbPath, dbPath + "-journal", dbPath + "-shm"} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Errorf("expected %q to be removed despite the -wal failure, err=%v", path, err)
+		}
+	}
+	if _, err := os.Stat(dbPath + "-wal"); err != nil {
+		t.Errorf("expected the blocked -wal to remain, err=%v", err)
 	}
 }
 
@@ -319,6 +346,31 @@ func TestOpenWithPolicy_RebuildOnCorruption(t *testing.T) {
 	}
 }
 
+// TestRebuildOnCorruption_RemovalFails_DoesNotRetry pins the retry=true
+// guarantee (ADR-0013): if a file cannot be removed, the policy must not ask
+// for a retry that would open next to a leftover sidecar.
+func TestRebuildOnCorruption_RemovalFails_DoesNotRetry(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "corrupt.db")
+	if err := os.WriteFile(dbPath, []byte("x"), 0o644); err != nil {
+		t.Fatalf("failed to create %q: %v", dbPath, err)
+	}
+	blockRemoval(t, dbPath+"-wal")
+	corrupt := sqliteErrorWithCode(11)
+
+	calls := 0
+	err := OpenWithPolicy(dbPath, RebuildOnCorruption, func() error {
+		calls++
+		return corrupt
+	})
+
+	if calls != 1 {
+		t.Fatalf("open called %d times, want 1", calls)
+	}
+	if !errors.Is(err, corrupt) {
+		t.Fatalf("OpenWithPolicy error = %v, want it to wrap the original %v", err, corrupt)
+	}
+}
+
 func TestSQLiteCode(t *testing.T) {
 	tests := []struct {
 		name string
@@ -341,6 +393,15 @@ func TestSQLiteCode(t *testing.T) {
 
 func sqliteFilePaths(dbPath string) []string {
 	return []string{dbPath, dbPath + "-journal", dbPath + "-wal", dbPath + "-shm"}
+}
+
+// blockRemoval puts a non-empty directory at path, so os.Remove and os.Rename
+// onto or from it fail portably without permission tricks.
+func blockRemoval(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(path, "blocker"), 0o755); err != nil {
+		t.Fatalf("failed to create blocking directory %q: %v", path, err)
+	}
 }
 
 func sqliteErrorWithCode(code int) error {

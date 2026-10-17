@@ -2,6 +2,7 @@ package sqliteutil
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 
@@ -35,12 +36,21 @@ func IsSQLiteRecoverableError(err error) bool {
 
 // RemoveSQLiteFiles deletes a SQLite database and any sidecar files
 // (-journal, -wal, -shm) that may have been left behind by a crashed run.
-func RemoveSQLiteFiles(dbPath string) {
-	for _, path := range []string{dbPath, dbPath + "-journal", dbPath + "-wal", dbPath + "-shm"} {
+// Missing files are not an error. It tries every file and returns the joined
+// errors of those it could not remove.
+func RemoveSQLiteFiles(dbPath string) error {
+	var errs []error
+	for _, path := range sqliteFiles(dbPath) {
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-			slog.Default().Warn("failed to remove database file", "path", path, "error", err)
+			errs = append(errs, err)
 		}
 	}
+	return errors.Join(errs...)
+}
+
+// sqliteFiles lists a database and the sidecars SQLite may keep next to it.
+func sqliteFiles(dbPath string) []string {
+	return []string{dbPath, dbPath + "-journal", dbPath + "-wal", dbPath + "-shm"}
 }
 
 // CorruptionPolicy decides what happens when a store's open function fails
@@ -55,9 +65,9 @@ func RemoveSQLiteFiles(dbPath string) {
 //   - The policy is only called for recoverable errors, and at most once per
 //     OpenWithPolicy call; err is the error open returned.
 //   - retry=true means the policy has removed or moved the database and all
-//     of its sidecars (-journal, -wal, -shm), or attempted to, so open can
-//     start from an empty path; a failed removal surfaces as the retry's
-//     error. open has already closed its handle by the time the policy runs
+//     of its sidecars (-journal, -wal, -shm), so open can start from an empty
+//     path. A policy that could not do so returns retry=false with an error
+//     instead. open has already closed its handle by the time the policy runs
 //     (see OpenWithPolicy). out is ignored when retry is true.
 //   - retry=false means OpenWithPolicy returns out without retrying. out must
 //     then be non-nil; a policy returning (false, nil) breaks the contract and
@@ -101,11 +111,15 @@ func OpenWithPolicy(dbPath string, policy CorruptionPolicy, open func() error) e
 // RebuildOnCorruption is the CorruptionPolicy for derived indexes (links,
 // tags, properties, search) that are rebuilt from the Markdown files
 // (ADR-0001): it deletes the database and its sidecars and asks for a retry,
-// which recreates an empty database. Real-state stores still use it until
-// steps 2 and 3 of the ADR-0013 rollout give them their own policies.
+// which recreates an empty database. If a file cannot be removed it does not
+// retry, since opening next to a leftover sidecar could mix stale pages into
+// the new database. Real-state stores still use it until steps 2 and 3 of
+// the ADR-0013 rollout give them their own policies.
 func RebuildOnCorruption(dbPath string, err error) (bool, error) {
 	slog.Default().Warn("database corrupt, removing and retrying", "path", dbPath, "sqliteCode", sqliteCode(err), "error", err)
-	RemoveSQLiteFiles(dbPath)
+	if rmErr := RemoveSQLiteFiles(dbPath); rmErr != nil {
+		return false, fmt.Errorf("%w (removing the corrupt database for a rebuild failed: %v)", err, rmErr)
+	}
 	return true, nil
 }
 
