@@ -84,6 +84,13 @@ func newRepoWithRemote(t *testing.T, bareDir string) (*Repository, string) {
 // bare remote (e.g. an edit via the GitHub UI).
 func commitToRemote(t *testing.T, bareDir, filename, content string) {
 	t.Helper()
+	commitFilesToRemote(t, bareDir, map[string]string{filename: content})
+}
+
+// commitFilesToRemote is commitToRemote for several files in one commit; files
+// maps repository-relative paths to their new content.
+func commitFilesToRemote(t *testing.T, bareDir string, files map[string]string) {
+	t.Helper()
 	cloneDir := t.TempDir()
 	cloned, err := gogit.PlainClone(cloneDir, false, &gogit.CloneOptions{
 		URL:           "file://" + bareDir,
@@ -91,21 +98,23 @@ func commitToRemote(t *testing.T, bareDir, filename, content string) {
 		Auth:          nil,
 	})
 	if err != nil {
-		t.Fatalf("commitToRemote: PlainClone failed: %v", err)
+		t.Fatalf("commitFilesToRemote: PlainClone failed: %v", err)
 	}
 	wt, err := cloned.Worktree()
 	if err != nil {
-		t.Fatalf("commitToRemote: Worktree failed: %v", err)
+		t.Fatalf("commitFilesToRemote: Worktree failed: %v", err)
 	}
-	path := filepath.Join(cloneDir, filename)
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		t.Fatalf("commitToRemote: MkdirAll: %v", err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("commitToRemote: WriteFile: %v", err)
-	}
-	if _, err := wt.Add(filename); err != nil {
-		t.Fatalf("commitToRemote: Add failed: %v", err)
+	for filename, content := range files {
+		path := filepath.Join(cloneDir, filename)
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatalf("commitFilesToRemote: MkdirAll: %v", err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatalf("commitFilesToRemote: WriteFile: %v", err)
+		}
+		if _, err := wt.Add(filename); err != nil {
+			t.Fatalf("commitFilesToRemote: Add failed: %v", err)
+		}
 	}
 	if _, err := wt.Commit("external commit", &gogit.CommitOptions{
 		Author: &object.Signature{
@@ -114,17 +123,17 @@ func commitToRemote(t *testing.T, bareDir, filename, content string) {
 			When:  time.Now(),
 		},
 	}); err != nil {
-		t.Fatalf("commitToRemote: Commit failed: %v", err)
+		t.Fatalf("commitFilesToRemote: Commit failed: %v", err)
 	}
 	remote, err := cloned.Remote("origin")
 	if err != nil {
-		t.Fatalf("commitToRemote: Remote failed: %v", err)
+		t.Fatalf("commitFilesToRemote: Remote failed: %v", err)
 	}
 	if err := remote.Push(&gogit.PushOptions{
 		RefSpecs: []config.RefSpec{"refs/heads/main:refs/heads/main"},
 		Auth:     nil,
 	}); err != nil {
-		t.Fatalf("commitToRemote: Push failed: %v", err)
+		t.Fatalf("commitFilesToRemote: Push failed: %v", err)
 	}
 }
 
@@ -251,4 +260,22 @@ func deleteFromRemote(t *testing.T, bareDir, filename string) {
 	}); err != nil {
 		t.Fatalf("deleteFromRemote: Push failed: %v", err)
 	}
+}
+
+// remoteHeadCommit returns the commit the bare remote's main branch points at.
+func remoteHeadCommit(t *testing.T, bareDir string) *object.Commit {
+	t.Helper()
+	bare, err := gogit.PlainOpen(bareDir)
+	if err != nil {
+		t.Fatalf("remoteHeadCommit: PlainOpen: %v", err)
+	}
+	ref, err := bare.Reference(plumbing.NewBranchReferenceName("main"), true)
+	if err != nil {
+		t.Fatalf("remoteHeadCommit: remote has no main branch: %v", err)
+	}
+	commit, err := bare.CommitObject(ref.Hash())
+	if err != nil {
+		t.Fatalf("remoteHeadCommit: CommitObject: %v", err)
+	}
+	return commit
 }

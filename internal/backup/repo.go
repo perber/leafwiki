@@ -766,8 +766,15 @@ func (r *Repository) pullBeforeBackup() error {
 	}
 
 	if err := r.materializeContent(localCommit, remoteCommit); err != nil {
-		if errors.Is(err, errPullConflict) {
-			return err // materializeContent already set NeedsIntervention
+		var conflict *pullConflictError
+		if errors.As(err, &conflict) {
+			msg := "pull conflict: a wiki file has been modified both on the remote and locally; " +
+				"reset the conflicting file on the remote or wait for the next backup cycle to retry"
+			for _, path := range conflict.Paths {
+				slog.Error("pullBeforeBackup: "+msg, "remote", r.remoteForLog(), "file", path)
+			}
+			r.status.SetNeedsIntervention(msg)
+			return err
 		}
 		msg := fmt.Sprintf("failed to update local content from remote: %v", err)
 		slog.Error(msg, "remote", r.remoteForLog())

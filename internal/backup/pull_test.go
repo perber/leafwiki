@@ -233,6 +233,31 @@ func TestPull_CaseFoldedLiveLookup_DetectsDivergedContentUnderDifferentCase(t *t
 	}
 }
 
+// TestPull_CaseFoldedLiveLookup_AcceptsRemoteVersionUnderDifferentCase tests
+// that the "already applied" check goes through the same case-folded lookup as
+// the conflict check: a file renamed locally to a different case that already
+// holds the remote version is not a conflict and keeps that content.
+func TestPull_CaseFoldedLiveLookup_AcceptsRemoteVersionUnderDifferentCase(t *testing.T) {
+	bareDir := initBareRemote(t)
+	repo, rootDir := newRepoWithRemote(t, bareDir)
+	repo.liveFSCaseInsensitive = true // simulate Windows/macOS regardless of host
+
+	renamed := filepath.Join(rootDir, "Page.md")
+	if err := os.Rename(filepath.Join(rootDir, "page.md"), renamed); err != nil {
+		t.Fatalf("Rename: %v", err)
+	}
+	writeFileHelper(t, rootDir, "Page.md", "remote content\n")
+	commitToRemote(t, bareDir, "root/page.md", "remote content\n")
+
+	if err := repo.Pull(); err != nil {
+		t.Fatalf("expected Pull to accept the already-applied remote version, got: %v", err)
+	}
+	if snap := repo.Status(); snap.NeedsIntervention {
+		t.Errorf("expected NeedsIntervention = false, got details %q", snap.ConflictDetails)
+	}
+	readFileEqual(t, renamed, "remote content\n")
+}
+
 // TestPull_RemoteRewrittenBetweenListAndFetch tests that a remote history
 // rewrite landing in the narrow window between pullBeforeBackup listing the
 // remote branch tip and fetching it produces a clear NeedsIntervention
