@@ -289,7 +289,10 @@ light/dark mode application).
 - **`features/branding`** — branding settings form (`BrandingSettings.tsx`).
 - **`features/designtoggle`** — light/dark mode toggle (`DesignToggle.tsx`, `designmode.ts`).
 - **`features/editor`** — the markdown editor, the single biggest feature folder:
-  `MarkdownEditor.tsx`/`MarkdownCodeEditor.tsx` (CodeMirror-based), `MarkdownToolbar.tsx`,
+  `MarkdownEditor.tsx`/`MarkdownCodeEditor.tsx` (CodeMirror-based; `MarkdownEditor` composes
+  `useEditorFileUpload.ts` for paste/drop uploads, `useSplitPaneResize.ts` for the persisted
+  editor/preview split and `usePreviewScrollSync.ts` for cursor-to-preview scrolling),
+  `MarkdownToolbar.tsx`,
   `pageEditorStore.ts` (feature-local Zustand store owning draft content/dirty state),
   `useAutoSave.ts` (drives the fixed-window revision coalescing from
   [ADR-0003: Revision Coalescing (Fixed Window)](./adr/0003-revision-coalescing-fixed-window.md)), `useNavigationGuard.tsx`/
@@ -299,9 +302,12 @@ light/dark mode application).
 - **`features/favorites`** — per-user favorite star toggle and sidebar list
   (`FavoriteToggleButton.tsx`, `FavoritesSection.tsx`, `FavoriteItem.tsx`).
 - **`features/history`** — page revision history viewer + restore dialog
-  (`PageHistoryContent.tsx`, `RestoreRevisionDialog.tsx`, `pageHistory.ts`).
+  (`PageHistoryContent.tsx`, `RevisionDetailPanels.tsx` for the changes/diff, preview,
+  raw-text and assets panels, `lineDiff.ts` for the line diff, `RestoreRevisionDialog.tsx`,
+  `pageHistory.ts`).
 - **`features/imagepreview`** — click-to-zoom image preview dialog for content images.
-- **`features/importer`** — bulk-import UI (`Importer.tsx`) driving `internal/wiki/importer`'s
+- **`features/importer`** — bulk-import UI (`Importer.tsx`, view-state derivation in
+  `importerState.ts`) driving `internal/wiki/importer`'s
   plan create/execute flow.
 - **`features/links`** — backlink/outgoing-link status panel (`LinkInfo.tsx`,
   `linkStatusStore.ts`).

@@ -4,11 +4,8 @@ import { historyField, redo, undo } from '@codemirror/commands'
 import { EditorView } from '@codemirror/view'
 import { Code2, Eye } from 'lucide-react'
 import {
-  ClipboardEvent,
-  DragEvent,
   forwardRef,
   JSX,
-  MouseEvent as ReactMouseEvent,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -25,14 +22,17 @@ import {
   replaceFilenameInText,
 } from './editorCommands'
 
-import { uploadAsset, UploadAssetResponse } from '@/lib/api/assets'
-import { mapApiError } from '@/lib/api/errors'
-import { formatBytes, IMAGE_EXTENSIONS, PDF_EXTENSIONS } from '@/lib/config'
 import { useConfigStore } from '@/stores/config'
 import { useEditorStore } from '@/stores/editor'
 import { toast } from 'sonner'
 import { usePageEditorStore } from './pageEditorStore'
-import { slugifyHeadline } from '../preview/rehypeLineNumber'
+import { useEditorFileUpload } from './useEditorFileUpload'
+import { usePreviewScrollSync } from './usePreviewScrollSync'
+import {
+  MAX_EDITOR_PANE_WIDTH,
+  MIN_EDITOR_PANE_WIDTH,
+  useSplitPaneResize,
+} from './useSplitPaneResize'
 import { htmlToMarkdown } from './htmlToMarkdown'
 import { uploadInlineDataUriImages } from './pasteImageUpload'
 
@@ -59,80 +59,17 @@ type Props = {
   pageId: string
 }
 
-const DEFAULT_EDITOR_PANE_WIDTH = 50
-const MIN_EDITOR_PANE_WIDTH = 25
-const MAX_EDITOR_PANE_WIDTH = 75
-const EDITOR_PANE_WIDTH_STORAGE_KEY = 'leafwiki-editor-pane-width'
-
-function clampEditorPaneWidth(value: number) {
-  return Math.min(MAX_EDITOR_PANE_WIDTH, Math.max(MIN_EDITOR_PANE_WIDTH, value))
-}
-
-function getInitialEditorPaneWidth() {
-  if (typeof window === 'undefined') return DEFAULT_EDITOR_PANE_WIDTH
-
-  const storedValue = window.localStorage.getItem(EDITOR_PANE_WIDTH_STORAGE_KEY)
-  const parsed = Number.parseFloat(storedValue ?? '')
-
-  if (Number.isNaN(parsed)) return DEFAULT_EDITOR_PANE_WIDTH
-
-  return clampEditorPaneWidth(parsed)
-}
-
 const MarkdownEditor = (
   { initialValue = '', onChange, pageId }: Props,
   ref: React.ForwardedRef<MarkdownEditorRef>,
 ) => {
-  const findHeadingTarget = useCallback(
-    (preview: HTMLDivElement, line: number): HTMLElement | null => {
-      const headingByLine = preview.querySelector(
-        `h1[data-line='${line}'], h2[data-line='${line}'], h3[data-line='${line}'], h4[data-line='${line}'], h5[data-line='${line}'], h6[data-line='${line}']`,
-      ) as HTMLElement | null
-      if (headingByLine) return headingByLine
-
-      const lineText = editorViewRef.current?.state.doc.line(line).text ?? ''
-      const headingMatch = lineText.match(/^\s{0,3}(#{1,6})\s+(.*)$/)
-      if (!headingMatch) return null
-
-      const headingText = headingMatch[2].replace(/<[^>]*>/g, ' ').trim()
-      const headingId = slugifyHeadline(headingText)
-      if (!headingId) return null
-
-      const escapedId =
-        typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
-          ? CSS.escape(headingId)
-          : headingId
-
-      return preview.querySelector(`#${escapedId}`) as HTMLElement | null
-    },
-    [],
-  )
-
   const { t } = useTranslation('editor')
-  const previewRef = useRef<HTMLDivElement | null>(null)
-  const desktopSplitRef = useRef<HTMLDivElement | null>(null)
 
-  const setPreviewRef = useCallback((node: HTMLDivElement | null) => {
-    if (node) {
-      previewRef.current = node
-    }
-  }, [])
   const path = usePageEditorStore((s) => s.page?.path)
   const editorViewRef = useRef<EditorView | null>(null)
-  const rafRef = useRef<number | null>(null)
-  const currentCursorLineRef = useRef<number | null>(null)
-  const liveEditorPaneWidthRef = useRef(DEFAULT_EDITOR_PANE_WIDTH)
-  const resizeHandlersRef = useRef<{
-    onMouseMove: (event: MouseEvent) => void
-    onMouseUp: () => void
-  } | null>(null)
   const [assetVersion, setAssetVersion] = useState(() => Date.now()) // Initial version based on current timestamp
 
   const [markdown, setMarkdown] = useState(initialValue)
-  const [editorPaneWidth, setEditorPaneWidth] = useState(
-    getInitialEditorPaneWidth,
-  )
-  const [isResizingSplit, setIsResizingSplit] = useState(false)
   const debouncedPreview = useDebounce(markdown, 100)
   const isMobile = useIsMobile()
   const maxAssetUploadSizeBytes = useConfigStore(
@@ -149,153 +86,36 @@ const MarkdownEditor = (
 
   const [activeTab, setActiveTab] = useState<'editor' | 'preview'>('editor')
 
-  useEffect(() => {
-    liveEditorPaneWidthRef.current = editorPaneWidth
-  }, [editorPaneWidth])
+  const {
+    desktopSplitRef,
+    editorPaneWidth,
+    isResizingSplit,
+    handleSplitResize,
+  } = useSplitPaneResize({ isMobile, showPreview, previewStacked })
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    window.localStorage.setItem(
-      EDITOR_PANE_WIDTH_STORAGE_KEY,
-      String(editorPaneWidth),
-    )
-  }, [editorPaneWidth])
+  const { setPreviewRef, onCursorLineChange } = usePreviewScrollSync({
+    editorViewRef,
+    showPreview,
+    previewContent: debouncedPreview,
+    assetVersion,
+  })
 
-  // Uploads a single file and inserts its markdown reference into the editor.
-  // Shared by paste-of-files and the drag-and-drop handler below. `insertPos`
-  // pins the insertion to a specific document offset (the drop point); when
-  // omitted, the cursor position at the time the upload resolves is used
-  // instead, which is what paste wants.
-  const uploadFileToEditor = useCallback(
-    async (file: File, insertPos?: number) => {
-      if (file.size > maxAssetUploadSizeBytes) {
-        toast.error(
-          t('markdownEditor.fileTooLarge', {
-            maxSize: formatBytes(maxAssetUploadSizeBytes),
-          }),
-        )
-        return
-      }
-
-      try {
-        const res: UploadAssetResponse = await uploadAsset(pageId, file)
-
-        toast.success(
-          t('markdownEditor.uploadedToast', { filename: file.name }),
-        )
-
-        // The result of uploadAsset looks like this:
-        // {"file":"/assets/0NmpvSivg/preview-scrollbar.gif"}
-        const uploadedFile = res.file
-        const ext = file.name.split('.').pop()?.toLowerCase()
-
-        const isImage =
-          file.type.startsWith('image/') || IMAGE_EXTENSIONS.includes(ext ?? '')
-        const isPdf =
-          file.type === 'application/pdf' || PDF_EXTENSIONS.includes(ext ?? '')
-
-        const markdown =
-          isImage || isPdf
-            ? `![${file.name}](${uploadedFile})\n`
-            : `[${file.name}](${uploadedFile})\n`
-
-        const view = editorViewRef.current
-        if (!view) return
-        // The document may have changed while the upload was in flight;
-        // clamp a caller-supplied drop position to the current doc length
-        // so it can't land out of range.
-        const from =
-          insertPos !== undefined
-            ? Math.min(insertPos, view.state.doc.length)
-            : view.state.selection.main.from
-        view.dispatch({
-          changes: { from, insert: markdown },
-          selection: { anchor: from + markdown.length },
-        })
-
-        const newDoc = view.state.doc.toString()
-        setMarkdown(newDoc)
-        onChange(newDoc)
-        editorViewRef.current?.focus()
-      } catch (err) {
-        console.error('Upload failed', err)
-        toast.error(
-          mapApiError(
-            err,
-            t('markdownEditor.uploadErrorFallback', { filename: file.name }),
-          ).message,
-        )
-      }
+  // syncFromView pushes the view's document into local state and to the
+  // parent — the step every programmatic edit below ends with.
+  const syncFromView = useCallback(
+    (view: EditorView) => {
+      const newDoc = view.state.doc.toString()
+      setMarkdown(newDoc)
+      onChange(newDoc)
     },
-    [editorViewRef, maxAssetUploadSizeBytes, onChange, pageId, setMarkdown, t],
+    [onChange],
   )
 
-  // Handles paste requests.
-  // This allows to paste images from clipboard directly into the editor.
-  const handlePaste = useCallback(
-    async (event: ClipboardEvent<HTMLDivElement>) => {
-      const { clipboardData } = event
-      if (!clipboardData) return
-
-      const files: File[] = []
-
-      if (clipboardData.files && clipboardData.files.length > 0) {
-        files.push(...Array.from(clipboardData.files))
-      } else if (clipboardData.items && clipboardData.items.length > 0) {
-        Array.from(clipboardData.items).forEach((item) => {
-          if (item.kind === 'file') {
-            const file = item.getAsFile()
-            if (file) {
-              files.push(file)
-            }
-          }
-        })
-      }
-
-      if (files.length === 0) {
-        return
-      }
-
-      // We take over the paste event to handle image files
-      event.preventDefault()
-      event.stopPropagation()
-
-      for (const file of files) {
-        await uploadFileToEditor(file)
-      }
-    },
-    [uploadFileToEditor],
-  )
-
-  // Dropping a file onto the editor is otherwise unhandled and falls through
-  // to the browser's native contenteditable behavior — which inlines images
-  // as bulky base64 data URIs and does nothing useful for a PDF or any other
-  // file type. Intercept every file drop and upload through the same path as
-  // paste, inserting at the drop point instead of wherever the text cursor
-  // happens to be. Only the first file anchors to the drop point; the rest
-  // chain off the cursor position paste itself just advanced to, the same
-  // way a multi-file paste stacks its insertions.
-  const handleDrop = useCallback(
-    async (event: DragEvent<HTMLDivElement>) => {
-      const files = Array.from(event.dataTransfer?.files ?? [])
-      if (files.length === 0) {
-        return
-      }
-
-      event.preventDefault()
-      event.stopPropagation()
-
-      const view = editorViewRef.current
-      const dropPos =
-        view?.posAtCoords({ x: event.clientX, y: event.clientY }) ??
-        view?.state.selection.main.from
-
-      for (let i = 0; i < files.length; i++) {
-        await uploadFileToEditor(files[i], i === 0 ? dropPos : undefined)
-      }
-    },
-    [editorViewRef, uploadFileToEditor],
-  )
+  const { handlePaste, handleDrop } = useEditorFileUpload({
+    editorViewRef,
+    pageId,
+    onDocChange: syncFromView,
+  })
 
   useEffect(() => {
     setMarkdown(initialValue)
@@ -364,11 +184,9 @@ const MarkdownEditor = (
       changes: { from: sel.from, to: sel.to, insert: md },
       selection: { anchor: sel.from + md.length },
     })
-    const newDoc = view.state.doc.toString()
-    setMarkdown(newDoc)
-    onChange(newDoc)
+    syncFromView(view)
     view.focus()
-  }, [maxAssetUploadSizeBytes, onChange, pageId, t])
+  }, [maxAssetUploadSizeBytes, pageId, syncFromView, t])
 
   const pastePlain = useCallback(async () => {
     const startView = editorViewRef.current
@@ -392,11 +210,9 @@ const MarkdownEditor = (
       changes: { from: sel.from, to: sel.to, insert: text },
       selection: { anchor: sel.from + text.length },
     })
-    const newDoc = view.state.doc.toString()
-    setMarkdown(newDoc)
-    onChange(newDoc)
+    syncFromView(view)
     view.focus()
-  }, [onChange, t])
+  }, [syncFromView, t])
 
   useImperativeHandle(ref, () => ({
     insertAtCursor: (text: string) => {
@@ -407,18 +223,14 @@ const MarkdownEditor = (
         changes: { from, insert: text },
         selection: { anchor: from + text.length },
       })
-      const newDoc = view.state.doc.toString()
-      setMarkdown(newDoc)
-      onChange(newDoc)
+      syncFromView(view)
       editorViewRef.current?.focus()
     },
     insertWrappedText: (before: string, after = before) => {
       const view = editorViewRef.current
       if (!view) return
       insertWrappedText(view, before, after)
-      const newDoc = view.state.doc.toString()
-      setMarkdown(newDoc)
-      onChange(newDoc)
+      syncFromView(view)
       editorViewRef.current?.focus()
     },
     replaceSelection: (text: string) => {
@@ -429,18 +241,14 @@ const MarkdownEditor = (
         changes: { from, to, insert: text },
         selection: { anchor: from + text.length },
       })
-      const newDoc = view.state.doc.toString()
-      setMarkdown(newDoc)
-      onChange(newDoc)
+      syncFromView(view)
       editorViewRef.current?.focus()
     },
     insertHeading: (level: 1 | 2 | 3) => {
       const view = editorViewRef.current
       if (!view) return
       insertHeadingAtStart(view, level)
-      const newDoc = view.state.doc.toString()
-      setMarkdown(newDoc)
-      onChange(newDoc)
+      syncFromView(view)
       editorViewRef.current?.focus()
     },
     replaceFilenameInMarkdown: (before: string, after: string) => {
@@ -517,166 +325,6 @@ const MarkdownEditor = (
     },
     [setAssetVersion],
   )
-
-  const scrollPreviewToLine = useCallback(
-    (line: number, behavior: ScrollBehavior = 'smooth') => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-
-      rafRef.current = requestAnimationFrame(() => {
-        const preview = previewRef.current
-        if (!preview) return
-
-        let target =
-          findHeadingTarget(preview, line) ??
-          (preview.querySelector(`[data-line='${line}']`) as HTMLElement | null)
-
-        if (!target) {
-          for (let i = line - 1; i > 0; i--) {
-            const fallback = preview.querySelector(
-              `[data-line='${i}']`,
-            ) as HTMLElement | null
-            if (fallback) {
-              target = fallback
-              break
-            }
-          }
-        }
-
-        if (target) {
-          // Measure relative to the preview viewport instead of relying on
-          // offsetTop, which can be relative to an intermediate offsetParent.
-          const previewRect = preview.getBoundingClientRect()
-          const targetRect = target.getBoundingClientRect()
-          const offsetTop = targetRect.top - previewRect.top + preview.scrollTop
-
-          const targetHeight = target.offsetHeight
-          const containerHeight = preview.clientHeight
-          const maxScrollTop = Math.max(
-            0,
-            preview.scrollHeight - containerHeight,
-          )
-          const desiredScrollTop = Math.max(
-            0,
-            Math.min(
-              maxScrollTop,
-              offsetTop - containerHeight / 2 + targetHeight / 2,
-            ),
-          )
-
-          const threshold = 16
-          const distance = Math.abs(preview.scrollTop - desiredScrollTop)
-
-          if (distance > threshold) {
-            preview.scrollTo({ top: desiredScrollTop, behavior })
-          }
-        }
-      })
-    },
-    [findHeadingTarget],
-  )
-
-  const onCursorLineChange = useCallback(
-    (line: number) => {
-      currentCursorLineRef.current = line
-      scrollPreviewToLine(line, 'smooth')
-    },
-    [scrollPreviewToLine],
-  )
-
-  useEffect(() => {
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!showPreview) return
-    const currentLine = currentCursorLineRef.current
-    if (currentLine == null) return
-
-    scrollPreviewToLine(currentLine, 'auto')
-  }, [assetVersion, debouncedPreview, scrollPreviewToLine, showPreview])
-
-  useEffect(() => {
-    if (!showPreview) return
-
-    const preview = previewRef.current
-    const content = preview?.firstElementChild
-    if (!preview || !content || typeof ResizeObserver === 'undefined') return
-
-    const observer = new ResizeObserver(() => {
-      const currentLine = currentCursorLineRef.current
-      if (currentLine == null) return
-
-      scrollPreviewToLine(currentLine, 'auto')
-    })
-
-    observer.observe(content)
-
-    return () => {
-      observer.disconnect()
-    }
-  }, [assetVersion, debouncedPreview, scrollPreviewToLine, showPreview])
-
-  useEffect(() => {
-    if (!isResizingSplit || !resizeHandlersRef.current) return
-
-    const { onMouseMove, onMouseUp } = resizeHandlersRef.current
-    document.addEventListener('mousemove', onMouseMove)
-    document.addEventListener('mouseup', onMouseUp)
-
-    return () => {
-      document.removeEventListener('mousemove', onMouseMove)
-      document.removeEventListener('mouseup', onMouseUp)
-    }
-  }, [isResizingSplit])
-
-  useEffect(
-    () => () => {
-      if (!resizeHandlersRef.current) return
-
-      const { onMouseMove, onMouseUp } = resizeHandlersRef.current
-      document.removeEventListener('mousemove', onMouseMove)
-      document.removeEventListener('mouseup', onMouseUp)
-    },
-    [],
-  )
-
-  const handleSplitResize = (event: ReactMouseEvent<HTMLDivElement>) => {
-    if (isMobile || !showPreview) return
-
-    event.preventDefault()
-    event.stopPropagation()
-
-    const startPosition = previewStacked ? event.clientY : event.clientX
-    const startWidth = editorPaneWidth
-    const splitRect = desktopSplitRef.current?.getBoundingClientRect()
-    const splitSize =
-      (previewStacked ? splitRect?.height : splitRect?.width) ||
-      (previewStacked ? window.innerHeight : window.innerWidth)
-
-    const onMouseMove = (moveEvent: MouseEvent) => {
-      const currentPosition = previewStacked
-        ? moveEvent.clientY
-        : moveEvent.clientX
-      const delta = currentPosition - startPosition
-      const nextWidth = clampEditorPaneWidth(
-        startWidth + (delta / splitSize) * 100,
-      )
-
-      liveEditorPaneWidthRef.current = nextWidth
-      setEditorPaneWidth(nextWidth)
-    }
-
-    const onMouseUp = () => {
-      setEditorPaneWidth(liveEditorPaneWidthRef.current)
-      setIsResizingSplit(false)
-      resizeHandlersRef.current = null
-    }
-
-    resizeHandlersRef.current = { onMouseMove, onMouseUp }
-    setIsResizingSplit(true)
-  }
 
   const renderToolbar = useCallback((): JSX.Element => {
     return (

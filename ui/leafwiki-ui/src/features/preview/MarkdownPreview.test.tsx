@@ -546,3 +546,72 @@ describe('MarkdownPreview sanitizes raw HTML', () => {
     expect(container.querySelector('mark')?.textContent).toBe('hi')
   })
 })
+
+describe('MarkdownPreview plain link tree refresh', () => {
+  const target: PageNode = {
+    id: 'target',
+    title: 'Target',
+    path: 'target',
+    slug: 'target',
+    version: 'v1',
+    kind: 'page',
+    children: null,
+  }
+  const moved: PageNode = { ...target, path: 'moved/target' }
+
+  beforeEach(() => {
+    useTreeStore.setState({ byId: {}, byPath: {} })
+    localStorage.setItem('design-mode', 'light')
+    useDesignModeStore.setState({ mode: 'light' })
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(prefers-color-scheme: light)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+  })
+
+  function renderTargetLink() {
+    return render(
+      <MemoryRouter>
+        <TooltipProvider>
+          <MarkdownPreview content="[Target](/target)" />
+        </TooltipProvider>
+      </MemoryRouter>,
+    )
+  }
+
+  it('resolves a plain markdown link when the tree arrives later', () => {
+    const { container } = renderTargetLink()
+    expect(container.querySelector('a[href="/target"]')).toBeNull()
+
+    act(() =>
+      useTreeStore.setState({
+        byId: { target },
+        byPath: { target },
+      }),
+    )
+
+    expect(container.querySelector('a[href="/target"]')?.textContent).toBe(
+      'Target',
+    )
+  })
+
+  it('unresolves a plain markdown link when the target is moved away', () => {
+    useTreeStore.setState({ byId: { target }, byPath: { target } })
+    const { container } = renderTargetLink()
+    expect(container.querySelector('a[href="/target"]')).not.toBeNull()
+
+    act(() =>
+      useTreeStore.setState({
+        byId: { target: moved },
+        byPath: { 'moved/target': moved },
+      }),
+    )
+    expect(container.querySelector('a[href="/target"]')).toBeNull()
+  })
+})
