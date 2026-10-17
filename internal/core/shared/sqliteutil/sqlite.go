@@ -1,11 +1,15 @@
 package sqliteutil
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	sqlite "modernc.org/sqlite"
@@ -65,12 +69,14 @@ func sqliteFiles(dbPath string) []string {
 // Contract, enforced by OpenWithPolicy and its policy table test:
 //
 //   - The policy is only called for recoverable errors, and at most once per
-//     OpenWithPolicy call; err is the error open returned.
+//     OpenWithPolicy call; err is the error of the read-only probe or of open
+//     (see OpenWithPolicy).
 //   - retry=true means the policy has removed or moved the database and all
 //     of its sidecars (-journal, -wal, -shm), so open can start from an empty
 //     path. A policy that could not do so returns retry=false with an error
-//     instead. open has already closed its handle by the time the policy runs
-//     (see OpenWithPolicy). out is ignored when retry is true.
+//     instead. No handle to the database is open when the policy runs: the
+//     probe closes its own, and open closes its handle before returning an
+//     error (see OpenWithPolicy). out is ignored when retry is true.
 //   - retry=false means OpenWithPolicy returns out without retrying. out must
 //     then be non-nil; a policy returning (false, nil) breaks the contract and
 //     OpenWithPolicy returns the original err, so a faulty policy can never
@@ -84,6 +90,19 @@ type CorruptionPolicy func(dbPath string, err error) (retry bool, out error)
 // more. Non-recoverable errors and the error of the retry are returned
 // unchanged.
 //
+// Before open runs, an existing non-empty file is probed read-only. If the
+// probe already fails with a recoverable error, policy gets that error and
+// open runs only if policy asks for a retry. A read-write connection to a
+// database whose header SQLite cannot read discards the -wal, even one that
+// holds committed transactions, so without the probe that sidecar would be
+// gone before FailOnCorruption or QuarantineOnCorruption could keep it. The
+// guard fails closed: if the probe cannot read an existing file for any
+// other reason, OpenWithPolicy returns that error and open never runs. The
+// one exception is SQLITE_READONLY_* (a hot journal or a WAL that needs
+// recovery): only a read-write connection can do that recovery, so open runs.
+// The probe only reads the header and the schema; corruption deeper in the
+// file still surfaces from open, after a read-write connection was made.
+//
 // Each store keeps its own opening mechanics (eager sql.Open, a lazy
 // Connect(), or a fully lazy withDB helper) inside the closure; only the
 // recovery sequence is shared. policy must not be nil: there is deliberately
@@ -93,12 +112,18 @@ func OpenWithPolicy(dbPath string, policy CorruptionPolicy, open func() error) e
 	if policy == nil {
 		panic("sqliteutil: nil CorruptionPolicy")
 	}
-	err := open()
-	if err == nil {
-		return nil
-	}
-	if !IsSQLiteRecoverableError(err) {
-		return err
+	err := probeReadOnly(dbPath)
+	switch {
+	case err == nil || needsWriteToRecover(err):
+		err = open()
+		if err == nil {
+			return nil
+		}
+		if !IsSQLiteRecoverableError(err) {
+			return err
+		}
+	case !IsSQLiteRecoverableError(err):
+		return fmt.Errorf("could not check %s read-only before opening it: %w", dbPath, err)
 	}
 	retry, out := policy(dbPath, err)
 	if !retry {
@@ -108,6 +133,70 @@ func OpenWithPolicy(dbPath string, policy CorruptionPolicy, open func() error) e
 		return out
 	}
 	return open()
+}
+
+// probeReadOnly opens an existing, non-empty database read-only, reads its
+// schema and closes it again, returning the error SQLite reports. A missing
+// or empty file is a valid new database and is not probed.
+func probeReadOnly(dbPath string) error {
+	info, err := os.Stat(dbPath)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if info.Size() == 0 {
+		return nil
+	}
+	dsn, err := readOnlyDSN(dbPath)
+	if err != nil {
+		return err
+	}
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = db.Close() }()
+	_, err = db.Exec("SELECT count(*) FROM sqlite_master")
+	return err
+}
+
+// readOnlyDSN builds a read-only URI for dbPath. mode=ro is only honoured in
+// URI form (a plain path with ?mode=ro opens read-write), and a URI path must
+// be absolute: a relative one such as the default ./data would become
+// file:///data/... and fail to open.
+func readOnlyDSN(dbPath string) (string, error) {
+	abs, err := filepath.Abs(dbPath)
+	if err != nil {
+		return "", err
+	}
+	path := filepath.ToSlash(stripLongPathPrefix(abs))
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path // Windows drive letter: file:///C:/...
+	}
+	// A UNC path (//server/share/...) gets an empty authority:
+	// file:////server/share/..., which SQLite on Windows opens as UNC.
+	u := url.URL{Scheme: "file", Path: path, RawQuery: "mode=ro&_pragma=busy_timeout(5000)"}
+	return u.String(), nil
+}
+
+// stripLongPathPrefix removes the Windows extended-length prefix, which a
+// file: URI cannot express: \\?\C:\x becomes C:\x and \\?\UNC\srv\share
+// becomes \\srv\share.
+func stripLongPathPrefix(p string) string {
+	if rest, ok := strings.CutPrefix(p, `\\?\UNC\`); ok {
+		return `\\` + rest
+	}
+	return strings.TrimPrefix(p, `\\?\`)
+}
+
+// needsWriteToRecover reports a probe error that only a read-write
+// connection can resolve: SQLITE_READONLY_ROLLBACK (a hot journal) or
+// SQLITE_READONLY_RECOVERY (a WAL that needs recovery), both primary code
+// SQLITE_READONLY (8). That is SQLite's own crash recovery, not corruption.
+func needsWriteToRecover(err error) bool {
+	return sqliteCode(err)&0xFF == 8
 }
 
 // RebuildOnCorruption is the CorruptionPolicy for derived indexes (links,
@@ -140,7 +229,8 @@ func sqliteCode(err error) int {
 const quarantineTimeFormat = "20060102T150405Z"
 
 // now and rename are package variables so tests can pin the quarantine name
-// and simulate a failed rename.
+// and simulate a failed rename. Tests that replace them must not run in
+// parallel.
 var (
 	now    = time.Now
 	rename = os.Rename

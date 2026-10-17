@@ -1,11 +1,13 @@
 package sqliteutil
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -307,10 +309,11 @@ func TestOpenWithPolicy_RebuildOnCorruption(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dbPath := filepath.Join(t.TempDir(), "corrupt.db")
 			paths := sqliteFilePaths(dbPath)
-			for _, path := range paths {
-				if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
-					t.Fatalf("failed to create %q: %v", path, err)
-				}
+			// An empty main file is a valid database, so the read-only probe
+			// passes and the scripted open results drive the policy.
+			writeTestFile(t, dbPath, "")
+			for _, path := range paths[1:] {
+				writeTestFile(t, path, "x")
 			}
 
 			calls := 0
@@ -353,9 +356,7 @@ func TestOpenWithPolicy_RebuildOnCorruption(t *testing.T) {
 // for a retry that would open next to a leftover sidecar.
 func TestRebuildOnCorruption_RemovalFails_DoesNotRetry(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "corrupt.db")
-	if err := os.WriteFile(dbPath, []byte("x"), 0o644); err != nil {
-		t.Fatalf("failed to create %q: %v", dbPath, err)
-	}
+	writeTestFile(t, dbPath, "") // passes the probe; the scripted open fails
 	blockRemoval(t, dbPath+"-wal")
 	corrupt := sqliteErrorWithCode(11)
 
@@ -394,14 +395,13 @@ func TestQuarantineOnCorruption(t *testing.T) {
 		sidecars      []string // sidecar suffixes present next to the db
 		existingQuar  bool     // a quarantined db with the same timestamp already exists
 		failRename    bool     // the second rename fails
-		wantQuarantin bool
-		wantOpenCalls int
+		wantQuarantin bool     // files moved and retry requested
 	}{
-		{name: "moves the db and every sidecar", sidecars: []string{"-journal", "-wal", "-shm"}, wantQuarantin: true, wantOpenCalls: 2},
-		{name: "moves only the sidecars that exist", sidecars: []string{"-wal"}, wantQuarantin: true, wantOpenCalls: 2},
-		{name: "db without sidecars", wantQuarantin: true, wantOpenCalls: 2},
-		{name: "failed rename moves back and does not retry", sidecars: []string{"-wal", "-shm"}, failRename: true, wantOpenCalls: 1},
-		{name: "never overwrites an earlier quarantine", sidecars: []string{"-wal"}, existingQuar: true, wantOpenCalls: 1},
+		{name: "moves the db and every sidecar", sidecars: []string{"-journal", "-wal", "-shm"}, wantQuarantin: true},
+		{name: "moves only the sidecars that exist", sidecars: []string{"-wal"}, wantQuarantin: true},
+		{name: "db without sidecars", wantQuarantin: true},
+		{name: "failed rename moves back and does not retry", sidecars: []string{"-wal", "-shm"}, failRename: true},
+		{name: "never overwrites an earlier quarantine", sidecars: []string{"-wal"}, existingQuar: true},
 	}
 
 	for _, tt := range tests {
@@ -425,21 +425,14 @@ func TestQuarantineOnCorruption(t *testing.T) {
 			}
 			corrupt := sqliteErrorWithCode(26)
 
-			openCalls := 0
-			err := OpenWithPolicy(dbPath, QuarantineOnCorruption, func() error {
-				openCalls++
-				if openCalls == 1 {
-					return corrupt
-				}
-				return nil
-			})
+			retry, err := QuarantineOnCorruption(dbPath, corrupt)
 
-			if openCalls != tt.wantOpenCalls {
-				t.Fatalf("open called %d times, want %d", openCalls, tt.wantOpenCalls)
+			if retry != tt.wantQuarantin {
+				t.Fatalf("QuarantineOnCorruption retry = %v, want %v (err %v)", retry, tt.wantQuarantin, err)
 			}
 			if !tt.wantQuarantin {
 				if !errors.Is(err, corrupt) {
-					t.Fatalf("OpenWithPolicy error = %v, want it to wrap the original %v", err, corrupt)
+					t.Fatalf("QuarantineOnCorruption error = %v, want it to wrap the original %v", err, corrupt)
 				}
 				for path, content := range original {
 					assertFileContent(t, path, content)
@@ -453,7 +446,7 @@ func TestQuarantineOnCorruption(t *testing.T) {
 			}
 
 			if err != nil {
-				t.Fatalf("OpenWithPolicy: unexpected error %v", err)
+				t.Fatalf("QuarantineOnCorruption: unexpected error %v", err)
 			}
 			for path, content := range original {
 				assertMissing(t, path)
@@ -497,6 +490,193 @@ func TestQuarantineOnCorruption_FailedMoveBack_KeepsEveryByte(t *testing.T) {
 	assertFileContent(t, dbPath+"-wal", "wal bytes")
 }
 
+// TestProbeReadOnly runs the probe against real files, with absolute and
+// relative paths: the default --data-dir is the relative ./data, and a
+// relative path the probe cannot open would let the read-write open discard
+// the -wal (ADR-0013).
+func TestProbeReadOnly(t *testing.T) {
+	files := []struct {
+		name            string
+		setup           func(t *testing.T, path string)
+		wantRecoverable bool
+	}{
+		{name: "missing file", setup: func(*testing.T, string) {}},
+		{name: "0-byte file", setup: func(t *testing.T, path string) { writeTestFile(t, path, "") }},
+		{name: "healthy database", setup: func(t *testing.T, path string) {
+			if err := openReadWrite(t, path); err != nil {
+				t.Fatalf("create database: %v", err)
+			}
+		}},
+		{name: "not a database", setup: func(t *testing.T, path string) {
+			writeTestFile(t, path, "this is not a sqlite database, just bytes!!")
+		}, wantRecoverable: true},
+	}
+
+	for _, relative := range []bool{false, true} {
+		for _, f := range files {
+			name := "absolute/" + f.name
+			if relative {
+				name = "relative/" + f.name
+			}
+			t.Run(name, func(t *testing.T) {
+				dir := t.TempDir()
+				dbPath := filepath.Join(dir, "probe.db")
+				if relative {
+					t.Chdir(dir)
+					dbPath = filepath.Join(".", "probe.db")
+				}
+				f.setup(t, dbPath)
+
+				err := probeReadOnly(dbPath)
+
+				if got := IsSQLiteRecoverableError(err); got != f.wantRecoverable {
+					t.Fatalf("probeReadOnly(%q) = %v, recoverable %v, want recoverable %v", dbPath, err, got, f.wantRecoverable)
+				}
+				if !f.wantRecoverable && err != nil {
+					t.Fatalf("probeReadOnly(%q): unexpected error %v", dbPath, err)
+				}
+			})
+		}
+	}
+}
+
+// TestOpenWithPolicy_ProbeCannotRead_FailsClosed pins that an existing file
+// the probe cannot read for a non-recoverable reason stops the open instead
+// of falling through to a read-write open that could discard the -wal.
+func TestOpenWithPolicy_ProbeCannotRead_FailsClosed(t *testing.T) {
+	// An unreadable file exists and is non-empty, but SQLite cannot open it:
+	// SQLITE_CANTOPEN, which is not recoverable.
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs POSIX file permissions that the current user cannot bypass")
+	}
+	dbPath := filepath.Join(t.TempDir(), "unreadable.db")
+	writeTestFile(t, dbPath, "this is not a sqlite database, just bytes!!")
+	if err := os.Chmod(dbPath, 0o000); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dbPath, 0o644) })
+
+	policyCalls, openCalls := 0, 0
+	err := OpenWithPolicy(dbPath, func(string, error) (bool, error) {
+		policyCalls++
+		return true, nil
+	}, func() error {
+		openCalls++
+		return nil
+	})
+
+	if err == nil {
+		t.Fatal("OpenWithPolicy: expected the probe error, got nil")
+	}
+	if policyCalls != 0 || openCalls != 0 {
+		t.Fatalf("policy called %d times, open called %d times, want neither", policyCalls, openCalls)
+	}
+}
+
+func TestNeedsWriteToRecover(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "SQLITE_READONLY_ROLLBACK (hot journal)", err: sqliteErrorWithCode(8 | (3 << 8)), want: true},
+		{name: "SQLITE_READONLY_RECOVERY (WAL needs recovery)", err: sqliteErrorWithCode(8 | (1 << 8)), want: true},
+		{name: "SQLITE_NOTADB", err: sqliteErrorWithCode(26)},
+		{name: "SQLITE_CANTOPEN", err: sqliteErrorWithCode(14)},
+		{name: "non-sqlite error", err: errors.New("boom")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := needsWriteToRecover(tt.err); got != tt.want {
+				t.Fatalf("needsWriteToRecover(%v) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestStripLongPathPrefix(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "drive path", in: `\\?\C:\data\users.db`, want: `C:\data\users.db`},
+		{name: "UNC path", in: `\\?\UNC\server\share\users.db`, want: `\\server\share\users.db`},
+		{name: "plain path is unchanged", in: `C:\data\users.db`, want: `C:\data\users.db`},
+		{name: "POSIX path is unchanged", in: "/srv/data/users.db", want: "/srv/data/users.db"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := stripLongPathPrefix(tt.in); got != tt.want {
+				t.Fatalf("stripLongPathPrefix(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestOpenWithPolicy_ProbesBeforeOpen pins why OpenWithPolicy looks at an
+// existing file read-only before open runs: a read-write connection to a
+// database whose header SQLite cannot read discards the -wal, even when it
+// holds committed transactions, before any policy could keep it (ADR-0013).
+func TestOpenWithPolicy_ProbesBeforeOpen(t *testing.T) {
+	tests := []struct {
+		name          string
+		page1InWAL    bool // the WAL holds page 1, so SQLite can still read the database
+		breakHeader   bool
+		wantPolicy    bool
+		wantOpenCalls int
+	}{
+		{name: "healthy database with a WAL opens normally", wantOpenCalls: 1},
+		{name: "broken header with a committed WAL reaches the policy before open", breakHeader: true, wantPolicy: true},
+		{name: "broken header that the WAL repairs is left to SQLite", page1InWAL: true, breakHeader: true, wantOpenCalls: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dbPath := writeDatabaseWithCommittedWAL(t, tt.page1InWAL)
+			if tt.breakHeader {
+				raw, err := os.ReadFile(dbPath)
+				if err != nil {
+					t.Fatalf("read %q: %v", dbPath, err)
+				}
+				copy(raw, "not a sqlite header!")
+				writeTestFile(t, dbPath, string(raw))
+			}
+			wal, err := os.ReadFile(dbPath + "-wal")
+			if err != nil {
+				t.Fatalf("read -wal: %v", err)
+			}
+			typed := errors.New("policy refused")
+
+			policyCalls, openCalls := 0, 0
+			err = OpenWithPolicy(dbPath, func(string, error) (bool, error) {
+				policyCalls++
+				return false, typed
+			}, func() error {
+				openCalls++
+				return openReadWrite(t, dbPath)
+			})
+
+			if gotPolicy := policyCalls == 1; gotPolicy != tt.wantPolicy {
+				t.Fatalf("policy called %d times, want called=%v", policyCalls, tt.wantPolicy)
+			}
+			if openCalls != tt.wantOpenCalls {
+				t.Fatalf("open called %d times, want %d", openCalls, tt.wantOpenCalls)
+			}
+			if tt.wantPolicy {
+				if err != typed {
+					t.Fatalf("OpenWithPolicy error = %v, want the policy error", err)
+				}
+				assertFileContent(t, dbPath+"-wal", string(wal))
+			} else if err != nil {
+				t.Fatalf("OpenWithPolicy: unexpected error %v", err)
+			}
+		})
+	}
+}
+
 func TestSQLiteCode(t *testing.T) {
 	tests := []struct {
 		name string
@@ -519,6 +699,53 @@ func TestSQLiteCode(t *testing.T) {
 
 func sqliteFilePaths(dbPath string) []string {
 	return []string{dbPath, dbPath + "-journal", dbPath + "-wal", dbPath + "-shm"}
+}
+
+// writeDatabaseWithCommittedWAL returns the path of a copy of a WAL-mode
+// database taken while its last transaction is still only in the -wal.
+// Without page1InWAL the schema is checkpointed first, so the WAL holds a
+// data page but not page 1.
+func writeDatabaseWithCommittedWAL(t *testing.T, page1InWAL bool) string {
+	t.Helper()
+	src := filepath.Join(t.TempDir(), "src.db")
+	db, err := sql.Open("sqlite", src+"?_pragma=journal_mode(WAL)&_pragma=wal_autocheckpoint(0)")
+	if err != nil {
+		t.Fatalf("open source: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	db.SetMaxOpenConns(1)
+	stmts := []string{"CREATE TABLE t(x)", "INSERT INTO t VALUES (1)"}
+	if !page1InWAL {
+		stmts = append(stmts, "PRAGMA wal_checkpoint(TRUNCATE)")
+	}
+	stmts = append(stmts, "INSERT INTO t VALUES (2)")
+	for _, stmt := range stmts {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+
+	dbPath := filepath.Join(t.TempDir(), "copy.db")
+	for _, suffix := range []string{"", "-wal"} {
+		raw, err := os.ReadFile(src + suffix)
+		if err != nil {
+			t.Fatalf("read %q: %v", src+suffix, err)
+		}
+		writeTestFile(t, dbPath+suffix, string(raw))
+	}
+	return dbPath
+}
+
+// openReadWrite opens dbPath the way the stores do and closes it again.
+func openReadWrite(t *testing.T, dbPath string) error {
+	t.Helper()
+	db, err := sql.Open("sqlite", dbPath+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = db.Close() }()
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS other(x)")
+	return err
 }
 
 func setNow(t *testing.T, at time.Time) {
