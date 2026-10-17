@@ -1678,7 +1678,7 @@
   }
 
   .page-viewer__subheader {
-    @apply bg-background/92 border-surface-border border-b backdrop-blur-sm md:h-12;
+    @apply bg-background/92 border-surface-border border-b backdrop-blur-sm md:min-h-12;
   }
 
   /* The subheader bar/border itself stays full-width (this is a sibling of
@@ -1713,7 +1713,7 @@
   }
 
   .page-viewer__subheader-inner {
-    @apply mx-auto flex w-full max-w-5xl flex-col gap-2 px-4 pt-0.75 pb-1.25 sm:px-8 md:h-full md:flex-row md:items-center md:justify-between md:gap-4 md:py-0;
+    @apply mx-auto flex w-full max-w-5xl flex-col gap-2 px-4 pt-0.75 pb-1.25 sm:px-8 md:min-h-12 md:flex-row md:items-center md:justify-between md:gap-4 md:py-1;
   }
 
   .page-viewer__subheader-main {
@@ -2305,6 +2305,48 @@
   }
 
   @media screen {
+    /* One reading column keeps prose, media and technical blocks aligned. */
+    .page-viewer__content {
+      inline-size: 100%;
+      min-inline-size: 0;
+      max-inline-size: 680px;
+      margin-inline: auto;
+    }
+
+    /* Match the article's phone/desktop gutters and center within the reserved TOC space. */
+    .page-viewer__subheader-inner,
+    .page-viewer__metadata-bar-inner {
+      inline-size: calc(100% - 2rem);
+      max-inline-size: 680px;
+      padding-inline: 0;
+    }
+
+    @media (min-width: 640px) {
+      .page-viewer__subheader-inner,
+      .page-viewer__metadata-bar-inner {
+        inline-size: calc(100% - 4rem);
+      }
+    }
+
+    .page-viewer__body > .backlinks__pane {
+      inline-size: 100%;
+      max-inline-size: 680px;
+      margin-inline: auto;
+    }
+
+    .page-viewer__metadata-bar .page-metadata__properties {
+      min-inline-size: 0;
+    }
+
+    .page-viewer__metadata-bar .page-metadata__props-list {
+      inline-size: 100%;
+    }
+
+    .page-viewer__metadata-bar .page-metadata__prop-value {
+      min-inline-size: 0;
+      overflow-wrap: anywhere;
+    }
+
     :is(
       .page-viewer__content,
       .markdown-editor__preview,
