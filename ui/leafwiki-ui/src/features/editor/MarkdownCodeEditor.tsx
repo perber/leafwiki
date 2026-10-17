@@ -252,6 +252,14 @@ export default function MarkdownCodeEditor({
               event.preventDefault()
             }
           },
+          // CodeMirror's built-in drop handler reads every dropped file as
+          // text and inlines whatever doesn't look binary (.txt, .md, .csv…).
+          // File drops are uploads, handled by the outer React onDrop
+          // (useEditorFileUpload); returning true skips CodeMirror's handler
+          // while the event still bubbles there.
+          drop(event) {
+            return (event.dataTransfer?.files.length ?? 0) > 0
+          },
           // Rich paste (HTML → Markdown) is not wired to the plain paste event
           // here — it's only reachable via the Shift-Mod-v keymap above and the
           // toolbar buttons while it's being tested. Plain Ctrl/Cmd+V and file
