@@ -164,6 +164,59 @@ func TestPlanContentChanges_PerPathCases_PlansExpectedChanges(t *testing.T) {
 			live:   files("P.md", "base"),
 			want:   contentChanges{conflicts: []string{"p.md"}},
 		},
+		{
+			name:   "every conflicting path is listed, not only the first",
+			base:   files("a.md", "base", "b.md", "base"),
+			remote: files("a.md", "remote", "b.md", "remote"),
+			live:   files("a.md", "local", "b.md", "local"),
+			want:   contentChanges{conflicts: []string{"a.md", "b.md"}},
+		},
+		{
+			name:   "nested and Unicode paths are planned in sorted order",
+			remote: files("z.md", "z", "a/ü/页.md", "u", "a/b.md", "b"),
+			live:   files(),
+			want: contentChanges{writes: []plannedWrite{
+				{rel: "a/b.md", blob: blob("b")},
+				{rel: "a/ü/页.md", blob: blob("u")},
+				{rel: "z.md", blob: blob("z")},
+			}},
+		},
+		{
+			// Deletes run before writes, so the file is gone before the
+			// directory of the same name is created.
+			name:   "remote replaces a file with a directory of the same name",
+			base:   files("sec", "old"),
+			remote: files("sec/page.md", "new"),
+			live:   files("sec", "old"),
+			want: contentChanges{
+				writes:  write("sec/page.md", "new"),
+				deletes: []string{"sec"},
+			},
+		},
+		{
+			name:   "remote replaces a directory with a file of the same name",
+			base:   files("sec/page.md", "old"),
+			remote: files("sec", "new"),
+			live:   files("sec/page.md", "old"),
+			want: contentChanges{
+				writes:  write("sec", "new"),
+				deletes: []string{"sec/page.md"},
+			},
+		},
+		{
+			name:         "unborn branch skips a remote file already present with the same content",
+			remote:       files("p.md", "remote"),
+			live:         files("p.md", "remote"),
+			unbornBranch: true,
+		},
+		{
+			name:     "case fold: remote case-only rename of a locally edited file conflicts on both names",
+			base:     files("Foo.md", "page"),
+			remote:   files("foo.md", "page"),
+			live:     files("Foo.md", "edited"),
+			caseFold: true,
+			want:     contentChanges{conflicts: []string{"Foo.md", "foo.md"}},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

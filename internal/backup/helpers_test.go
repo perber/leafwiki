@@ -91,6 +91,14 @@ func commitToRemote(t *testing.T, bareDir, filename, content string) {
 // maps repository-relative paths to their new content.
 func commitFilesToRemote(t *testing.T, bareDir string, files map[string]string) {
 	t.Helper()
+	commitChangesToRemote(t, bareDir, files, nil)
+}
+
+// commitChangesToRemote pushes one external commit that writes files (paths
+// relative to the repository, mapped to their new content) and removes the
+// paths in deletes, so a single pull sees edits and deletes together.
+func commitChangesToRemote(t *testing.T, bareDir string, files map[string]string, deletes []string) {
+	t.Helper()
 	cloneDir := t.TempDir()
 	cloned, err := gogit.PlainClone(cloneDir, false, &gogit.CloneOptions{
 		URL:           "file://" + bareDir,
@@ -98,22 +106,27 @@ func commitFilesToRemote(t *testing.T, bareDir string, files map[string]string) 
 		Auth:          nil,
 	})
 	if err != nil {
-		t.Fatalf("commitFilesToRemote: PlainClone failed: %v", err)
+		t.Fatalf("commitChangesToRemote: PlainClone failed: %v", err)
 	}
 	wt, err := cloned.Worktree()
 	if err != nil {
-		t.Fatalf("commitFilesToRemote: Worktree failed: %v", err)
+		t.Fatalf("commitChangesToRemote: Worktree failed: %v", err)
 	}
 	for filename, content := range files {
 		path := filepath.Join(cloneDir, filename)
 		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-			t.Fatalf("commitFilesToRemote: MkdirAll: %v", err)
+			t.Fatalf("commitChangesToRemote: MkdirAll: %v", err)
 		}
 		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-			t.Fatalf("commitFilesToRemote: WriteFile: %v", err)
+			t.Fatalf("commitChangesToRemote: WriteFile: %v", err)
 		}
 		if _, err := wt.Add(filename); err != nil {
-			t.Fatalf("commitFilesToRemote: Add failed: %v", err)
+			t.Fatalf("commitChangesToRemote: Add failed: %v", err)
+		}
+	}
+	for _, filename := range deletes {
+		if _, err := wt.Remove(filename); err != nil {
+			t.Fatalf("commitChangesToRemote: Remove %s failed: %v", filename, err)
 		}
 	}
 	if _, err := wt.Commit("external commit", &gogit.CommitOptions{
@@ -123,17 +136,17 @@ func commitFilesToRemote(t *testing.T, bareDir string, files map[string]string) 
 			When:  time.Now(),
 		},
 	}); err != nil {
-		t.Fatalf("commitFilesToRemote: Commit failed: %v", err)
+		t.Fatalf("commitChangesToRemote: Commit failed: %v", err)
 	}
 	remote, err := cloned.Remote("origin")
 	if err != nil {
-		t.Fatalf("commitFilesToRemote: Remote failed: %v", err)
+		t.Fatalf("commitChangesToRemote: Remote failed: %v", err)
 	}
 	if err := remote.Push(&gogit.PushOptions{
 		RefSpecs: []config.RefSpec{"refs/heads/main:refs/heads/main"},
 		Auth:     nil,
 	}); err != nil {
-		t.Fatalf("commitFilesToRemote: Push failed: %v", err)
+		t.Fatalf("commitChangesToRemote: Push failed: %v", err)
 	}
 }
 

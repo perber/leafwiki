@@ -4,6 +4,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -328,4 +330,101 @@ func TestConflict_RemoteAhead_RemoteTreeKeepsIncomingPages(t *testing.T) {
 		assertFileInCommit(t, remote, p, want)
 	}
 	assertFileInCommit(t, remote, "root/page.md", "local edit\n")
+}
+
+// TestConflict_MixedDeletesAndWrites_ConflictElsewhere_LeavesLiveDirUntouched
+// tests that a conflict on one file also holds back the remote's deletes and
+// its writes into nested and Unicode-named directories, and that once the
+// local edit is reverted the next cycle applies all of them at once.
+func TestConflict_MixedDeletesAndWrites_ConflictElsewhere_LeavesLiveDirUntouched(t *testing.T) {
+	bareDir := initBareRemote(t)
+	repo, rootDir := newRepoWithRemote(t, bareDir)
+	writeFileHelper(t, rootDir, "gone.md", "to be deleted\n")
+	writeFileHelper(t, rootDir, "sec/nested.md", "nested base\n")
+	writeFileHelper(t, rootDir, "sec/only/child.md", "only child\n")
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup (seed): %v", err)
+	}
+	headBefore := headCommit(t, repo).Hash
+
+	commitChangesToRemote(t, bareDir, map[string]string{
+		"root/page.md":        "remote page\n",
+		"root/sec/nested.md":  "nested remote\n",
+		"root/über/日本/新しい.md": "unicode remote\n",
+	}, []string{"root/gone.md", "root/sec/only/child.md"})
+	writeFileHelper(t, rootDir, "page.md", "local page\n")
+
+	err := repo.RunBackup()
+	var conflict *pullConflictError
+	if !errors.As(err, &conflict) {
+		t.Fatalf("RunBackup err = %v, want *pullConflictError", err)
+	}
+	if want := []string{"root/page.md"}; !reflect.DeepEqual(conflict.Paths, want) {
+		t.Errorf("conflict paths = %v, want %v", conflict.Paths, want)
+	}
+	readFileEqual(t, filepath.Join(rootDir, "gone.md"), "to be deleted\n")
+	readFileEqual(t, filepath.Join(rootDir, "sec", "nested.md"), "nested base\n")
+	readFileEqual(t, filepath.Join(rootDir, "sec", "only", "child.md"), "only child\n")
+	if _, statErr := os.Stat(filepath.Join(rootDir, "über")); !os.IsNotExist(statErr) {
+		t.Errorf("über/ was created despite the conflict (stat err = %v)", statErr)
+	}
+	if got := headCommit(t, repo).Hash; got != headBefore {
+		t.Errorf("HEAD moved to %s, want it to stay at %s", got, headBefore)
+	}
+
+	// Revert the local edit; the next cycle applies everything.
+	writeFileHelper(t, rootDir, "page.md", "# Page\n")
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup after reverting the local edit: %v", err)
+	}
+	readFileEqual(t, filepath.Join(rootDir, "page.md"), "remote page\n")
+	readFileEqual(t, filepath.Join(rootDir, "sec", "nested.md"), "nested remote\n")
+	readFileEqual(t, filepath.Join(rootDir, "über", "日本", "新しい.md"), "unicode remote\n")
+	if _, statErr := os.Stat(filepath.Join(rootDir, "gone.md")); !os.IsNotExist(statErr) {
+		t.Errorf("gone.md still present after the pull (stat err = %v)", statErr)
+	}
+	if _, statErr := os.Stat(filepath.Join(rootDir, "sec", "only")); !os.IsNotExist(statErr) {
+		t.Errorf("sec/only/ should be removed once its last file is deleted (stat err = %v)", statErr)
+	}
+	if snap := repo.Status(); snap.NeedsIntervention || snap.LastError != "" {
+		t.Errorf("expected a clean status, got NeedsIntervention=%v LastError=%q", snap.NeedsIntervention, snap.LastError)
+	}
+}
+
+// TestConflict_SeveralFilesInBothTargets_AllReported tests that the conflict
+// error names every conflicting file in root/ and assets/, not just the first
+// one the pull happens to visit.
+func TestConflict_SeveralFilesInBothTargets_AllReported(t *testing.T) {
+	bareDir := initBareRemote(t)
+	repo, rootDir := newRepoWithRemote(t, bareDir)
+	assetsDir := repo.cfg.AssetsDir
+	writeFileHelper(t, rootDir, "other.md", "other base\n")
+	writeFileHelper(t, assetsDir, "logo.svg", "<svg/>\n")
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup (seed): %v", err)
+	}
+
+	commitFilesToRemote(t, bareDir, map[string]string{
+		"root/page.md":    "remote page\n",
+		"root/other.md":   "remote other\n",
+		"assets/logo.svg": "<svg>remote</svg>\n",
+	})
+	writeFileHelper(t, rootDir, "page.md", "local page\n")
+	writeFileHelper(t, rootDir, "other.md", "local other\n")
+	writeFileHelper(t, assetsDir, "logo.svg", "<svg>local</svg>\n")
+
+	err := repo.RunBackup()
+	var conflict *pullConflictError
+	if !errors.As(err, &conflict) {
+		t.Fatalf("RunBackup err = %v, want *pullConflictError", err)
+	}
+	got := append([]string(nil), conflict.Paths...)
+	sort.Strings(got)
+	want := []string{"assets/logo.svg", "root/other.md", "root/page.md"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("conflict paths = %v, want %v", got, want)
+	}
+	if !repo.Status().NeedsIntervention {
+		t.Error("expected NeedsIntervention = true")
+	}
 }
