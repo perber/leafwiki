@@ -91,11 +91,12 @@ func TestExtractAndValidate_RejectsCorruptUsersDB(t *testing.T) {
 // TestExtractAndValidate_RejectsCorruptUserSettingsDB are regression tests
 // for a real bug found in review: favorites.db/usersettings.db weren't
 // sanity-checked at all, unlike users.db. Both stores open via
-// sqliteutil.RebuildOnCorruption (see NewFavoritesStore/NewUserSettingsStore),
-// which silently deletes and recreates a corrupt database file on open — so
-// without this check, a corrupt staged favorites.db/usersettings.db would
-// get swapped in, then silently wiped empty the moment Manager.Replace
-// reopens it, while the restore itself reports success.
+// sqliteutil.QuarantineOnCorruption (see NewFavoritesStore/
+// NewUserSettingsStore), which moves a corrupt database file aside and
+// continues with an empty one — so without this check, a corrupt staged
+// favorites.db/usersettings.db would get swapped in, then taken out of
+// service the moment Manager.Replace reopens it, while the restore itself
+// reports success.
 func TestExtractAndValidate_RejectsCorruptFavoritesDB(t *testing.T) {
 	zipPath := writeRawZip(t, map[string]string{
 		"backup-meta.json": `{"id":"x","version":"v1"}`,

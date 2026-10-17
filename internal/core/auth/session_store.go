@@ -38,7 +38,7 @@ func NewSessionStore(storageDir string) (*SessionStore, error) {
 		log:        slog.Default().With("component", "SessionStore"),
 	}
 
-	err := sqliteutil.OpenWithPolicy(sessionDatabasePath(s.storageDir, s.filename), sqliteutil.RebuildOnCorruption, func() error {
+	err := sqliteutil.OpenWithPolicy(sessionDatabasePath(s.storageDir, s.filename), sqliteutil.QuarantineOnCorruption, func() error {
 		if err := s.ensureSchema(); err != nil {
 			if s.db != nil {
 				_ = s.db.Close()

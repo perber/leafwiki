@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/perber/wiki/internal/core/auth"
@@ -9,7 +10,7 @@ import (
 func ResetAdminPassword(storageDir, username, email string) (*auth.User, error) {
 	store, err := auth.NewUserStore(storageDir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open user store: %w", err)
 	}
 	defer func() {
 		if err := store.Close(); err != nil {

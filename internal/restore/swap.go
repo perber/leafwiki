@@ -177,11 +177,13 @@ var (
 // table-existence query can't see) and one whose table actually has the
 // shape this restore expects (catching a same-named table with different or
 // missing columns, which a plain "SELECT count(*)" can't tell apart from the
-// real thing). Without this, a corrupt or wrong-shaped file would get
-// swapped in and, for favorites.db/usersettings.db specifically,
-// RebuildOnCorruption (see NewFavoritesStore/NewUserSettingsStore) would then
-// silently delete and recreate it empty the moment it's reopened — with the
-// restore still reporting success either way.
+// real thing). This check is the only place a restore rejects a corrupt
+// staged file and rolls back: once swapped in, reopening it goes through the
+// store's corruption policy (ADR-0013), and for favorites.db/usersettings.db
+// that is QuarantineOnCorruption, which moves the file aside and continues
+// with an empty store — so the restore would report success with the
+// snapshot's favorites/settings out of service. users.db would fail the
+// reopen instead and leave the instance needing intervention.
 func sanityCheckSQLiteDB(path, table string, columns []string) error {
 	db, err := sql.Open("sqlite", path)
 	if err != nil {

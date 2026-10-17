@@ -204,8 +204,7 @@ func needsWriteToRecover(err error) bool {
 // (ADR-0001): it deletes the database and its sidecars and asks for a retry,
 // which recreates an empty database. If a file cannot be removed it does not
 // retry, since opening next to a leftover sidecar could mix stale pages into
-// the new database. Real-state stores still use it until steps 2 and 3 of
-// the ADR-0013 rollout give them their own policies.
+// the new database. Never use it for real state (ADR-0013).
 func RebuildOnCorruption(dbPath string, err error) (bool, error) {
 	slog.Default().Warn("database corrupt, removing and retrying", "path", dbPath, "sqliteCode", sqliteCode(err), "error", err)
 	if rmErr := RemoveSQLiteFiles(dbPath); rmErr != nil {
@@ -222,6 +221,41 @@ func sqliteCode(err error) int {
 		return 0
 	}
 	return e.Code()
+}
+
+// CorruptDatabaseError reports a database that could not be opened because of
+// a SQLite I/O or corruption error and was not replaced (ADR-0013). The edge
+// (cmd/leafwiki) finds it with errors.As and tells the operator the path, the
+// SQLite code and the ways out.
+type CorruptDatabaseError struct {
+	Path string
+	Err  error
+	// Stranded lists files a failed quarantine moved aside and could not
+	// move back; they now carry a .corrupt-* name. Empty means every file is
+	// still where it was.
+	Stranded []string
+}
+
+func (e *CorruptDatabaseError) Error() string {
+	msg := fmt.Sprintf("database %s is unreadable (SQLite code %d): %v", e.Path, e.SQLiteCode(), e.Err)
+	if len(e.Stranded) > 0 {
+		msg += "; left under quarantine names: " + strings.Join(e.Stranded, ", ")
+	}
+	return msg
+}
+
+func (e *CorruptDatabaseError) Unwrap() error { return e.Err }
+
+// SQLiteCode returns the extended SQLite result code of the underlying
+// error, or 0 if it is not a SQLite error.
+func (e *CorruptDatabaseError) SQLiteCode() int { return sqliteCode(e.Err) }
+
+// FailOnCorruption is the CorruptionPolicy for real state that must never be
+// replaced automatically (users.db, ADR-0013): it touches no file and
+// returns a *CorruptDatabaseError, so the store's constructor and startup
+// fail. It does not log; the caller reports the error once (ADR-0008).
+func FailOnCorruption(dbPath string, err error) (bool, error) {
+	return false, &CorruptDatabaseError{Path: dbPath, Err: err}
 }
 
 // quarantineTimeFormat is a UTC timestamp without ':' so the quarantined
@@ -245,15 +279,16 @@ var (
 //
 // OpenWithPolicy runs it only after open has closed its handle, which the
 // rename needs on Windows. If any rename fails, the files already moved are
-// moved back, nothing is deleted, and the policy does not retry. It never
+// moved back, nothing is deleted, and the policy returns a
+// *CorruptDatabaseError instead of retrying. It never
 // overwrites an earlier quarantine with the same timestamp.
 //
 // It logs one Error through slog.Default(): the store keeps running, but the
 // user data in the file is no longer live, so the operator has to know.
 func QuarantineOnCorruption(dbPath string, err error) (bool, error) {
 	target := dbPath + ".corrupt-" + now().UTC().Format(quarantineTimeFormat)
-	if mvErr := moveSQLiteFiles(dbPath, target); mvErr != nil {
-		return false, fmt.Errorf("%w (moving the corrupt database aside failed: %v)", err, mvErr)
+	if stranded, mvErr := moveSQLiteFiles(dbPath, target); mvErr != nil {
+		return false, &CorruptDatabaseError{Path: dbPath, Err: fmt.Errorf("%w (moving it aside failed: %v)", err, mvErr), Stranded: stranded}
 	}
 	slog.Default().Error("database corrupt, moved aside and continuing with an empty one",
 		"path", dbPath, "quarantinedPath", target, "sqliteCode", sqliteCode(err), "error", err)
@@ -262,8 +297,9 @@ func QuarantineOnCorruption(dbPath string, err error) (bool, error) {
 
 // moveSQLiteFiles renames every existing file of the database at from to the
 // matching name at to. It refuses to overwrite an existing target and, if a
-// rename fails, moves the files it already renamed back.
-func moveSQLiteFiles(from, to string) error {
+// rename fails, moves the files it already renamed back. On error it returns
+// the target names of files it could not move back.
+func moveSQLiteFiles(from, to string) ([]string, error) {
 	sources, targets := sqliteFiles(from), sqliteFiles(to)
 	var pending []int
 	for i := range sources {
@@ -271,10 +307,10 @@ func moveSQLiteFiles(from, to string) error {
 			if os.IsNotExist(err) {
 				continue
 			}
-			return err
+			return nil, err
 		}
 		if _, err := os.Lstat(targets[i]); !os.IsNotExist(err) {
-			return fmt.Errorf("quarantine target %s already exists", targets[i])
+			return nil, fmt.Errorf("quarantine target %s already exists", targets[i])
 		}
 		pending = append(pending, i)
 	}
@@ -282,13 +318,15 @@ func moveSQLiteFiles(from, to string) error {
 	for n, i := range pending {
 		if err := rename(sources[i], targets[i]); err != nil {
 			errs := []error{err}
+			var stranded []string
 			for _, j := range slices.Backward(pending[:n]) {
 				if rbErr := rename(targets[j], sources[j]); rbErr != nil {
 					errs = append(errs, fmt.Errorf("moving %s back failed: %w", targets[j], rbErr))
+					stranded = append(stranded, targets[j])
 				}
 			}
-			return errors.Join(errs...)
+			return stranded, errors.Join(errs...)
 		}
 	}
-	return nil
+	return nil, nil
 }

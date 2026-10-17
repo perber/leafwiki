@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -374,6 +375,50 @@ func TestRebuildOnCorruption_RemovalFails_DoesNotRetry(t *testing.T) {
 	}
 }
 
+// TestFailOnCorruption covers the policy for users.db (ADR-0013): no retry,
+// no file touched, and a typed error that keeps the SQLite error.
+func TestFailOnCorruption(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "users.db")
+	original := map[string]string{dbPath: "not a database", dbPath + "-wal": "wal bytes"}
+	for path, content := range original {
+		writeTestFile(t, path, content)
+	}
+	openCalls := 0
+	err := OpenWithPolicy(dbPath, FailOnCorruption, func() error {
+		openCalls++
+		return nil
+	})
+
+	// The read-only probe already reports SQLITE_NOTADB, so open never runs.
+	if openCalls != 0 {
+		t.Fatalf("open called %d times, want 0", openCalls)
+	}
+	var corrupt *CorruptDatabaseError
+	if !errors.As(err, &corrupt) {
+		t.Fatalf("OpenWithPolicy error = %v (%T), want *CorruptDatabaseError", err, err)
+	}
+	if corrupt.Path != dbPath {
+		t.Errorf("Path = %q, want %q", corrupt.Path, dbPath)
+	}
+	if !IsSQLiteRecoverableError(err) {
+		t.Errorf("error %v does not wrap the SQLite error", err)
+	}
+	if len(corrupt.Stranded) != 0 {
+		t.Errorf("Stranded = %v, want none", corrupt.Stranded)
+	}
+	if got := corrupt.SQLiteCode(); got != 26 {
+		t.Errorf("SQLiteCode() = %d, want 26", got)
+	}
+	for _, part := range []string{dbPath, "26"} {
+		if !strings.Contains(err.Error(), part) {
+			t.Errorf("Error() = %q, want it to contain %q", err.Error(), part)
+		}
+	}
+	for path, content := range original {
+		assertFileContent(t, path, content)
+	}
+}
+
 // TestQuarantineOnCorruption covers the move-aside policy for real state
 // (ADR-0013): the bytes of the database and every sidecar survive under the
 // quarantine name, and a failed move leaves everything where it was and
@@ -485,6 +530,17 @@ func TestQuarantineOnCorruption_FailedMoveBack_KeepsEveryByte(t *testing.T) {
 	}
 	if err == nil || !strings.Contains(err.Error(), "rename 2 blocked") || !strings.Contains(err.Error(), "rename 3 blocked") {
 		t.Fatalf("error = %v, want it to name the failed move and the failed move back", err)
+	}
+	var corrupt *CorruptDatabaseError
+	if !errors.As(err, &corrupt) {
+		t.Fatalf("error = %v (%T), want *CorruptDatabaseError", err, err)
+	}
+	want := []string{dbPath + ".corrupt-20261017T143005Z"}
+	if !slices.Equal(corrupt.Stranded, want) {
+		t.Fatalf("Stranded = %v, want %v", corrupt.Stranded, want)
+	}
+	if !strings.Contains(err.Error(), want[0]) {
+		t.Errorf("Error() = %q, want it to name the stranded file", err.Error())
 	}
 	assertFileContent(t, dbPath+".corrupt-20261017T143005Z", "db bytes")
 	assertFileContent(t, dbPath+"-wal", "wal bytes")

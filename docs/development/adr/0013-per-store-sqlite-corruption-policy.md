@@ -55,12 +55,27 @@ Contract (doc comment on `CorruptionPolicy`, enforced by a table test):
 
 - `OpenWithPolicy` classifies the error itself (`IsSQLiteRecoverableError`) and calls the policy
   only for recoverable errors.
+- Before `open` runs, `OpenWithPolicy` opens an existing, non-empty file read-only and reads its
+  schema; a recoverable error there goes to the policy before `open` runs at all. A read-write
+  connection to a database whose header SQLite cannot read discards the `-wal`, even one that
+  holds committed transactions, so without the probe the sidecar would be gone before any policy
+  could keep it. A broken header that the WAL can still repair passes the probe and is left to
+  SQLite. Missing and empty files are valid new databases and are not probed. The probe resolves
+  the path to an absolute `file:` URI (the default `--data-dir` is the relative `./data`) and
+  strips a Windows `\\?\` prefix. It fails closed: if it cannot read an existing, non-empty file
+  for a non-recoverable reason, `OpenWithPolicy` returns that error and `open` never runs. Only
+  `SQLITE_READONLY_*` (a hot journal or a WAL that needs recovery) lets `open` run, because only
+  a read-write connection can do that recovery. The probe only catches corruption in the header
+  or the schema; corruption deeper in the file is found by `open`, after a read-write connection
+  was made.
 - A nil policy panics at the start of `OpenWithPolicy`, so any constructor test catches a store
   that forgot to choose.
 - It retries at most once.
-- `retry=true` means the policy has removed or moved the database and all sidecars, or
-  attempted to; a failed removal surfaces as the retry's error. The handle is closed (`open`
-  closes its own handle before returning an error). `out` is ignored.
+- `retry=true` means the policy has removed or moved the database and all sidecars. A policy
+  that could not do so returns `retry=false` with an error instead (`RebuildOnCorruption` when a
+  file cannot be deleted, `QuarantineOnCorruption` when a rename fails). No handle is open when
+  the policy runs (the probe closes its own; `open` closes its handle before returning an
+  error). `out` is ignored.
 - `retry=false` returns `out`. `out == nil` is a contract violation; `OpenWithPolicy` then returns
   the original error, so a faulty policy can never make a broken store look healthy.
 - Non-recoverable errors and the error of the retry pass through unchanged.
@@ -71,7 +86,8 @@ Contract (doc comment on `CorruptionPolicy`, enforced by a table test):
 |---|---|---|
 | `links`, `tags`, `properties`, `search` | `RebuildOnCorruption` | delete db + sidecars, retry, log one `Warn` with `path`, `sqliteCode`, `error` |
 | `users.db` | `FailOnCorruption` | touch nothing; return `*CorruptDatabaseError{Path, Err}`; startup fails |
-| `sessions.db`, `email_tokens.db`, `favorites.db`, `usersettings.db` | `QuarantineOnCorruption` | rename db and every existing sidecar to `<name>.corrupt-<UTC timestamp>`, retry with an empty db, log one `Error` |
+| `sessions.db`, `email_tokens.db`, `favorites.db`, `usersettings.db` | `QuarantineOnCorruption` | rename db and every existing sidecar to `<name>.corrupt-<UTC timestamp>` (sidecars as `<name>.corrupt-<UTC timestamp>-wal` etc.), retry with an empty db, log one `Error` with `path`, `quarantinedPath`, `sqliteCode`, `error`; if a rename fails, move the renamed files back and return `*CorruptDatabaseError`; files that cannot be moved back are listed in its `Stranded` field and in the operator message |
+| `api_keys.db` | none: `NewAPIKeyStore` does not use the seam | any open error, corruption included, fails startup and touches nothing |
 
 - **`users.db` fails**, it is never moved aside automatically: an empty user store would let
   `InitDefaultAdmin` create a new admin from the startup flags. The operator decides
@@ -84,7 +100,9 @@ Contract (doc comment on `CorruptionPolicy`, enforced by a table test):
 - **Logging (ADR-0008):** `FailOnCorruption` does not log; the error propagates and is reported
   once at the edge. `RebuildOnCorruption` logs `Warn` because the store recovers fully.
   `QuarantineOnCorruption` logs `Error` because user data is no longer live, even though startup
-  continues.
+  continues. Policies log through `slog.Default()`: the `CorruptionPolicy` signature has no
+  logger, and the stores that hold an injected logger (favorites, user settings) use one derived
+  from the default anyway, so the line ends up in the same place.
 
 ### Operator message at the edge
 
@@ -96,8 +114,10 @@ It is not a `LocalizedError`: it is a startup error with no HTTP response and no
 
 1. The seam and `RebuildOnCorruption`, with every existing store passing it explicitly (no
    behaviour change).
-2. `FailOnCorruption` for `users.db`, the CLI message and docs.
-3. `QuarantineOnCorruption` for sessions, email tokens, favorites and user settings.
+2. One PR: `RebuildOnCorruption` stops retrying when a file cannot be deleted,
+   `QuarantineOnCorruption`, the read-only probe, `FailOnCorruption` for `users.db`, the
+   quarantine policy for sessions, email tokens, favorites and user settings, the CLI message and
+   docs.
 
 ## Alternatives considered
 
@@ -122,6 +142,10 @@ It is not a `LocalizedError`: it is a startup error with no HTTP response and no
   Accepted: refusing to start is recoverable, wiping users is not.
 - Quarantined files accumulate in the data directory until an operator removes them; they are
   small and named so they are easy to find.
+- The read-only probe costs one extra open per store at startup and may leave a `-shm` next to a
+  database it rejected; `-shm` is an index SQLite rebuilds from the `-wal`, not data.
+- Two quarantines of the same store within the same second would collide; the second one then
+  fails instead of overwriting the first.
 - Derived indexes still delete on `SQLITE_IOERR`. Revisit if that causes avoidable rebuilds on
   flaky storage.
 - Lazy reopen paths (`UserStore.Connect`, the stores' `withDB` helpers) do not go through the

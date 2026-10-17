@@ -2,6 +2,7 @@ package wiki
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/perber/wiki/internal/core/shared/sqliteutil"
 	"github.com/perber/wiki/internal/core/tree"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/test_utils"
@@ -248,6 +250,32 @@ func TestWiki_InitDefaultAdmin_UsesGivenUsernameAndEmail(t *testing.T) {
 	if user.Email != "root@example.com" {
 		t.Errorf("Expected admin email %q, got %q", "root@example.com", user.Email)
 	}
+}
+
+// Regression test: an unreadable users.db used to be replaced by an empty
+// one, and InitDefaultAdmin then created a fresh admin from the startup
+// flags. NewWiki must fail before that and leave the file alone (ADR-0013).
+func TestNewWiki_CorruptUsersDB_FailsWithoutCreatingDefaultAdmin(t *testing.T) {
+	dir := t.TempDir()
+	files := test_utils.WriteCorruptSQLiteDB(t, filepath.Join(dir, "users.db"))
+
+	w, err := NewWiki(&WikiOptions{
+		StorageDir:          dir,
+		AdminPassword:       "adminpassword",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+	})
+
+	if err == nil {
+		_ = w.Close()
+		t.Fatal("NewWiki: expected an error for a corrupt users.db, got nil")
+	}
+	var corrupt *sqliteutil.CorruptDatabaseError
+	if !errors.As(err, &corrupt) {
+		t.Fatalf("NewWiki error = %v (%T), want it to wrap *sqliteutil.CorruptDatabaseError", err, err)
+	}
+	test_utils.AssertFilesUnchanged(t, files)
 }
 
 func TestWiki_Login_SuccessAndFailure(t *testing.T) {

@@ -94,7 +94,8 @@ filesystem-canonical (`tree`, `revision`) and SQLite-derived (`links`, `tags`, `
   exception), `shared/htmlutil/html.go` (HTML
   escaping helpers), `shared/sqliteutil/sqlite.go` (`OpenWithPolicy` + `CorruptionPolicy` —
   each SQLite store names at its constructor what happens on a recoverable I/O/corruption error,
-  e.g. `RebuildOnCorruption` for derived indexes, see
+  `RebuildOnCorruption` for derived indexes, `QuarantineOnCorruption` / `FailOnCorruption`
+  (typed `*CorruptDatabaseError`) for real state, see
   [ADR-0013](./adr/0013-per-store-sqlite-corruption-policy.md); `IsSQLiteRecoverableError`
   distinguishes those errors from transient `SQLITE_BUSY`/`SQLITE_LOCKED`).
 - **`internal/core/tools`** — small operator CLI helpers, e.g. `adminreset.go`
