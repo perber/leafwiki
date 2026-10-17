@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -252,4 +253,78 @@ func TestApplyMaterialize_DeleteAndWriteSamePath_KeepsWrittenFile(t *testing.T) 
 		t.Fatalf("applyMaterialize: %v", err)
 	}
 	readFileEqual(t, filepath.Join(rootDir, "Foo.md"), "new\n")
+}
+
+// TestApplyMaterialize_PathOutsideLiveDir_RefusesWithoutTouchingIt tests the
+// apply pass's own containment check, independent of tree entry validation: a
+// planned write or delete that resolves outside the live directory fails and
+// leaves the file there alone.
+func TestApplyMaterialize_PathOutsideLiveDir_RefusesWithoutTouchingIt(t *testing.T) {
+	tests := []struct {
+		name    string
+		changes func(blob plumbing.Hash) contentChanges
+	}{
+		{
+			name: "write",
+			changes: func(blob plumbing.Hash) contentChanges {
+				return contentChanges{writes: []plannedWrite{{rel: "../existing.txt", blob: blob}}}
+			},
+		},
+		{
+			name: "delete",
+			changes: func(plumbing.Hash) contentChanges {
+				return contentChanges{deletes: []string{"../existing.txt"}}
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, rootDir := newRepoWithRemote(t, initBareRemote(t))
+			existing := filepath.Join(filepath.Dir(rootDir), "existing.txt")
+			writeFileHelper(t, filepath.Dir(rootDir), "existing.txt", "original")
+			blob, err := repo.writeBlob([]byte("overwritten"))
+			if err != nil {
+				t.Fatalf("writeBlob: %v", err)
+			}
+
+			err = repo.applyMaterialize([]targetPlan{{
+				target:         contentTarget{treePath: "root", liveDir: rootDir},
+				contentChanges: tc.changes(blob),
+			}})
+			if err == nil {
+				t.Fatal("expected applyMaterialize to refuse a path outside the live directory")
+			}
+			readFileEqual(t, existing, "original")
+		})
+	}
+}
+
+// TestApplyMaterialize_LastWriteOutsideLiveDir_TouchesNothing tests that the
+// apply pass resolves every path before it changes anything, so a path that
+// leaves the live directory late in the plan does not leave earlier deletes
+// and writes applied.
+func TestApplyMaterialize_LastWriteOutsideLiveDir_TouchesNothing(t *testing.T) {
+	repo, rootDir := newRepoWithRemote(t, initBareRemote(t))
+	writeFileHelper(t, rootDir, "old.md", "old\n")
+	blob, err := repo.writeBlob([]byte("new\n"))
+	if err != nil {
+		t.Fatalf("writeBlob: %v", err)
+	}
+
+	err = repo.applyMaterialize([]targetPlan{{
+		target: contentTarget{treePath: "root", liveDir: rootDir},
+		contentChanges: contentChanges{
+			deletes: []string{"old.md"},
+			writes:  []plannedWrite{{rel: "a.md", blob: blob}, {rel: "../z.md", blob: blob}},
+		},
+	}})
+	if err == nil {
+		t.Fatal("expected applyMaterialize to refuse a path outside the live directory")
+	}
+	readFileEqual(t, filepath.Join(rootDir, "old.md"), "old\n")
+	for _, p := range []string{filepath.Join(rootDir, "a.md"), filepath.Join(filepath.Dir(rootDir), "z.md")} {
+		if _, err := os.Lstat(p); !os.IsNotExist(err) {
+			t.Errorf("%s exists after a refused apply (err %v)", p, err)
+		}
+	}
 }

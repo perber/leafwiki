@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -113,6 +114,12 @@ func (r *Repository) buildDirTree(dir string, rel []string, patterns []gitignore
 			slog.Debug("backup: skipping ignored path", "path", strings.Join(childRel, "/"))
 			continue
 		}
+		// The pull refuses such names, so committing one would make every
+		// later pull of this backup fail; leave it out instead.
+		if err := validateTreeEntryName(name); err != nil {
+			r.warnSkippedName(strings.Join(childRel, "/"), err)
+			continue
+		}
 		full := filepath.Join(dir, name)
 
 		if entry.IsDir() {
@@ -172,6 +179,20 @@ func (r *Repository) buildDirTree(dir string, rel []string, patterns []gitignore
 		return plumbing.ZeroHash, false, err
 	}
 	return h, true, nil
+}
+
+// warnSkippedName logs once per path that buildDirTree left it out of the
+// backup. The path is quoted so control characters stay readable in the log.
+func (r *Repository) warnSkippedName(path string, reason error) {
+	if _, seen := r.skippedNames[path]; seen {
+		return
+	}
+	if r.skippedNames == nil {
+		r.skippedNames = map[string]struct{}{}
+	}
+	r.skippedNames[path] = struct{}{}
+	slog.Warn("backup: skipping a file name the backup cannot store on this system; rename it to include it in the backup",
+		"path", strconv.Quote(path), "reason", reason.Error())
 }
 
 // ignorePatternsIn reads dir/.gitignore if present and parses its patterns with
@@ -449,6 +470,12 @@ func (r *Repository) flattenTree(treeHash plumbing.Hash, prefix string, out map[
 		return err
 	}
 	for _, entry := range tree.Entries {
+		if err := validateTreeEntryName(entry.Name); err != nil {
+			if prefix != "" {
+				return fmt.Errorf("%w (in %q)", err, prefix)
+			}
+			return err
+		}
 		name := entry.Name
 		if prefix != "" {
 			name = prefix + "/" + name
@@ -543,7 +570,10 @@ func (r *Repository) syncContentFromRemote(commitHash plumbing.Hash) (int, error
 			return synced, fmt.Errorf("read remote %s tree: %w", t.treePath, err)
 		}
 		for rel, blobHash := range files {
-			livePath := filepath.Join(t.liveDir, filepath.FromSlash(rel))
+			livePath, err := resolveLivePath(t.liveDir, rel)
+			if err != nil {
+				return synced, err
+			}
 			if _, err := os.Stat(livePath); err == nil {
 				continue // keep the local copy; never overwrite
 			} else if !os.IsNotExist(err) {
@@ -725,19 +755,41 @@ func planContentChanges(base, remote, live map[string]plumbing.Hash, caseFold, c
 }
 
 // applyMaterialize carries out plans: deletes first, so a write that lands on
-// the same physical file under a different case is not removed again.
+// the same physical file under a different case is not removed again. Every
+// path is resolved before anything changes, so a path outside the live
+// directory leaves the plan entirely unapplied.
 func (r *Repository) applyMaterialize(plans []targetPlan) error {
-	for _, p := range plans {
+	type resolved struct {
+		deletes []string
+		writes  []string
+	}
+	paths := make([]resolved, len(plans))
+	for i, p := range plans {
 		for _, rel := range p.deletes {
-			livePath := filepath.Join(p.target.liveDir, filepath.FromSlash(rel))
+			livePath, err := resolveLivePath(p.target.liveDir, rel)
+			if err != nil {
+				return err
+			}
+			paths[i].deletes = append(paths[i].deletes, livePath)
+		}
+		for _, w := range p.writes {
+			livePath, err := resolveLivePath(p.target.liveDir, w.rel)
+			if err != nil {
+				return err
+			}
+			paths[i].writes = append(paths[i].writes, livePath)
+		}
+	}
+
+	for i, p := range plans {
+		for _, livePath := range paths[i].deletes {
 			if err := os.Remove(livePath); err != nil && !os.IsNotExist(err) {
 				return err
 			}
 			removeEmptyParents(filepath.Dir(livePath), p.target.liveDir)
 		}
-		for _, w := range p.writes {
-			livePath := filepath.Join(p.target.liveDir, filepath.FromSlash(w.rel))
-			if err := r.writeLiveBlob(livePath, w.blob); err != nil {
+		for j, w := range p.writes {
+			if err := r.writeLiveBlob(paths[i].writes[j], w.blob); err != nil {
 				return fmt.Errorf("read remote blob for %s: %w", w.rel, err)
 			}
 		}

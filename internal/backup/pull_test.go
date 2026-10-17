@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -546,5 +548,108 @@ func TestPull_UnbornLocalHead_WritesMissingFilesAndConverges(t *testing.T) {
 	}
 	if got := remoteHeadCommit(t, bareDir).Hash; got != settled {
 		t.Errorf("remote moved to %s on an idle cycle, want %s", got, settled)
+	}
+}
+
+// TestPull_InvalidRemoteTreeEntry_FailsWithoutWriting tests that a remote
+// tree entry whose name git's own tree-path rules refuse (a relative
+// component, a backslash path, .git) fails the pull before anything is
+// written: no file appears inside root/ or next to it, an existing file next
+// to root/ keeps its content, HEAD stays, and the failure is logged once with
+// the entry name and its parent directory.
+func TestPull_InvalidRemoteTreeEntry_FailsWithoutWriting(t *testing.T) {
+	tests := []struct {
+		name   string
+		parent string
+		entry  string
+		files  map[string]string
+	}{
+		{
+			name:  "dot-dot directory",
+			entry: "..",
+			files: map[string]string{"outside.txt": "new", "existing.txt": "changed"},
+		},
+		{
+			name:   "nested dot-dot directory",
+			parent: "sub",
+			entry:  "..",
+			files:  map[string]string{"outside.txt": "new"},
+		},
+		{name: "backslash dot-dot file", entry: `..\outside.txt`},
+		{name: "backslash dot-dot in the middle", entry: `x\..\..\outside.txt`},
+		{name: "dot git directory", entry: ".git", files: map[string]string{"config": "new"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			bareDir := initBareRemote(t)
+			repo, rootDir := newRepoWithRemote(t, bareDir)
+			dataDir := filepath.Dir(rootDir)
+			writeFileHelper(t, dataDir, "existing.txt", "original")
+			headBefore := headCommit(t, repo).Hash
+			pushRawRootEntryToRemote(t, bareDir, tc.parent, tc.entry, tc.files)
+			logs := captureLogs(t)
+
+			err := repo.RunBackup()
+			if err == nil {
+				t.Fatal("expected RunBackup to fail on an invalid remote tree entry")
+			}
+			if errors.Is(err, errPullConflict) {
+				t.Fatalf("an invalid entry was reported as a conflict: %v", err)
+			}
+			snap := repo.Status()
+			wants := []string{strconv.Quote(tc.entry)}
+			if tc.parent != "" {
+				wants = append(wants, strconv.Quote(tc.parent))
+			}
+			for _, want := range wants {
+				if !strings.Contains(snap.LastError, want) {
+					t.Errorf("want LastError naming %s, got NeedsIntervention=%v LastError=%q", want, snap.NeedsIntervention, snap.LastError)
+				}
+			}
+			if got := headCommit(t, repo).Hash; got != headBefore {
+				t.Errorf("HEAD moved to %s after a refused pull, want %s", got, headBefore)
+			}
+			readFileEqual(t, filepath.Join(dataDir, "existing.txt"), "original")
+			if _, err := os.Lstat(filepath.Join(dataDir, "outside.txt")); !os.IsNotExist(err) {
+				t.Errorf("outside.txt was written next to root/ (err %v)", err)
+			}
+			entries, err := os.ReadDir(rootDir)
+			if err != nil {
+				t.Fatalf("ReadDir: %v", err)
+			}
+			if len(entries) != 1 || entries[0].Name() != "page.md" {
+				t.Errorf("root/ holds %v after a refused pull, want only page.md", entries)
+			}
+			if n := strings.Count(logs.String(), "level=ERROR"); n != 1 || !strings.Contains(logs.String(), "remote=") {
+				t.Errorf("want exactly one error log with the remote, got %d:\n%s", n, logs.String())
+			}
+		})
+	}
+}
+
+// TestInit_FirstContactInvalidRemoteTreeEntry_FailsWithoutWriting tests the
+// first-contact sync (syncContentFromRemote) against the same kind of entry:
+// Init fails and nothing lands next to root/.
+func TestInit_FirstContactInvalidRemoteTreeEntry_FailsWithoutWriting(t *testing.T) {
+	bareDir := initBareRemote(t)
+	pushFirstCommitToRemote(t, bareDir, "main", "root/page.md", "# Page\n")
+	pushRawRootEntryToRemote(t, bareDir, "", "..", map[string]string{"outside.txt": "new", "existing.txt": "changed"})
+
+	dataDir := t.TempDir()
+	rootDir := filepath.Join(dataDir, "root")
+	assetsDir := filepath.Join(dataDir, "assets")
+	writeFileHelper(t, dataDir, "existing.txt", "original")
+
+	_, err := Init(Config{
+		RootDir: rootDir, AssetsDir: assetsDir,
+		AuthorName: "Test", AuthorEmail: "t@t.com",
+		Branch: "main", RemoteURL: "file://" + bareDir, SSHKey: testSSHKeyPEM,
+	})
+	if err == nil {
+		t.Fatal("expected Init to fail on an invalid remote tree entry")
+	}
+	readFileEqual(t, filepath.Join(dataDir, "existing.txt"), "original")
+	if _, err := os.Lstat(filepath.Join(dataDir, "outside.txt")); !os.IsNotExist(err) {
+		t.Errorf("outside.txt was written next to root/ (err %v)", err)
 	}
 }
