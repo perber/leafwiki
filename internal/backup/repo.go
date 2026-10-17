@@ -57,6 +57,11 @@ type Repository struct {
 	// resolves to the same physical file as unrelated.
 	liveFSCaseInsensitive bool
 
+	// skippedNames holds the local paths buildDirTree already left out
+	// because validateTreeEntryName refuses them, so each is warned about
+	// once per process instead of on every backup cycle. Guarded by mu.
+	skippedNames map[string]struct{}
+
 	// syncedContentOnInit records whether this Init() call wrote files to
 	// RootDir/AssetsDir via syncContentFromRemote (first contact with a
 	// remote that already had history). See SyncedContentOnInit.

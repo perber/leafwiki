@@ -3,6 +3,10 @@ package backup
 import (
 	"os"
 	"path/filepath"
+	"reflect"
+	"runtime"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -376,4 +380,115 @@ func commitDirectlyOnRepo(t *testing.T, repo *Repository, rootDir, filename, con
 	}); err != nil {
 		t.Fatalf("commitDirectlyOnRepo: Commit: %v", err)
 	}
+}
+
+// TestRunBackup_LocalNameRefusedByGit_SkippedAndLoggedOnce tests that the
+// commit side applies the same name rules as the pull side: a local file or
+// directory whose name the pull refuses on this OS is left out of the backup
+// with one warning, so it can never block the following pulls. On Windows
+// that includes names Windows cannot store; elsewhere such names are backed
+// up as before.
+func TestRunBackup_LocalNameRefusedByGit_SkippedAndLoggedOnce(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("these names cannot be created on Windows")
+	}
+	bareDir := initBareRemote(t)
+	repo, rootDir := newRepoWithRemote(t, bareDir)
+	skipped := []string{`sub\page.md`, ".git /x.md", "sec/git~1/y.md"}
+	for _, rel := range skipped {
+		writeFileHelper(t, rootDir, rel, "skipped\n")
+	}
+	writeFileHelper(t, rootDir, "sec/ok.md", "ok\n")
+	writeFileHelper(t, rootDir, "a:b.md", "kept\n")
+	writeFileHelper(t, rootDir, "notes.", "kept\n")
+	logs := captureLogs(t)
+
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup: %v", err)
+	}
+	want := []string{"root/a:b.md", "root/notes.", "root/page.md", "root/sec/ok.md"}
+	if got := remoteFilePaths(t, bareDir); !reflect.DeepEqual(got, want) {
+		t.Errorf("remote files = %v, want %v", got, want)
+	}
+	for _, rel := range []string{`root/sub\page.md`, "root/.git ", "root/sec/git~1"} {
+		if n := strings.Count(logs.String(), "path="+strconv.Quote(strconv.Quote(rel))); n != 1 {
+			t.Errorf("want one warning for %q, got %d:\n%s", rel, n, logs.String())
+		}
+	}
+
+	logs.Reset()
+	commitToRemote(t, bareDir, "root/ext.md", "ext\n")
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup after an external commit: %v", err)
+	}
+	readFileEqual(t, filepath.Join(rootDir, "ext.md"), "ext\n")
+	if strings.Contains(logs.String(), "level=WARN") {
+		t.Errorf("skipped names were warned about again:\n%s", logs.String())
+	}
+}
+
+// TestPull_BaseTreeWithWindowsOnlyNames_KeepsBackingUp tests the upgrade
+// case on Linux and macOS: names git accepts but Windows cannot store (an
+// upload keeps its raw extension, so "report." or "a:b.md" can already be in
+// the local HEAD and on the remote) must not stop later pulls, and stay in
+// the backup.
+func TestPull_BaseTreeWithWindowsOnlyNames_KeepsBackingUp(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("these names cannot be created on Windows")
+	}
+	bareDir := initBareRemote(t)
+	repo, rootDir := newRepoWithRemote(t, bareDir)
+	pushRawRootEntryToRemote(t, bareDir, "", "notes.", nil)
+	pushRawRootEntryToRemote(t, bareDir, "", "a:b.md", nil)
+
+	// State left by an earlier version: HEAD at the remote commit holding
+	// those names, and the files on disk.
+	remote, err := repo.ensureRemote()
+	if err != nil {
+		t.Fatalf("ensureRemote: %v", err)
+	}
+	auth, err := repo.buildAuth()
+	if err != nil {
+		t.Fatalf("buildAuth: %v", err)
+	}
+	if err := repo.fetchBranch(remote, auth); err != nil {
+		t.Fatalf("fetchBranch: %v", err)
+	}
+	if err := repo.setHead(remoteHeadCommit(t, bareDir).Hash); err != nil {
+		t.Fatalf("setHead: %v", err)
+	}
+	writeFileHelper(t, rootDir, "notes.", "outside")
+	writeFileHelper(t, rootDir, "a:b.md", "outside")
+
+	commitToRemote(t, bareDir, "root/ext.md", "ext\n")
+	writeFileHelper(t, rootDir, "page.md", "local edit\n")
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup: %v", err)
+	}
+	readFileEqual(t, filepath.Join(rootDir, "ext.md"), "ext\n")
+	head := remoteHeadCommit(t, bareDir)
+	assertFileInCommit(t, head, "root/page.md", "local edit\n")
+	assertFileInCommit(t, head, "root/notes.", "outside")
+	assertFileInCommit(t, head, "root/a:b.md", "outside")
+	if snap := repo.Status(); snap.LastError != "" || snap.NeedsIntervention {
+		t.Errorf("NeedsIntervention=%v LastError=%q, want a clean status", snap.NeedsIntervention, snap.LastError)
+	}
+}
+
+// remoteFilePaths lists every file path in the bare remote's main branch.
+func remoteFilePaths(t *testing.T, bareDir string) []string {
+	t.Helper()
+	tree, err := remoteHeadCommit(t, bareDir).Tree()
+	if err != nil {
+		t.Fatalf("remoteFilePaths: Tree: %v", err)
+	}
+	var paths []string
+	if err := tree.Files().ForEach(func(f *object.File) error {
+		paths = append(paths, f.Name)
+		return nil
+	}); err != nil {
+		t.Fatalf("remoteFilePaths: Files: %v", err)
+	}
+	sort.Strings(paths)
+	return paths
 }

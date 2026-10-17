@@ -3,6 +3,7 @@ package backup
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -378,5 +379,39 @@ func TestRunBackup_WithPath_RemoteDeletionMaterialized(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(rootDir, "page.md")); !os.IsNotExist(err) {
 		t.Fatalf("expected live page.md to be removed, stat err = %v", err)
+	}
+}
+
+// TestResolveLivePath_TreePaths_StayInsideLiveDir tests that a tree path is
+// only resolved to a location strictly inside the live content directory.
+func TestResolveLivePath_TreePaths_StayInsideLiveDir(t *testing.T) {
+	liveDir := filepath.Join(t.TempDir(), "root")
+	tests := []struct {
+		name    string
+		rel     string
+		want    string
+		wantErr bool
+	}{
+		{name: "file", rel: "page.md", want: filepath.Join(liveDir, "page.md")},
+		{name: "nested file", rel: "sec/page.md", want: filepath.Join(liveDir, "sec", "page.md")},
+		{name: "dot dot inside", rel: "sec/../page.md", want: filepath.Join(liveDir, "page.md")},
+		{name: "empty is the directory itself", rel: "", wantErr: true},
+		{name: "dot is the directory itself", rel: ".", wantErr: true},
+		{name: "parent", rel: "..", wantErr: true},
+		{name: "sibling", rel: "../existing.txt", wantErr: true},
+		{name: "nested parent", rel: "sec/../../existing.txt", wantErr: true},
+		{name: "sibling with the same prefix", rel: "../root2/x", wantErr: true},
+		{name: "backslash parent", rel: `..\existing.txt`, wantErr: runtime.GOOS == "windows"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := resolveLivePath(liveDir, tc.rel)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("resolveLivePath(%q) = %q, %v, wantErr %v", tc.rel, got, err, tc.wantErr)
+			}
+			if !tc.wantErr && tc.want != "" && got != tc.want {
+				t.Errorf("resolveLivePath(%q) = %q, want %q", tc.rel, got, tc.want)
+			}
+		})
 	}
 }

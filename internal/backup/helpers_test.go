@@ -6,12 +6,14 @@ import (
 	"encoding/pem"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 	"time"
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	gossh "golang.org/x/crypto/ssh"
 )
@@ -291,4 +293,95 @@ func remoteHeadCommit(t *testing.T, bareDir string) *object.Commit {
 		t.Fatalf("remoteHeadCommit: CommitObject: %v", err)
 	}
 	return commit
+}
+
+// pushRawRootEntryToRemote commits an entry with the raw name name under root/
+// on the bare remote, written with git plumbing so none of go-git's worktree
+// name checks apply. With dir set the entry sits in a root/<dir>/
+// directory. With files nil the entry is a file holding "outside"; otherwise
+// it is a directory holding files.
+func pushRawRootEntryToRemote(t *testing.T, bareDir, dir, name string, files map[string]string) {
+	t.Helper()
+	bare, err := gogit.PlainOpen(bareDir)
+	if err != nil {
+		t.Fatalf("pushRawRootEntryToRemote: PlainOpen: %v", err)
+	}
+	s := bare.Storer
+	blob := func(content string) plumbing.Hash {
+		obj := s.NewEncodedObject()
+		obj.SetType(plumbing.BlobObject)
+		w, err := obj.Writer()
+		if err != nil {
+			t.Fatalf("pushRawRootEntryToRemote: blob writer: %v", err)
+		}
+		if _, err := w.Write([]byte(content)); err != nil {
+			t.Fatalf("pushRawRootEntryToRemote: write blob: %v", err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("pushRawRootEntryToRemote: close blob: %v", err)
+		}
+		h, err := s.SetEncodedObject(obj)
+		if err != nil {
+			t.Fatalf("pushRawRootEntryToRemote: store blob: %v", err)
+		}
+		return h
+	}
+	tree := func(entries []object.TreeEntry) plumbing.Hash {
+		sort.Sort(object.TreeEntrySorter(entries))
+		obj := s.NewEncodedObject()
+		if err := (&object.Tree{Entries: entries}).Encode(obj); err != nil {
+			t.Fatalf("pushRawRootEntryToRemote: encode tree: %v", err)
+		}
+		h, err := s.SetEncodedObject(obj)
+		if err != nil {
+			t.Fatalf("pushRawRootEntryToRemote: store tree: %v", err)
+		}
+		return h
+	}
+
+	entry := object.TreeEntry{Name: name, Mode: filemode.Regular, Hash: blob("outside")}
+	if files != nil {
+		var children []object.TreeEntry
+		for fileName, content := range files {
+			children = append(children, object.TreeEntry{Name: fileName, Mode: filemode.Regular, Hash: blob(content)})
+		}
+		entry = object.TreeEntry{Name: name, Mode: filemode.Dir, Hash: tree(children)}
+	}
+	if dir != "" {
+		entry = object.TreeEntry{Name: dir, Mode: filemode.Dir, Hash: tree([]object.TreeEntry{entry})}
+	}
+
+	parent := remoteHeadCommit(t, bareDir)
+	top, err := parent.Tree()
+	if err != nil {
+		t.Fatalf("pushRawRootEntryToRemote: Tree: %v", err)
+	}
+	root, err := top.Tree("root")
+	if err != nil {
+		t.Fatalf("pushRawRootEntryToRemote: remote has no root/: %v", err)
+	}
+	newRoot := tree(append(append([]object.TreeEntry{}, root.Entries...), entry))
+	var topEntries []object.TreeEntry
+	for _, e := range top.Entries {
+		if e.Name == "root" {
+			e.Hash = newRoot
+		}
+		topEntries = append(topEntries, e)
+	}
+	sig := object.Signature{Name: "External", Email: "ext@example.com", When: time.Now()}
+	commit := &object.Commit{
+		Author: sig, Committer: sig, Message: "raw entry",
+		TreeHash: tree(topEntries), ParentHashes: []plumbing.Hash{parent.Hash},
+	}
+	obj := s.NewEncodedObject()
+	if err := commit.Encode(obj); err != nil {
+		t.Fatalf("pushRawRootEntryToRemote: encode commit: %v", err)
+	}
+	commitHash, err := s.SetEncodedObject(obj)
+	if err != nil {
+		t.Fatalf("pushRawRootEntryToRemote: store commit: %v", err)
+	}
+	if err := s.SetReference(plumbing.NewHashReference(plumbing.NewBranchReferenceName("main"), commitHash)); err != nil {
+		t.Fatalf("pushRawRootEntryToRemote: SetReference: %v", err)
+	}
 }
