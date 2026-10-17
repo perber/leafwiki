@@ -196,6 +196,108 @@ func TestHandleTriggerPull_ErrorHasEmptyTemplate(t *testing.T) {
 	}
 }
 
+// newFileConflictRoutes returns Routes over a backup whose root/page.md was
+// backed up, then changed on the remote by an external commit and changed
+// differently on local disk: the next pull conflicts and local HEAD is behind
+// the remote tip.
+func newFileConflictRoutes(t *testing.T) *Routes {
+	t.Helper()
+	bareDir := t.TempDir()
+	if _, err := gogit.PlainInit(bareDir, true); err != nil {
+		t.Fatalf("PlainInit bare remote: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	rootDir := filepath.Join(tmpDir, "root")
+	assetsDir := filepath.Join(tmpDir, "assets")
+	for _, dir := range []string{rootDir, assetsDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("MkdirAll %s: %v", dir, err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(rootDir, "page.md"), []byte("# Page\n"), 0644); err != nil {
+		t.Fatalf("WriteFile page.md: %v", err)
+	}
+
+	repo, err := backupSvc.Init(backupSvc.Config{
+		RootDir:     rootDir,
+		AssetsDir:   assetsDir,
+		AuthorName:  "Test",
+		AuthorEmail: "t@t.com",
+		Branch:      "main",
+		RemoteURL:   "file://" + bareDir,
+		SSHKey:      testSSHKeyPEM(t),
+	})
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("initial RunBackup failed: %v", err)
+	}
+
+	cloneDir := t.TempDir()
+	cloned, err := gogit.PlainClone(cloneDir, false, &gogit.CloneOptions{
+		URL:           "file://" + bareDir,
+		ReferenceName: plumbing.NewBranchReferenceName("main"),
+	})
+	if err != nil {
+		t.Fatalf("PlainClone: %v", err)
+	}
+	wt, err := cloned.Worktree()
+	if err != nil {
+		t.Fatalf("Worktree: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cloneDir, "root", "page.md"), []byte("version B from remote\n"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	if _, err := wt.Add("root/page.md"); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+	if _, err := wt.Commit("external commit", &gogit.CommitOptions{
+		Author: &object.Signature{Name: "External", Email: "ext@example.com", When: time.Now()},
+	}); err != nil {
+		t.Fatalf("Commit: %v", err)
+	}
+	remote, err := cloned.Remote("origin")
+	if err != nil {
+		t.Fatalf("Remote: %v", err)
+	}
+	if err := remote.Push(&gogit.PushOptions{
+		RefSpecs: []config.RefSpec{"refs/heads/main:refs/heads/main"},
+	}); err != nil {
+		t.Fatalf("Push: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(rootDir, "page.md"), []byte("version C local\n"), 0644); err != nil {
+		t.Fatalf("WriteFile local change: %v", err)
+	}
+	return &Routes{mgr: backupSvc.NewEnvManager(repo, nil)}
+}
+
+// TestHandleForcePush_RemoteAhead_Returns409 verifies that a force push the
+// backup refuses (local behind the remote) is reported as 409 with its own
+// code, so the UI can explain it instead of showing a generic failure.
+func TestHandleForcePush_RemoteAhead_Returns409(t *testing.T) {
+	routes := newFileConflictRoutes(t)
+	c, rec := newTestGinContext()
+
+	routes.handleForcePush(c)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected status %d, got %d, body: %s", http.StatusConflict, rec.Code, rec.Body.String())
+	}
+	var body BackupErrorResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("failed to unmarshal response body: %v", err)
+	}
+	if body.Error.Code != ErrCodeBackupForcePushConflict {
+		t.Errorf("code = %q, want %q", body.Error.Code, ErrCodeBackupForcePushConflict)
+	}
+	if body.Error.Template == "" {
+		t.Error("expected a template so the frontend can translate the refusal")
+	}
+}
+
 // ─── settings-mode config endpoints ────────────────────────────────────────
 
 func ginPOSTJSON(t *testing.T, path, body string) (*gin.Context, *httptest.ResponseRecorder) {

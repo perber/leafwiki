@@ -15,6 +15,11 @@ var ErrEnvManaged = errors.New("git backup is configured via environment variabl
 // when no backup is currently active.
 var ErrNotRunning = errors.New("git backup is not enabled")
 
+// ErrForcePushRemoteAhead is returned by ForcePush when local HEAD is an
+// ancestor of the remote branch tip: the remote holds commits the local backup
+// has not applied yet, and overwriting them would lose those pages.
+var ErrForcePushRemoteAhead = errors.New("the remote has commits the local backup has not applied yet; force push refused")
+
 // Manager owns the git backup Repository + Scheduler and, in settings mode,
 // lets an admin reconfigure them at runtime without restarting the server.
 //

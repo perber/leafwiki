@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -39,6 +40,9 @@ func TestConflict_DivergedHistory(t *testing.T) {
 	if snap.ConflictDetails == "" {
 		t.Error("expected ConflictDetails to be set")
 	}
+	if snap.ConflictKind != ConflictKindDiverged {
+		t.Errorf("ConflictKind = %q, want %q", snap.ConflictKind, ConflictKindDiverged)
+	}
 }
 
 // TestConflict_FileConflict tests that RunBackup sets NeedsIntervention when
@@ -69,6 +73,12 @@ func TestConflict_FileConflict(t *testing.T) {
 	snap := repo.Status()
 	if !snap.NeedsIntervention {
 		t.Error("expected NeedsIntervention = true after file conflict")
+	}
+	if snap.ConflictKind != ConflictKindFileConflict {
+		t.Errorf("ConflictKind = %q, want %q", snap.ConflictKind, ConflictKindFileConflict)
+	}
+	if !strings.Contains(snap.ConflictDetails, "root/page.md") {
+		t.Errorf("ConflictDetails = %q, want it to name root/page.md", snap.ConflictDetails)
 	}
 }
 

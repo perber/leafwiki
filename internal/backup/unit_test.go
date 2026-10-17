@@ -10,7 +10,7 @@ import (
 
 func TestStatus_SetSuccessClearsAllFields(t *testing.T) {
 	s := &Status{}
-	s.SetNeedsIntervention("conflict details")
+	s.SetNeedsIntervention(ConflictKindDiverged, "conflict details")
 	s.SetSuccess(time.Now())
 
 	snap := s.Snapshot()
@@ -30,7 +30,7 @@ func TestStatus_SetSuccessClearsAllFields(t *testing.T) {
 
 func TestStatus_SetNeedsInterventionSetsAllFields(t *testing.T) {
 	s := &Status{}
-	s.SetNeedsIntervention("some conflict")
+	s.SetNeedsIntervention(ConflictKindFileConflict, "some conflict")
 
 	snap := s.Snapshot()
 	if !snap.NeedsIntervention {
@@ -41,6 +41,36 @@ func TestStatus_SetNeedsInterventionSetsAllFields(t *testing.T) {
 	}
 	if snap.LastError != "some conflict" {
 		t.Errorf("expected LastError %q, got %q", "some conflict", snap.LastError)
+	}
+}
+
+func TestStatus_ConflictKind(t *testing.T) {
+	resets := []struct {
+		name  string
+		reset func(*Status)
+	}{
+		{"SetSuccess", func(s *Status) { s.SetSuccess(time.Now()) }},
+		{"SetError", func(s *Status) { s.SetError("network down") }},
+		{"ClearIntervention", func(s *Status) { s.ClearIntervention() }},
+	}
+	for _, kind := range []ConflictKind{ConflictKindDiverged, ConflictKindFileConflict} {
+		t.Run(string(kind)+"/set", func(t *testing.T) {
+			s := &Status{}
+			s.SetNeedsIntervention(kind, "details")
+			if got := s.Snapshot().ConflictKind; got != kind {
+				t.Errorf("ConflictKind = %q, want %q", got, kind)
+			}
+		})
+		for _, r := range resets {
+			t.Run(string(kind)+"/"+r.name+" resets", func(t *testing.T) {
+				s := &Status{}
+				s.SetNeedsIntervention(kind, "details")
+				r.reset(s)
+				if got := s.Snapshot().ConflictKind; got != "" {
+					t.Errorf("ConflictKind = %q after %s, want empty", got, r.name)
+				}
+			})
+		}
 	}
 }
 

@@ -113,8 +113,13 @@ func (r *Routes) handleForcePush(c *gin.Context) {
 		return
 	}
 	if err := r.mgr.ForcePush(); err != nil {
-		if errors.Is(err, backupSvc.ErrNotRunning) {
+		switch {
+		case errors.Is(err, backupSvc.ErrNotRunning):
 			r.respondNotEnabled(c)
+			return
+		case errors.Is(err, backupSvc.ErrForcePushRemoteAhead):
+			respondWithBackupStatusError(c, http.StatusConflict, ErrCodeBackupForcePushConflict, err.Error(),
+				"force push refused: the remote has changes the local backup has not applied yet")
 			return
 		}
 		respondWithBackupStatusError(c, http.StatusInternalServerError, ErrCodeBackupInternalError, err.Error(), "backup internal error")

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import {
   BackupConfig,
   BackupConfigInput,
+  BackupConflictKind,
   BackupStatusResponse,
   disableBackup,
   fetchBackupConfig,
@@ -22,6 +23,7 @@ interface BackupState {
   lastError: string
   needsIntervention: boolean
   conflictDetails: string
+  conflictKind: BackupConflictKind | null
   isLoading: boolean
   isPolling: boolean
   pollingFromAt: string | null
@@ -54,6 +56,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
   lastError: '',
   needsIntervention: false,
   conflictDetails: '',
+  conflictKind: null,
   isLoading: false,
   isPolling: false,
   pollingFromAt: null,
@@ -83,6 +86,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
         lastError: data.status?.lastError ?? '',
         needsIntervention: data.status?.needsIntervention ?? false,
         conflictDetails: data.status?.conflictDetails ?? '',
+        conflictKind: data.status?.conflictKind ?? null,
         isLoading: false,
         statusError: '',
       })

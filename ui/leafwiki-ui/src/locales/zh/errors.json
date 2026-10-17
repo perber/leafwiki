@@ -26,6 +26,7 @@
   "circular reference detected": "移动将造成循环引用",
   "convert not allowed": "不允许转换操作",
   "editor limit reached for this plan": "已达本套餐的编辑者上限。升级套餐以添加更多编辑者。",
+  "force push refused: the remote has changes the local backup has not applied yet": "已拒绝强制推送：远端有此 Wiki 尚未应用的更改。覆盖它们会导致这些更改丢失。",
   "email disabled": "本服务器未配置邮件",
   "failed to clear authentication cookies": "清除认证 Cookie 失败",
   "failed to clear csrf cookie": "清除 CSRF Cookie 失败",
