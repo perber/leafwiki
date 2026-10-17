@@ -7,8 +7,16 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Trans } from 'react-i18next'
 import { useNavigate } from 'react-router'
 import { useSetTitle } from '../viewer/setTitle'
-
-type ResultFilter = 'all' | 'created' | 'skipped' | 'failed'
+import {
+  filterResultItems,
+  getClearButtonLabelKey,
+  getImportProgress,
+  getImportStep,
+  getNextActionKey,
+  getStatusLabelKey,
+  getStatusPillClass,
+  type ResultFilter,
+} from './importerState'
 
 const t = (key: string, opts?: Record<string, unknown>) =>
   i18next.t(key, { ...opts, ns: 'importer' })
@@ -132,51 +140,12 @@ export default function Importer() {
   }, [cancelImportPlan, importPlan])
 
   const importStatus = importPlan?.execution_status ?? null
-  const progressLabel =
-    importPlan && importPlan.total_items > 0
-      ? `${importPlan.processed_items}/${importPlan.total_items}`
-      : null
-  const progressPercent =
-    importPlan && importPlan.total_items > 0
-      ? Math.round((importPlan.processed_items / importPlan.total_items) * 100)
-      : 0
-  const statusPillClass =
-    importStatus === 'completed'
-      ? 'settings__pill settings__pill-success'
-      : importStatus === 'failed' || importStatus === 'canceled'
-        ? 'settings__pill settings__pill-error'
-        : importStatus === 'running'
-          ? 'settings__pill settings__pill-warning'
-          : 'settings__pill settings__pill-success'
-  const statusLabel =
-    importStatus === 'running'
-      ? t('status.running')
-      : importStatus === 'completed'
-        ? t('status.completed')
-        : importStatus === 'canceled'
-          ? t('status.canceled')
-          : importStatus === 'failed'
-            ? t('status.failed')
-            : importStatus === 'planned'
-              ? t('status.planned')
-              : t('status.idle')
-  const clearButtonLabel =
-    importStatus === 'running'
-      ? importPlan?.cancel_requested
-        ? t('run.cancelRequested')
-        : t('run.cancelImport')
-      : t('run.clearImportPlan')
-  const currentStep =
-    importStatus === 'running'
-      ? 3
-      : importResult ||
-          importStatus === 'completed' ||
-          importStatus === 'failed' ||
-          importStatus === 'canceled'
-        ? 4
-        : importPlan
-          ? 2
-          : 1
+  const { label: progressLabel, percent: progressPercent } =
+    getImportProgress(importPlan)
+  const statusPillClass = getStatusPillClass(importStatus)
+  const statusLabel = t(getStatusLabelKey(importStatus))
+  const clearButtonLabel = t(getClearButtonLabelKey(importPlan))
+  const currentStep = getImportStep(importPlan, importResult)
   const stepItems = [
     {
       number: 1,
@@ -210,30 +179,11 @@ export default function Importer() {
   const plannedSkipCount = planItems.filter(
     (item) => item.action === 'skip',
   ).length
-  const filteredResultItems = resultItems.filter((item) => {
-    const matchesFilter =
-      resultFilter === 'all'
-        ? true
-        : resultFilter === 'failed'
-          ? Boolean(item.error)
-          : item.action === resultFilter
-
-    if (!matchesFilter) {
-      return false
-    }
-
-    const normalizedSearch = resultSearch.trim().toLowerCase()
-    if (normalizedSearch === '') {
-      return true
-    }
-
-    return (
-      item.source_path.toLowerCase().includes(normalizedSearch) ||
-      item.target_path.toLowerCase().includes(normalizedSearch) ||
-      item.action.toLowerCase().includes(normalizedSearch) ||
-      (item.error ?? '').toLowerCase().includes(normalizedSearch)
-    )
-  })
+  const filteredResultItems = filterResultItems(
+    resultItems,
+    resultFilter,
+    resultSearch,
+  )
   const failedCount = resultItems.filter((item) => Boolean(item.error)).length
   const createdCount = resultItems.filter(
     (item) => item.action === 'created',
@@ -247,21 +197,7 @@ export default function Importer() {
   const showRunStep = currentStep === 3
   const showResultStep = currentStep === 4
   const showRunSection = currentStep === 2 || currentStep === 3
-  const nextActionText = !importPlan
-    ? t('nextAction.chooseZip')
-    : importStatus === 'planned'
-      ? t('nextAction.reviewThenStart')
-      : importStatus === 'running'
-        ? importPlan.cancel_requested
-          ? t('nextAction.cancellationRequested')
-          : t('nextAction.running')
-        : importStatus === 'completed'
-          ? t('nextAction.completed')
-          : importStatus === 'failed'
-            ? t('nextAction.failed')
-            : importStatus === 'canceled'
-              ? t('nextAction.canceled')
-              : t('nextAction.selectZipToBegin')
+  const nextActionText = t(getNextActionKey(importPlan))
 
   return (
     <>
