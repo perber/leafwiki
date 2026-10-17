@@ -39,6 +39,11 @@ test.describe('Markdown web link navigation', () => {
           slug: sourceSlug,
           content: `[Same origin](${href})\n\n[External](https://example.com/leafwiki-link-test)\n\n[Asset](assets/test.txt)\n\n[Relative](/${targetSlug})`,
         });
+        const treeResponse = page.waitForResponse((response) =>
+          response.url().endsWith('/api/tree'),
+        );
+        await page.reload();
+        await (await treeResponse).finished();
         const viewPage = new ViewPage(page);
         await viewPage.goto(`/${sourceSlug}`);
         if (mode === 'editor') await viewPage.clickEditPageButton();
