@@ -39,7 +39,7 @@ func NewUserStore(storageDir string) (*UserStore, error) {
 
 	// ensureSchema calls Connect() itself (idempotently), so it alone is
 	// enough to bring the store to a working state.
-	err := sqliteutil.RetryOnCorruption(databasePath(u.storageDir, u.filename), func() error {
+	err := sqliteutil.OpenWithPolicy(databasePath(u.storageDir, u.filename), sqliteutil.RebuildOnCorruption, func() error {
 		if err := u.ensureSchema(); err != nil {
 			if u.db != nil {
 				_ = u.db.Close()

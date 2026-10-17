@@ -2,6 +2,7 @@ package sqliteutil
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -96,82 +97,250 @@ func TestRemoveSQLiteFiles_NoOpWhenMissing(t *testing.T) {
 	}
 }
 
-func TestRetryOnCorruption_SucceedsOnFirstTry(t *testing.T) {
-	calls := 0
-	err := RetryOnCorruption("unused.db", func() error {
-		calls++
+// TestOpenWithPolicy_Contract pins the contract every CorruptionPolicy relies
+// on (ADR-0013), using a recording fake policy so the rows test OpenWithPolicy
+// itself rather than any concrete policy.
+func TestOpenWithPolicy_Contract(t *testing.T) {
+	corrupt := sqliteErrorWithCode(11) // SQLITE_CORRUPT
+	notADB := sqliteErrorWithCode(26)  // SQLITE_NOTADB
+	boom := errors.New("boom")
+	stillBroken := errors.New("still broken")
+	typed := errors.New("typed policy error")
+
+	tests := []struct {
+		name          string
+		openErrs      []error // error returned by the n-th open call; nil = success
+		policyRetry   bool
+		policyOut     error
+		wantErr       error
+		wantOpenCalls int
+		wantPolicy    bool
+	}{
+		{
+			name:          "success on first try does not call the policy",
+			openErrs:      []error{nil},
+			wantOpenCalls: 1,
+		},
+		{
+			name:          "non-recoverable error passes through without calling the policy",
+			openErrs:      []error{boom},
+			wantErr:       boom,
+			wantOpenCalls: 1,
+		},
+		{
+			name:          "retry then success",
+			openErrs:      []error{corrupt, nil},
+			policyRetry:   true,
+			wantOpenCalls: 2,
+			wantPolicy:    true,
+		},
+		{
+			name:          "retry then non-recoverable failure returns that error unchanged",
+			openErrs:      []error{corrupt, stillBroken},
+			policyRetry:   true,
+			wantErr:       stillBroken,
+			wantOpenCalls: 2,
+			wantPolicy:    true,
+		},
+		{
+			name:          "retry then recoverable failure is not retried again",
+			openErrs:      []error{corrupt, notADB},
+			policyRetry:   true,
+			wantErr:       notADB,
+			wantOpenCalls: 2,
+			wantPolicy:    true,
+		},
+		{
+			name:          "retry ignores a non-nil out",
+			openErrs:      []error{corrupt, nil},
+			policyRetry:   true,
+			policyOut:     typed,
+			wantOpenCalls: 2,
+			wantPolicy:    true,
+		},
+		{
+			name:          "no retry returns the policy error",
+			openErrs:      []error{corrupt},
+			policyOut:     typed,
+			wantErr:       typed,
+			wantOpenCalls: 1,
+			wantPolicy:    true,
+		},
+		{
+			name:          "no retry with nil out returns the original error",
+			openErrs:      []error{corrupt},
+			wantErr:       corrupt,
+			wantOpenCalls: 1,
+			wantPolicy:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			const dbPath = "unused.db"
+			openCalls, policyCalls := 0, 0
+			policy := func(gotPath string, gotErr error) (bool, error) {
+				policyCalls++
+				if gotPath != dbPath {
+					t.Errorf("policy got path %q, want %q", gotPath, dbPath)
+				}
+				if !errors.Is(gotErr, tt.openErrs[0]) {
+					t.Errorf("policy got err %v, want the first open error %v", gotErr, tt.openErrs[0])
+				}
+				return tt.policyRetry, tt.policyOut
+			}
+
+			err := OpenWithPolicy(dbPath, policy, func() error {
+				openCalls++
+				if openCalls > len(tt.openErrs) {
+					t.Fatalf("open called %d times, more than the %d scripted results", openCalls, len(tt.openErrs))
+				}
+				return tt.openErrs[openCalls-1]
+			})
+
+			if tt.wantErr == nil && err != nil {
+				t.Fatalf("OpenWithPolicy: unexpected error %v", err)
+			}
+			if tt.wantErr != nil && err != tt.wantErr {
+				t.Fatalf("OpenWithPolicy error = %v, want exactly %v", err, tt.wantErr)
+			}
+			if openCalls != tt.wantOpenCalls {
+				t.Fatalf("open called %d times, want %d", openCalls, tt.wantOpenCalls)
+			}
+			wantPolicyCalls := 0
+			if tt.wantPolicy {
+				wantPolicyCalls = 1
+			}
+			if policyCalls != wantPolicyCalls {
+				t.Fatalf("policy called %d times, want %d", policyCalls, wantPolicyCalls)
+			}
+		})
+	}
+}
+
+func TestOpenWithPolicy_NilPolicyPanics(t *testing.T) {
+	openCalls := 0
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected OpenWithPolicy to panic on a nil policy")
+		}
+		if openCalls != 0 {
+			t.Fatalf("expected the panic before open runs, open called %d times", openCalls)
+		}
+	}()
+	_ = OpenWithPolicy("unused.db", nil, func() error {
+		openCalls++
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("RetryOnCorruption: %v", err)
+}
+
+// TestOpenWithPolicy_RebuildOnCorruption covers the derived-index policy:
+// a recoverable error removes the database and its sidecars before the one
+// retry; anything else leaves the files alone.
+func TestOpenWithPolicy_RebuildOnCorruption(t *testing.T) {
+	boom := errors.New("boom")
+	stillBroken := errors.New("still broken")
+
+	tests := []struct {
+		name             string
+		openErrs         []error
+		wantErr          error
+		wantOpenCalls    int
+		wantFilesRemoved bool
+	}{
+		{
+			name:          "succeeds on first try",
+			openErrs:      []error{nil},
+			wantOpenCalls: 1,
+		},
+		{
+			name:          "non-recoverable error returns immediately",
+			openErrs:      []error{boom},
+			wantErr:       boom,
+			wantOpenCalls: 1,
+		},
+		{
+			name:             "recoverable error removes files and retries once",
+			openErrs:         []error{sqliteErrorWithCode(11), nil},
+			wantOpenCalls:    2,
+			wantFilesRemoved: true,
+		},
+		{
+			name:             "recoverable error then second failure returns that error",
+			openErrs:         []error{sqliteErrorWithCode(11), stillBroken},
+			wantErr:          stillBroken,
+			wantOpenCalls:    2,
+			wantFilesRemoved: true,
+		},
 	}
-	if calls != 1 {
-		t.Fatalf("expected open to be called once, got %d", calls)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dbPath := filepath.Join(t.TempDir(), "corrupt.db")
+			paths := sqliteFilePaths(dbPath)
+			for _, path := range paths {
+				if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
+					t.Fatalf("failed to create %q: %v", path, err)
+				}
+			}
+
+			calls := 0
+			err := OpenWithPolicy(dbPath, RebuildOnCorruption, func() error {
+				calls++
+				if calls == 2 {
+					for _, path := range paths {
+						if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
+							t.Errorf("expected %q to be removed before the retry, err=%v", path, statErr)
+						}
+					}
+				}
+				if calls > len(tt.openErrs) {
+					t.Fatalf("open called %d times, more than the %d scripted results", calls, len(tt.openErrs))
+				}
+				return tt.openErrs[calls-1]
+			})
+
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("OpenWithPolicy error = %v, want %v", err, tt.wantErr)
+			}
+			if calls != tt.wantOpenCalls {
+				t.Fatalf("open called %d times, want %d", calls, tt.wantOpenCalls)
+			}
+			for _, path := range paths {
+				_, statErr := os.Stat(path)
+				if tt.wantFilesRemoved && !os.IsNotExist(statErr) {
+					t.Fatalf("expected %q to have been removed, err=%v", path, statErr)
+				}
+				if !tt.wantFilesRemoved && statErr != nil {
+					t.Fatalf("expected %q to be left alone, err=%v", path, statErr)
+				}
+			}
+		})
 	}
 }
 
-func TestRetryOnCorruption_NonRecoverableError_ReturnsImmediately(t *testing.T) {
-	calls := 0
-	wantErr := errors.New("boom")
-	err := RetryOnCorruption("unused.db", func() error {
-		calls++
-		return wantErr
-	})
-	if !errors.Is(err, wantErr) {
-		t.Fatalf("expected wantErr, got %v", err)
+func TestSQLiteCode(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want int
+	}{
+		{name: "extended code is kept", err: sqliteErrorWithCode(10 | (12 << 8)), want: 10 | (12 << 8)},
+		{name: "wrapped sqlite error", err: fmt.Errorf("open: %w", sqliteErrorWithCode(26)), want: 26},
+		{name: "non-sqlite error", err: errors.New("boom"), want: 0},
 	}
-	if calls != 1 {
-		t.Fatalf("expected open to be called once (no retry), got %d", calls)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := sqliteCode(tt.err); got != tt.want {
+				t.Fatalf("sqliteCode() = %d, want %d", got, tt.want)
+			}
+		})
 	}
 }
 
-func TestRetryOnCorruption_RecoverableError_RetriesOnceAndRemovesFiles(t *testing.T) {
-	dir := t.TempDir()
-	dbPath := filepath.Join(dir, "corrupt.db")
-	paths := []string{dbPath, dbPath + "-journal", dbPath + "-wal", dbPath + "-shm"}
-	for _, path := range paths {
-		if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
-			t.Fatalf("failed to create %q: %v", path, err)
-		}
-	}
-
-	calls := 0
-	err := RetryOnCorruption(dbPath, func() error {
-		calls++
-		if calls == 1 {
-			return sqliteErrorWithCode(11) // SQLITE_CORRUPT
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("RetryOnCorruption: %v", err)
-	}
-	if calls != 2 {
-		t.Fatalf("expected open to be called twice (initial + retry), got %d", calls)
-	}
-	for _, path := range paths {
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
-			t.Fatalf("expected %q to have been removed before retry, err=%v", path, err)
-		}
-	}
-}
-
-func TestRetryOnCorruption_RecoverableError_SecondFailureReturnsThatError(t *testing.T) {
-	calls := 0
-	secondErr := errors.New("still broken")
-	err := RetryOnCorruption(t.TempDir()+"/corrupt.db", func() error {
-		calls++
-		if calls == 1 {
-			return sqliteErrorWithCode(11) // SQLITE_CORRUPT
-		}
-		return secondErr
-	})
-	if !errors.Is(err, secondErr) {
-		t.Fatalf("expected secondErr, got %v", err)
-	}
-	if calls != 2 {
-		t.Fatalf("expected open to be called twice, got %d", calls)
-	}
+func sqliteFilePaths(dbPath string) []string {
+	return []string{dbPath, dbPath + "-journal", dbPath + "-wal", dbPath + "-shm"}
 }
 
 func sqliteErrorWithCode(code int) error {

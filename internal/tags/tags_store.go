@@ -32,7 +32,7 @@ func NewTagsStore(storageDir string) (*TagsStore, error) {
 	dbPath := filepath.Join(normalized, "tags.db")
 
 	s := &TagsStore{}
-	err := sqliteutil.RetryOnCorruption(dbPath, func() error {
+	err := sqliteutil.OpenWithPolicy(dbPath, sqliteutil.RebuildOnCorruption, func() error {
 		db, err := sql.Open("sqlite", dbPath+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
 		if err != nil {
 			return fmt.Errorf("failed to open tags database: %w", err)

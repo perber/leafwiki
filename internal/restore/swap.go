@@ -179,7 +179,7 @@ var (
 // missing columns, which a plain "SELECT count(*)" can't tell apart from the
 // real thing). Without this, a corrupt or wrong-shaped file would get
 // swapped in and, for favorites.db/usersettings.db specifically,
-// RetryOnCorruption (see NewFavoritesStore/NewUserSettingsStore) would then
+// RebuildOnCorruption (see NewFavoritesStore/NewUserSettingsStore) would then
 // silently delete and recreate it empty the moment it's reopened — with the
 // restore still reporting success either way.
 func sanityCheckSQLiteDB(path, table string, columns []string) error {

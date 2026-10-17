@@ -91,7 +91,7 @@ func TestExtractAndValidate_RejectsCorruptUsersDB(t *testing.T) {
 // TestExtractAndValidate_RejectsCorruptUserSettingsDB are regression tests
 // for a real bug found in review: favorites.db/usersettings.db weren't
 // sanity-checked at all, unlike users.db. Both stores open via
-// sqliteutil.RetryOnCorruption (see NewFavoritesStore/NewUserSettingsStore),
+// sqliteutil.RebuildOnCorruption (see NewFavoritesStore/NewUserSettingsStore),
 // which silently deletes and recreates a corrupt database file on open — so
 // without this check, a corrupt staged favorites.db/usersettings.db would
 // get swapped in, then silently wiped empty the moment Manager.Replace

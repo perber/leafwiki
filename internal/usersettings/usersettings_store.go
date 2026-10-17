@@ -44,7 +44,7 @@ func NewUserSettingsStore(storageDir string, log *slog.Logger) (*UserSettingsSto
 	dbPath := filepath.Join(normalized, "usersettings.db")
 
 	s := &UserSettingsStore{log: log}
-	err := sqliteutil.RetryOnCorruption(dbPath, func() error {
+	err := sqliteutil.OpenWithPolicy(dbPath, sqliteutil.RebuildOnCorruption, func() error {
 		db, err := sql.Open("sqlite", dbPath+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
 		if err != nil {
 			return fmt.Errorf("failed to open user settings database: %w", err)

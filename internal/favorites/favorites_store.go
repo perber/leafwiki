@@ -50,7 +50,7 @@ func NewFavoritesStore(storageDir string, log *slog.Logger) (*FavoritesStore, er
 	dbPath := filepath.Join(normalized, "favorites.db")
 
 	s := &FavoritesStore{log: log}
-	err := sqliteutil.RetryOnCorruption(dbPath, func() error {
+	err := sqliteutil.OpenWithPolicy(dbPath, sqliteutil.RebuildOnCorruption, func() error {
 		db, err := sql.Open("sqlite", dbPath+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
 		if err != nil {
 			return fmt.Errorf("failed to open favorites database: %w", err)
