@@ -57,3 +57,4 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Deprecated`, `Superseded by 
 | [0010](./0010-remote-user-auto-provisioning.md) | Opt-in auto-provisioning for reverse-proxy header auth | Accepted |
 | [0011](./0011-smtp-cli-env-optional-feature.md) | SMTP as a CLI/ENV-only optional feature | Accepted |
 | [0012](./0012-portable-markdown-link-format.md) | Portable on-disk Markdown link format | Proposed |
+| [0013](./0013-generated-api-documentation.md) | API documentation is generated (Swagger 2.0, pinned swag) and covered incrementally with exact exceptions | Proposed |
