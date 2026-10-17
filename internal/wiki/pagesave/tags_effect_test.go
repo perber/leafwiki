@@ -37,7 +37,7 @@ func createPageWithFrontmatter(t *testing.T, treeSvc *tree.TreeService, title, s
 	if err != nil {
 		t.Fatalf("CreateNode(%q): %v", title, err)
 	}
-	if err := treeSvc.UpdateNode("system", *id, title, slug, &raw, tree.VersionUnchecked, nil, nil, true); err != nil {
+	if err := treeSvc.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: *id, Title: title, Slug: slug, Content: &raw, ExpectedVersion: tree.VersionUnchecked, PreserveFrontmatter: true}); err != nil {
 		t.Fatalf("UpdateNode(%q): %v", title, err)
 	}
 	page, err := treeSvc.GetPage(*id)
@@ -86,7 +86,7 @@ func TestTagsSideEffect_Apply_Update_ReindexesTags(t *testing.T) {
 	effect.Apply(PageSaveEvent{Operation: PageOperationCreate, After: page})
 
 	newRaw := "---\ntags:\n  - newtag\n---\n\nUpdated."
-	if err := treeSvc.UpdateNode("system", page.ID, "Update Tags", "update-tags", &newRaw, tree.VersionUnchecked, nil, nil, true); err != nil {
+	if err := treeSvc.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: page.ID, Title: "Update Tags", Slug: "update-tags", Content: &newRaw, ExpectedVersion: tree.VersionUnchecked, PreserveFrontmatter: true}); err != nil {
 		t.Fatalf("UpdateNode: %v", err)
 	}
 	updated, err := treeSvc.GetPage(page.ID)

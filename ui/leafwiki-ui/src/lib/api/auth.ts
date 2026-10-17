@@ -74,6 +74,33 @@ export async function fetchMe(): Promise<AuthResponse['user'] | null> {
   return user ?? null
 }
 
+// Field-validation errors ({ error: 'validation_error', fields: [...] }) are
+// re-thrown untouched so callers can surface per-field messages instead of
+// the literal string "validation_error"; localized errors become
+// ApiLocalizedError. Both are surfaced the same way by every request path.
+function throwIfStructuredError(errorBody: unknown): void {
+  if (
+    errorBody &&
+    typeof errorBody === 'object' &&
+    (errorBody as { error?: unknown }).error === 'validation_error'
+  ) {
+    throw errorBody
+  }
+  if (isApiLocalizedErrorResponse(errorBody)) {
+    throw new ApiLocalizedError(errorBody.error)
+  }
+}
+
+// stringField returns errorBody[field] when it is a string (including "").
+function stringField(
+  errorBody: unknown,
+  field: 'error' | 'message',
+): string | undefined {
+  if (!errorBody || typeof errorBody !== 'object') return undefined
+  const value = (errorBody as Record<string, unknown>)[field]
+  return typeof value === 'string' ? value : undefined
+}
+
 async function postLoginRequest<T>(path: string, body: object): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
@@ -90,28 +117,11 @@ async function postLoginRequest<T>(path: string, body: object): Promise<T> {
       throw new Error(t('login.errorFallback'))
     }
 
-    if (isApiLocalizedErrorResponse(errorBody)) {
-      throw new ApiLocalizedError(errorBody.error)
-    }
+    throwIfStructuredError(errorBody)
 
-    // Field-validation errors use their own body shape
-    // ({ error: 'validation_error', fields: [...] }) — re-throw it untouched
-    // so callers can surface per-field messages instead of the literal
-    // string "validation_error". Mirrors fetchWithAuth's handling.
-    if (
-      errorBody &&
-      typeof errorBody === 'object' &&
-      (errorBody as { error?: unknown }).error === 'validation_error'
-    ) {
-      throw errorBody
-    }
-
-    if (
-      errorBody &&
-      typeof errorBody === 'object' &&
-      typeof (errorBody as { error?: unknown }).error === 'string'
-    ) {
-      throw new Error((errorBody as { error: string }).error)
+    const message = stringField(errorBody, 'error')
+    if (message !== undefined) {
+      throw new Error(message)
     }
 
     throw new Error(t('login.errorFallback'))
@@ -214,11 +224,14 @@ export async function logout() {
   }).catch(() => {})
 }
 
-export async function fetchWithAuth(
+// fetchWithAuth sends an authenticated request and resolves the parsed JSON
+// body (null when the response has none). T only types the result for the
+// caller; the body is not validated at runtime.
+export async function fetchWithAuth<T = unknown>(
   path: string,
   options: RequestInit = {},
   retry = true,
-): Promise<unknown> {
+): Promise<T> {
   const store = useSessionStore.getState()
   const sessionLogout = store.logout
   const config = useConfigStore.getState()
@@ -311,41 +324,21 @@ export async function fetchWithAuth(
       throw new ApiError(errorText || t('apiErrors.requestFailed'), res.status)
     }
 
-    if (
-      errorBody &&
-      typeof errorBody === 'object' &&
-      (errorBody as { error?: unknown }).error === 'validation_error'
-    ) {
-      throw errorBody
-    }
+    throwIfStructuredError(errorBody)
 
-    if (isApiLocalizedErrorResponse(errorBody)) {
-      throw new ApiLocalizedError(errorBody.error)
-    }
-
-    if (
-      errorBody &&
-      typeof errorBody === 'object' &&
-      typeof (errorBody as { error?: unknown }).error === 'string'
-    ) {
-      throw new ApiError((errorBody as { error: string }).error, res.status)
-    }
-
-    if (
-      errorBody &&
-      typeof errorBody === 'object' &&
-      typeof (errorBody as { message?: unknown }).message === 'string'
-    ) {
-      throw new ApiError((errorBody as { message: string }).message, res.status)
+    const message =
+      stringField(errorBody, 'error') ?? stringField(errorBody, 'message')
+    if (message !== undefined) {
+      throw new ApiError(message, res.status)
     }
 
     throw new ApiError(t('apiErrors.requestFailed'), res.status)
   }
 
   try {
-    return await res.json()
+    return (await res.json()) as T
   } catch {
-    return null
+    return null as T
   }
 }
 

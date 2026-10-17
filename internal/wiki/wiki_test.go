@@ -14,6 +14,7 @@ import (
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/test_utils"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
+	wikiresync "github.com/perber/wiki/internal/wiki/resync"
 )
 
 func createWikiTestInstance(t *testing.T) *Wiki {
@@ -529,5 +530,71 @@ func TestWiki_ResyncRespectsLeafwikiignore(t *testing.T) {
 	}
 	if lookup.Exists {
 		t.Fatal("expected ignored page 'secret' to not exist")
+	}
+}
+
+func TestWiki_ReloadWithProgress_PicksUpDiskChangesAndFinishesInSearchPhase(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	if err := os.WriteFile(filepath.Join(w.GetStorageDir(), "root", "from-disk.md"), []byte("# From Disk\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	if !w.resyncJob.Start() {
+		t.Fatal("expected resync job to start")
+	}
+
+	w.reloadWithProgress(context.Background())
+
+	status := w.resyncJob.Status()
+	want := wikiresync.JobStatus{Running: false, Phase: string(wikiresync.PhaseSearch), Done: true}
+	if status != want {
+		t.Fatalf("status = %+v, want %+v", status, want)
+	}
+	found := false
+	if err := w.tree.WalkNodes(func(id string) error {
+		if page, err := w.tree.GetPage(id); err == nil && page.Slug == "from-disk" {
+			found = true
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("WalkNodes failed: %v", err)
+	}
+	if !found {
+		t.Fatal("expected reload to pick up the page written to disk")
+	}
+}
+
+func TestWiki_ReloadWithProgress_CanceledContext_FinishesWithErrorAndFailureMetric(t *testing.T) {
+	metrics := httpmetrics.NewHTTPMetrics("test")
+	w := createWikiTestInstanceWithMetrics(t, metrics)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if !w.resyncJob.Start() {
+		t.Fatal("expected resync job to start")
+	}
+
+	w.reloadWithProgress(ctx)
+
+	status := w.resyncJob.Status()
+	want := wikiresync.JobStatus{
+		Running: false,
+		Phase:   string(wikiresync.PhaseTree),
+		Done:    true,
+		Error:   "tree reconstruction failed: context canceled",
+	}
+	if status != want {
+		t.Fatalf("status = %+v, want %+v", status, want)
+	}
+	body := metricsBody(t, metrics)
+	for _, metric := range []string{
+		`leafwiki_resync_runs_total{result="error"} 1`,
+		`leafwiki_resync_failures_total{result="error"} 1`,
+	} {
+		if !strings.Contains(body, metric) {
+			t.Fatalf("expected %s in metrics, got: %s", metric, body)
+		}
 	}
 }

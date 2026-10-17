@@ -35,13 +35,11 @@ type APIKeyConfig struct {
 //   - LeafWiki-shaped token, store suspended for a
 //     live restore                                   → 503, not counted as a failed attempt
 //
-// Note on writes: every feature's authGroup also runs CSRFMiddleware, which
-// requires a CSRF cookie a pure Bearer client never has — so today, every
-// mutating (POST/PUT/PATCH/DELETE) request made with an API key is rejected
-// regardless of the key's role. This is expected for the read-only phase this
-// feature currently supports; it is not itself an access-control mechanism.
-// A future phase adding API-key write support must address CSRF for Bearer
-// requests explicitly rather than assuming it already works.
+// Note on writes: a successfully resolved key sets security.APIKeyAuthContextKey,
+// which CSRFMiddleware treats as proof the request is not browser-forgeable and
+// skips its cookie check for. Writes are then limited only by the usual role
+// guards (role(user) ∩ role(key)). Routes that manage credentials, sessions or
+// users must opt out with RequireCookieSession.
 func InjectAPIKeyUser(cfg APIKeyConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if cfg.Service == nil {
@@ -95,7 +93,7 @@ func InjectAPIKeyUser(cfg APIKeyConfig) gin.HandlerFunc {
 		}
 
 		c.Set("user", user)
-		c.Set("apiKeyAuth", true)
+		c.Set(security.APIKeyAuthContextKey, true)
 		c.Next()
 	}
 }

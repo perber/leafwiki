@@ -89,7 +89,17 @@ func (uc *UpdatePageUseCase) Execute(_ context.Context, in UpdatePageInput) (out
 		}
 	}
 
-	if err = uc.tree.UpdateNode(in.UserID, in.ID, in.Title, in.Slug, in.Content, in.Version, in.Tags, in.Properties, in.PreserveFrontmatter); err != nil {
+	if err = uc.tree.UpdateNode(tree.UpdateNodeInput{
+		UserID:              in.UserID,
+		ID:                  in.ID,
+		Title:               in.Title,
+		Slug:                in.Slug,
+		Content:             in.Content,
+		ExpectedVersion:     in.Version,
+		Tags:                in.Tags,
+		Properties:          in.Properties,
+		PreserveFrontmatter: in.PreserveFrontmatter,
+	}); err != nil {
 		return nil, err
 	}
 

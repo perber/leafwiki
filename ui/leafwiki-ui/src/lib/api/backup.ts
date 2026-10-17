@@ -70,55 +70,48 @@ export interface BackupConfigInput {
 }
 
 export async function fetchBackupStatus(): Promise<BackupStatusResponse> {
-  const res = await fetchWithAuth(BACKUP_STATUS_URL, {
-    credentials: 'include',
-  })
-  return res as BackupStatusResponse
+  return await fetchWithAuth<BackupStatusResponse>(BACKUP_STATUS_URL)
 }
 
 export async function fetchBackupAlert(): Promise<{
   needsIntervention: boolean
   hasError: boolean
 }> {
-  const res = await fetchWithAuth(BACKUP_ALERT_URL, { credentials: 'include' })
-  return res as { needsIntervention: boolean; hasError: boolean }
+  return await fetchWithAuth<{
+    needsIntervention: boolean
+    hasError: boolean
+  }>(BACKUP_ALERT_URL)
 }
 
 export async function triggerBackupPush(): Promise<void> {
   await fetchWithAuth(BACKUP_PUSH_URL, {
     method: 'POST',
-    credentials: 'include',
   })
 }
 
 export async function triggerForcePush(): Promise<void> {
   await fetchWithAuth(BACKUP_FORCE_PUSH_URL, {
     method: 'POST',
-    credentials: 'include',
   })
 }
 
 export async function triggerPull(): Promise<void> {
   await fetchWithAuth(BACKUP_PULL_URL, {
     method: 'POST',
-    credentials: 'include',
   })
 }
 
 export async function fetchBackupConfig(): Promise<BackupConfigResponse> {
-  const res = await fetchWithAuth(BACKUP_CONFIG_URL, { credentials: 'include' })
-  return res as BackupConfigResponse
+  return await fetchWithAuth<BackupConfigResponse>(BACKUP_CONFIG_URL)
 }
 
 export async function saveBackupConfig(
   input: BackupConfigInput,
 ): Promise<BackupConfigResponse> {
-  const res = await fetchWithAuth(BACKUP_CONFIG_URL, {
+  return await fetchWithAuth<BackupConfigResponse>(BACKUP_CONFIG_URL, {
     method: 'POST',
-    credentials: 'include',
     body: JSON.stringify(input),
   })
-  return res as BackupConfigResponse
 }
 
 export async function testBackupConfig(
@@ -126,7 +119,6 @@ export async function testBackupConfig(
 ): Promise<void> {
   await fetchWithAuth(BACKUP_CONFIG_TEST_URL, {
     method: 'POST',
-    credentials: 'include',
     body: JSON.stringify(input),
   })
 }
@@ -134,6 +126,5 @@ export async function testBackupConfig(
 export async function disableBackup(): Promise<void> {
   await fetchWithAuth(BACKUP_DISABLE_URL, {
     method: 'POST',
-    credentials: 'include',
   })
 }

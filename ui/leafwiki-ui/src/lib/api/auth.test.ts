@@ -2,7 +2,14 @@ import '@/lib/i18n'
 import { useConfigStore } from '@/stores/config'
 import { useSessionStore } from '@/stores/session'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { confirmPasswordReset, ensureRefresh, fetchWithAuth } from './auth'
+import {
+  ApiError,
+  confirmPasswordReset,
+  ensureRefresh,
+  fetchWithAuth,
+  login,
+} from './auth'
+import { ApiLocalizedError } from './errors'
 
 type MockResponseSpec = {
   status: number
@@ -270,5 +277,175 @@ describe('confirmPasswordReset', () => {
     // handleFieldErrors cannot route to a field.
     expect(err).not.toBeInstanceOf(Error)
     expect(err).toEqual(body)
+  })
+})
+
+// Pins how each response shape surfaces to callers, for the authenticated
+// transport (fetchWithAuth) and the unauthenticated login-style requests.
+describe('API error decoding', () => {
+  const localized = {
+    error: {
+      code: 'page_not_found',
+      message: 'Page not found',
+      template: 'Page not found',
+    },
+  }
+  const validation = {
+    error: 'validation_error',
+    fields: [{ field: 'title', message: 'Title is required' }],
+  }
+
+  function stubRawResponse(status: number, text: string) {
+    const fetchMock = vi.fn(
+      async () => new Response(status === 204 ? null : text, { status }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  async function rejection(promise: Promise<unknown>): Promise<unknown> {
+    return promise.then(
+      () => {
+        throw new Error('expected request to reject')
+      },
+      (e: unknown) => e,
+    )
+  }
+
+  beforeEach(() => {
+    useConfigStore.setState({
+      authDisabled: true,
+      httpRemoteUserEnabled: false,
+      configLoadSucceeded: true,
+      hasLoaded: true,
+    })
+    useSessionStore.setState({ user: null, accessTokenExpiresAt: null })
+  })
+
+  describe('fetchWithAuth', () => {
+    it('re-throws a validation body untouched', async () => {
+      stubRawResponse(400, JSON.stringify(validation))
+      expect(await rejection(fetchWithAuth('/api/x'))).toEqual(validation)
+    })
+
+    it('throws ApiLocalizedError for a localized error body', async () => {
+      stubRawResponse(404, JSON.stringify(localized))
+      const err = await rejection(fetchWithAuth('/api/x'))
+      expect(err).toBeInstanceOf(ApiLocalizedError)
+      expect((err as ApiLocalizedError).code).toBe('page_not_found')
+    })
+
+    it('throws ApiError with the status for a string error field', async () => {
+      stubRawResponse(409, JSON.stringify({ error: 'conflict' }))
+      const err = await rejection(fetchWithAuth('/api/x'))
+      expect(err).toBeInstanceOf(ApiError)
+      expect((err as ApiError).message).toBe('conflict')
+      expect((err as ApiError).status).toBe(409)
+    })
+
+    it('keeps an empty string error field as the message', async () => {
+      stubRawResponse(400, JSON.stringify({ error: '' }))
+      const err = await rejection(fetchWithAuth('/api/x'))
+      expect(err).toBeInstanceOf(ApiError)
+      expect((err as ApiError).message).toBe('')
+    })
+
+    it('falls back to a string message field', async () => {
+      stubRawResponse(500, JSON.stringify({ message: 'boom' }))
+      const err = await rejection(fetchWithAuth('/api/x'))
+      expect(err).toBeInstanceOf(ApiError)
+      expect((err as ApiError).message).toBe('boom')
+      expect((err as ApiError).status).toBe(500)
+    })
+
+    it('uses the raw text for a non-JSON error body', async () => {
+      stubRawResponse(502, 'Bad Gateway')
+      const err = await rejection(fetchWithAuth('/api/x'))
+      expect(err).toBeInstanceOf(ApiError)
+      expect((err as ApiError).message).toBe('Bad Gateway')
+      expect((err as ApiError).status).toBe(502)
+    })
+
+    it('uses the generic message for an empty or unrecognized error body', async () => {
+      stubRawResponse(500, '')
+      const empty = await rejection(fetchWithAuth('/api/x'))
+      stubRawResponse(500, JSON.stringify({ unexpected: true }))
+      const unknownShape = await rejection(fetchWithAuth('/api/x'))
+      for (const err of [empty, unknownShape]) {
+        expect(err).toBeInstanceOf(ApiError)
+        expect((err as ApiError).message).not.toBe('')
+        expect((err as ApiError).status).toBe(500)
+      }
+      expect((empty as ApiError).message).toBe(
+        (unknownShape as ApiError).message,
+      )
+    })
+
+    it('resolves null for a successful response without a JSON body', async () => {
+      stubRawResponse(204, '')
+      expect(await fetchWithAuth('/api/x', { method: 'DELETE' })).toBeNull()
+    })
+
+    it('sends JSON content type, credentials and the CSRF header on writes', async () => {
+      document.cookie = 'leafwiki_csrf=csrf-token-value'
+      const fetchMock = stubRawResponse(200, '{}')
+      await fetchWithAuth('/api/x', { method: 'POST', body: '{"a":1}' })
+      const [url, init] = fetchMock.mock.calls[0] as unknown as [
+        string,
+        RequestInit,
+      ]
+      const headers = new Headers(init.headers)
+      expect(url.endsWith('/api/x')).toBe(true)
+      expect(init.credentials).toBe('include')
+      expect(headers.get('Content-Type')).toBe('application/json')
+      expect(headers.get('X-CSRF-Token')).toBe('csrf-token-value')
+      expect(init.body).toBe('{"a":1}')
+      document.cookie = 'leafwiki_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+    })
+
+    it('leaves the content type to the browser for FormData bodies', async () => {
+      const fetchMock = stubRawResponse(200, '{}')
+      const form = new FormData()
+      await fetchWithAuth('/api/x', { method: 'POST', body: form })
+      const [, init] = fetchMock.mock.calls[0] as unknown as [
+        string,
+        RequestInit,
+      ]
+      expect(new Headers(init.headers).has('Content-Type')).toBe(false)
+      expect(init.body).toBe(form)
+    })
+  })
+
+  describe('login requests', () => {
+    it('re-throws a validation body untouched', async () => {
+      stubRawResponse(400, JSON.stringify(validation))
+      expect(await rejection(login('a', 'b'))).toEqual(validation)
+    })
+
+    it('throws ApiLocalizedError for a localized error body', async () => {
+      stubRawResponse(401, JSON.stringify(localized))
+      expect(await rejection(login('a', 'b'))).toBeInstanceOf(ApiLocalizedError)
+    })
+
+    it('throws a plain Error (not ApiError) for a string error field', async () => {
+      stubRawResponse(401, JSON.stringify({ error: 'invalid credentials' }))
+      const err = await rejection(login('a', 'b'))
+      expect(err).toBeInstanceOf(Error)
+      expect(err).not.toBeInstanceOf(ApiError)
+      expect((err as Error).message).toBe('invalid credentials')
+    })
+
+    it('uses the login fallback for non-JSON and unrecognized bodies', async () => {
+      stubRawResponse(500, 'oops')
+      const nonJSON = await rejection(login('a', 'b'))
+      stubRawResponse(500, JSON.stringify({ message: 'ignored' }))
+      const unknownShape = await rejection(login('a', 'b'))
+      for (const err of [nonJSON, unknownShape]) {
+        expect(err).toBeInstanceOf(Error)
+        expect(err).not.toBeInstanceOf(ApiError)
+      }
+      expect((nonJSON as Error).message).toBe((unknownShape as Error).message)
+      expect((nonJSON as Error).message).not.toBe('ignored')
+    })
   })
 })

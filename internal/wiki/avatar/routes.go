@@ -70,7 +70,11 @@ func (r *Routes) handleUploadAvatar(c *gin.Context) {
 	}
 	defer func() { _ = file.Close() }()
 
-	if err := r.uploadAvatar.Execute(c.Request.Context(), user.ID, file, header.Filename); err != nil {
+	if err := r.uploadAvatar.Execute(c.Request.Context(), UploadAvatarInput{
+		UserID:   user.ID,
+		File:     file,
+		Filename: header.Filename,
+	}); err != nil {
 		respondWithAvatarError(c, err)
 		return
 	}
@@ -80,7 +84,7 @@ func (r *Routes) handleUploadAvatar(c *gin.Context) {
 func (r *Routes) handleDeleteAvatar(c *gin.Context) {
 	user := authmw.MustGetUser(c)
 
-	if err := r.deleteAvatar.Execute(c.Request.Context(), user.ID); err != nil {
+	if err := r.deleteAvatar.Execute(c.Request.Context(), DeleteAvatarInput{UserID: user.ID}); err != nil {
 		respondWithAvatarError(c, err)
 		return
 	}

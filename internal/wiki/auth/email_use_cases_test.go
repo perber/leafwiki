@@ -164,6 +164,9 @@ func setupEmailUseCases(t *testing.T, smtpAddr string) (*coreauth.EmailTokenServ
 	})
 
 	svc := coreauth.NewEmailTokenService(tokenStore, users, authSvc, mailer, "https://wiki.example.com")
+	// Wait for background sends (RequestPasswordResetAsync) before the stores
+	// above are closed and the temp dir is removed; cleanups run in reverse.
+	t.Cleanup(svc.Close)
 	return svc, users, resolver, authSvc
 }
 
@@ -204,20 +207,24 @@ func TestRequestPasswordResetUseCase_Execute_DoesNotBlockOnSlowSMTP(t *testing.T
 	defer func() { _ = ln.Close() }()
 
 	accepted := make(chan struct{})
+	release := make(chan struct{})
 	go func() {
 		conn, err := ln.Accept()
 		if err != nil {
 			return
 		}
 		close(accepted)
-		// Deliberately never send the SMTP greeting or close the connection —
-		// simulates a stalled SMTP server. Held open until the test process
-		// tears down the listener.
-		<-context.Background().Done()
-		_ = conn
+		// Deliberately never send the SMTP greeting — simulates a stalled SMTP
+		// server. The connection is held open until the test ends.
+		<-release
+		_ = conn.Close()
 	}()
 
 	svc, users, _, _ := setupEmailUseCases(t, ln.Addr().String())
+	// Registered after setupEmailUseCases, so it runs before svc.Close: the
+	// stalled send then fails at once instead of running into the mailer
+	// timeout while the cleanup waits for it.
+	t.Cleanup(func() { close(release) })
 	uc := NewRequestPasswordResetUseCase(func() *coreauth.EmailTokenService { return svc })
 
 	if _, err := users.CreateUser("alice", "alice@example.com", "password123", coreauth.RoleEditor); err != nil {

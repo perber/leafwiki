@@ -253,7 +253,7 @@ func TestTreeService_TreeHash_ChangesWhenTreeChanges(t *testing.T) {
 		t.Fatalf("expected hash to change after create")
 	}
 
-	if err := svc.UpdateNode("system", *pageID, "Welcome 2", "welcome", nil, VersionUnchecked, nil, nil, false); err != nil {
+	if err := svc.UpdateNode(UpdateNodeInput{UserID: "system", ID: *pageID, Title: "Welcome 2", Slug: "welcome", Content: nil, ExpectedVersion: VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 	afterUpdate := svc.TreeHash()
@@ -568,7 +568,7 @@ func TestTreeService_UpdateNode_TitleOnly_SyncsFrontmatterIfFileExists(t *testin
 	mustStat(t, p)
 
 	// Update title only: content=nil, slug unchanged
-	if err := svc.UpdateNode("system", *id, "Documentation", "docs", nil, VersionUnchecked, nil, nil, false); err != nil {
+	if err := svc.UpdateNode(UpdateNodeInput{UserID: "system", ID: *id, Title: "Documentation", Slug: "docs", Content: nil, ExpectedVersion: VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -600,7 +600,7 @@ func TestTreeService_UpdateNode_SlugRename_RenamesOnDisk(t *testing.T) {
 	mustStat(t, oldPath)
 
 	newSlug := "documentation"
-	if err := svc.UpdateNode("system", *id, "Docs", newSlug, nil, VersionUnchecked, nil, nil, false); err != nil {
+	if err := svc.UpdateNode(UpdateNodeInput{UserID: "system", ID: *id, Title: "Docs", Slug: newSlug, Content: nil, ExpectedVersion: VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -621,7 +621,7 @@ func TestTreeService_UpdateNode_RejectsCaseInsensitiveSlugConflict(t *testing.T)
 		t.Fatalf("CreateNode second failed: %v", err)
 	}
 
-	err = svc.UpdateNode("system", *secondID, "Beta", "alpha", nil, VersionUnchecked, nil, nil, false)
+	err = svc.UpdateNode(UpdateNodeInput{UserID: "system", ID: *secondID, Title: "Beta", Slug: "alpha", Content: nil, ExpectedVersion: VersionUnchecked})
 	if !errors.Is(err, ErrPageAlreadyExists) {
 		t.Fatalf("expected ErrPageAlreadyExists, got %v", err)
 	}
@@ -651,7 +651,7 @@ func TestTreeService_UpdateNode_SectionToPage_DisallowedWithChildren(t *testing.
 	}
 
 	// Now parent is section with children, attempt to convert back to page
-	err = svc.UpdateNode("system", *parentID, "Docs", "docs", nil, VersionUnchecked, nil, nil, false)
+	err = svc.UpdateNode(UpdateNodeInput{UserID: "system", ID: *parentID, Title: "Docs", Slug: "docs", Content: nil, ExpectedVersion: VersionUnchecked})
 	if err == nil {
 		t.Fatalf("expected error converting section->page with children")
 	}
@@ -1338,7 +1338,7 @@ func TestTreeService_FindPageByRoutePath_ReturnsContent(t *testing.T) {
 	// Update specs content
 	specsNode := svc.GetTree().Children[0].Children[0].Children[0]
 	body := "# Specs\nHello"
-	if err := svc.UpdateNode("system", specsNode.ID, "Specs", "specs", &body, VersionUnchecked, nil, nil, false); err != nil {
+	if err := svc.UpdateNode(UpdateNodeInput{UserID: "system", ID: specsNode.ID, Title: "Specs", Slug: "specs", Content: &body, ExpectedVersion: VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode content failed: %v", err)
 	}
 
@@ -1454,7 +1454,7 @@ func TestTreeService_LookupPagePath_ReflectsSlugRename(t *testing.T) {
 		t.Fatalf("CreateNode guide failed: %v", err)
 	}
 
-	if err := svc.UpdateNode("system", *id, "Documentation", "documentation", nil, VersionUnchecked, nil, nil, false); err != nil {
+	if err := svc.UpdateNode(UpdateNodeInput{UserID: "system", ID: *id, Title: "Documentation", Slug: "documentation", Content: nil, ExpectedVersion: VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -1525,7 +1525,7 @@ func TestTreeService_ResolvePermalinkTarget_ReflectsRenameAndMove(t *testing.T) 
 		t.Fatalf("CreateNode archive failed: %v", err)
 	}
 
-	if err := svc.UpdateNode("system", *guideID, "User Guide", "user-guide", nil, VersionUnchecked, nil, nil, false); err != nil {
+	if err := svc.UpdateNode(UpdateNodeInput{UserID: "system", ID: *guideID, Title: "User Guide", Slug: "user-guide", Content: nil, ExpectedVersion: VersionUnchecked}); err != nil {
 		t.Fatalf("UpdateNode guide failed: %v", err)
 	}
 	if err := svc.MoveNode("system", *guideID, *archiveID, VersionUnchecked); err != nil {
@@ -3110,12 +3110,12 @@ func TestTreeService_UpdateNode_StaleVersion_ReturnsErrVersionConflict(t *testin
 	currentVersion := node.Version()
 
 	// First update succeeds — advances the version.
-	if err := svc.UpdateNode("system", *id, "Page v2", "page", nil, currentVersion, nil, nil, false); err != nil {
+	if err := svc.UpdateNode(UpdateNodeInput{UserID: "system", ID: *id, Title: "Page v2", Slug: "page", Content: nil, ExpectedVersion: currentVersion}); err != nil {
 		t.Fatalf("first UpdateNode failed: %v", err)
 	}
 
 	// Second update with the same (now stale) version must fail.
-	err := svc.UpdateNode("system", *id, "Page v3", "page", nil, currentVersion, nil, nil, false)
+	err := svc.UpdateNode(UpdateNodeInput{UserID: "system", ID: *id, Title: "Page v3", Slug: "page", Content: nil, ExpectedVersion: currentVersion})
 	if !errors.Is(err, ErrVersionConflict) {
 		t.Fatalf("expected ErrVersionConflict, got %v", err)
 	}
@@ -3125,7 +3125,7 @@ func TestTreeService_UpdateNode_MissingVersion_ReturnsErrVersionRequired(t *test
 	svc, _ := newLoadedService(t)
 	id, _ := svc.CreateNode("system", nil, "Page", "page", ptrKind(NodeKindPage))
 
-	err := svc.UpdateNode("system", *id, "Page v2", "page", nil, "", nil, nil, false)
+	err := svc.UpdateNode(UpdateNodeInput{UserID: "system", ID: *id, Title: "Page v2", Slug: "page", Content: nil, ExpectedVersion: ""})
 	if !errors.Is(err, ErrVersionRequired) {
 		t.Fatalf("expected ErrVersionRequired, got %v", err)
 	}
@@ -3139,7 +3139,7 @@ func TestTreeService_DeleteNode_StaleVersion_ReturnsErrVersionConflict(t *testin
 	staleVersion := node.Version()
 
 	// Advance the version via an update.
-	if err := svc.UpdateNode("system", *id, "Page v2", "page", nil, staleVersion, nil, nil, false); err != nil {
+	if err := svc.UpdateNode(UpdateNodeInput{UserID: "system", ID: *id, Title: "Page v2", Slug: "page", Content: nil, ExpectedVersion: staleVersion}); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -3168,7 +3168,7 @@ func TestTreeService_MoveNode_StaleVersion_ReturnsErrVersionConflict(t *testing.
 	staleVersion := node.Version()
 
 	// Advance the version.
-	if err := svc.UpdateNode("system", *moveID, "Move v2", "move", nil, staleVersion, nil, nil, false); err != nil {
+	if err := svc.UpdateNode(UpdateNodeInput{UserID: "system", ID: *moveID, Title: "Move v2", Slug: "move", Content: nil, ExpectedVersion: staleVersion}); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -3197,7 +3197,7 @@ func TestTreeService_ConvertNode_StaleVersion_ReturnsErrVersionConflict(t *testi
 	staleVersion := node.Version()
 
 	// Advance the version.
-	if err := svc.UpdateNode("system", *id, "Page v2", "page", nil, staleVersion, nil, nil, false); err != nil {
+	if err := svc.UpdateNode(UpdateNodeInput{UserID: "system", ID: *id, Title: "Page v2", Slug: "page", Content: nil, ExpectedVersion: staleVersion}); err != nil {
 		t.Fatalf("UpdateNode failed: %v", err)
 	}
 
@@ -3222,10 +3222,10 @@ func TestTreeService_VersionUnchecked_BypassesVersionCheck(t *testing.T) {
 	id, _ := svc.CreateNode("system", nil, "Page", "page", ptrKind(NodeKindPage))
 
 	// VersionUnchecked must always succeed regardless of actual node version.
-	if err := svc.UpdateNode("system", *id, "Page v2", "page", nil, VersionUnchecked, nil, nil, false); err != nil {
+	if err := svc.UpdateNode(UpdateNodeInput{UserID: "system", ID: *id, Title: "Page v2", Slug: "page", Content: nil, ExpectedVersion: VersionUnchecked}); err != nil {
 		t.Fatalf("expected VersionUnchecked to bypass check, got: %v", err)
 	}
-	if err := svc.UpdateNode("system", *id, "Page v3", "page", nil, VersionUnchecked, nil, nil, false); err != nil {
+	if err := svc.UpdateNode(UpdateNodeInput{UserID: "system", ID: *id, Title: "Page v3", Slug: "page", Content: nil, ExpectedVersion: VersionUnchecked}); err != nil {
 		t.Fatalf("expected VersionUnchecked to bypass check on second call, got: %v", err)
 	}
 }
@@ -3244,7 +3244,7 @@ func TestTreeService_GetPage_RawContent_ContainsFrontmatterAndBody(t *testing.T)
 	if err != nil {
 		t.Fatalf("GetPage before update: %v", err)
 	}
-	if err := svc.UpdateNode("system", *id, "Raw Test", "raw-test", &body, page.Version(), nil, nil, false); err != nil {
+	if err := svc.UpdateNode(UpdateNodeInput{UserID: "system", ID: *id, Title: "Raw Test", Slug: "raw-test", Content: &body, ExpectedVersion: page.Version()}); err != nil {
 		t.Fatalf("UpdateNode: %v", err)
 	}
 

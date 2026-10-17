@@ -5,71 +5,44 @@ import EditPageMetadataDialog from '../pages/EditPageMetadataDialog';
 import LoginPage from '../pages/LoginPage';
 import MovePageDialog from '../pages/MovePageDialog';
 import ViewPage from '../pages/ViewPage';
+import { browserFetch, expectOk, pageByPathUrl } from '../helpers/api';
 
 const user = process.env.E2E_ADMIN_USER || 'admin';
 const password = process.env.E2E_ADMIN_PASSWORD || 'admin';
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
-function getCsrfScript(): string {
-  return `
-    const hostMatch =
-      document.cookie.match(/(?:^|;\\s*)__Host-leafwiki_csrf=([^;]+)/) ??
-      document.cookie.match(/(?:^|;\\s*)leafwiki_csrf=([^;]+)/);
-    if (!hostMatch) throw new Error('Missing CSRF token cookie');
-    try { return decodeURIComponent(hostMatch[1]); } catch { return hostMatch[1]; }
-  `;
-}
-
 async function createPage(
   page: Page,
   input: { title: string; slug: string; content?: string; parentSlug?: string },
 ): Promise<{ id: string; version: string }> {
-  return page.evaluate(
-    async ({ title, slug, content, parentSlug, csrfScript }) => {
-      const csrfToken = new Function(csrfScript)() as string;
-      const headers = { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken };
+  const { title, slug, content, parentSlug } = input;
+  let parentId: string | null = null;
+  if (parentSlug) {
+    parentId = expectOk(
+      await browserFetch<{ id: string }>(page, pageByPathUrl(parentSlug)),
+      'parent lookup',
+    ).id;
+  }
 
-      let parentId: string | null = null;
-      if (parentSlug) {
-        const r = await fetch(`/api/pages/by-path?path=${encodeURIComponent(parentSlug)}`, {
-          credentials: 'include',
-          headers: { 'X-CSRF-Token': csrfToken },
-        });
-        if (!r.ok) throw new Error(`parent lookup failed: ${r.status}`);
-        parentId = ((await r.json()) as { id: string }).id;
-      }
-
-      const createRes = await fetch('/api/pages', {
-        method: 'POST',
-        credentials: 'include',
-        headers,
-        body: JSON.stringify({ parentId, title, slug, kind: 'page' }),
-      });
-      if (!createRes.ok) throw new Error(`create failed: ${createRes.status}`);
-      const created = (await createRes.json()) as { id: string; version: string };
-
-      if (content !== undefined) {
-        const updateRes = await fetch(`/api/pages/${created.id}`, {
-          method: 'PUT',
-          credentials: 'include',
-          headers,
-          body: JSON.stringify({
-            version: created.version,
-            title,
-            slug,
-            content,
-            tags: [],
-            properties: {},
-          }),
-        });
-        if (!updateRes.ok) throw new Error(`update failed: ${updateRes.status}`);
-        return (await updateRes.json()) as { id: string; version: string };
-      }
-      return created;
-    },
-    { ...input, csrfScript: getCsrfScript() },
+  const created = expectOk(
+    await browserFetch<{ id: string; version: string }>(page, '/api/pages', {
+      method: 'POST',
+      body: { parentId, title, slug, kind: 'page' },
+    }),
+    'create',
   );
+
+  if (content !== undefined) {
+    return expectOk(
+      await browserFetch<{ id: string; version: string }>(page, `/api/pages/${created.id}`, {
+        method: 'PUT',
+        body: { version: created.version, title, slug, content, tags: [], properties: {} },
+      }),
+      'update',
+    );
+  }
+  return created;
 }
 
 async function refactorPreview(
@@ -80,26 +53,16 @@ async function refactorPreview(
   counts: { affectedPages: number; matchedLinks: number };
   affectedPages: Array<{ fromTitle: string; matchedPaths: string[] }>;
 }> {
-  return page.evaluate(
-    async ({ pageSlug, body, csrfScript }) => {
-      const csrfToken = new Function(csrfScript)() as string;
-      const r = await fetch(`/api/pages/by-path?path=${encodeURIComponent(pageSlug)}`, {
-        credentials: 'include',
-        headers: { 'X-CSRF-Token': csrfToken },
-      });
-      if (!r.ok) throw new Error(`lookup failed: ${r.status}`);
-      const { id } = (await r.json()) as { id: string };
-
-      const pr = await fetch(`/api/pages/${id}/refactor/preview`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify(body),
-      });
-      if (!pr.ok) throw new Error(`preview failed: ${pr.status}`);
-      return pr.json();
-    },
-    { pageSlug, body, csrfScript: getCsrfScript() },
+  const { id } = expectOk(
+    await browserFetch<{ id: string }>(page, pageByPathUrl(pageSlug)),
+    'lookup',
+  );
+  return expectOk(
+    await browserFetch<{
+      counts: { affectedPages: number; matchedLinks: number };
+      affectedPages: Array<{ fromTitle: string; matchedPaths: string[] }>;
+    }>(page, `/api/pages/${id}/refactor/preview`, { method: 'POST', body }),
+    'preview',
   );
 }
 
@@ -110,47 +73,22 @@ async function applyRefactorRename(
   newSlug: string,
   rewriteLinks: boolean,
 ): Promise<void> {
-  await page.evaluate(
-    async ({ pageSlug, newTitle, newSlug, rewriteLinks, csrfScript }) => {
-      const csrfToken = new Function(csrfScript)() as string;
-      const r = await fetch(`/api/pages/by-path?path=${encodeURIComponent(pageSlug)}`, {
-        credentials: 'include',
-        headers: { 'X-CSRF-Token': csrfToken },
-      });
-      if (!r.ok) throw new Error(`lookup failed: ${r.status}`);
-      const { id, version } = (await r.json()) as { id: string; version: string };
-
-      const ar = await fetch(`/api/pages/${id}/refactor/apply`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify({
-          kind: 'rename',
-          version,
-          title: newTitle,
-          slug: newSlug,
-          rewriteLinks,
-        }),
-      });
-      if (!ar.ok) throw new Error(`apply failed: ${ar.status}`);
-    },
-    { pageSlug, newTitle, newSlug, rewriteLinks, csrfScript: getCsrfScript() },
+  const { id, version } = expectOk(
+    await browserFetch<{ id: string; version: string }>(page, pageByPathUrl(pageSlug)),
+    'lookup',
+  );
+  expectOk(
+    await browserFetch(page, `/api/pages/${id}/refactor/apply`, {
+      method: 'POST',
+      body: { kind: 'rename', version, title: newTitle, slug: newSlug, rewriteLinks },
+    }),
+    'apply',
   );
 }
 
 async function getPageContent(page: Page, slug: string): Promise<string> {
-  return page.evaluate(
-    async ({ slug, csrfScript }) => {
-      const csrfToken = new Function(csrfScript)() as string;
-      const r = await fetch(`/api/pages/by-path?path=${encodeURIComponent(slug)}`, {
-        credentials: 'include',
-        headers: { 'X-CSRF-Token': csrfToken },
-      });
-      if (!r.ok) throw new Error(`lookup failed: ${r.status}`);
-      return ((await r.json()) as { content: string }).content;
-    },
-    { slug, csrfScript: getCsrfScript() },
-  );
+  return expectOk(await browserFetch<{ content: string }>(page, pageByPathUrl(slug)), 'lookup')
+    .content;
 }
 
 /** Polls the refactor preview endpoint until affectedPages reaches the expected count. */

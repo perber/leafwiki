@@ -342,7 +342,9 @@ func TestManager_Reconfigure_DoesNotBlockGettersDuringGitIO(t *testing.T) {
 	}
 
 	releaseNow()
-	<-errc // Reconfigure returns (remote 404s) — the error itself is not asserted here.
+	if err := <-errc; err == nil {
+		t.Fatal("Reconfigure succeeded with a remote returning 404")
+	}
 }
 
 // TestManager_NewSettings_DoesNotBlockStartupOnSlowRemote pins that a

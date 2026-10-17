@@ -17,19 +17,22 @@ export type TOTPStatus = {
 export async function startTOTPSetup(
   currentPassword: string,
 ): Promise<TOTPSetupStart> {
-  return (await fetchWithAuth('/api/users/me/totp/setup/start', {
+  return await fetchWithAuth<TOTPSetupStart>('/api/users/me/totp/setup/start', {
     method: 'POST',
     body: JSON.stringify({ currentPassword }),
-  })) as TOTPSetupStart
+  })
 }
 
 export async function confirmTOTPSetup(
   code: string,
 ): Promise<TOTPSetupConfirm> {
-  return (await fetchWithAuth('/api/users/me/totp/setup/confirm', {
-    method: 'POST',
-    body: JSON.stringify({ code }),
-  })) as TOTPSetupConfirm
+  return await fetchWithAuth<TOTPSetupConfirm>(
+    '/api/users/me/totp/setup/confirm',
+    {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    },
+  )
 }
 
 export async function disableTOTP(
@@ -43,5 +46,5 @@ export async function disableTOTP(
 }
 
 export async function getTOTPStatus(): Promise<TOTPStatus> {
-  return (await fetchWithAuth('/api/users/me/totp/status')) as TOTPStatus
+  return await fetchWithAuth<TOTPStatus>('/api/users/me/totp/status')
 }

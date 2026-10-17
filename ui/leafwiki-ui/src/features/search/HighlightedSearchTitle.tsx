@@ -13,6 +13,9 @@ function decodeHtmlEntities(value: string) {
     return value
   }
 
+  // Safe: a <textarea>'s content is parsed as text (RCDATA), never as elements,
+  // and only its decoded .value is rendered, as a React text node.
+  // eslint-disable-next-line no-restricted-syntax
   htmlEntityDecoder.innerHTML = value
   return htmlEntityDecoder.value
 }

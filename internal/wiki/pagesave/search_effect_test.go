@@ -43,7 +43,7 @@ func createPageWithContent(t *testing.T, treeSvc *tree.TreeService, title, slug,
 	if err != nil {
 		t.Fatalf("GetPage after CreateNode: %v", err)
 	}
-	if err := treeSvc.UpdateNode("system", *id, title, slug, &content, page.Version(), nil, nil, false); err != nil {
+	if err := treeSvc.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: *id, Title: title, Slug: slug, Content: &content, ExpectedVersion: page.Version()}); err != nil {
 		t.Fatalf("UpdateNode(%q): %v", title, err)
 	}
 	page, err = treeSvc.GetPage(*id)
@@ -155,7 +155,7 @@ func TestSearchIndexSideEffect_Apply_Update_ReplacesContentAfterBootstrap(t *tes
 	}
 
 	newContent := "updated uniqueword_after content"
-	if err := treeSvc.UpdateNode("system", page.ID, page.Title, page.Slug, &newContent, page.Version(), nil, nil, false); err != nil {
+	if err := treeSvc.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: page.ID, Title: page.Title, Slug: page.Slug, Content: &newContent, ExpectedVersion: page.Version()}); err != nil {
 		t.Fatalf("UpdateNode: %v", err)
 	}
 	updated, err := treeSvc.GetPage(page.ID)
@@ -231,7 +231,7 @@ func TestSearchIndexSideEffect_Apply_Delete_Recursive_RemovesAllPagesFromIndex(t
 		t.Fatalf("GetPage child1: %v", err)
 	}
 	content1 := "child one uniqueterm_child1 content"
-	if err := treeSvc.UpdateNode("system", child1.ID, child1.Title, child1.Slug, &content1, child1.Version(), nil, nil, false); err != nil {
+	if err := treeSvc.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: child1.ID, Title: child1.Title, Slug: child1.Slug, Content: &content1, ExpectedVersion: child1.Version()}); err != nil {
 		t.Fatalf("UpdateNode child1: %v", err)
 	}
 
@@ -244,7 +244,7 @@ func TestSearchIndexSideEffect_Apply_Delete_Recursive_RemovesAllPagesFromIndex(t
 		t.Fatalf("GetPage child2: %v", err)
 	}
 	content2 := "child two uniqueterm_child2 content"
-	if err := treeSvc.UpdateNode("system", child2.ID, child2.Title, child2.Slug, &content2, child2.Version(), nil, nil, false); err != nil {
+	if err := treeSvc.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: child2.ID, Title: child2.Title, Slug: child2.Slug, Content: &content2, ExpectedVersion: child2.Version()}); err != nil {
 		t.Fatalf("UpdateNode child2: %v", err)
 	}
 

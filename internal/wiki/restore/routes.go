@@ -44,10 +44,14 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	adminGroup := authGroup.Group("/admin")
 	adminGroup.Use(authmw.RequireAdmin(opts.AuthDisabled))
 
-	adminGroup.POST("/restore/upload", r.handleTriggerUpload)
-	adminGroup.POST("/restore/:id", r.handleTrigger)
+	// A restore replaces users.db and api_keys.db, so it is browser-session
+	// only: an API key must not be able to swap in its own credentials.
+	sessionOnly := authmw.RequireCookieSession()
+
+	adminGroup.POST("/restore/upload", sessionOnly, r.handleTriggerUpload)
+	adminGroup.POST("/restore/:id", sessionOnly, r.handleTrigger)
 	adminGroup.GET("/restore/status", r.handleStatus)
-	adminGroup.POST("/restore/self-restart", r.handleSelfRestart)
+	adminGroup.POST("/restore/self-restart", sessionOnly, r.handleSelfRestart)
 }
 
 // respondNotEnabled writes the standard 503 response for handlers that need

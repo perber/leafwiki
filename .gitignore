@@ -52,7 +52,10 @@ ui.zip
 internal/http/dist/*
 !internal/http/dist/.gitkeep
 
-# local-only AI agent config/docs (never pushed, see CLAUDE.md)
-/CLAUDE.md
-/AGENTS.md
-/.claude/
+# AI agent config: AGENTS.md, CLAUDE.md and the public parts of .claude/ are versioned.
+# Maintainer-local overlays and personal state stay out (see AGENTS.md "Local overlay").
+/AGENTS.local.md
+/CLAUDE.local.md
+/.claude/settings.local.json
+/.claude/worktrees/
+# Maintainer-only skills and data are excluded via .git/info/exclude, not listed here.

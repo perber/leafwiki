@@ -34,6 +34,12 @@ jobs:
           echo "Using version: $VERSION"
           make release VERSION=$VERSION
 
+      - name: Verify release checksums
+        # Users download binary + .sha256 into one directory and run
+        # `sha256sum -c`; the files must name the bare binary, no dir prefix.
+        working-directory: releases
+        run: sha256sum -c *.sha256
+
       - name: Attest release binaries
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
@@ -87,6 +93,8 @@ jobs:
           files: |
             releases/leafwiki-${{ github.ref_name }}-linux-amd64
             releases/leafwiki-${{ github.ref_name }}-linux-amd64.sha256
+            releases/leafwiki-${{ github.ref_name }}-linux-386
+            releases/leafwiki-${{ github.ref_name }}-linux-386.sha256
             releases/leafwiki-${{ github.ref_name }}-linux-arm64
             releases/leafwiki-${{ github.ref_name }}-linux-arm64.sha256
             releases/leafwiki-${{ github.ref_name }}-darwin-amd64

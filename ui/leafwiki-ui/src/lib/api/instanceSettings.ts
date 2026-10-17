@@ -15,12 +15,10 @@ export type PublicAccessResponse = {
 export async function setPublicAccess(
   enabled: boolean,
 ): Promise<PublicAccessResponse> {
-  const res = await fetchWithAuth(PUBLIC_ACCESS_URL, {
+  return await fetchWithAuth<PublicAccessResponse>(PUBLIC_ACCESS_URL, {
     method: 'PUT',
-    credentials: 'include',
     body: JSON.stringify({ enabled }),
   })
-  return res as PublicAccessResponse
 }
 
 export type TocDisplayResponse = {
@@ -34,10 +32,8 @@ export type TocDisplayResponse = {
 export async function setAlwaysShowToc(
   alwaysShow: boolean,
 ): Promise<TocDisplayResponse> {
-  const res = await fetchWithAuth(TOC_DISPLAY_URL, {
+  return await fetchWithAuth<TocDisplayResponse>(TOC_DISPLAY_URL, {
     method: 'PUT',
-    credentials: 'include',
     body: JSON.stringify({ alwaysShow }),
   })
-  return res as TocDisplayResponse
 }

@@ -12,13 +12,9 @@ export interface ResyncStatus {
 export async function triggerResync(): Promise<void> {
   await fetchWithAuth(RESYNC_URL, {
     method: 'POST',
-    credentials: 'include',
   })
 }
 
 export async function getResyncStatus(): Promise<ResyncStatus> {
-  const res = await fetchWithAuth(`${RESYNC_URL}/status`, {
-    credentials: 'include',
-  })
-  return res as ResyncStatus
+  return await fetchWithAuth<ResyncStatus>(`${RESYNC_URL}/status`, {})
 }

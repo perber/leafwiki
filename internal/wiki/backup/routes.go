@@ -49,10 +49,14 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	adminGroup.POST("/backup/pull", r.handleTriggerPull)
 
 	// Settings-mode configuration. These 409 when the backup is env-managed.
+	// Save and test accept a caller-chosen remote URL and fill blank secrets
+	// from the stored config, so a key could make the server send the stored
+	// git credentials to another host. Browser-session only.
+	sessionOnly := authmw.RequireCookieSession()
 	adminGroup.GET("/backup/config", r.handleGetBackupConfig)
-	adminGroup.POST("/backup/config", r.handleSaveBackupConfig)
-	adminGroup.POST("/backup/config/test", r.handleTestBackupConfig)
-	adminGroup.POST("/backup/disable", r.handleDisableBackup)
+	adminGroup.POST("/backup/config", sessionOnly, r.handleSaveBackupConfig)
+	adminGroup.POST("/backup/config/test", sessionOnly, r.handleTestBackupConfig)
+	adminGroup.POST("/backup/disable", sessionOnly, r.handleDisableBackup)
 }
 
 func (r *Routes) handleGetBackupStatus(c *gin.Context) {

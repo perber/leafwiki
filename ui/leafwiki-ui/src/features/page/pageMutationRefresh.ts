@@ -4,7 +4,7 @@ import { buildEditUrl, buildHistoryUrl, buildViewUrl } from '@/lib/routePath'
 import { normalizeWikiRoutePath } from '@/lib/wikiPath'
 import { useTreeStore } from '@/stores/tree'
 import { NavigateFunction } from 'react-router'
-import { useLinkStatusStore } from '../links/linkstatus_store'
+import { useLinkStatusStore } from '../links/linkStatusStore'
 import { useViewerStore } from '../viewer/viewer'
 
 type RefreshAfterPageRefactorOptions = {

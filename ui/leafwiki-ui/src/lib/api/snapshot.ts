@@ -23,30 +23,26 @@ export interface SnapshotStatusResponse {
 }
 
 export async function fetchSnapshotStatus(): Promise<SnapshotStatusResponse> {
-  const res = await fetchWithAuth(SNAPSHOT_STATUS_URL, {
-    credentials: 'include',
-  })
-  return res as SnapshotStatusResponse
+  return await fetchWithAuth<SnapshotStatusResponse>(SNAPSHOT_STATUS_URL, {})
 }
 
 export async function fetchSnapshots(): Promise<SnapshotEntry[]> {
-  const res = (await fetchWithAuth(SNAPSHOT_LIST_URL, {
-    credentials: 'include',
-  })) as { snapshots: SnapshotEntry[] }
+  const res = await fetchWithAuth<{ snapshots: SnapshotEntry[] }>(
+    SNAPSHOT_LIST_URL,
+    {},
+  )
   return res.snapshots ?? []
 }
 
 export async function triggerSnapshot(): Promise<void> {
   await fetchWithAuth(SNAPSHOT_TRIGGER_URL, {
     method: 'POST',
-    credentials: 'include',
   })
 }
 
 export async function deleteSnapshot(id: string): Promise<void> {
   await fetchWithAuth(`/api/admin/snapshot/${encodeURIComponent(id)}`, {
     method: 'DELETE',
-    credentials: 'include',
   })
 }
 

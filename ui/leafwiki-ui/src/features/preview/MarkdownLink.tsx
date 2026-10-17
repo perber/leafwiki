@@ -43,6 +43,24 @@ function safeDecodeURIComponent(s: string): string {
   }
 }
 
+function isWebHref(href: string): boolean {
+  return /^(https?:|\/\/)/i.test(href)
+}
+
+function isInternalHref(href: string): boolean {
+  return (
+    href !== '' &&
+    !isWebHref(href) &&
+    !href.startsWith('http') &&
+    !href.startsWith('mailto:') &&
+    !href.startsWith('#')
+  )
+}
+
+function isAssetHref(href: string): boolean {
+  return href.startsWith('assets/') || href.startsWith('/assets/')
+}
+
 interface MarkdownLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
   href?: string
   children?: ReactNode
@@ -75,6 +93,31 @@ export function MarkdownLink({
     }
     return normalizeWikiRoutePath(props.path ?? buildViewUrl(locationPath))
   }
+
+  // Resolve the wiki target before any early return so the tree subscription
+  // below is unconditional. A stable lookup function such as `getPageByPath`
+  // never triggers a re-render when the tree arrives or changes, so the link
+  // would keep its stale resolved/broken state.
+  let normalizedHref: string | null = null
+  if (
+    href !== undefined &&
+    !href.startsWith('wikilink-ambiguous:') &&
+    !href.startsWith('wikilink-notfound:') &&
+    isInternalHref(href) &&
+    !isAssetHref(href)
+  ) {
+    // Absolute (e.g. "/stoff/change") or relative (e.g. "../stoff/change",
+    // "child-page", "./foo") to the current page.
+    normalizedHref = href.startsWith('/')
+      ? normalizeWikiRoutePath(href)
+      : resolveWikiLinkPath(getCurrentWikiPath(), href)
+  }
+  // lookupPath is the path without leading /, without query and hash
+  const lookupPath =
+    normalizedHref === null ? null : toWikiLookupPath(normalizedHref)
+  const targetPage = useTreeStore((s) =>
+    lookupPath === null ? null : (s.byPath[lookupPath] ?? null),
+  )
 
   if (href === undefined) {
     return <>{children}</>
@@ -140,11 +183,18 @@ export function MarkdownLink({
     )
   }
 
-  const isInternal =
-    href &&
-    !href.startsWith('http') &&
-    !href.startsWith('mailto:') &&
-    !href.startsWith('#')
+  const isWebLink = isWebHref(href)
+  let isSameOrigin = false
+  if (isWebLink) {
+    try {
+      const url = new URL(href, window.location.href)
+      isSameOrigin =
+        (url.protocol === 'http:' || url.protocol === 'https:') &&
+        url.origin === window.location.origin
+    } catch {
+      // Malformed web URLs must not enter wiki path resolution.
+    }
+  }
 
   const handleOpenCreatePageDialog = (path: string) => {
     openDialog(DIALOG_CREATE_PAGE_BY_PATH, {
@@ -154,52 +204,35 @@ export function MarkdownLink({
     })
   }
 
-  if (isInternal) {
-    // check if it is a asset link
-    if (href.startsWith('assets/') || href.startsWith('/assets/')) {
-      const path = href.startsWith('/assets/')
-        ? href
-        : '/assets/' + href.slice('assets/'.length)
+  if (isInternalHref(href) && isAssetHref(href)) {
+    const path = href.startsWith('/assets/')
+      ? href
+      : '/assets/' + href.slice('assets/'.length)
 
-      const resolvedPath = resolveAssetUrl?.(path) ?? path
-      const assetHref = withBasePath(resolvedPath)
-      return (
-        <a
-          href={assetHref}
-          {...props}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-brand hover:text-brand-dark no-underline hover:underline"
-        >
-          {children}
-        </a>
-      )
-    }
-    /*
-      First we need to check if it is a relative link or an absolute link.
-    */
-    let normalizedHref = href
-    if (href.startsWith('/')) {
-      // Already absolute (e.g. "/stoff/change")
-      normalizedHref = normalizeWikiRoutePath(href)
-    } else {
-      // Relative link (e.g. "../stoff/change", "child-page", "./foo")
-      normalizedHref = resolveWikiLinkPath(getCurrentWikiPath(), href)
-    }
+    const resolvedPath = resolveAssetUrl?.(path) ?? path
+    const assetHref = withBasePath(resolvedPath)
+    return (
+      <a
+        href={assetHref}
+        {...props}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-brand hover:text-brand-dark no-underline hover:underline"
+      >
+        {children}
+      </a>
+    )
+  }
 
+  if (normalizedHref !== null && lookupPath !== null) {
     /**
      *  When a page link is internal and not an asset link and the page doesn't exist yet,
      * we will color the link in red and offer to create the page. Via the CreatePageByPathDialog.
      * we should handle and calculate relative paths here as well.
      * normalizedHref contains now the absolute path. We can use it directly.
      **/
-
-    // normalizedTargetPath is the path without leading /, without query and hash
-    const normalizedTargetPath = toWikiLookupPath(normalizedHref)
-
-    // Check if the page exists
-    const page = getPageByPath(normalizedTargetPath)
-    const pageExists = !!page
+    const normalizedTargetPath = lookupPath
+    const pageExists = !!targetPage
     if (!pageExists && !readOnly) {
       return (
         <Button
@@ -238,7 +271,7 @@ export function MarkdownLink({
     <a
       href={href}
       {...props}
-      target={href.startsWith('#') ? undefined : '_blank'}
+      target={isSameOrigin || href.startsWith('#') ? undefined : '_blank'}
       rel="noopener noreferrer"
       className="text-brand hover:text-brand-dark no-underline hover:underline"
     >

@@ -109,6 +109,7 @@ Before submitting the code execute `npm run format` in the `ui/leafwiki-ui` dire
 If you change the e2e tests, please also run `npm run format` in the `e2e` directory.
 
 Translating the UI or adding a language? See [docs/i18n.md](docs/i18n.md).
+How the code is structured: [docs/development/](docs/development/README.md).
 
 ---
 ## Pull request guidelines
@@ -122,6 +123,32 @@ To keep reviews efficient, please follow these guidelines:
 - Update documentation if necessary
 
 PRs that combine multiple unrelated changes may be asked to split.
+
+---
+
+## AI-assisted contributions
+
+Using AI coding agents is fine. The rules are the same as for any other contribution, plus a few
+that matter more when code is generated:
+
+- **You are the author.** You must understand every line you submit and be able to explain and
+  change it during review. "The AI wrote it" is not an answer to a review question.
+- **Say so in the PR.** Tick the AI box in the PR template and name the tool. This doesn't make a
+  PR less welcome; it helps review.
+- **Test it yourself, by hand.** Generated code often passes its own tests and still does the
+  wrong thing. For **UI changes**, cover the behaviour with automated tests (e2e, component or
+  unit) wherever possible, then click through at least what tests can't show — how it looks in
+  light/dark mode and at mobile width, real-browser specifics — and tick both UI boxes in the
+  PR template. A screenshot or short recording is welcome but not required. UI PRs without the
+  boxes ticked will be asked to test before review.
+- **Same scope rules.** One focused change per PR, linked to an issue. No drive-by refactors or
+  reformatting the agent decided to do on the side.
+- **Don't paste unverified AI output into issues or security reports.** Reproduce the problem
+  yourself first.
+
+[AGENTS.md](./AGENTS.md) holds the project conventions in a form agents follow. Point your agent
+at it; most tools read it automatically. Developer docs (architecture, source map, processes,
+ADRs) are in [docs/development/](./docs/development/README.md).
 
 ---
 

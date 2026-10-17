@@ -10,9 +10,11 @@ import (
 // data out from under the running server. It has no HTTP dependency itself —
 // internal/http/middleware/maintenance wraps it as gin middleware.
 type WriteGate struct {
-	mu       sync.Mutex
-	engaged  bool
-	inflight int64
+	mu      sync.Mutex
+	engaged bool
+	// atomic.Int64 rather than a raw int64: it is guaranteed 64-bit aligned,
+	// so this doesn't panic on 32-bit platforms (linux/386).
+	inflight atomic.Int64
 }
 
 func NewWriteGate() *WriteGate {
@@ -49,9 +51,9 @@ func (g *WriteGate) TryEnter() (leave func(), ok bool) {
 		g.mu.Unlock()
 		return nil, false
 	}
-	atomic.AddInt64(&g.inflight, 1)
+	g.inflight.Add(1)
 	g.mu.Unlock()
-	return func() { atomic.AddInt64(&g.inflight, -1) }, true
+	return func() { g.inflight.Add(-1) }, true
 }
 
 // WaitForDrain blocks until every request admitted by TryEnter before Engage
@@ -62,7 +64,7 @@ func (g *WriteGate) TryEnter() (leave func(), ok bool) {
 func (g *WriteGate) WaitForDrain(timeout time.Duration) bool {
 	deadline := time.Now().Add(timeout)
 	for {
-		if atomic.LoadInt64(&g.inflight) == 0 {
+		if g.inflight.Load() == 0 {
 			return true
 		}
 		if time.Now().After(deadline) {

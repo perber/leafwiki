@@ -61,10 +61,10 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
 **Operations:**
 - Single Go binary — no external database, no runtime dependencies
 - Markdown on disk — page content is readable outside the app, backup is `cp -r` (stop the app first)
-- Runs on Linux, macOS, Windows, Raspberry Pi (x86_64 and ARM64)
+- Runs on Linux, macOS, Windows, Raspberry Pi (x86_64 and ARM64; 32-bit x86 Linux via standalone binary)
 - Reverse-proxy friendly with `--base-path`
 - Reverse-proxy authentication via trusted HTTP header (v0.10+)
-- API keys for programmatic and agent access, admin-managed, read-only — in development, not yet ready for use
+- API keys for programmatic and agent access, admin-managed, scoped by role — in development, not yet ready for use
 - Three access modes: fully internal, public read with login-only editing, or open editing without login (see [Operating Modes](#operating-modes))
 - Roles: admin, editor, viewer
 
@@ -212,7 +212,16 @@ sudo ./install.sh --non-interactive --env-file ./.env
 
 ### Binary
 
+Download `leafwiki-<version>-<os>-<arch>` and its `.sha256` file from
+[GitHub Releases](https://github.com/perber/leafwiki/releases)
+(linux-amd64, linux-arm64, linux-386, darwin-amd64, darwin-arm64,
+windows-amd64), check that the hash matches the one in the `.sha256` file,
+and rename it to `leafwiki`:
+
 ```bash
+sha256sum leafwiki-<version>-<os>-<arch>
+cat leafwiki-<version>-<os>-<arch>.sha256
+mv leafwiki-<version>-<os>-<arch> leafwiki
 chmod +x leafwiki
 ./leafwiki --jwt-secret=yoursecret --admin-password=yourpassword --allow-insecure=true
 ```
@@ -224,6 +233,8 @@ The server binds to `127.0.0.1:8080` by default. To expose it on the network:
 ```
 
 Default data directory is `./data`. Change with `--data-dir`.
+
+> 32-bit x86 Linux (i686, e.g. Alpine on an Intel Atom) is supported on a best-effort basis: use the `linux-386` binary. It is built without CGO, so it doesn't need glibc and runs on musl-based distros. The systemd installer and Docker images only cover amd64/arm64, so the binary is the only install path on 32-bit x86 (that includes `update.sh`, which expects the systemd setup).
 
 ### Build from source
 

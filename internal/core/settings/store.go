@@ -1,7 +1,7 @@
 // Package settings provides the shared persistence primitive behind
 // LeafWiki's small settings-managed JSON config files living flat in the
-// data directory (branding.json, public-access.json, and future ones) —
-// see pleaf plan "Shared JSON Settings Store".
+// data directory (branding.json, public-access.json, and future ones), so
+// each feature doesn't reimplement its own load/atomic-save/locking logic.
 //
 // It intentionally covers only the JSON-file side. The SQLite hot-swappable
 // stores (users.db, api_keys.db, favorites.db, usersettings.db) are a
