@@ -70,62 +70,43 @@ func TestIsSQLiteRecoverableError(t *testing.T) {
 }
 
 func TestRemoveSQLiteFiles(t *testing.T) {
-	dir := t.TempDir()
-	dbPath := filepath.Join(dir, "search.db")
-	paths := []string{dbPath, dbPath + "-journal", dbPath + "-wal", dbPath + "-shm"}
-
-	for _, path := range paths {
-		if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
-			t.Fatalf("failed to create %q: %v", path, err)
-		}
+	all := []string{"", "-journal", "-wal", "-shm"}
+	tests := []struct {
+		name     string
+		existing []string // suffixes written as files before the call
+		blocked  string   // suffix replaced by an undeletable directory, "" for none
+		wantErr  bool
+	}{
+		{name: "removes the db and every sidecar", existing: all},
+		{name: "missing files are not an error", existing: nil},
+		{name: "reports a failure and still removes the rest", existing: []string{"", "-journal", "-shm"}, blocked: "-wal", wantErr: true},
 	}
 
-	if err := RemoveSQLiteFiles(dbPath); err != nil {
-		t.Fatalf("RemoveSQLiteFiles: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dbPath := filepath.Join(t.TempDir(), "search.db")
+			for _, suffix := range tt.existing {
+				writeTestFile(t, dbPath+suffix, "x")
+			}
+			if tt.blocked != "" {
+				blockRemoval(t, dbPath+tt.blocked)
+			}
 
-	for _, path := range paths {
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
-			t.Fatalf("expected %q to be removed, err=%v", path, err)
-		}
-	}
-}
+			err := RemoveSQLiteFiles(dbPath)
 
-func TestRemoveSQLiteFiles_NoOpWhenMissing(t *testing.T) {
-	dir := t.TempDir()
-	dbPath := filepath.Join(dir, "missing.db")
-
-	if err := RemoveSQLiteFiles(dbPath); err != nil {
-		t.Fatalf("RemoveSQLiteFiles: %v", err)
-	}
-
-	for _, path := range []string{dbPath, dbPath + "-journal", dbPath + "-wal", dbPath + "-shm"} {
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
-			t.Fatalf("expected %q to remain absent, err=%v", path, err)
-		}
-	}
-}
-
-func TestRemoveSQLiteFiles_ReportsFailureAndRemovesTheRest(t *testing.T) {
-	dbPath := filepath.Join(t.TempDir(), "search.db")
-	for _, path := range []string{dbPath, dbPath + "-journal", dbPath + "-shm"} {
-		if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
-			t.Fatalf("failed to create %q: %v", path, err)
-		}
-	}
-	blockRemoval(t, dbPath+"-wal")
-
-	if err := RemoveSQLiteFiles(dbPath); err == nil {
-		t.Fatal("RemoveSQLiteFiles: expected an error for an undeletable -wal, got nil")
-	}
-
-	for _, path := range []string{dbPath, dbPath + "-journal", dbPath + "-shm"} {
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
-			t.Errorf("expected %q to be removed despite the -wal failure, err=%v", path, err)
-		}
-	}
-	if _, err := os.Stat(dbPath + "-wal"); err != nil {
-		t.Errorf("expected the blocked -wal to remain, err=%v", err)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("RemoveSQLiteFiles error = %v, want error: %v", err, tt.wantErr)
+			}
+			for _, suffix := range all {
+				if tt.blocked != "" && suffix == tt.blocked {
+					if _, statErr := os.Stat(dbPath + suffix); statErr != nil {
+						t.Errorf("expected the blocked %q to remain, err=%v", dbPath+suffix, statErr)
+					}
+					continue
+				}
+				assertMissing(t, dbPath+suffix)
+			}
+		})
 	}
 }
 
