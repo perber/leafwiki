@@ -204,7 +204,7 @@ remarkMath, remarkGfm, remarkFlexibleMarkers, remarkImageSize
 → rehypeLineNumber, rehypeCodeFenceLineNumbers
 → rehypeWhitelistStyles   (filters inline `style` to a property whitelist)
 → rehypeKatex
-→ rehypeSanitize          (custom schema, sanitizes the WHOLE tree incl. rehypeRaw's output)
+→ rehypeSanitize          (custom schema in previewSanitizeSchema.ts, sanitizes the WHOLE tree incl. rehypeRaw's output)
 → rehypeHighlight
 ```
 

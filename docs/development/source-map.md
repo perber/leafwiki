@@ -318,7 +318,9 @@ light/dark mode application).
 - **`features/page-switcher`** — Cmd/Ctrl-K quick page switcher
   (`PageQuickSwitcherDialog.tsx`, `pageQuickSwitcher.ts`).
 - **`features/preview`** — markdown-to-HTML rendering pipeline used by both the editor's live
-  preview and the read-only viewer: `MarkdownPreview.tsx`, custom renderers
+  preview and the read-only viewer: `MarkdownPreview.tsx` (sanitize schema in
+  `previewSanitizeSchema.ts`, error boundary in `MarkdownPreviewErrorBoundary.tsx`, pure
+  renderer helpers in `previewHelpers.ts`), custom renderers
   (`MarkdownCodeBlock.tsx`, `MarkdownImage.tsx`, `MarkdownLink.tsx`, `MermaidBlock.tsx`,
   `Headline.tsx`, `MarkdownPdfEmbed.tsx`, `MarkdownInlineCode.tsx`), rehype/remark plugins
   (`rehypeLineNumber.ts`, `rehypeCodeFenceLineNumbers.ts`, `rehypeWhitelistStyles.ts`,

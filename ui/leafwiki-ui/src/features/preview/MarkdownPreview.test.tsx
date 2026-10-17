@@ -395,6 +395,158 @@ describe('MarkdownPreview title index refresh', () => {
   })
 })
 
+describe('MarkdownPreview sanitizes raw HTML', () => {
+  beforeEach(() => {
+    useTreeStore.setState({ byId: {}, byPath: {} })
+    localStorage.setItem('design-mode', 'light')
+    useDesignModeStore.setState({ mode: 'light' })
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(prefers-color-scheme: light)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+  })
+
+  function renderRouted(content: string) {
+    return render(
+      <MemoryRouter>
+        <TooltipProvider>
+          <MarkdownPreview content={content} />
+        </TooltipProvider>
+      </MemoryRouter>,
+    )
+  }
+
+  function eventHandlerAttributes(root: Element) {
+    return Array.from(root.querySelectorAll('*')).flatMap((el) =>
+      Array.from(el.attributes)
+        .map((attr) => attr.name)
+        .filter((name) => name.toLowerCase().startsWith('on')),
+    )
+  }
+
+  function urlAttributes(root: Element) {
+    return Array.from(
+      root.querySelectorAll('[href], [src], [action], [formaction]'),
+    ).flatMap((el) =>
+      ['href', 'src', 'action', 'formaction']
+        .map((name) => el.getAttribute(name))
+        .filter((value): value is string => value !== null),
+    )
+  }
+
+  it.each([
+    ['script tag', 'before <script>window.__xss = 1</script> after', 'script'],
+    ['onerror attribute', '<img src="x" onerror="window.__xss = 1">', null],
+    ['onclick on a div', '<div onclick="window.__xss = 1">click</div>', null],
+    ['svg onload', '<svg onload="window.__xss = 1"><circle /></svg>', 'svg'],
+    ['iframe', '<iframe src="https://evil.example"></iframe>', 'iframe'],
+    ['object', '<object data="https://evil.example/x.swf"></object>', 'object'],
+    ['embed', '<embed src="https://evil.example/x.swf">', 'embed'],
+    ['form', '<form action="https://evil.example"><input></form>', 'form'],
+    ['style tag', '<style>body { display: none }</style>', 'style'],
+    [
+      'meta refresh',
+      '<meta http-equiv="refresh" content="0;url=https://evil.example">',
+      'meta',
+    ],
+    ['base tag', '<base href="https://evil.example/">', 'base'],
+    [
+      'video onerror',
+      '<video src="x.mp4" onerror="window.__xss = 1"></video>',
+      null,
+    ],
+    [
+      'audio onplay',
+      '<audio controls src="x.mp3" onplay="window.__xss = 1"></audio>',
+      null,
+    ],
+  ])('strips %s', (_name, content, forbiddenTag) => {
+    const { container } = renderRouted(content)
+
+    if (forbiddenTag) {
+      expect(container.querySelector(forbiddenTag)).toBeNull()
+    }
+    expect(eventHandlerAttributes(container)).toEqual([])
+    expect(container.innerHTML).not.toContain('window.__xss')
+  })
+
+  it.each([
+    ['html javascript: href', '<a href="javascript:alert(1)">x</a>'],
+    [
+      'html JaVaScRiPt: href with entities',
+      '<a href="jav&#x09;ascript:alert(1)">x</a>',
+    ],
+    ['markdown javascript: link', '[x](javascript:alert(1))'],
+    ['markdown javascript: image', '![x](javascript:alert(1))'],
+    [
+      'html data: href',
+      '<a href="data:text/html,<script>alert(1)</script>">x</a>',
+    ],
+    [
+      'html data: img src',
+      '<img src="data:image/svg+xml,<svg onload=alert(1)>">',
+    ],
+    ['vbscript: href', '<a href="vbscript:msgbox(1)">x</a>'],
+    [
+      'video javascript: src',
+      '<video controls src="javascript:alert(1)"></video>',
+    ],
+    [
+      'wikilink protocol prefix abuse',
+      '<a href="wikilink-notfound:x" onclick="alert(1)">x</a>',
+    ],
+  ])('drops dangerous URLs: %s', (_name, content) => {
+    const { container } = renderRouted(content)
+
+    for (const value of urlAttributes(container)) {
+      expect(
+        Array.from(value)
+          .filter((ch) => ch.charCodeAt(0) > 0x20)
+          .join('')
+          .toLowerCase(),
+      ).not.toMatch(/^(javascript|vbscript|data):/)
+    }
+    expect(eventHandlerAttributes(container)).toEqual([])
+  })
+
+  it.each([
+    'position: fixed; top: 0; left: 0; width: 100%; height: 100%',
+    'position:fixed;z-index:9999',
+    'background-image: url(javascript:alert(1))',
+    'behavior: url(x.htc)',
+  ])('removes non-whitelisted inline style %j', (style) => {
+    const { container } = renderRouted(
+      `<div style="${style}" data-testid="styled">overlay</div>`,
+    )
+
+    const div = Array.from(container.querySelectorAll('div')).find(
+      (el) => el.textContent === 'overlay',
+    )
+    expect(div).toBeDefined()
+    const remaining = div?.getAttribute('style') ?? ''
+    expect(remaining).not.toMatch(/position|z-index|url\(|behavior/i)
+  })
+
+  it('keeps whitelisted inline style and allowed media/mark tags', () => {
+    const { container } = renderRouted(
+      '<p style="color: red; position: fixed">kept</p>\n\n<mark>hi</mark>',
+    )
+
+    const p = Array.from(container.querySelectorAll('p')).find(
+      (el) => el.textContent === 'kept',
+    )
+    expect(p?.getAttribute('style') ?? '').toMatch(/color:\s*red/)
+    expect(p?.getAttribute('style') ?? '').not.toMatch(/position/)
+    expect(container.querySelector('mark')?.textContent).toBe('hi')
+  })
+})
+
 describe('MarkdownPreview plain link tree refresh', () => {
   const target: PageNode = {
     id: 'target',
@@ -460,7 +612,6 @@ describe('MarkdownPreview plain link tree refresh', () => {
         byPath: { 'moved/target': moved },
       }),
     )
-
     expect(container.querySelector('a[href="/target"]')).toBeNull()
   })
 })
