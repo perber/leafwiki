@@ -86,15 +86,39 @@ get_version(){
     validate_version
 }
 
+# verify_checksum <file> <url>: compare <file> against the hash published at
+# <url>.sha256. Only the hash field is compared, so checksum files that name
+# the binary with a "releases/" prefix (older releases) work too.
+verify_checksum(){
+    local file="$1" url="$2" expected actual
+    expected=$(wget -qO- "${url}.sha256" | awk '{print $1}')
+    if [[ -z "$expected" ]]; then
+        echo "Error: Could not download checksum from ${url}.sha256" >&2
+        return 1
+    fi
+    actual=$(sha256sum "$file" | awk '{print $1}')
+    if [[ "$expected" != "$actual" ]]; then
+        echo "Error: Checksum mismatch for $(basename "$file") (expected ${expected}, got ${actual})" >&2
+        return 1
+    fi
+}
+
 download_binary(){
-    wget "${RELEASE_LINK}releases/download/v${VERSION}/leafwiki-v${VERSION}-linux-${ARCH}" || exit 1
-    cp leafwiki-v${VERSION}-linux-${ARCH} $PATH_TO_BINARY
-    rm leafwiki-v${VERSION}-linux-${ARCH}
+    local name="leafwiki-v${VERSION}-linux-${ARCH}"
+    local url="${RELEASE_LINK}releases/download/v${VERSION}/${name}"
+    wget -O "$name" "$url" || exit 1
+    if ! verify_checksum "$name" "$url"; then
+        rm -f "$name"
+        exit 1
+    fi
+    cp "$name" $PATH_TO_BINARY
+    rm "$name"
     chmod +x $PATH_TO_BINARY
 }
 
 check_dependencies "systemctl"
 check_dependencies "wget"
+check_dependencies "sha256sum"
 
 # Check if --non-interactive flag is present
 if [[ "$*" == *"--non-interactive"*  ||  "$*" == *"-non-interactive"* ]]; then
