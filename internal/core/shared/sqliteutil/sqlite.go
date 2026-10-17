@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"slices"
+	"time"
 
 	sqlite "modernc.org/sqlite"
 )
@@ -131,4 +133,72 @@ func sqliteCode(err error) int {
 		return 0
 	}
 	return e.Code()
+}
+
+// quarantineTimeFormat is a UTC timestamp without ':' so the quarantined
+// name is valid on Windows.
+const quarantineTimeFormat = "20060102T150405Z"
+
+// now and rename are package variables so tests can pin the quarantine name
+// and simulate a failed rename.
+var (
+	now    = time.Now
+	rename = os.Rename
+)
+
+// QuarantineOnCorruption is the CorruptionPolicy for real state that is worth
+// keeping but not worth refusing to start over (sessions, email tokens,
+// favorites, user settings; ADR-0013). It renames the database and every
+// existing sidecar to "<name>.corrupt-<UTC timestamp>" (a sidecar keeps its
+// suffix after the new name, so SQLite still pairs them when an operator
+// opens the quarantined copy) and asks for a retry with an empty database.
+//
+// OpenWithPolicy runs it only after open has closed its handle, which the
+// rename needs on Windows. If any rename fails, the files already moved are
+// moved back, nothing is deleted, and the policy does not retry. It never
+// overwrites an earlier quarantine with the same timestamp.
+//
+// It logs one Error through slog.Default(): the store keeps running, but the
+// user data in the file is no longer live, so the operator has to know.
+func QuarantineOnCorruption(dbPath string, err error) (bool, error) {
+	target := dbPath + ".corrupt-" + now().UTC().Format(quarantineTimeFormat)
+	if mvErr := moveSQLiteFiles(dbPath, target); mvErr != nil {
+		return false, fmt.Errorf("%w (moving the corrupt database aside failed: %v)", err, mvErr)
+	}
+	slog.Default().Error("database corrupt, moved aside and continuing with an empty one",
+		"path", dbPath, "quarantinedPath", target, "sqliteCode", sqliteCode(err), "error", err)
+	return true, nil
+}
+
+// moveSQLiteFiles renames every existing file of the database at from to the
+// matching name at to. It refuses to overwrite an existing target and, if a
+// rename fails, moves the files it already renamed back.
+func moveSQLiteFiles(from, to string) error {
+	sources, targets := sqliteFiles(from), sqliteFiles(to)
+	var pending []int
+	for i := range sources {
+		if _, err := os.Lstat(sources[i]); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return err
+		}
+		if _, err := os.Lstat(targets[i]); !os.IsNotExist(err) {
+			return fmt.Errorf("quarantine target %s already exists", targets[i])
+		}
+		pending = append(pending, i)
+	}
+
+	for n, i := range pending {
+		if err := rename(sources[i], targets[i]); err != nil {
+			errs := []error{err}
+			for _, j := range slices.Backward(pending[:n]) {
+				if rbErr := rename(targets[j], sources[j]); rbErr != nil {
+					errs = append(errs, fmt.Errorf("moving %s back failed: %w", targets[j], rbErr))
+				}
+			}
+			return errors.Join(errs...)
+		}
+	}
+	return nil
 }

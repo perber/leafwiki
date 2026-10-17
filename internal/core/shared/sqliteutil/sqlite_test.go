@@ -6,7 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
+	"time"
 	"unsafe"
 
 	sqlite "modernc.org/sqlite"
@@ -371,6 +373,130 @@ func TestRebuildOnCorruption_RemovalFails_DoesNotRetry(t *testing.T) {
 	}
 }
 
+// TestQuarantineOnCorruption covers the move-aside policy for real state
+// (ADR-0013): the bytes of the database and every sidecar survive under the
+// quarantine name, and a failed move leaves everything where it was and
+// does not retry.
+func TestQuarantineOnCorruption(t *testing.T) {
+	const stamp = "20261017T143005Z"
+	failSecondRename := func(calls *int) func(string, string) error {
+		return func(from, to string) error {
+			*calls++
+			if *calls == 2 {
+				return errors.New("rename blocked")
+			}
+			return os.Rename(from, to)
+		}
+	}
+
+	tests := []struct {
+		name          string
+		sidecars      []string // sidecar suffixes present next to the db
+		existingQuar  bool     // a quarantined db with the same timestamp already exists
+		failRename    bool     // the second rename fails
+		wantQuarantin bool
+		wantOpenCalls int
+	}{
+		{name: "moves the db and every sidecar", sidecars: []string{"-journal", "-wal", "-shm"}, wantQuarantin: true, wantOpenCalls: 2},
+		{name: "moves only the sidecars that exist", sidecars: []string{"-wal"}, wantQuarantin: true, wantOpenCalls: 2},
+		{name: "db without sidecars", wantQuarantin: true, wantOpenCalls: 2},
+		{name: "failed rename moves back and does not retry", sidecars: []string{"-wal", "-shm"}, failRename: true, wantOpenCalls: 1},
+		{name: "never overwrites an earlier quarantine", sidecars: []string{"-wal"}, existingQuar: true, wantOpenCalls: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setNow(t, time.Date(2026, 10, 17, 16, 30, 5, 0, time.FixedZone("CEST", 2*3600)))
+			renameCalls := 0
+			if tt.failRename {
+				setRename(t, failSecondRename(&renameCalls))
+			}
+			dbPath := filepath.Join(t.TempDir(), "favorites.db")
+			quarantined := dbPath + ".corrupt-" + stamp
+			original := map[string]string{dbPath: "not a database"}
+			for _, suffix := range tt.sidecars {
+				original[dbPath+suffix] = "sidecar " + suffix
+			}
+			for path, content := range original {
+				writeTestFile(t, path, content)
+			}
+			if tt.existingQuar {
+				writeTestFile(t, quarantined, "earlier quarantine")
+			}
+			corrupt := sqliteErrorWithCode(26)
+
+			openCalls := 0
+			err := OpenWithPolicy(dbPath, QuarantineOnCorruption, func() error {
+				openCalls++
+				if openCalls == 1 {
+					return corrupt
+				}
+				return nil
+			})
+
+			if openCalls != tt.wantOpenCalls {
+				t.Fatalf("open called %d times, want %d", openCalls, tt.wantOpenCalls)
+			}
+			if !tt.wantQuarantin {
+				if !errors.Is(err, corrupt) {
+					t.Fatalf("OpenWithPolicy error = %v, want it to wrap the original %v", err, corrupt)
+				}
+				for path, content := range original {
+					assertFileContent(t, path, content)
+				}
+				if tt.existingQuar {
+					assertFileContent(t, quarantined, "earlier quarantine")
+				} else {
+					assertMissing(t, quarantined)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("OpenWithPolicy: unexpected error %v", err)
+			}
+			for path, content := range original {
+				assertMissing(t, path)
+				assertFileContent(t, quarantined+strings.TrimPrefix(path, dbPath), content)
+			}
+			for _, suffix := range []string{"-journal", "-wal", "-shm"} {
+				if _, ok := original[dbPath+suffix]; !ok {
+					assertMissing(t, quarantined+suffix)
+				}
+			}
+		})
+	}
+}
+
+// TestQuarantineOnCorruption_FailedMoveBack_KeepsEveryByte covers the worst
+// case: the move aside and the move back both fail. Nothing is deleted, the
+// error names both failures, and there is no retry.
+func TestQuarantineOnCorruption_FailedMoveBack_KeepsEveryByte(t *testing.T) {
+	setNow(t, time.Date(2026, 10, 17, 14, 30, 5, 0, time.UTC))
+	calls := 0
+	setRename(t, func(from, to string) error {
+		calls++
+		if calls >= 2 {
+			return fmt.Errorf("rename %d blocked", calls)
+		}
+		return os.Rename(from, to)
+	})
+	dbPath := filepath.Join(t.TempDir(), "sessions.db")
+	writeTestFile(t, dbPath, "db bytes")
+	writeTestFile(t, dbPath+"-wal", "wal bytes")
+
+	retry, err := QuarantineOnCorruption(dbPath, sqliteErrorWithCode(11))
+
+	if retry {
+		t.Fatal("QuarantineOnCorruption asked for a retry after a failed move")
+	}
+	if err == nil || !strings.Contains(err.Error(), "rename 2 blocked") || !strings.Contains(err.Error(), "rename 3 blocked") {
+		t.Fatalf("error = %v, want it to name the failed move and the failed move back", err)
+	}
+	assertFileContent(t, dbPath+".corrupt-20261017T143005Z", "db bytes")
+	assertFileContent(t, dbPath+"-wal", "wal bytes")
+}
+
 func TestSQLiteCode(t *testing.T) {
 	tests := []struct {
 		name string
@@ -393,6 +519,45 @@ func TestSQLiteCode(t *testing.T) {
 
 func sqliteFilePaths(dbPath string) []string {
 	return []string{dbPath, dbPath + "-journal", dbPath + "-wal", dbPath + "-shm"}
+}
+
+func setNow(t *testing.T, at time.Time) {
+	t.Helper()
+	old := now
+	now = func() time.Time { return at }
+	t.Cleanup(func() { now = old })
+}
+
+func setRename(t *testing.T, fn func(string, string) error) {
+	t.Helper()
+	old := rename
+	rename = fn
+	t.Cleanup(func() { rename = old })
+}
+
+func writeTestFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("failed to create %q: %v", path, err)
+	}
+}
+
+func assertFileContent(t *testing.T, path, want string) {
+	t.Helper()
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %q: %v", path, err)
+	}
+	if string(got) != want {
+		t.Fatalf("%q = %q, want %q", path, got, want)
+	}
+}
+
+func assertMissing(t *testing.T, path string) {
+	t.Helper()
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("expected %q not to exist, err=%v", path, err)
+	}
 }
 
 // blockRemoval puts a non-empty directory at path, so os.Remove and os.Rename
