@@ -41,6 +41,11 @@ func newTestDeps(t *testing.T) *testDeps {
 		t.Fatalf("failed to create links store: %v", err)
 	}
 	linkService := links.NewLinkService(storageDir, treeService, linksStore)
+	t.Cleanup(func() {
+		if err := linkService.Close(); err != nil {
+			t.Errorf("failed to close link service: %v", err)
+		}
+	})
 
 	revService := revision.NewService(storageDir, treeService, nil, revision.ServiceOptions{})
 
