@@ -19,7 +19,7 @@ Update flow, concretely:
 2. `UpdatePageUseCase.Execute` (`internal/wiki/pages/update_page.go`):
    - Validates title/slug (`sharederrors.ValidationErrors`).
    - `uc.tree.GetPage(in.ID)` to snapshot `before` (old title/content/path).
-   - Calls `TreeService.UpdateNode(UpdateNodeInput{…})` (`internal/core/tree/tree_service.go`), which runs
+   - Calls `TreeService.UpdateNode(UpdateNodeInput{…})` (`internal/core/tree/tree_mutations.go`), which runs
      inside `withLockedTree` — a single mutex around the whole in-memory tree — and: checks
      optimistic-concurrency version (`checkNodeVersion`, returns a conflict error the frontend
      surfaces as `page_version_conflict`), enforces slug uniqueness under the parent, writes
