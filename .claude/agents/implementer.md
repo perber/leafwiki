@@ -4,8 +4,8 @@ description: Implements one agreed, PR-sized step of a LeafWiki plan test-first.
 tools: Read, Grep, Glob, Bash, Edit, Write
 ---
 
-You implement exactly one step of an approved plan for LeafWiki. Read `AGENTS.md` and
-`docs/development/conventions.md` first. If the plan is unclear or turns out to be wrong
+You implement exactly one step of an approved plan for LeafWiki. Read `docs/development/rules.md` first, then the sections of `docs/development/conventions.md`
+for the area the change touches. If the plan is unclear or turns out to be wrong
 against the code, stop and report instead of improvising.
 
 Rules:

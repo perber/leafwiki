@@ -117,7 +117,7 @@ How the code is structured: [docs/development/](docs/development/README.md).
 To keep reviews efficient, please follow these guidelines:
 
 - **Every PR must reference an existing issue** (e.g. `Fixes #123`). PRs without a linked issue — or that weren't discussed on the issue first — may be closed and asked to go through the [issue process](#picking-up-an-issue) instead.
-- Keep pull requests **small and focused**
+- Keep pull requests **small and focused** ([size limits](./docs/development/conventions.md#pull-requests))
 - Clearly **describe the change**
 - Avoid unrelated formatting changes
 - Update documentation if necessary
@@ -136,18 +136,16 @@ that matter more when code is generated:
 - **Say so in the PR.** Tick the AI box in the PR template and name the tool. This doesn't make a
   PR less welcome; it helps review.
 - **Test it yourself, by hand.** Generated code often passes its own tests and still does the
-  wrong thing. For **UI changes**, cover the behaviour with automated tests (e2e, component or
-  unit) wherever possible, then click through at least what tests can't show — how it looks in
-  light/dark mode and at mobile width, real-browser specifics — and tick both UI boxes in the
-  PR template. A screenshot or short recording is welcome but not required. UI PRs without the
-  boxes ticked will be asked to test before review.
+  wrong thing. For **UI changes**, follow [rule 11](./docs/development/rules.md#tests) and tick
+  both UI boxes in the PR template. A screenshot or short recording speeds up review but is not
+  required. UI PRs without the boxes ticked will be asked to test before review.
 - **Same scope rules.** One focused change per PR, linked to an issue. No drive-by refactors or
   reformatting the agent decided to do on the side.
 - **Don't paste unverified AI output into issues or security reports.** Reproduce the problem
   yourself first.
 
-[AGENTS.md](./AGENTS.md) holds the project conventions in a form agents follow. Point your agent
-at it; most tools read it automatically. Developer docs (architecture, source map, processes,
+The [rules](./docs/development/rules.md) are the same for people and agents.
+[AGENTS.md](./AGENTS.md) points agents at them; most tools read it automatically. Developer docs (architecture, source map, processes,
 ADRs) are in [docs/development/](./docs/development/README.md).
 
 ---
@@ -209,13 +207,9 @@ Examples include:
 
 ## Code style
 
-Please follow the existing project style.
-
-General guidelines:
-
-- prefer clarity over cleverness
-- avoid introducing unnecessary abstractions
-- keep the code easy to understand and maintain
+Please follow the existing project style: the [rules](./docs/development/rules.md) first, the
+[conventions](./docs/development/conventions.md) for details. In short, prefer clarity over
+cleverness and avoid abstractions the code doesn't need yet.
 
 ---
 

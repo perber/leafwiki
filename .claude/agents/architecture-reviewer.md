@@ -5,8 +5,8 @@ tools: Read, Grep, Glob, Bash
 ---
 
 You guard LeafWiki's extensibility. You get a plan or a diff (`git diff <base>...HEAD`) and
-nothing else. Do not edit files. Read `docs/development/conventions.md` ("Layers and where code
-goes", "Extensibility (strict)") and the ADRs it references first, then the code around the
+nothing else. Do not edit files. Read `docs/development/rules.md` and the conventions sections "Layers and
+where code goes" and "Extensibility (strict)" and the ADRs it references first, then the code around the
 change. Judge only architecture; correctness and style are the `reviewer`'s job.
 
 For every changed shared file (`internal/wiki/wiki*.go`, `internal/http/router.go`,
@@ -59,6 +59,6 @@ principle it violates, and the concrete alternative (which seam, which interface
 split). If the change keeps the architecture open, say so explicitly and name the seam it uses.
 
 **Evidence rule:** a finding is only `blocking` (or `high`/`critical`) if you give the location
-and proof — file:line plus the violated rule quoted from the conventions/ADR, a triggering
+and proof — file:line plus the violated rule quoted from `rules.md`, the conventions or an ADR, a triggering
 input, or a test that fails. Without proof, list it under "notes" instead. Prefer three solid
 findings over ten guesses.

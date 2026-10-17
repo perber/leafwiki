@@ -2,29 +2,10 @@
 
 How code in this repository is shaped, so new code looks like the code around it. Most rules
 describe what the code already does; where the code doesn't follow a rule yet, the exception is
-listed and has a cleanup plan. **When in doubt, read two neighbouring files in the same package
-and copy their shape. A new pattern needs an [ADR](./adr/README.md).**
+listed and has a cleanup plan.
 
-> **The rules that matter most** — if you read nothing else:
->
-> 1. **Open/Closed:** new features plug into an extension point; shared code registers
->    features, it never grows `if feature` branches. No fitting seam → add the seam first.
-> 2. **Layers:** dependencies point down the [layer table](#layers-and-where-code-goes).
->    *Enforced by `internal/architecture_test.go`.*
-> 3. **Cross-cutting rules** (visibility, drafts, access control) live in one layer above the
->    tree, never in `core/tree` or single handlers.
-> 4. **Tests first;** a bug gets a failing regression test before the fix.
-> 5. **UI changes are tested by a person** in the browser before they count as done.
-> 6. **Use cases** take `Execute(ctx, in XxxInput)`; domain errors are `LocalizedError` with
->    `<domain>_<reason>` codes.
-> 7. **Every UI string through i18n**, in every locale (*enforced by `i18n.test.ts`*); form
->    controls are shadcn primitives.
-> 8. **No raw HTML sinks** (`innerHTML`, `dangerouslySetInnerHTML`, …). *Enforced by ESLint.*
-> 9. **Reuse:** the same logic a second time gets extracted, placed by its dependencies.
-> 10. **PRs:** ≤ 400–500 lines of production code, one topic, `main` always works (unfinished
->     work behind a default-off flag).
->
-> Everything below is reference: look up the section for the area you are working in.
+The short list of rules that matter most is in [rules.md](./rules.md); this page is the
+reference behind it. Look up the section for the area you are working in.
 
 ## Goal
 
@@ -572,5 +553,5 @@ the convention, remove dead helpers. Constraints:
   `main` never advertises an unreleased feature. Reference docs under `docs/` that belong to a
   change go in the same PR as the code.
 - One topic per PR; refactoring and behaviour changes in separate PRs.
-- Conventional Commits (`type(scope): description`); one logical change per commit. Run
-  `npm run format` in `ui/leafwiki-ui` (and `e2e` if touched) before committing.
+- One logical change per commit, in the [commit style](../../CONTRIBUTING.md#commit-style).
+  Formatting is checked in CI (`npm run format:check`); run `npm run format` before committing.

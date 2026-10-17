@@ -14,9 +14,9 @@ Backend: layered Go (`cmd/leafwiki` → `internal/wiki` composition root → sli
 `internal/core/*`). Frontend: React SPA in `ui/leafwiki-ui` with feature-local Zustand stores.
 
 Read before changing code — **[docs/development/](./docs/development/README.md)**:
-[conventions](./docs/development/conventions.md) (how code is shaped; start with the ten rules
-at the top), [source map](./docs/development/source-map.md),
-[architecture](./docs/development/architecture.md),
+[rules](./docs/development/rules.md) (the short list, same for people and agents),
+[conventions](./docs/development/conventions.md) (the reference behind them),
+[source map](./docs/development/source-map.md), [architecture](./docs/development/architecture.md),
 [processes](./docs/development/processes.md), [ADRs](./docs/development/adr/README.md).
 
 ## Commands
@@ -34,27 +34,10 @@ A fresh worktree has no `node_modules`: run `npm ci --ignore-scripts` in `ui/lea
 
 ## Rules
 
-1. **Keep the architecture open — SOLID, Open/Closed first.** New features plug into an
-   extension point; shared code (composition root, router, `TreeService`, `MarkdownPreview`, …)
-   registers them and never grows `if feature` branches. No fitting seam → add it first, in its
-   own PR. Cross-cutting rules (visibility, drafts, access control) go into one layer above the
-   tree, never into `core/tree`. Read two neighbouring files and copy their shape.
-2. **Plan first when scope is unclear.** Files, risks, implied refactoring, cross-platform
-   impact. Architecture decisions get an ADR.
-3. **Tests first.** New behaviour needs a test; a bug gets a failing regression test before the
-   fix. Leave the tests you touch better (separate `test: tidy …` commit, no lost case).
-4. **Automate UI tests; a manual click test is required only where automation can't reach.**
-   Behaviour gets e2e, component or unit tests. A manual checklist covers only the rest (visual
-   look, light/dark, mobile width, real-browser specifics); UI work with such items is not done
-   until someone has run them. Clicking through by hand on top is always welcome.
-5. **Stay in scope.** Notice a bug elsewhere → report it, don't fix it silently. Keep
-   `docs/`, `README.md` and `.env.example` in sync with what you change.
-6. **Comments explain why** and reference only GitHub issues or ADRs — never private notes,
-   local paths or chat history.
-7. Everything else — errors, API, i18n, naming, reuse, dependencies, migrations, deprecation,
-   feature flags, concurrency, cross-platform — is in the
-   [conventions](./docs/development/conventions.md). Much of it is enforced in CI (import
-   boundaries, ESLint XSS guard, i18n key parity, golangci-lint); a red check is a real finding.
+The rules live in **[docs/development/rules.md](./docs/development/rules.md)**, nowhere else.
+Read them before changing code; don't restate them in prompts, skills or roles, link there.
+Much of it is enforced in CI (import boundaries, ESLint XSS guard, i18n key parity,
+golangci-lint, Prettier); a red check is a real finding.
 
 ## Commits and pull requests
 
@@ -63,9 +46,9 @@ A fresh worktree has no `node_modules`: run `npm ci --ignore-scripts` in `ui/lea
   `test: tidy` in separate commits, formatters run, tests green. Never commit secrets,
   generated files or local overlays.
 - **Pushing, opening PRs and commenting on GitHub need the person's explicit OK.**
-- PRs: ≤ 400–500 lines of production code (tests and docs don't count), one topic, `main`
-  always works (unfinished work behind a default-off flag), README changes in a separate PR at
-  release time. See [CONTRIBUTING.md](./CONTRIBUTING.md#pull-request-guidelines) and
+- PR size and scope: [rules](./docs/development/rules.md) and
+  [conventions](./docs/development/conventions.md#pull-requests); process in
+  [CONTRIBUTING.md](./CONTRIBUTING.md#pull-request-guidelines) and
   [AI-assisted contributions](./CONTRIBUTING.md#ai-assisted-contributions).
 
 ## Workflow and roles
