@@ -419,7 +419,8 @@ func TestQuarantineOnCorruption(t *testing.T) {
 	tests := []struct {
 		name          string
 		sidecars      []string // sidecar suffixes present next to the db
-		existingQuar  bool     // a quarantined db with the same timestamp already exists
+		existingQuar  bool     // a quarantined file with the same timestamp already exists
+		quarSuffix    string   // which quarantined file exists ("" = the db itself)
 		failRename    bool     // the second rename fails
 		wantQuarantin bool     // files moved and retry requested
 	}{
@@ -428,6 +429,7 @@ func TestQuarantineOnCorruption(t *testing.T) {
 		{name: "db without sidecars", wantQuarantin: true},
 		{name: "failed rename moves back and does not retry", sidecars: []string{"-wal", "-shm"}, failRename: true},
 		{name: "never overwrites an earlier quarantine", sidecars: []string{"-wal"}, existingQuar: true},
+		{name: "never overwrites an earlier quarantined sidecar", sidecars: []string{"-wal"}, existingQuar: true, quarSuffix: "-wal"},
 	}
 
 	for _, tt := range tests {
@@ -447,7 +449,7 @@ func TestQuarantineOnCorruption(t *testing.T) {
 				writeTestFile(t, path, content)
 			}
 			if tt.existingQuar {
-				writeTestFile(t, quarantined, "earlier quarantine")
+				writeTestFile(t, quarantined+tt.quarSuffix, "earlier quarantine")
 			}
 			corrupt := sqliteErrorWithCode(26)
 
@@ -464,7 +466,10 @@ func TestQuarantineOnCorruption(t *testing.T) {
 					assertFileContent(t, path, content)
 				}
 				if tt.existingQuar {
-					assertFileContent(t, quarantined, "earlier quarantine")
+					assertFileContent(t, quarantined+tt.quarSuffix, "earlier quarantine")
+					if tt.quarSuffix != "" {
+						assertMissing(t, quarantined)
+					}
 				} else {
 					assertMissing(t, quarantined)
 				}
@@ -841,4 +846,270 @@ func sqliteErrorWithCode(code int) error {
 	v := reflect.ValueOf(e).Elem().FieldByName("code")
 	reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem().SetInt(int64(code))
 	return e
+}
+
+// TestQuarantineOnCorruption_SecondCorruptionAfterRestart runs the real
+// OpenWithPolicy twice on the same path, as two restarts would: the first
+// quarantine must survive the second one. Two corruptions within the same
+// second must not overwrite the first copy; the second open fails instead and
+// leaves the new bytes in place (ADR-0013).
+func TestQuarantineOnCorruption_SecondCorruptionAfterRestart(t *testing.T) {
+	first := time.Date(2026, 10, 17, 14, 30, 5, 0, time.UTC)
+	tests := []struct {
+		name       string
+		second     time.Time
+		wantSecond bool // the second open quarantines and succeeds
+	}{
+		{name: "later restart keeps both copies", second: first.Add(90 * time.Minute), wantSecond: true},
+		{name: "same second refuses to overwrite the first copy", second: first},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dbPath := filepath.Join(t.TempDir(), "sessions.db")
+			open := func() error { return openReadWrite(t, dbPath) }
+
+			writeTestFile(t, dbPath, "first corruption")
+			writeTestFile(t, dbPath+"-wal", "first wal")
+			setNow(t, first)
+			if err := OpenWithPolicy(dbPath, QuarantineOnCorruption, open); err != nil {
+				t.Fatalf("first OpenWithPolicy: %v", err)
+			}
+			firstCopy := dbPath + ".corrupt-" + first.Format(quarantineTimeFormat)
+
+			writeTestFile(t, dbPath, "second corruption")
+			writeTestFile(t, dbPath+"-wal", "second wal")
+			setNow(t, tt.second)
+			err := OpenWithPolicy(dbPath, QuarantineOnCorruption, open)
+
+			assertFileContent(t, firstCopy, "first corruption")
+			assertFileContent(t, firstCopy+"-wal", "first wal")
+			if !tt.wantSecond {
+				var corrupt *CorruptDatabaseError
+				if !errors.As(err, &corrupt) {
+					t.Fatalf("second OpenWithPolicy error = %v (%T), want *CorruptDatabaseError", err, err)
+				}
+				if len(corrupt.Stranded) != 0 {
+					t.Fatalf("Stranded = %v, want none", corrupt.Stranded)
+				}
+				assertFileContent(t, dbPath, "second corruption")
+				assertFileContent(t, dbPath+"-wal", "second wal")
+				return
+			}
+			if err != nil {
+				t.Fatalf("second OpenWithPolicy: %v", err)
+			}
+			secondCopy := dbPath + ".corrupt-" + tt.second.Format(quarantineTimeFormat)
+			assertFileContent(t, secondCopy, "second corruption")
+			assertFileContent(t, secondCopy+"-wal", "second wal")
+			if err := probeReadOnly(dbPath); err != nil {
+				t.Fatalf("database after the second quarantine is not healthy: %v", err)
+			}
+		})
+	}
+}
+
+// TestOpenWithPolicy_ReadOnlyDataDir_TouchesNothing runs every policy against
+// a corrupt database in a directory where nothing can be renamed or removed:
+// the open must fail and every byte must stay in place. With a -wal present
+// the read-only probe cannot create the -shm and fails closed before any
+// policy runs; without one the policy runs and its rename or remove fails.
+func TestOpenWithPolicy_ReadOnlyDataDir_TouchesNothing(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs POSIX directory permissions that the current user cannot bypass")
+	}
+	tests := []struct {
+		name        string
+		policy      CorruptionPolicy
+		withWAL     bool
+		wantCorrupt bool // error is a *CorruptDatabaseError
+	}{
+		{name: "quarantine without sidecar", policy: QuarantineOnCorruption, wantCorrupt: true},
+		{name: "fail without sidecar", policy: FailOnCorruption, wantCorrupt: true},
+		{name: "rebuild without sidecar", policy: RebuildOnCorruption},
+		{name: "quarantine with -wal fails closed in the probe", policy: QuarantineOnCorruption, withWAL: true},
+		{name: "fail with -wal fails closed in the probe", policy: FailOnCorruption, withWAL: true},
+		{name: "rebuild with -wal fails closed in the probe", policy: RebuildOnCorruption, withWAL: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			dbPath := filepath.Join(dir, "favorites.db")
+			files := map[string]string{dbPath: "this is not a sqlite database, just bytes!!"}
+			if tt.withWAL {
+				files[dbPath+"-wal"] = "wal bytes"
+			}
+			for path, content := range files {
+				writeTestFile(t, path, content)
+			}
+			if err := os.Chmod(dir, 0o555); err != nil {
+				t.Fatalf("chmod: %v", err)
+			}
+			t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+
+			err := OpenWithPolicy(dbPath, tt.policy, func() error { return openReadWrite(t, dbPath) })
+
+			if err == nil {
+				t.Fatal("OpenWithPolicy: expected an error in a read-only directory, got nil")
+			}
+			var corrupt *CorruptDatabaseError
+			if got := errors.As(err, &corrupt); got != tt.wantCorrupt {
+				t.Fatalf("error = %v (%T), *CorruptDatabaseError = %v, want %v", err, err, got, tt.wantCorrupt)
+			}
+			if corrupt != nil && len(corrupt.Stranded) != 0 {
+				t.Fatalf("Stranded = %v, want none", corrupt.Stranded)
+			}
+			for path, content := range files {
+				assertFileContent(t, path, content)
+			}
+			entries, err := os.ReadDir(dir)
+			if err != nil {
+				t.Fatalf("read dir: %v", err)
+			}
+			if len(entries) != len(files) {
+				t.Fatalf("directory holds %d entries, want %d (nothing created or moved)", len(entries), len(files))
+			}
+		})
+	}
+}
+
+// TestOpenWithPolicy_HealthyDatabaseWithWAL_KeepsData pins that the probe
+// never costs a healthy database the committed rows in its -wal, whether
+// another connection still holds it (live server, restore) or it was left by
+// a crash, with an absolute and a relative path (the default ./data).
+func TestOpenWithPolicy_HealthyDatabaseWithWAL_KeepsData(t *testing.T) {
+	sources := []struct {
+		name  string
+		setup func(t *testing.T) string // returns the absolute db path
+	}{
+		{name: "WAL left by a crash", setup: func(t *testing.T) string {
+			return writeDatabaseWithCommittedWAL(t, false)
+		}},
+		{name: "WAL held by a live writer", setup: func(t *testing.T) string {
+			dbPath := filepath.Join(t.TempDir(), "live.db")
+			db, err := sql.Open("sqlite", dbPath+"?_pragma=journal_mode(WAL)&_pragma=wal_autocheckpoint(0)")
+			if err != nil {
+				t.Fatalf("open writer: %v", err)
+			}
+			t.Cleanup(func() { _ = db.Close() })
+			db.SetMaxOpenConns(1)
+			for _, stmt := range []string{"CREATE TABLE t(x)", "INSERT INTO t VALUES (1)", "INSERT INTO t VALUES (2)"} {
+				if _, err := db.Exec(stmt); err != nil {
+					t.Fatalf("%s: %v", stmt, err)
+				}
+			}
+			if info, err := os.Stat(dbPath + "-wal"); err != nil || info.Size() == 0 {
+				t.Fatalf("expected a non-empty -wal, info=%v err=%v", info, err)
+			}
+			return dbPath
+		}},
+	}
+
+	for _, relative := range []bool{false, true} {
+		for _, src := range sources {
+			name := "absolute/" + src.name
+			if relative {
+				name = "relative/" + src.name
+			}
+			t.Run(name, func(t *testing.T) {
+				dbPath := src.setup(t)
+				if relative {
+					dir := filepath.Dir(dbPath)
+					t.Chdir(filepath.Dir(dir))
+					dbPath = "./" + filepath.Base(dir) + "/" + filepath.Base(dbPath)
+				}
+
+				var rows int
+				err := OpenWithPolicy(dbPath, func(_ string, err error) (bool, error) {
+					t.Errorf("policy called for a healthy database: %v", err)
+					return false, err
+				}, func() error {
+					db, err := sql.Open("sqlite", dbPath+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
+					if err != nil {
+						return err
+					}
+					defer func() { _ = db.Close() }()
+					return db.QueryRow("SELECT count(*) FROM t").Scan(&rows)
+				})
+
+				if err != nil {
+					t.Fatalf("OpenWithPolicy: %v", err)
+				}
+				if rows != 2 {
+					t.Fatalf("rows = %d, want 2 (the committed row in the -wal was lost)", rows)
+				}
+			})
+		}
+	}
+}
+
+// TestProbeReadOnly_SpecialCharactersInPath pins that the read-only URI
+// escapes the data path: a mis-escaped space, '#', '?' or '%' would make the
+// probe miss a healthy file (startup fails closed) or open a different one.
+func TestProbeReadOnly_SpecialCharactersInPath(t *testing.T) {
+	dirs := []string{"with space", "hash#dir", "pct%41dir", "pct%dir", "ümlaut ✓"}
+	if runtime.GOOS != "windows" {
+		dirs = append(dirs, "q?mark", "amp&mode=rw")
+	}
+
+	for _, d := range dirs {
+		for _, healthy := range []bool{true, false} {
+			name := d + "/corrupt"
+			if healthy {
+				name = d + "/healthy"
+			}
+			t.Run(name, func(t *testing.T) {
+				dir := filepath.Join(t.TempDir(), d)
+				if err := os.Mkdir(dir, 0o755); err != nil {
+					t.Fatalf("mkdir: %v", err)
+				}
+				dbPath := filepath.Join(dir, "users.db")
+				if healthy {
+					// Create through a URI so the setup itself is not
+					// tripped by '?' in the plain path.
+					dsn, err := readOnlyDSN(dbPath)
+					if err != nil {
+						t.Fatalf("readOnlyDSN: %v", err)
+					}
+					db, err := sql.Open("sqlite", strings.Replace(dsn, "mode=ro", "mode=rwc", 1))
+					if err != nil {
+						t.Fatalf("open: %v", err)
+					}
+					if _, err := db.Exec("CREATE TABLE t(x)"); err != nil {
+						t.Fatalf("create: %v", err)
+					}
+					_ = db.Close()
+					if info, err := os.Stat(dbPath); err != nil || info.Size() == 0 {
+						t.Fatalf("setup did not create %q: info=%v err=%v", dbPath, info, err)
+					}
+				} else {
+					writeTestFile(t, dbPath, "this is not a sqlite database, just bytes!!")
+					writeTestFile(t, dbPath+"-wal", "wal bytes")
+				}
+
+				err := probeReadOnly(dbPath)
+
+				if healthy {
+					if err != nil {
+						t.Fatalf("probeReadOnly(%q) on a healthy database: %v", dbPath, err)
+					}
+					return
+				}
+				if !IsSQLiteRecoverableError(err) {
+					t.Fatalf("probeReadOnly(%q) = %v, want a recoverable error", dbPath, err)
+				}
+				err = OpenWithPolicy(dbPath, FailOnCorruption, func() error {
+					t.Error("open ran although the probe found corruption")
+					return nil
+				})
+				var corrupt *CorruptDatabaseError
+				if !errors.As(err, &corrupt) || corrupt.Path != dbPath {
+					t.Fatalf("OpenWithPolicy error = %v, want *CorruptDatabaseError for %q", err, dbPath)
+				}
+				assertFileContent(t, dbPath, "this is not a sqlite database, just bytes!!")
+				assertFileContent(t, dbPath+"-wal", "wal bytes")
+			})
+		}
+	}
 }

@@ -206,3 +206,39 @@ func TestAuthStores_MissingOrEmptyFile_OpensWithoutQuarantine(t *testing.T) {
 		}
 	}
 }
+
+// A healthy users.db in a data dir whose name needs URI escaping must reopen
+// with its users: the read-only probe builds a URI while the store opens a
+// plain path, and a mismatch would fail startup closed on a healthy file.
+func TestNewUserStore_SpecialCharactersInDataDir_KeepsUsers(t *testing.T) {
+	dirs := []string{"with space", "hash#dir", "pct%41dir", "pct%dir", "ümlaut ✓"}
+	for _, d := range dirs {
+		t.Run(d, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), d)
+			if err := os.Mkdir(dir, 0o755); err != nil {
+				t.Fatalf("mkdir: %v", err)
+			}
+			first, err := NewUserStore(dir)
+			if err != nil {
+				t.Fatalf("first NewUserStore: %v", err)
+			}
+			if err := first.CreateUser(&User{ID: "u1", Username: "alice", Email: "alice@example.com", Password: "pw", Role: RoleEditor}); err != nil {
+				t.Fatalf("CreateUser: %v", err)
+			}
+			test_utils.WrapCloseWithErrorCheck(first.Close, t)
+
+			second, err := NewUserStore(dir)
+			if err != nil {
+				t.Fatalf("second NewUserStore on a healthy users.db: %v", err)
+			}
+			defer test_utils.WrapCloseWithErrorCheck(second.Close, t)
+			if _, err := second.GetUserByUsername("alice"); err != nil {
+				t.Fatalf("user lost after reopen: %v", err)
+			}
+			if _, err := os.Stat(filepath.Join(dir, "users.db")); err != nil {
+				t.Fatalf("users.db not at the expected path: %v", err)
+			}
+			test_utils.AssertNoSQLiteQuarantine(t, filepath.Join(dir, "users.db"))
+		})
+	}
+}

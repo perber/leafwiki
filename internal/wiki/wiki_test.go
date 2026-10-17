@@ -626,3 +626,138 @@ func TestWiki_ReloadWithProgress_CanceledContext_FinishesWithErrorAndFailureMetr
 		}
 	}
 }
+
+func newWikiOnDir(dir string) (*Wiki, error) {
+	return NewWiki(&WikiOptions{
+		StorageDir:          dir,
+		AdminPassword:       "adminpassword",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+	})
+}
+
+// seedWikiWithUser boots a wiki on dir, adds the user alice with a favorite
+// and closes it again, as a previous run of the server would. Like
+// cmd/leafwiki, it creates the data dir first.
+func seedWikiWithUser(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("mkdir %q: %v", dir, err)
+	}
+	w, err := newWikiOnDir(dir)
+	if err != nil {
+		t.Fatalf("seed NewWiki: %v", err)
+	}
+	alice, err := w.UserService().CreateUser("alice", "alice@example.com", "alicepassword", "editor")
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	if err := w.Favorites().Add(alice.ID, "page-1"); err != nil {
+		t.Fatalf("Favorites.Add: %v", err)
+	}
+	if _, err := w.auth.Login("alice", "alicepassword"); err != nil {
+		t.Fatalf("Login: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("seed Close: %v", err)
+	}
+}
+
+// A corrupt sessions.db, favorites.db or usersettings.db is quarantined and
+// the wiki still boots with every user (and, for the other stores, their
+// data) intact, with an absolute and the default relative --data-dir
+// (ADR-0013).
+func TestNewWiki_CorruptQuarantinedStore_BootsAndKeepsUsers(t *testing.T) {
+	stores := []struct {
+		filename      string
+		wantFavorites int // favorites alice still has after the restart
+	}{
+		{filename: "sessions.db", wantFavorites: 1},
+		{filename: "favorites.db", wantFavorites: 0},
+		{filename: "usersettings.db", wantFavorites: 1},
+	}
+
+	for _, relative := range []bool{false, true} {
+		for _, s := range stores {
+			name := "absolute/" + s.filename
+			if relative {
+				name = "relative/" + s.filename
+			}
+			t.Run(name, func(t *testing.T) {
+				dir := t.TempDir()
+				if relative {
+					t.Chdir(dir)
+					dir = "./data"
+				}
+				seedWikiWithUser(t, dir)
+				dbPath := filepath.Join(dir, s.filename)
+				files := test_utils.WriteCorruptSQLiteDB(t, dbPath)
+
+				w, err := newWikiOnDir(dir)
+				if err != nil {
+					t.Fatalf("NewWiki with a corrupt %s: %v", s.filename, err)
+				}
+				defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+				alice, err := w.UserService().GetUserByUsername("alice")
+				if err != nil {
+					t.Fatalf("alice lost after the restart: %v", err)
+				}
+				if _, err := w.auth.Login("alice", "alicepassword"); err != nil {
+					t.Fatalf("Login after the restart: %v", err)
+				}
+				favs, err := w.Favorites().ListPageIDsForUser(alice.ID)
+				if err != nil {
+					t.Fatalf("ListPageIDsForUser: %v", err)
+				}
+				if len(favs) != s.wantFavorites {
+					t.Fatalf("favorites = %v, want %d", favs, s.wantFavorites)
+				}
+				if err := w.Favorites().Add(alice.ID, "page-2"); err != nil {
+					t.Fatalf("Favorites.Add after the restart: %v", err)
+				}
+				test_utils.AssertSQLiteQuarantined(t, dbPath, files)
+			})
+		}
+	}
+}
+
+// The default --data-dir is the relative ./data: a corrupt users.db there
+// must stop NewWiki with every byte (and the -wal) in place, and a healthy
+// one must keep its users across restarts (ADR-0013).
+func TestNewWiki_RelativeDataDir_UsersDB(t *testing.T) {
+	t.Run("healthy users.db keeps its users", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		seedWikiWithUser(t, "./data")
+
+		w, err := newWikiOnDir("./data")
+		if err != nil {
+			t.Fatalf("NewWiki: %v", err)
+		}
+		defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+		if _, err := w.UserService().GetUserByUsername("alice"); err != nil {
+			t.Fatalf("alice lost after the restart: %v", err)
+		}
+		test_utils.AssertNoSQLiteQuarantine(t, filepath.Join("data", "users.db"))
+	})
+
+	t.Run("corrupt users.db fails and keeps every byte", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		seedWikiWithUser(t, "./data")
+		files := test_utils.WriteCorruptSQLiteDB(t, filepath.Join("data", "users.db"))
+
+		w, err := newWikiOnDir("./data")
+
+		if err == nil {
+			_ = w.Close()
+			t.Fatal("NewWiki: expected an error for a corrupt users.db, got nil")
+		}
+		var corrupt *sqliteutil.CorruptDatabaseError
+		if !errors.As(err, &corrupt) {
+			t.Fatalf("NewWiki error = %v (%T), want *sqliteutil.CorruptDatabaseError", err, err)
+		}
+		test_utils.AssertFilesUnchanged(t, files)
+		test_utils.AssertNoSQLiteQuarantine(t, filepath.Join("data", "users.db"))
+	})
+}
