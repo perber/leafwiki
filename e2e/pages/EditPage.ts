@@ -113,6 +113,19 @@ export default class EditPage {
     await expect(assets).toHaveCount(existingCount + 1);
   }
 
+  // Drops an in-memory file onto the editor text the way a desktop file
+  // manager does: a native drop event whose DataTransfer carries the file.
+  async dropFileOnEditor(file: { name: string; content: string; type: string }) {
+    const content = this.page.locator('.cm-content');
+    await content.waitFor({ state: 'visible' });
+    const dataTransfer = await this.page.evaluateHandle(({ name, content, type }) => {
+      const dt = new DataTransfer();
+      dt.items.add(new File([content], name, { type }));
+      return dt;
+    }, file);
+    await content.dispatchEvent('drop', { dataTransfer });
+  }
+
   async listAmountOfAssets(): Promise<number> {
     await this.page.locator('.asset-manager__loading').waitFor({ state: 'hidden' });
     const assets = this.page.locator('li[data-testid="asset-item"]');
