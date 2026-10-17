@@ -754,6 +754,57 @@ async function movePageWithRefactorByPath(
   }, input);
 }
 
+// Reads a page through the real API without throwing on non-2xx, so a test can assert
+// the server-side state at a checkpoint and keep it as failure evidence.
+async function readPageByPath(
+  page: import('@playwright/test').Page,
+  path: string,
+): Promise<{ status: number; path: string | null; content: string | null }> {
+  return await page.evaluate(async (targetPath) => {
+    const normalizedPath = targetPath.replace(/^\/+/, '');
+    const response = await fetch(`/api/pages/by-path?path=${encodeURIComponent(normalizedPath)}`, {
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      return { status: response.status, path: null, content: null };
+    }
+
+    const body = (await response.json()) as { path?: string; content?: string };
+    return { status: response.status, path: body.path ?? null, content: body.content ?? null };
+  }, path);
+}
+
+// Holds back the tree response so a test can look at the viewer before the tree store is
+// filled. Only GET <app>/api/tree is gated; everything else, including auth, stays real.
+async function gateTreeResponses(
+  page: import('@playwright/test').Page,
+): Promise<{ release(): void; dispose(): Promise<void> }> {
+  const treePath = toAppPath('/api/tree');
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  const matchesTree = (url: URL) => url.pathname === treePath;
+  await page.route(matchesTree, async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+    await released;
+    await route.continue();
+  });
+
+  return {
+    release,
+    dispose: async () => {
+      release();
+      await page.unroute(matchesTree);
+    },
+  };
+}
+
 async function deletePageByPath(
   page: import('@playwright/test').Page,
   input: { path: string; recursive?: boolean },
@@ -3126,7 +3177,7 @@ Paragraph outside the list.
     await expect(page.locator('.cm-editor')).toBeVisible();
   });
 
-  test('move-page-updates-incoming-links-via-refactor-dialog', async ({ page }) => {
+  test('move-page-updates-incoming-links-via-refactor-api', async ({ page }) => {
     const stamp = Date.now();
     const parentTitle = `incoming-parent-${stamp}`;
     const targetTitle = `incoming-target-${stamp}`;
@@ -3157,6 +3208,10 @@ Paragraph outside the list.
     await editPage.writeContent(`[${targetTitle}](/${parentTitle}/${targetTitle})`);
     await editPage.savePage();
     await editPage.closeEditor();
+
+    const referrerBefore = await readPageByPath(page, referrerTitle);
+    expect(referrerBefore.status).toBe(200);
+    expect(referrerBefore.content).toContain(`[${targetTitle}](/${parentTitle}/${targetTitle})`);
 
     await expect
       .poll(
@@ -3233,15 +3288,88 @@ Paragraph outside the list.
       targetParentPath: '',
       rewriteLinks: true,
     });
-    await page.goto(toAppPath(`/${referrerTitle}`));
-    await expect(page.locator('article').getByRole('link', { name: targetTitle })).toHaveAttribute(
-      'href',
-      toAppPath(`/${targetTitle}`),
-    );
 
-    await page.locator('article').getByRole('link', { name: targetTitle }).click();
-    await expect.poll(() => new URL(page.url()).pathname).toBe(`/${targetTitle}`);
-    await expect(page.locator('article > h1')).toHaveText(targetTitle);
+    const movedTarget = await readPageByPath(page, targetTitle);
+    expect(movedTarget.status).toBe(200);
+    expect(movedTarget.path).toBe(targetTitle);
+    const referrerAfter = await readPageByPath(page, referrerTitle);
+    expect(referrerAfter.status).toBe(200);
+    expect(referrerAfter.content).toContain(`](/${targetTitle})`);
+    expect(referrerAfter.content).not.toContain(`/${parentTitle}/${targetTitle}`);
+
+    try {
+      await page.goto(toAppPath(`/${referrerTitle}`));
+      await expect(
+        page.locator('article').getByRole('link', { name: targetTitle }),
+      ).toHaveAttribute('href', toAppPath(`/${targetTitle}`));
+
+      await page.locator('article').getByRole('link', { name: targetTitle }).click();
+      await expect.poll(() => new URL(page.url()).pathname).toBe(`/${targetTitle}`);
+      await expect(page.locator('article > h1')).toHaveText(targetTitle);
+    } catch (e) {
+      // Test-owned values only: no cookies, headers or credentials
+      const articleHtml = await page
+        .locator('article')
+        .first()
+        .innerHTML({ timeout: 2000 })
+        .catch(() => null);
+      await test.info().attach('incoming-link-evidence.json', {
+        contentType: 'application/json',
+        body: JSON.stringify(
+          {
+            parentTitle,
+            targetTitle,
+            referrerTitle,
+            referrerBefore,
+            movedTarget,
+            referrerAfter,
+            articleHtml,
+            pagePathname: new URL(page.url()).pathname,
+          },
+          null,
+          2,
+        ),
+      });
+      throw e;
+    }
+  });
+
+  test('incoming-link-recovers-after-late-tree-response', async ({ page }) => {
+    const stamp = Date.now();
+    const targetSlug = `late-tree-target-${stamp}`;
+    const targetTitle = targetSlug;
+    const referrerSlug = `late-tree-referrer-${stamp}`;
+
+    await createPageWithContent(page, {
+      title: targetTitle,
+      slug: targetSlug,
+      content: `# ${targetTitle}`,
+    });
+    await createPageWithContent(page, {
+      title: referrerSlug,
+      slug: referrerSlug,
+      content: `[${targetTitle}](/${targetSlug})`,
+    });
+
+    const gate = await gateTreeResponses(page);
+    try {
+      await page.goto(toAppPath(`/${referrerSlug}`));
+      const article = page.locator('article');
+      await expect(article).toContainText(targetTitle);
+      // Without the tree the link cannot be resolved yet, so it must not be a link
+      await expect(article.getByRole('link', { name: targetTitle })).toHaveCount(0);
+      const pathnameBefore = new URL(page.url()).pathname;
+
+      gate.release();
+
+      await expect(article.getByRole('link', { name: targetTitle })).toHaveAttribute(
+        'href',
+        toAppPath(`/${targetSlug}`),
+      );
+      expect(new URL(page.url()).pathname).toBe(pathnameBefore);
+    } finally {
+      await gate.dispose();
+    }
   });
 
   test('copy-page', async ({ page }) => {

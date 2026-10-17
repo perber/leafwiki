@@ -33,6 +33,9 @@ Runs on `http://localhost:5173` — open this URL, not :8080, during development
 
 - Run both in the background (e.g. two `run_in_background` Bash calls) and poll
   `http://localhost:5173` / `http://localhost:8080` readiness before navigating.
+- Click-throughs and screenshots belong in a subagent that reports back a short text verdict.
+  Every image read in the main session stays in its context and is paid for again on every
+  later turn.
 - Data is stored on disk under the backend's working directory (`cmd/leafwiki`) by default —
   starting fresh creates an empty wiki with just the root page.
 - Before committing, run `npm run format` in `ui/leafwiki-ui` (and in `e2e/` if e2e tests changed).

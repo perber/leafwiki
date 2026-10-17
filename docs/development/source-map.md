@@ -42,10 +42,14 @@ filesystem-canonical (`tree`, `revision`) and SQLite-derived (`links`, `tags`, `
 ## `internal/core/*` — filesystem/DB primitives (no HTTP, no use-case orchestration)
 
 - **`internal/core/tree`** — the canonical in-memory page tree plus its on-disk representation
-  (markdown files + frontmatter under `root/`). `tree_service.go` (`TreeService`, guarded by a
-  single `sync.RWMutex`) is the one component allowed to mutate the tree: create/move/delete/copy
-  pages and sections. `node_store.go` reconstructs the tree from disk (walks `root/`, reads
-  `leafwiki_id` frontmatter). `schema.go` tracks an on-disk schema version (`CurrentSchemaVersion`,
+  (markdown files + frontmatter under `root/`). `TreeService` (guarded by a single `sync.RWMutex`)
+  is the one component allowed to mutate the tree: create/move/delete/copy pages and sections.
+  `tree_service.go` holds the type, its lifecycle and the lock helpers; mutations live in
+  `tree_mutations.go`, reads in `tree_reads.go`, the lookup indexes in `tree_index.go`.
+  `node_store.go` holds the `NodeStore` type, page reads and the path/metadata helpers;
+  `node_store_reconstruct.go` rebuilds the tree from disk (walks `root/`, reads `leafwiki_id`
+  frontmatter); `node_store_write.go` holds the file write paths.
+  `schema.go` tracks an on-disk schema version (`CurrentSchemaVersion`,
   currently 5) used to gate one-time migrations. `slug_service.go` handles slug generation/collision
   suggestions. `migration_adapter.go` bridges to `internal/core/treemigration` for legacy-format
   upgrades.
@@ -289,7 +293,10 @@ light/dark mode application).
 - **`features/branding`** — branding settings form (`BrandingSettings.tsx`).
 - **`features/designtoggle`** — light/dark mode toggle (`DesignToggle.tsx`, `designmode.ts`).
 - **`features/editor`** — the markdown editor, the single biggest feature folder:
-  `MarkdownEditor.tsx`/`MarkdownCodeEditor.tsx` (CodeMirror-based), `MarkdownToolbar.tsx`,
+  `MarkdownEditor.tsx`/`MarkdownCodeEditor.tsx` (CodeMirror-based; `MarkdownEditor` composes
+  `useEditorFileUpload.ts` for paste/drop uploads, `useSplitPaneResize.ts` for the persisted
+  editor/preview split and `usePreviewScrollSync.ts` for cursor-to-preview scrolling),
+  `MarkdownToolbar.tsx`,
   `pageEditorStore.ts` (feature-local Zustand store owning draft content/dirty state),
   `useAutoSave.ts` (drives the fixed-window revision coalescing from
   [ADR-0003: Revision Coalescing (Fixed Window)](./adr/0003-revision-coalescing-fixed-window.md)), `useNavigationGuard.tsx`/
@@ -299,9 +306,12 @@ light/dark mode application).
 - **`features/favorites`** — per-user favorite star toggle and sidebar list
   (`FavoriteToggleButton.tsx`, `FavoritesSection.tsx`, `FavoriteItem.tsx`).
 - **`features/history`** — page revision history viewer + restore dialog
-  (`PageHistoryContent.tsx`, `RestoreRevisionDialog.tsx`, `pageHistory.ts`).
+  (`PageHistoryContent.tsx`, `RevisionDetailPanels.tsx` for the changes/diff, preview,
+  raw-text and assets panels, `lineDiff.ts` for the line diff, `RestoreRevisionDialog.tsx`,
+  `pageHistory.ts`).
 - **`features/imagepreview`** — click-to-zoom image preview dialog for content images.
-- **`features/importer`** — bulk-import UI (`Importer.tsx`) driving `internal/wiki/importer`'s
+- **`features/importer`** — bulk-import UI (`Importer.tsx`, view-state derivation in
+  `importerState.ts`) driving `internal/wiki/importer`'s
   plan create/execute flow.
 - **`features/links`** — backlink/outgoing-link status panel (`LinkInfo.tsx`,
   `linkStatusStore.ts`).
@@ -312,7 +322,9 @@ light/dark mode application).
 - **`features/page-switcher`** — Cmd/Ctrl-K quick page switcher
   (`PageQuickSwitcherDialog.tsx`, `pageQuickSwitcher.ts`).
 - **`features/preview`** — markdown-to-HTML rendering pipeline used by both the editor's live
-  preview and the read-only viewer: `MarkdownPreview.tsx`, custom renderers
+  preview and the read-only viewer: `MarkdownPreview.tsx` (sanitize schema in
+  `previewSanitizeSchema.ts`, error boundary in `MarkdownPreviewErrorBoundary.tsx`, pure
+  renderer helpers in `previewHelpers.ts`), custom renderers
   (`MarkdownCodeBlock.tsx`, `MarkdownImage.tsx`, `MarkdownLink.tsx`, `MermaidBlock.tsx`,
   `Headline.tsx`, `MarkdownPdfEmbed.tsx`, `MarkdownInlineCode.tsx`), rehype/remark plugins
   (`rehypeLineNumber.ts`, `rehypeCodeFenceLineNumbers.ts`, `rehypeWhitelistStyles.ts`,
@@ -320,6 +332,12 @@ light/dark mode application).
   `normalizeMarkdownListIndentation.ts`), syntax highlighting (`syntaxHighlightLanguages.ts`,
   `splitHighlightedLines.ts`), and the table of contents (`extractTocEntries.ts`,
   `TocSidePanel.tsx`, `TocDropdownButton.tsx`, `useTocScrollSpy.ts`, `tocVisibility.ts`).
+  Shared Markdown typography lives in `src/index.css`: screen prose is limited to 680px,
+  with 16px text on phones and 17px from the `sm` breakpoint. Media, code and table
+  blocks retain the available surface width in editor/history previews. The viewer centers
+  all content in one 680px reading column, including media, code and tables, aligned with
+  breadcrumbs, metadata and backlinks. Wrapped breadcrumbs grow the header, and
+  expanded metadata values wrap within the reading column. Nested indentation and print layout stay separate.
 - **`features/progressbar`** — top-of-page loading progress bar (`progressbarStore.ts`, driven
   today by manual `setLoading` calls; a planned TanStack Query migration would drive this from
   `useIsFetching` instead — not yet implemented).

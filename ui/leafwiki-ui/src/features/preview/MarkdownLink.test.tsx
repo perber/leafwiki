@@ -1,10 +1,13 @@
 import type { PageNode } from '@/lib/api/pages'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
+import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
+import { useSessionStore } from '@/stores/session'
 import { useTreeStore } from '@/stores/tree'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MarkdownLink } from './MarkdownLink'
 
 vi.mock('@/lib/api/pages', async () => {
@@ -228,5 +231,120 @@ describe('MarkdownLink web URLs', () => {
     expect(link).toHaveAttribute('href', '/assets/file.pdf')
     expect(link).toHaveAttribute('target', '_blank')
     expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+})
+
+describe('MarkdownLink tree updates', () => {
+  const target = makePage('t', 'target', null)
+
+  beforeEach(() => {
+    useDialogsStore.setState({ dialogType: null, dialogProps: null })
+    useTreeStore.setState({ byId: {}, byPath: {} })
+  })
+
+  it('resolves a link when its target appears after render', () => {
+    render(
+      <MemoryRouter>
+        <MarkdownLink href="/target">Target</MarkdownLink>
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('button', { name: 'Target' })).toBeInTheDocument()
+    expect(screen.queryByRole('link')).toBeNull()
+
+    act(() =>
+      useTreeStore.setState({
+        byId: { t: target },
+        byPath: { target },
+      }),
+    )
+
+    expect(screen.getByRole('link', { name: 'Target' })).toHaveAttribute(
+      'href',
+      '/target',
+    )
+  })
+
+  it('resolves a relative link when its target appears after render', () => {
+    const child = makePage('c', 'docs/current/child', null)
+    render(
+      <MemoryRouter>
+        <MarkdownLink href="child" path="docs/current">
+          Child
+        </MarkdownLink>
+      </MemoryRouter>,
+    )
+    expect(screen.queryByRole('link')).toBeNull()
+
+    act(() =>
+      useTreeStore.setState({
+        byId: { c: child },
+        byPath: { 'docs/current/child': child },
+      }),
+    )
+
+    expect(screen.getByRole('link', { name: 'Child' })).toHaveAttribute(
+      'href',
+      '/docs/current/child',
+    )
+  })
+
+  it('stops navigating when the target disappears after render (editor)', () => {
+    useTreeStore.setState({ byId: { t: target }, byPath: { target } })
+    render(
+      <MemoryRouter>
+        <MarkdownLink href="/target">Target</MarkdownLink>
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('link', { name: 'Target' })).toBeInTheDocument()
+
+    act(() => useTreeStore.setState({ byId: {}, byPath: {} }))
+
+    expect(screen.getByRole('button', { name: 'Target' })).toBeInTheDocument()
+    expect(screen.queryByRole('link')).toBeNull()
+  })
+
+  describe('read-only', () => {
+    const config = useConfigStore.getState()
+    const session = useSessionStore.getState()
+
+    beforeEach(() => {
+      useConfigStore.setState({ publicAccess: true, authDisabled: false })
+      useSessionStore.setState({ user: null })
+      // BrokenLinkTooltip renders TooltipWrapper, which reads matchMedia.
+      window.matchMedia = vi.fn().mockImplementation(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }))
+    })
+
+    // Runs before Testing Library's cleanup, so the component is still mounted.
+    afterEach(() => {
+      act(() => {
+        useConfigStore.setState({
+          publicAccess: config.publicAccess,
+          authDisabled: config.authDisabled,
+        })
+        useSessionStore.setState({ user: session.user })
+      })
+    })
+
+    it('shows broken text when the target disappears after render (read-only)', () => {
+      useTreeStore.setState({ byId: { t: target }, byPath: { target } })
+      render(
+        <MemoryRouter>
+          <TooltipProvider>
+            <MarkdownLink href="/target">Target</MarkdownLink>
+          </TooltipProvider>
+        </MemoryRouter>,
+      )
+      expect(screen.getByRole('link', { name: 'Target' })).toBeInTheDocument()
+
+      act(() => useTreeStore.setState({ byId: {}, byPath: {} }))
+
+      expect(screen.queryByRole('link')).toBeNull()
+      expect(screen.queryByRole('button')).toBeNull()
+      expect(screen.getByText('Target')).toHaveClass('text-error')
+    })
   })
 })

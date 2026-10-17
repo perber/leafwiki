@@ -1,5 +1,5 @@
 import test, { expect } from '@playwright/test';
-import { createPage, getCsrfScript } from '../helpers/api';
+import { browserFetch, createPage } from '../helpers/api';
 import AccountSettingsPage from '../pages/AccountSettingsPage';
 import LoginPage from '../pages/LoginPage';
 import ViewPage from '../pages/ViewPage';
@@ -12,17 +12,10 @@ const password = process.env.E2E_ADMIN_PASSWORD || 'admin';
 // other spec file sharing this admin account. Always restore the default
 // afterward, the same way totp.spec.ts resets TOTP in its afterEach.
 test.afterEach(async ({ page }) => {
-  await page
-    .evaluate(async (csrfScript) => {
-      const csrfToken = new Function(csrfScript)() as string;
-      await fetch('/api/user-settings', {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify({ autoSave: true }),
-      });
-    }, getCsrfScript())
-    .catch(() => {});
+  await browserFetch(page, '/api/user-settings', {
+    method: 'PUT',
+    body: { autoSave: true },
+  }).catch(() => {});
 });
 
 test.describe('Account settings — preferences', () => {

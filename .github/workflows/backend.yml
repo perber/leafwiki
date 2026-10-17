@@ -83,6 +83,15 @@ jobs:
             docs/api/swagger.yaml
           if-no-files-found: error
 
+  test-install-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Test checksum verification in install.sh / update.sh
+        run: ./scripts/verify-checksum.test.sh
+
   test-go:
     runs-on: ubuntu-latest
     steps:

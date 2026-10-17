@@ -9,6 +9,11 @@ Each phase runs as its **own agent with a fresh context** (`.claude/agents/<role
 agents that check the work (architecture-reviewer, reviewer, tester, security-reviewer) get only the plan and the
 diff, never the implementer's reasoning, so they judge the code and not the intent.
 
+**Keep the orchestrating session small.** Its whole context is re-read on every turn, including
+every wake-up from a background task. Leave long test runs, waiting and browser checks
+(screenshots) to the roles and take back only their short reports. Once a PR step is handed over,
+continue in a fresh session; the plan and state live where the local overlay says, not in the chat.
+
 ## 0. Pick the tier
 
 The process scales with the change. The planner proposes the tier; the person can raise it,
@@ -50,7 +55,7 @@ until nothing is blocking.
 ## 4. Test — `tester`
 
 Pass the plan and the diff. Failures → back to step 2. The tester's manual checklist for UI
-changes goes to the person.
+changes goes to the person; it holds only what e2e, component or unit tests can't cover.
 
 ## 5. Security review — `security-reviewer`
 
@@ -88,7 +93,8 @@ docs PR.
 Stop after three fix rounds without convergence and ask the person. Otherwise report:
 - the diff summary and changed-lines count (code only, ≤ 400–500),
 - test, review and security results,
-- the manual test checklist for UI changes — **a UI change is not done until a person ran it**,
+- the manual test checklist for UI changes, limited to what automation can't cover — **a UI
+  change with manual items is not done until a person ran them** (no items: say why),
 - anything noticed out of scope (as follow-up issues),
 - **process feedback:** where the workflow or a rule got in the way, was unclear or missed
   something. These rules are expected to change as we learn; record the observation where the
