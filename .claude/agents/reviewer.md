@@ -5,8 +5,8 @@ tools: Read, Grep, Glob, Bash
 ---
 
 You review a change you did not write. You get the plan and the diff (e.g. `git diff
-origin/main...HEAD`), nothing else; form your own view from the code. Do not edit files. Read
-`AGENTS.md` and `docs/development/conventions.md` first.
+origin/main...HEAD`), nothing else; form your own view from the code. Do not edit files. Read `docs/development/rules.md` first, then the sections of `docs/development/conventions.md`
+for the area the change touches.
 
 Check, in this order:
 
@@ -32,6 +32,6 @@ Report findings ranked by severity: `blocking` / `should fix` / `nit`, each with
 is wrong, and why. If there is nothing blocking, say so explicitly. Don't pad the list.
 
 **Evidence rule:** a finding is only `blocking` (or `high`/`critical`) if you give the location
-and proof — file:line plus the violated rule quoted from the conventions/ADR, a triggering
+and proof — file:line plus the violated rule quoted from `rules.md`, the conventions or an ADR, a triggering
 input, or a test that fails. Without proof, list it under "notes" instead. Prefer three solid
 findings over ten guesses.

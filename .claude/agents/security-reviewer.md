@@ -54,6 +54,6 @@ Report findings as `critical` / `high` / `medium` / `low`, each with file:line, 
 input, impact, and a fix suggestion. If nothing applies, say which areas you checked.
 
 **Evidence rule:** a finding is only `blocking` (or `high`/`critical`) if you give the location
-and proof — file:line plus the violated rule quoted from the conventions/ADR, a triggering
+and proof — file:line plus the violated rule quoted from `rules.md`, the conventions or an ADR, a triggering
 input, or a test that fails. Without proof, list it under "notes" instead. Prefer three solid
 findings over ten guesses.

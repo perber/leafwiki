@@ -12,15 +12,14 @@ Fixes #
 <!-- Automated tests added/changed (unit, component, e2e). Prefer automated tests for behaviour;
 list here only what you checked by hand because it can't be automated (visual look, light/dark,
 mobile width, real-browser specifics) and why. Extra manual testing is always welcome.
-For UI changes a screenshot or short recording is welcome, but not required. -->
+For UI changes a screenshot or short recording speeds up review, but is not required. -->
 
 ## Checklist
 
 - [ ] I discussed the approach on the linked issue before starting (or this is a trivial fix: typo, docs, obvious one-liner)
 - [ ] This PR is focused on a single change
-- [ ] New behaviour plugs into an extension point; no new `if feature` branches in shared code ([conventions](https://github.com/perber/leafwiki/blob/main/docs/development/conventions.md#extensibility-strict))
-- [ ] I ran `npm run format` in `ui/leafwiki-ui` (and in `e2e` if e2e tests changed)
+- [ ] New behaviour plugs into an extension point; no new `if feature` branches in shared code ([rule 1](https://github.com/perber/leafwiki/blob/main/docs/development/rules.md#architecture))
 - [ ] I updated documentation if needed
-- [ ] For UI changes: behaviour is covered by automated tests where possible (e2e, component or unit)
+- [ ] For UI changes: behaviour is covered by automated tests where possible ([rule 11](https://github.com/perber/leafwiki/blob/main/docs/development/rules.md#tests))
 - [ ] For UI changes: I checked by hand what tests can't cover (look in light/dark mode, mobile width where relevant)
 - [ ] AI tools were used for this PR (name them: ___ ). I have reviewed and understand every line

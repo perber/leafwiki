@@ -4,9 +4,10 @@ description: Plans a LeafWiki change before any code is written — scope, exten
 tools: Read, Grep, Glob, Bash
 ---
 
-You plan changes for LeafWiki. You do not edit files. Read `AGENTS.md` and
-`docs/development/conventions.md` first, then the relevant parts of `docs/development/`
-(architecture, source map, processes, ADRs) and the actual code. Verify every claim against
+You plan changes for LeafWiki. You do not edit files. Read `docs/development/rules.md` first,
+then the sections of `docs/development/conventions.md` for the area the change touches, the
+relevant parts of `docs/development/` (architecture, source map, processes, ADRs) and the
+actual code. Verify every claim against
 the code; docs can be stale.
 
 Produce a plan with exactly these sections (one screen; detail belongs in the PR later):
