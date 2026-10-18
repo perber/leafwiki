@@ -213,3 +213,37 @@ func TestForcePush_Diverged_NextCycleIsClean(t *testing.T) {
 		t.Errorf("remote head = %s, want local head %s", got, local.Hash)
 	}
 }
+
+// TestForcePush_RemoteMovedAfterCompare_Refused checks the lease: a commit
+// pushed to the remote between ForcePush's comparison and its push must not be
+// overwritten unseen.
+func TestForcePush_RemoteMovedAfterCompare_Refused(t *testing.T) {
+	bareDir := initBareRemote(t)
+	repo, rootDir := newRepoWithRemote(t, bareDir)
+
+	commitToRemote(t, bareDir, "root/remote-only.md", "from remote\n")
+	commitDirectlyOnRepo(t, repo, rootDir, "local-only.md", "local only\n")
+	if err := repo.RunBackup(); err == nil {
+		t.Fatal("expected RunBackup to fail on diverged history")
+	}
+
+	repo.beforeForcePush = func() {
+		commitToRemote(t, bareDir, "root/late.md", "pushed after the comparison\n")
+	}
+	err := repo.ForcePush()
+	if !errors.Is(err, ErrForcePushRemoteAhead) {
+		t.Fatalf("ForcePush error = %v, want ErrForcePushRemoteAhead", err)
+	}
+	if _, fileErr := remoteHeadCommit(t, bareDir).File("root/late.md"); fileErr != nil {
+		t.Errorf("remote lost the late commit: %v", fileErr)
+	}
+	if kind := repo.Status().ConflictKind; kind != ConflictKindDiverged {
+		t.Errorf("ConflictKind = %q, want the divergence to stay visible", kind)
+	}
+
+	// Without a concurrent push, the next force push goes through.
+	repo.beforeForcePush = nil
+	if err := repo.ForcePush(); err != nil {
+		t.Fatalf("second ForcePush failed: %v", err)
+	}
+}

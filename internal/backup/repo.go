@@ -53,6 +53,11 @@ type Repository struct {
 	// sets it.
 	afterListBeforeFetch func()
 
+	// beforeForcePush, when set, runs in ForcePush after the remote comparison
+	// and before the push. Tests use it to move the remote branch in that
+	// window; production code never sets it.
+	beforeForcePush func()
+
 	// liveFSCaseInsensitive records whether repoDir's filesystem folds case
 	// (the default on Windows and macOS), probed once at Init. materialize
 	// uses it to avoid treating two differently-cased paths that the OS
@@ -561,7 +566,7 @@ func (r *Repository) RunBackup() error {
 			localHead, err := r.repo.Head()
 			if err == nil && localHead.Hash() != r.lastPushedHash {
 				slog.Debug("RunBackup: pushing unpushed local commit", "commit", localHead.Hash().String())
-				if err := r.push(false); err != nil {
+				if err := r.push(false, plumbing.ZeroHash); err != nil {
 					r.status.SetError(err.Error())
 					return fmt.Errorf("push failed: %w", err)
 				}
@@ -596,7 +601,7 @@ func (r *Repository) RunBackup() error {
 
 	if r.cfg.RemoteURL != "" {
 		slog.Debug("RunBackup: pushing to remote", "remote", r.remoteForLog(), "branch", r.cfg.Branch, "commit", commitHash.String())
-		if err := r.push(false); err != nil {
+		if err := r.push(false, plumbing.ZeroHash); err != nil {
 			slog.Debug("RunBackup: push failed", "error", err)
 			r.status.SetError(err.Error())
 			return fmt.Errorf("push failed: %w", err)
@@ -930,7 +935,9 @@ func fileConflictMessage(paths []string) string {
 
 // push pushes the current local HEAD to the configured remote.
 // If force is true, a non-fast-forward push is allowed (overwrites remote history).
-func (r *Repository) push(force bool) error {
+// A non-zero lease limits a force push to a remote branch that still points at
+// that commit; if the remote moved, push returns ErrForcePushRemoteAhead.
+func (r *Repository) push(force bool, lease plumbing.Hash) error {
 	slog.Debug("push: starting", "force", force, "remote", r.remoteForLog(), "branch", r.cfg.Branch)
 
 	auth, err := r.buildAuth()
@@ -971,6 +978,22 @@ func (r *Repository) push(force bool) error {
 		slog.Warn("push: could not remove stale remote tracking ref", "ref", trackingRef.String(), "error", rmErr)
 	}
 
+	// go-git checks a lease against the tracking ref named after the local
+	// branch (refs/remotes/origin/<local branch>) and fails if it is missing,
+	// so point that ref at the leased commit. It is the commit just fetched,
+	// so it cannot cause the stale short-circuit described above.
+	var forceWithLease *gogit.ForceWithLease
+	if force && !lease.IsZero() {
+		leaseRef := plumbing.NewRemoteReferenceName("origin", localHead.Name().Short())
+		if err := r.repo.Storer.SetReference(plumbing.NewHashReference(leaseRef, lease)); err != nil {
+			return fmt.Errorf("failed to record the force push lease: %w", err)
+		}
+		if leaseRef != trackingRef {
+			defer func() { _ = r.repo.Storer.RemoveReference(leaseRef) }()
+		}
+		forceWithLease = &gogit.ForceWithLease{RefName: plumbing.NewBranchReferenceName(r.cfg.Branch), Hash: lease}
+	}
+
 	// Use the resolved branch ref explicitly rather than HEAD.
 	// Symbolic HEAD in a force refspec can confuse go-git when the local branch
 	// name differs from the configured remote branch (e.g. local=master, remote=main).
@@ -985,9 +1008,10 @@ func (r *Repository) push(force bool) error {
 	pushCtx, pushCancel := context.WithTimeout(context.Background(), networkTimeout)
 	defer pushCancel()
 	err = remote.PushContext(pushCtx, &gogit.PushOptions{
-		Auth:     auth,
-		RefSpecs: []config.RefSpec{refSpec},
-		Force:    force,
+		Auth:           auth,
+		RefSpecs:       []config.RefSpec{refSpec},
+		Force:          force,
+		ForceWithLease: forceWithLease,
 	})
 	err = redactCredentials(err, r.cfg)
 	if err != nil {
@@ -995,6 +1019,15 @@ func (r *Repository) push(force bool) error {
 			slog.Debug("push: remote already up-to-date")
 			r.lastPushedHash = localHead.Hash()
 			return nil
+		}
+		// go-git reports a broken lease only as a plain error, so check the
+		// remote tip directly.
+		if forceWithLease != nil {
+			if current, listErr := r.listRemoteBranch(remote, auth); listErr == nil && current != lease {
+				slog.Warn("push: force push refused, the remote branch moved since it was compared",
+					"remote", r.remoteForLog(), "branch", r.cfg.Branch, "expected", lease.String(), "current", current.String())
+				return ErrForcePushRemoteAhead
+			}
 		}
 		slog.Error("git push failed", "error", err, "remote", r.remoteForLog(), "branch", r.cfg.Branch, "refSpec", string(refSpec))
 		return fmt.Errorf("failed to push: %w", err)
@@ -1074,7 +1107,19 @@ func (r *Repository) ForcePush() error {
 		return ErrForcePushRemoteAhead
 	}
 
-	if err := r.push(true); err != nil {
+	// Lease the push on the remote tip just compared, so a commit pushed to
+	// the remote in the meantime is not overwritten unseen.
+	var lease plumbing.Hash
+	if cmp.remote != nil {
+		lease = cmp.remote.Hash
+	}
+	if r.beforeForcePush != nil {
+		r.beforeForcePush()
+	}
+	if err := r.push(true, lease); err != nil {
+		if errors.Is(err, ErrForcePushRemoteAhead) {
+			return err
+		}
 		r.status.SetError(fmt.Sprintf("force push failed: %v", err))
 		return fmt.Errorf("force push failed: %w", err)
 	}

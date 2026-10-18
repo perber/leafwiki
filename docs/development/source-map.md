@@ -165,7 +165,11 @@ resync-derived state.
   (a remote change hits a locally changed file; nothing is applied, local stays behind the
   remote, and `ForcePush` refuses with `ErrForcePushRemoteAhead` → 409
   `backup_force_push_conflict`, because overwriting would drop the remote commits).
-  `compareWithRemote` decides the relation for both the pull and `ForcePush`. Documented exception to the `*sharederrors.LocalizedError` convention (uses plain
+  `compareWithRemote` decides the relation for both the pull and `ForcePush`; `ForcePush` leases
+  its push on the remote tip it compared, so a commit pushed in between is not overwritten. Don't
+  move the backup branch ref by hand to clear a conflict: a local branch behind the remote is
+  exactly the state `ForcePush` refuses. `redact.go` masks remote credentials in transport
+  errors before they reach logs or the status. Documented exception to the `*sharederrors.LocalizedError` convention (uses plain
   `errors`/`fmt.Errorf`) — see `AGENTS.md`.
 - **`internal/branding`** — custom logo/favicon/site-name: `branding_service.go`,
   `branding_store.go`, `models.go`, `utils.go`.
