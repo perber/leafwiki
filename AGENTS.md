@@ -55,7 +55,7 @@ golangci-lint, Prettier); a red check is a real finding.
 
 Changes run through independent roles, scaled by tier (details in the `develop` skill):
 **trivial** (typo, rename, docs) → implement + CI; **normal** (change inside one slice) →
-implement + architecture-reviewer + reviewer + tester; **feature** (new feature, extension
+implement + tester + architecture-reviewer + reviewer; **feature** (new feature, extension
 point, API or format change) → all roles with a plan gate; **+ security** for anything touching
 rendering, uploads, served files, auth, routes or paths.
 
