@@ -60,12 +60,16 @@ Contract (doc comment on `CorruptionPolicy`, enforced by a table test):
   connection to a database whose header SQLite cannot read discards the `-wal`, even one that
   holds committed transactions, so without the probe the sidecar would be gone before any policy
   could keep it. A broken header that the WAL can still repair passes the probe and is left to
-  SQLite. Missing and empty files are valid new databases and are not probed. The probe resolves
+  SQLite. Missing and empty files are valid new databases and are not probed, except an empty
+  file next to a non-empty `-wal` or `-journal`: such a sidecar can only belong to a database
+  that held data, so the probe reports it as a recoverable error and the policy decides. The probe resolves
   the path to an absolute `file:` URI (the default `--data-dir` is the relative `./data`) and
   strips a Windows `\\?\` prefix. It fails closed: if it cannot read an existing, non-empty file
   for a non-recoverable reason, `OpenWithPolicy` returns that error and `open` never runs. Only
   `SQLITE_READONLY_*` (a hot journal or a WAL that needs recovery) lets `open` run, because only
-  a read-write connection can do that recovery. The probe only catches corruption in the header
+  a read-write connection can do that recovery. Failing closed applies to every store, derived
+  ones included: a transient error such as `SQLITE_BUSY` during the probe stops startup instead
+  of rebuilding the index. The probe only catches corruption in the header
   or the schema; corruption deeper in the file is found by `open`, after a read-write connection
   was made.
 - A nil policy panics at the start of `OpenWithPolicy`, so any constructor test catches a store
@@ -85,7 +89,7 @@ Contract (doc comment on `CorruptionPolicy`, enforced by a table test):
 | Store | Policy | On a recoverable error |
 |---|---|---|
 | `links`, `tags`, `properties`, `search` | `RebuildOnCorruption` | delete db + sidecars, retry, log one `Warn` with `path`, `sqliteCode`, `error` |
-| `users.db` | `FailOnCorruption` | touch nothing; return `*CorruptDatabaseError{Path, Err}`; startup fails |
+| `users.db` | `FailOnCorruption` | touch nothing (the probe may leave a `-shm`, see Consequences); return `*CorruptDatabaseError{Path, Err}`; startup fails |
 | `sessions.db`, `email_tokens.db`, `favorites.db`, `usersettings.db` | `QuarantineOnCorruption` | rename db and every existing sidecar to `<name>.corrupt-<UTC timestamp>` (sidecars as `<name>.corrupt-<UTC timestamp>-wal` etc.), retry with an empty db, log one `Error` with `path`, `quarantinedPath`, `sqliteCode`, `error`; if a rename fails, move the renamed files back and return `*CorruptDatabaseError`; files that cannot be moved back are listed in its `Stranded` field and in the operator message |
 | `api_keys.db` | none: `NewAPIKeyStore` does not use the seam | any open error, corruption included, fails startup and touches nothing |
 
