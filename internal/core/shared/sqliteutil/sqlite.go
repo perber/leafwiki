@@ -20,6 +20,9 @@ import (
 // Transient errors (SQLITE_BUSY, SQLITE_LOCKED) and resource errors
 // (SQLITE_IOERR_NOMEM) are not considered recoverable.
 func IsSQLiteRecoverableError(err error) bool {
+	if errors.Is(err, errEmptyWithSidecar) {
+		return true
+	}
 	var e *sqlite.Error
 	if !errors.As(err, &e) {
 		return false
@@ -135,9 +138,17 @@ func OpenWithPolicy(dbPath string, policy CorruptionPolicy, open func() error) e
 	return open()
 }
 
+// errEmptyWithSidecar marks a 0-byte database next to a non-empty -wal or
+// -journal. The sidecar can only belong to a database that held data, so the
+// main file was truncated or replaced; a read-write open would treat it as a
+// new database and drop the sidecar. It counts as recoverable, so the store's
+// policy decides what to keep.
+var errEmptyWithSidecar = errors.New("database file is empty but its -wal or -journal is not")
+
 // probeReadOnly opens an existing, non-empty database read-only, reads its
 // schema and closes it again, returning the error SQLite reports. A missing
-// or empty file is a valid new database and is not probed.
+// file is a valid new database and is not probed; so is an empty one, unless
+// a non-empty -wal or -journal sits next to it (errEmptyWithSidecar).
 func probeReadOnly(dbPath string) error {
 	info, err := os.Stat(dbPath)
 	if os.IsNotExist(err) {
@@ -147,6 +158,11 @@ func probeReadOnly(dbPath string) error {
 		return err
 	}
 	if info.Size() == 0 {
+		for _, sidecar := range []string{dbPath + "-wal", dbPath + "-journal"} {
+			if sideInfo, statErr := os.Stat(sidecar); statErr == nil && sideInfo.Mode().IsRegular() && sideInfo.Size() > 0 {
+				return fmt.Errorf("%s: %w", dbPath, errEmptyWithSidecar)
+			}
+		}
 		return nil
 	}
 	dsn, err := readOnlyDSN(dbPath)

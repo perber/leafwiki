@@ -291,11 +291,11 @@ func TestOpenWithPolicy_RebuildOnCorruption(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dbPath := filepath.Join(t.TempDir(), "corrupt.db")
 			paths := sqliteFilePaths(dbPath)
-			// An empty main file is a valid database, so the read-only probe
-			// passes and the scripted open results drive the policy.
-			writeTestFile(t, dbPath, "")
-			for _, path := range paths[1:] {
-				writeTestFile(t, path, "x")
+			// An empty main file with empty sidecars is a valid database, so
+			// the read-only probe passes and the scripted open results drive
+			// the policy.
+			for _, path := range paths {
+				writeTestFile(t, path, "")
 			}
 
 			calls := 0
@@ -552,6 +552,23 @@ func TestProbeReadOnly(t *testing.T) {
 		{name: "not a database", setup: func(t *testing.T, path string) {
 			writeTestFile(t, path, "this is not a sqlite database, just bytes!!")
 		}, wantRecoverable: true},
+		{name: "0-byte file with empty sidecars", setup: func(t *testing.T, path string) {
+			for _, p := range sqliteFilePaths(path) {
+				writeTestFile(t, p, "")
+			}
+		}},
+		{name: "0-byte file next to a non-empty -wal", setup: func(t *testing.T, path string) {
+			writeTestFile(t, path, "")
+			writeTestFile(t, path+"-wal", "committed frames")
+		}, wantRecoverable: true},
+		{name: "0-byte file next to a non-empty -journal", setup: func(t *testing.T, path string) {
+			writeTestFile(t, path, "")
+			writeTestFile(t, path+"-journal", "hot journal")
+		}, wantRecoverable: true},
+		{name: "0-byte file next to a non-empty -shm only", setup: func(t *testing.T, path string) {
+			writeTestFile(t, path, "")
+			writeTestFile(t, path+"-shm", "index")
+		}},
 	}
 
 	for _, relative := range []bool{false, true} {
