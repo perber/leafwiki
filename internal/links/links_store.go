@@ -53,7 +53,7 @@ func NewLinksStore(storageDir string) (*LinksStore, error) {
 
 	// ensureSchema calls Connect() itself (idempotently), so it alone is
 	// enough to bring the store to a working state.
-	err := sqliteutil.RetryOnCorruption(linksDatabasePath(s.storageDir, s.filename), func() error {
+	err := sqliteutil.OpenWithPolicy(linksDatabasePath(s.storageDir, s.filename), sqliteutil.RebuildOnCorruption, func() error {
 		if err := s.ensureSchema(); err != nil {
 			if s.db != nil {
 				_ = s.db.Close()

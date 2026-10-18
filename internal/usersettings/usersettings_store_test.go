@@ -316,3 +316,43 @@ func TestUserSettingsStore_MigratesLegacySchema_AddsFormatColumns(t *testing.T) 
 		t.Fatalf("expected iso/12h round-trip, got %+v", got2)
 	}
 }
+
+// A corrupt usersettings.db is moved aside with its sidecars, never
+// deleted, and the store keeps working on an empty database (ADR-0013); a
+// 0-byte file is a valid empty database and stays where it is.
+func TestNewUserSettingsStore_UnreadableOrEmptyFile(t *testing.T) {
+	tests := []struct {
+		name           string
+		setup          func(t *testing.T, dbPath string) map[string]string
+		wantQuarantine bool
+	}{
+		{name: "corrupt file is quarantined", setup: test_utils.WriteCorruptSQLiteDB, wantQuarantine: true},
+		{name: "0-byte file is a valid database", setup: func(t *testing.T, dbPath string) map[string]string {
+			test_utils.WriteFile(t, filepath.Dir(dbPath), filepath.Base(dbPath), "")
+			return nil
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			dbPath := filepath.Join(dir, "usersettings.db")
+			files := tt.setup(t, dbPath)
+
+			store, err := NewUserSettingsStore(dir, nil)
+			if err != nil {
+				t.Fatalf("NewUserSettingsStore: %v", err)
+			}
+			defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
+			if err := store.Upsert(&UserSettings{UserID: "user-1", Language: "de"}); err != nil {
+				t.Fatalf("Upsert: %v", err)
+			}
+
+			if tt.wantQuarantine {
+				test_utils.AssertSQLiteQuarantined(t, dbPath, files)
+			} else {
+				test_utils.AssertNoSQLiteQuarantine(t, dbPath)
+			}
+		})
+	}
+}

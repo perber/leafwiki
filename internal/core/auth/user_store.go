@@ -39,7 +39,7 @@ func NewUserStore(storageDir string) (*UserStore, error) {
 
 	// ensureSchema calls Connect() itself (idempotently), so it alone is
 	// enough to bring the store to a working state.
-	err := sqliteutil.RetryOnCorruption(databasePath(u.storageDir, u.filename), func() error {
+	err := sqliteutil.OpenWithPolicy(databasePath(u.storageDir, u.filename), sqliteutil.FailOnCorruption, func() error {
 		if err := u.ensureSchema(); err != nil {
 			if u.db != nil {
 				_ = u.db.Close()
@@ -88,8 +88,8 @@ func (f *UserStore) Connect() error {
 }
 
 // suspend closes db (if open) and marks the store so Connect() refuses to
-// lazily reopen it — unlike a plain Close(), whose reconnect-on-next-query
-// behavior NewUserStore's corruption-retry path deliberately relies on.
+// lazily reopen it — unlike a plain Close(), which reconnects on the next
+// query.
 // Used by AuthService.PauseUserStoreForSwap before a live restore renames
 // users.db out from under this store: on Windows, an open file handle (or
 // one silently reopened by a query landing mid-swap) blocks the rename with

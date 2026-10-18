@@ -97,12 +97,12 @@ categories:
 
 **Derived indexes — rebuildable from the filesystem, safe to lose:**
 
-| Store | Package | File |
-|---|---|---|
-| Full-text search | `internal/search` | `search.db` |
-| Wikilink graph | `internal/links` | `links.db` |
-| Tag index | `internal/tags` | `tags.db` |
-| Frontmatter property index | `internal/properties` | `properties.db` |
+| Store | Package | File | Corruption policy |
+|---|---|---|---|
+| Full-text search | `internal/search` | `search.db` | `RebuildOnCorruption` |
+| Wikilink graph | `internal/links` | `links.db` | `RebuildOnCorruption` |
+| Tag index | `internal/tags` | `tags.db` | `RebuildOnCorruption` |
+| Frontmatter property index | `internal/properties` | `properties.db` | `RebuildOnCorruption` |
 
 These four are exactly what `internal/wiki/resync` (triggered via `POST /api/admin/resync`,
 `SIGUSR1`/`SIGHUP`, or automatically at every `NewWiki()` boot today) rebuilds. The core sequence —
@@ -114,14 +114,14 @@ tracked via `wikiresync.ResyncJob` per [ADR-0004: Resync Progress via Polling](.
 
 **Real state — NOT derived from disk, losing them is real data loss:**
 
-| Store | Package | File |
-|---|---|---|
-| Users (accounts, roles, password hashes, TOTP secrets) | `internal/core/auth` | `users.db` |
-| Active JWT refresh sessions | `internal/core/auth` | `sessions.db` |
-| API keys (hashed) | `internal/core/auth` | `api_keys.db` |
-| Favorited pages per user | `internal/favorites` | `favorites.db` |
-| Per-user preferences | `internal/usersettings` | `usersettings.db` |
-| Password-reset / invite tokens | `internal/core/auth` | `email_tokens.db` |
+| Store | Package | File | Corruption policy |
+|---|---|---|---|
+| Users (accounts, roles, password hashes, TOTP secrets) | `internal/core/auth` | `users.db` | `FailOnCorruption` |
+| Active JWT refresh sessions | `internal/core/auth` | `sessions.db` | `QuarantineOnCorruption` |
+| API keys (hashed) | `internal/core/auth` | `api_keys.db` | none (any open error fails startup) |
+| Favorited pages per user | `internal/favorites` | `favorites.db` | `QuarantineOnCorruption` |
+| Per-user preferences | `internal/usersettings` | `usersettings.db` | `QuarantineOnCorruption` |
+| Password-reset / invite tokens | `internal/core/auth` | `email_tokens.db` | `QuarantineOnCorruption` |
 
 Plus a few small JSON settings files in the data directory (`branding.json`,
 `public-access.json`, …, via `internal/core/settings`) and the asset/avatar/branding files on
@@ -141,6 +141,14 @@ Why the distinction matters operationally: a corrupted or deleted derived index 
 from full recovery with zero data loss. A corrupted or deleted real-state store is unrecoverable
 except from a backup — there's no filesystem walk that can regenerate a lost password hash or a
 revoked-but-still-listed API key.
+
+The "corruption policy" column says what a store's constructor does when SQLite reports
+`SQLITE_IOERR`, `SQLITE_CORRUPT` or `SQLITE_NOTADB` ([ADR-0013](./adr/0013-per-store-sqlite-corruption-policy.md)):
+`RebuildOnCorruption` deletes the file and its sidecars and starts empty (the next resync fills
+it); `QuarantineOnCorruption` renames the file and its sidecars to
+`<name>.corrupt-<UTC timestamp>`, logs an `Error` and starts empty; `FailOnCorruption` leaves the
+file alone and startup (and `reset-admin-password`) fails with the path, the SQLite code and the
+ways out (`restore-snapshot`, or moving the file aside by hand).
 
 ## Auth model
 

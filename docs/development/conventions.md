@@ -362,6 +362,10 @@ A change to how pages, frontmatter, folders or links are stored on disk:
 Starting an older binary on a newer schema fails with a clear error; keep that behaviour.
 Derived indexes (SQLite) don't need a migration: bump their schema and rebuild via resync.
 
+A new SQLite store chooses a `CorruptionPolicy` at its constructor
+([ADR-0013](./adr/0013-per-store-sqlite-corruption-policy.md)): derived index →
+`RebuildOnCorruption`; real state → `FailOnCorruption` or `QuarantineOnCorruption`, never Rebuild.
+
 ## Deprecation
 
 Anything users or API clients depend on — routes, request/response fields, error codes, CLI flags,
