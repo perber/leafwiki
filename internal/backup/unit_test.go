@@ -117,11 +117,13 @@ func TestFileConflictMessage_CapsListedPaths(t *testing.T) {
 		lastShow string
 		hidden   string
 	}{
-		{"one path", paths(1), "", "root/p00.md", ""},
-		{"exactly the cap", paths(10), "", "root/p09.md", ""},
-		{"one over the cap", paths(11), " and 1 more", "root/p09.md", "root/p10.md"},
-		{"many over the cap", paths(25), " and 15 more", "root/p09.md", "root/p24.md"},
-		{"unicode and spaces", []string{"root/Über uns/ä ö.md"}, "", "root/Über uns/ä ö.md", ""},
+		{"one path", paths(1), "", `"root/p00.md"`, ""},
+		{"exactly the cap", paths(10), "", `"root/p09.md"`, ""},
+		{"one over the cap", paths(11), " and 1 more", `"root/p09.md"`, "root/p10.md"},
+		{"many over the cap", paths(25), " and 15 more", `"root/p09.md"`, "root/p24.md"},
+		{"unicode and spaces", []string{"root/Über uns/ä ö.md"}, "", `"root/Über uns/ä ö.md"`, ""},
+		{"comma in name", []string{"root/a, b.md"}, "", `"root/a, b.md"`, ""},
+		{"control character", []string{"root/a\nb.md"}, "", `"root/a\nb.md"`, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

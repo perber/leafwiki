@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -920,7 +921,8 @@ func divergenceMessage(branch string) string {
 const maxConflictPathsInStatus = 10
 
 // fileConflictMessage is the status text for ConflictKindFileConflict, naming
-// the conflicting files (repository-relative).
+// the conflicting files (repository-relative). Each name is quoted, since a
+// name may itself contain ", " or characters that do not print.
 func fileConflictMessage(paths []string) string {
 	shown := paths
 	more := ""
@@ -928,7 +930,11 @@ func fileConflictMessage(paths []string) string {
 		shown = paths[:maxConflictPathsInStatus]
 		more = fmt.Sprintf(" and %d more", len(paths)-maxConflictPathsInStatus)
 	}
-	return "pull conflict: changed both on the remote and locally: " + strings.Join(shown, ", ") + more +
+	quoted := make([]string, len(shown))
+	for i, p := range shown {
+		quoted[i] = strconv.QuoteToGraphic(p)
+	}
+	return "pull conflict: changed both on the remote and locally: " + strings.Join(quoted, ", ") + more +
 		"; make each file match on both sides (revert the remote change or edit the page to match), " +
 		"the next backup cycle retries the pull"
 }

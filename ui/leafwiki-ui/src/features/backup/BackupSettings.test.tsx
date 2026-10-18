@@ -176,9 +176,10 @@ describe('BackupSettings conflict edge cases', () => {
   it('renders a long file-conflict list in full as the server sent it', () => {
     const details =
       'pull conflict: changed both on the remote and locally: ' +
-      Array.from({ length: 10 }, (_, i) => `root/Über uns/seite-${i}.md`).join(
-        ', ',
-      ) +
+      Array.from(
+        { length: 10 },
+        (_, i) => `"root/Über uns/seite-${i}.md"`,
+      ).join(', ') +
       ' and 15 more; make each file match on both sides'
     storeState = makeState({
       needsIntervention: true,
