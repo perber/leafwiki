@@ -8,12 +8,15 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 )
@@ -50,6 +53,11 @@ type Repository struct {
 	// (see TestPull_RemoteRewrittenBetweenListAndFetch); production code never
 	// sets it.
 	afterListBeforeFetch func()
+
+	// beforeForcePush, when set, runs in ForcePush after the remote comparison
+	// and before the push. Tests use it to move the remote branch in that
+	// window; production code never sets it.
+	beforeForcePush func()
 
 	// liveFSCaseInsensitive records whether repoDir's filesystem folds case
 	// (the default on Windows and macOS), probed once at Init. materialize
@@ -326,6 +334,7 @@ func (r *Repository) initWithRemoteHistory(repoDir string) (*gogit.Repository, e
 	listCtx, listCancel := context.WithTimeout(context.Background(), networkTimeout)
 	defer listCancel()
 	refs, err := remote.ListContext(listCtx, &gogit.ListOptions{Auth: auth})
+	err = redactCredentials(err, r.cfg)
 	if err != nil {
 		returnErr = fmt.Errorf("initWithRemoteHistory: list remote: %w", err)
 		return nil, returnErr
@@ -357,7 +366,7 @@ func (r *Repository) initWithRemoteHistory(repoDir string) (*gogit.Repository, e
 		Auth:     auth,
 		RefSpecs: []config.RefSpec{refSpec},
 	}); err != nil && !errors.Is(err, gogit.NoErrAlreadyUpToDate) {
-		returnErr = fmt.Errorf("initWithRemoteHistory: fetch: %w", err)
+		returnErr = fmt.Errorf("initWithRemoteHistory: fetch: %w", redactCredentials(err, r.cfg))
 		return nil, returnErr
 	}
 
@@ -558,7 +567,7 @@ func (r *Repository) RunBackup() error {
 			localHead, err := r.repo.Head()
 			if err == nil && localHead.Hash() != r.lastPushedHash {
 				slog.Debug("RunBackup: pushing unpushed local commit", "commit", localHead.Hash().String())
-				if err := r.push(false); err != nil {
+				if err := r.push(false, plumbing.ZeroHash); err != nil {
 					r.status.SetError(err.Error())
 					return fmt.Errorf("push failed: %w", err)
 				}
@@ -593,7 +602,7 @@ func (r *Repository) RunBackup() error {
 
 	if r.cfg.RemoteURL != "" {
 		slog.Debug("RunBackup: pushing to remote", "remote", r.remoteForLog(), "branch", r.cfg.Branch, "commit", commitHash.String())
-		if err := r.push(false); err != nil {
+		if err := r.push(false, plumbing.ZeroHash); err != nil {
 			slog.Debug("RunBackup: push failed", "error", err)
 			r.status.SetError(err.Error())
 			return fmt.Errorf("push failed: %w", err)
@@ -695,90 +704,37 @@ func (r *Repository) gc() bool {
 //   - same file changed remotely and dirty locally → NeedsIntervention
 //   - other (network / auth)                      → SetError, return
 func (r *Repository) pullBeforeBackup() error {
-	remote, err := r.ensureRemote()
+	cmp, err := r.compareWithRemote()
 	if err != nil {
-		return err
+		return r.failWith(err.Error())
 	}
-
-	auth, err := r.buildAuth()
-	if err != nil {
-		return r.failWith(fmt.Sprintf("failed to build auth for pre-backup pull: %v", err))
-	}
-
-	remoteHead, err := r.listRemoteBranch(remote, auth)
-	if err != nil {
-		msg := fmt.Sprintf("failed to query remote before backup: %v", err)
-		slog.Error(msg, "remote", r.remoteForLog())
-		return r.failWith(msg)
-	}
-	if remoteHead.IsZero() {
+	switch cmp.relation {
+	case remoteNoBranch:
 		slog.Debug("pullBeforeBackup: remote branch not present yet, skipping pull (first push)", "branch", r.cfg.Branch)
 		return nil
-	}
-
-	localCommit, err := r.headCommit()
-	if err != nil {
-		return r.failWith(fmt.Sprintf("failed to resolve local HEAD before pull: %v", err))
-	}
-	if localCommit != nil && localCommit.Hash == remoteHead {
+	case remoteUpToDate:
 		slog.Debug("pullBeforeBackup: already up-to-date, no pull needed")
 		return nil
+	case remoteLocalAhead:
+		slog.Debug("pullBeforeBackup: local history is ahead of remote, nothing to pull")
+		return nil
+	case remoteDiverged:
+		msg := divergenceMessage(r.cfg.Branch)
+		slog.Error("pullBeforeBackup: "+msg, "remote", r.remoteForLog())
+		return r.failNeedsIntervention(ConflictKindDiverged, msg)
 	}
 
-	if r.afterListBeforeFetch != nil {
-		r.afterListBeforeFetch()
-	}
-
-	if err := r.fetchBranch(remote, auth); err != nil {
-		msg := fmt.Sprintf("failed to fetch from remote before backup: %v", err)
-		slog.Error(msg, "remote", r.remoteForLog())
-		return r.failWith(msg)
-	}
-
-	// Re-resolve the branch tip from what fetchBranch actually fetched into the
-	// tracking ref, rather than trusting the value listed before the fetch: if
-	// the remote branch was rewritten concurrently (e.g. a force-push landing
-	// between listRemoteBranch and here), the commit remoteHead pointed to may
-	// never have been fetched at all, while the tracking ref always reflects
-	// whatever this fetch actually brought down.
-	tracking := plumbing.NewRemoteReferenceName("origin", r.cfg.Branch)
-	trackingRef, err := r.repo.Reference(tracking, true)
-	if err != nil {
-		return r.failWith(fmt.Sprintf("failed to resolve fetched remote branch: %v", err))
-	}
-	remoteHead = trackingRef.Hash()
-
-	remoteCommit, err := r.repo.CommitObject(remoteHead)
-	if err != nil {
-		return r.failWith(fmt.Sprintf("failed to read fetched remote commit: %v", err))
-	}
-
-	if localCommit != nil {
-		behind, err := localCommit.IsAncestor(remoteCommit)
-		if err != nil {
-			return r.failWith(fmt.Sprintf("failed to compare local and remote history: %v", err))
-		}
-		if !behind {
-			ahead, aErr := remoteCommit.IsAncestor(localCommit)
-			if aErr == nil && ahead {
-				slog.Debug("pullBeforeBackup: local history is ahead of remote, nothing to pull")
-				return nil
-			}
-			msg := divergenceMessage(r.repoDir, r.cfg.Branch)
-			slog.Error("pullBeforeBackup: "+msg, "remote", r.remoteForLog())
-			return r.failNeedsIntervention(msg)
-		}
-	}
+	localCommit, remoteCommit := cmp.local, cmp.remote
+	remoteHead := remoteCommit.Hash
 
 	if err := r.materializeContent(localCommit, remoteCommit); err != nil {
 		var conflict *pullConflictError
 		if errors.As(err, &conflict) {
-			msg := "pull conflict: a wiki file has been modified both on the remote and locally; " +
-				"reset the conflicting file on the remote or wait for the next backup cycle to retry"
 			for _, path := range conflict.Paths {
-				slog.Error("pullBeforeBackup: "+msg, "remote", r.remoteForLog(), "file", path)
+				slog.Error("pullBeforeBackup: pull conflict, file changed both on the remote and locally",
+					"remote", r.remoteForLog(), "file", path)
 			}
-			r.status.SetNeedsIntervention(msg)
+			r.status.SetNeedsIntervention(ConflictKindFileConflict, fileConflictMessage(conflict.Paths))
 			return err
 		}
 		msg := fmt.Sprintf("failed to update local content from remote: %v", err)
@@ -792,6 +748,104 @@ func (r *Repository) pullBeforeBackup() error {
 	r.lastPushedHash = remoteHead
 	slog.Info("pullBeforeBackup: pulled remote changes", "head", remoteHead.String())
 	return nil
+}
+
+// remoteRelation is how the local branch relates to the remote branch tip.
+type remoteRelation int
+
+const (
+	remoteNoBranch    remoteRelation = iota // the remote branch (or the whole remote) does not exist yet
+	remoteUpToDate                          // local HEAD equals the remote tip
+	remoteLocalAhead                        // the remote tip is an ancestor of local HEAD
+	remoteLocalBehind                       // local HEAD is an ancestor of the remote tip, or local is unborn
+	remoteDiverged                          // neither is an ancestor of the other
+)
+
+// remoteComparison is the result of compareWithRemote. local is nil on an
+// unborn branch; remote is set only for remoteLocalAhead, remoteLocalBehind and
+// remoteDiverged (the cases that needed a fetch).
+type remoteComparison struct {
+	relation remoteRelation
+	local    *object.Commit
+	remote   *object.Commit
+}
+
+// compareWithRemote lists the remote branch, fetches it when it differs from
+// local HEAD, and reports how the two histories relate. It does not touch the
+// status, apart from ensureRemote recording its own failure; callers decide
+// what a failure or relation means for them.
+func (r *Repository) compareWithRemote() (remoteComparison, error) {
+	remote, err := r.ensureRemote()
+	if err != nil {
+		return remoteComparison{}, err
+	}
+
+	auth, err := r.buildAuth()
+	if err != nil {
+		return remoteComparison{}, fmt.Errorf("failed to build auth to compare with the remote: %v", err)
+	}
+
+	remoteHead, err := r.listRemoteBranch(remote, auth)
+	if err != nil {
+		msg := fmt.Sprintf("failed to query remote: %v", err)
+		slog.Error(msg, "remote", r.remoteForLog())
+		return remoteComparison{}, errors.New(msg)
+	}
+	if remoteHead.IsZero() {
+		return remoteComparison{relation: remoteNoBranch}, nil
+	}
+
+	localCommit, err := r.headCommit()
+	if err != nil {
+		return remoteComparison{}, fmt.Errorf("failed to resolve local HEAD: %v", err)
+	}
+	if localCommit != nil && localCommit.Hash == remoteHead {
+		return remoteComparison{relation: remoteUpToDate, local: localCommit}, nil
+	}
+
+	if r.afterListBeforeFetch != nil {
+		r.afterListBeforeFetch()
+	}
+
+	if err := r.fetchBranch(remote, auth); err != nil {
+		msg := fmt.Sprintf("failed to fetch from remote: %v", err)
+		slog.Error(msg, "remote", r.remoteForLog())
+		return remoteComparison{}, errors.New(msg)
+	}
+
+	// Re-resolve the branch tip from what fetchBranch actually fetched into the
+	// tracking ref, rather than trusting the value listed before the fetch: if
+	// the remote branch was rewritten concurrently (e.g. a force-push landing
+	// between listRemoteBranch and here), the commit remoteHead pointed to may
+	// never have been fetched at all, while the tracking ref always reflects
+	// whatever this fetch actually brought down.
+	tracking := plumbing.NewRemoteReferenceName("origin", r.cfg.Branch)
+	trackingRef, err := r.repo.Reference(tracking, true)
+	if err != nil {
+		return remoteComparison{}, fmt.Errorf("failed to resolve fetched remote branch: %v", err)
+	}
+	remoteCommit, err := r.repo.CommitObject(trackingRef.Hash())
+	if err != nil {
+		return remoteComparison{}, fmt.Errorf("failed to read fetched remote commit: %v", err)
+	}
+
+	cmp := remoteComparison{relation: remoteLocalBehind, local: localCommit, remote: remoteCommit}
+	if localCommit == nil {
+		return cmp, nil
+	}
+	behind, err := localCommit.IsAncestor(remoteCommit)
+	if err != nil {
+		return remoteComparison{}, fmt.Errorf("failed to compare local and remote history: %v", err)
+	}
+	if behind {
+		return cmp, nil
+	}
+	if ahead, aErr := remoteCommit.IsAncestor(localCommit); aErr == nil && ahead {
+		cmp.relation = remoteLocalAhead
+		return cmp, nil
+	}
+	cmp.relation = remoteDiverged
+	return cmp, nil
 }
 
 // ensureRemote returns the "origin" remote, creating it from cfg if absent.
@@ -823,7 +877,7 @@ func (r *Repository) listRemoteBranch(remote *gogit.Remote, auth transport.AuthM
 		if errors.Is(err, transport.ErrEmptyRemoteRepository) {
 			return plumbing.ZeroHash, nil
 		}
-		return plumbing.ZeroHash, err
+		return plumbing.ZeroHash, redactCredentials(err, r.cfg)
 	}
 	target := plumbing.NewBranchReferenceName(r.cfg.Branch)
 	for _, ref := range refs {
@@ -850,17 +904,46 @@ func (r *Repository) fetchBranch(remote *gogit.Remote, auth transport.AuthMethod
 	if errors.Is(err, plumbing.ErrReferenceNotFound) || errors.Is(err, transport.ErrEmptyRemoteRepository) {
 		return nil // branch vanished between list and fetch — nothing to pull
 	}
-	return err
+	return redactCredentials(err, r.cfg)
 }
 
-func divergenceMessage(repoDir, branch string) string {
-	return "remote has diverged from local backup history; " +
-		"to recover, run: git -C " + repoDir + " push --force origin HEAD:" + branch
+// divergenceMessage is the status text for ConflictKindDiverged. It points to
+// the Force Push button rather than a manual git command, and says what Force
+// Push costs.
+func divergenceMessage(branch string) string {
+	return "the remote branch " + branch + " has diverged from the local backup history; " +
+		"Force Push replaces the remote branch with the local history, " +
+		"and commits that exist only on the remote are overwritten"
+}
+
+// maxConflictPathsInStatus caps how many conflicting files the status text
+// names; every file is still logged.
+const maxConflictPathsInStatus = 10
+
+// fileConflictMessage is the status text for ConflictKindFileConflict, naming
+// the conflicting files (repository-relative). Each name is quoted, since a
+// name may itself contain ", " or characters that do not print.
+func fileConflictMessage(paths []string) string {
+	shown := paths
+	more := ""
+	if len(paths) > maxConflictPathsInStatus {
+		shown = paths[:maxConflictPathsInStatus]
+		more = fmt.Sprintf(" and %d more", len(paths)-maxConflictPathsInStatus)
+	}
+	quoted := make([]string, len(shown))
+	for i, p := range shown {
+		quoted[i] = strconv.QuoteToGraphic(p)
+	}
+	return "pull conflict: changed both on the remote and locally: " + strings.Join(quoted, ", ") + more +
+		"; make each file match on both sides (revert the remote change or edit the page to match), " +
+		"the next backup cycle retries the pull"
 }
 
 // push pushes the current local HEAD to the configured remote.
 // If force is true, a non-fast-forward push is allowed (overwrites remote history).
-func (r *Repository) push(force bool) error {
+// A non-zero lease limits a force push to a remote branch that still points at
+// that commit; if the remote moved, push returns ErrForcePushRemoteAhead.
+func (r *Repository) push(force bool, lease plumbing.Hash) error {
 	slog.Debug("push: starting", "force", force, "remote", r.remoteForLog(), "branch", r.cfg.Branch)
 
 	auth, err := r.buildAuth()
@@ -901,6 +984,22 @@ func (r *Repository) push(force bool) error {
 		slog.Warn("push: could not remove stale remote tracking ref", "ref", trackingRef.String(), "error", rmErr)
 	}
 
+	// go-git checks a lease against the tracking ref named after the local
+	// branch (refs/remotes/origin/<local branch>) and fails if it is missing,
+	// so point that ref at the leased commit. It is the commit just fetched,
+	// so it cannot cause the stale short-circuit described above.
+	var forceWithLease *gogit.ForceWithLease
+	if force && !lease.IsZero() {
+		leaseRef := plumbing.NewRemoteReferenceName("origin", localHead.Name().Short())
+		if err := r.repo.Storer.SetReference(plumbing.NewHashReference(leaseRef, lease)); err != nil {
+			return fmt.Errorf("failed to record the force push lease: %w", err)
+		}
+		if leaseRef != trackingRef {
+			defer func() { _ = r.repo.Storer.RemoveReference(leaseRef) }()
+		}
+		forceWithLease = &gogit.ForceWithLease{RefName: plumbing.NewBranchReferenceName(r.cfg.Branch), Hash: lease}
+	}
+
 	// Use the resolved branch ref explicitly rather than HEAD.
 	// Symbolic HEAD in a force refspec can confuse go-git when the local branch
 	// name differs from the configured remote branch (e.g. local=master, remote=main).
@@ -915,15 +1014,26 @@ func (r *Repository) push(force bool) error {
 	pushCtx, pushCancel := context.WithTimeout(context.Background(), networkTimeout)
 	defer pushCancel()
 	err = remote.PushContext(pushCtx, &gogit.PushOptions{
-		Auth:     auth,
-		RefSpecs: []config.RefSpec{refSpec},
-		Force:    force,
+		Auth:           auth,
+		RefSpecs:       []config.RefSpec{refSpec},
+		Force:          force,
+		ForceWithLease: forceWithLease,
 	})
+	err = redactCredentials(err, r.cfg)
 	if err != nil {
 		if errors.Is(err, gogit.NoErrAlreadyUpToDate) {
 			slog.Debug("push: remote already up-to-date")
 			r.lastPushedHash = localHead.Hash()
 			return nil
+		}
+		// go-git reports a broken lease only as a plain error, so check the
+		// remote tip directly.
+		if forceWithLease != nil {
+			if current, listErr := r.listRemoteBranch(remote, auth); listErr == nil && current != lease {
+				slog.Warn("push: force push refused, the remote branch moved since it was compared",
+					"remote", r.remoteForLog(), "branch", r.cfg.Branch, "expected", lease.String(), "current", current.String())
+				return ErrForcePushRemoteAhead
+			}
 		}
 		slog.Error("git push failed", "error", err, "remote", r.remoteForLog(), "branch", r.cfg.Branch, "refSpec", string(refSpec))
 		return fmt.Errorf("failed to push: %w", err)
@@ -963,8 +1073,8 @@ func (r *Repository) failWith(msg string) error {
 }
 
 // failNeedsIntervention is failWith's NeedsIntervention counterpart.
-func (r *Repository) failNeedsIntervention(msg string) error {
-	r.status.SetNeedsIntervention(msg)
+func (r *Repository) failNeedsIntervention(kind ConflictKind, msg string) error {
+	r.status.SetNeedsIntervention(kind, msg)
 	return errors.New(msg)
 }
 
@@ -976,9 +1086,12 @@ func (r *Repository) buildAuth() (transport.AuthMethod, error) {
 }
 
 // ForcePush overwrites the remote branch with the current local HEAD.
-// Used to recover from NeedsIntervention state when the remote has diverged.
-// Returns an error immediately if the scheduler goroutine is mid-RunBackup
-// (rather than blocking the HTTP handler for up to 4 minutes).
+// Used to recover from ConflictKindDiverged. It first compares with the remote
+// and refuses with ErrForcePushRemoteAhead when local HEAD is behind the remote
+// tip (e.g. a pull blocked by a file conflict): overwriting would only drop the
+// remote commits. The status is left unchanged then, so the conflict stays
+// visible. Returns an error immediately if the scheduler goroutine is
+// mid-RunBackup (rather than blocking the HTTP handler for up to 4 minutes).
 func (r *Repository) ForcePush() error {
 	if !r.mu.TryLock() {
 		return fmt.Errorf("backup is currently running — try again in a moment")
@@ -989,7 +1102,30 @@ func (r *Repository) ForcePush() error {
 		return fmt.Errorf("no remote configured")
 	}
 
-	if err := r.push(true); err != nil {
+	cmp, err := r.compareWithRemote()
+	if err != nil {
+		r.status.SetError(fmt.Sprintf("force push failed: %v", err))
+		return fmt.Errorf("force push failed: %w", err)
+	}
+	if cmp.relation == remoteLocalBehind {
+		slog.Warn("backup: force push refused, the remote has commits the local backup has not applied",
+			"remote", r.remoteForLog(), "branch", r.cfg.Branch, "remoteHead", cmp.remote.Hash.String())
+		return ErrForcePushRemoteAhead
+	}
+
+	// Lease the push on the remote tip just compared, so a commit pushed to
+	// the remote in the meantime is not overwritten unseen.
+	var lease plumbing.Hash
+	if cmp.remote != nil {
+		lease = cmp.remote.Hash
+	}
+	if r.beforeForcePush != nil {
+		r.beforeForcePush()
+	}
+	if err := r.push(true, lease); err != nil {
+		if errors.Is(err, ErrForcePushRemoteAhead) {
+			return err
+		}
 		r.status.SetError(fmt.Sprintf("force push failed: %v", err))
 		return fmt.Errorf("force push failed: %w", err)
 	}

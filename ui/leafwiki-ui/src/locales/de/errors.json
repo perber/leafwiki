@@ -26,6 +26,7 @@
   "circular reference detected": "Die Verschiebung würde einen Zirkelbezug erzeugen",
   "convert not allowed": "Konvertierung nicht erlaubt",
   "editor limit reached for this plan": "Das Bearbeiter-Limit dieses Plans wurde erreicht. Führen Sie ein Upgrade Ihres Plans durch, um weitere Bearbeiter hinzuzufügen.",
+  "force push refused: the remote has changes the local backup has not applied yet": "Force Push abgelehnt: Das Remote-Repository enthält Änderungen, die dieses Wiki noch nicht übernommen hat. Ein Überschreiben würde diese Änderungen verlieren.",
   "email disabled": "E-Mail ist auf diesem Server nicht konfiguriert",
   "failed to clear authentication cookies": "Authentifizierungs-Cookies konnten nicht gelöscht werden",
   "failed to clear csrf cookie": "CSRF-Cookie konnte nicht gelöscht werden",

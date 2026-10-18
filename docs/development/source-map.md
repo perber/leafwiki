@@ -163,7 +163,16 @@ resync-derived state.
 - **`internal/backup`** — git-based off-site backup of the markdown tree (`repo.go`, `go-git/go-git`
   — no shell-out to a `git` binary, matters for the single-binary story), `scheduler.go` (same
   manual-mode-at-interval-0 pattern as `snapshot`), `conflict_test.go`/`gitignore.go`,
-  `status.go`. Documented exception to the `*sharederrors.LocalizedError` convention (uses plain
+  `status.go`. A pull that cannot proceed sets `NeedsIntervention` with a `ConflictKind`:
+  `diverged` (no fast-forward either way; `ForcePush` overwrites the remote) or `fileConflict`
+  (a remote change hits a locally changed file; nothing is applied, local stays behind the
+  remote, and `ForcePush` refuses with `ErrForcePushRemoteAhead` → 409
+  `backup_force_push_conflict`, because overwriting would drop the remote commits).
+  `compareWithRemote` decides the relation for both the pull and `ForcePush`; `ForcePush` leases
+  its push on the remote tip it compared, so a commit pushed in between is not overwritten. Don't
+  move the backup branch ref by hand to clear a conflict: a local branch behind the remote is
+  exactly the state `ForcePush` refuses. `redact.go` masks remote credentials in transport
+  errors before they reach logs or the status. Documented exception to the `*sharederrors.LocalizedError` convention (uses plain
   `errors`/`fmt.Errorf`) — see `AGENTS.md`.
 - **`internal/branding`** — custom logo/favicon/site-name: `branding_service.go`,
   `branding_store.go`, `models.go`, `utils.go`.
@@ -292,7 +301,8 @@ light/dark mode application).
 - **`features/auth`** — login form (`LoginForm.tsx`), route guards (`RequireAuth.tsx`,
   `AuthRedirect.test.tsx`), external-IdP redirect handling (`ExternalRedirect.tsx`).
 - **`features/backup`** — git backup settings panel and its warning indicator when backup needs
-  manual intervention (conflict) — `BackupSettings.tsx`, `BackupWarningIndicator.tsx`.
+  manual intervention (conflict) — `BackupSettings.tsx` (Force Push only for the `diverged`
+  conflict kind, an explanation for `fileConflict`), `BackupWarningIndicator.tsx`.
 - **`features/branding`** — branding settings form (`BrandingSettings.tsx`).
 - **`features/designtoggle`** — light/dark mode toggle (`DesignToggle.tsx`, `designmode.ts`).
 - **`features/editor`** — the markdown editor, the single biggest feature folder:

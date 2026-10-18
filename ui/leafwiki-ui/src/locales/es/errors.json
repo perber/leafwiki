@@ -26,6 +26,7 @@
   "circular reference detected": "El movimiento crearía una referencia circular",
   "convert not allowed": "La operación de conversión no está permitida",
   "editor limit reached for this plan": "Se ha alcanzado el límite de editores de este plan. Mejora tu plan para añadir más editores.",
+  "force push refused: the remote has changes the local backup has not applied yet": "Envío forzado rechazado: el repositorio remoto tiene cambios que esta wiki aún no ha aplicado. Sobrescribirlos haría que se perdieran.",
   "email disabled": "El correo electrónico no está configurado en este servidor",
   "failed to clear authentication cookies": "No se pudieron borrar las cookies de autenticación",
   "failed to clear csrf cookie": "No se pudo borrar la cookie CSRF",
