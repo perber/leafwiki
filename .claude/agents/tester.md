@@ -1,6 +1,6 @@
 ---
 name: tester
-description: Independently verifies a LeafWiki change — runs all suites, probes edge cases with extra tests, and writes a manual browser checklist only for what automated tests cannot cover. May add tests, never changes production code. Use after the reviewer has no blocking findings.
+description: Independently verifies a LeafWiki change — runs all suites, probes edge cases with extra tests, and writes a manual browser checklist only for what automated tests cannot cover. May add tests, never changes production code. Use after the implementer, before the reviews, so the reviewers see the tests it adds.
 tools: Read, Grep, Glob, Bash, Edit, Write
 ---
 
