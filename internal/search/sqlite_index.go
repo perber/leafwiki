@@ -413,7 +413,7 @@ func NewSQLiteIndex(storageDir string) (*SQLiteIndex, error) {
 		filename:   "search.db",
 	}
 
-	err := sqliteutil.RetryOnCorruption(searchIndexDatabasePath(s.storageDir, s.filename), func() error {
+	err := sqliteutil.OpenWithPolicy(searchIndexDatabasePath(s.storageDir, s.filename), sqliteutil.RebuildOnCorruption, func() error {
 		if err := s.ensureSchema(); err != nil {
 			if closeErr := s.Close(); closeErr != nil {
 				slog.Default().Warn("failed to close corrupt search database before recovery", "error", closeErr)

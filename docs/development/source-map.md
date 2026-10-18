@@ -92,9 +92,12 @@ filesystem-canonical (`tree`, `revision`) and SQLite-derived (`links`, `tags`, `
   `shared/errors/localized_error.go` (`*LocalizedError` — the required domain-error type for all
   backend domain errors per `AGENTS.md`, with `internal/backup` as the one documented legacy
   exception), `shared/htmlutil/html.go` (HTML
-  escaping helpers), `shared/sqliteutil/sqlite.go` (`IsSQLiteRecoverableError` — distinguishes
-  recoverable I/O/corruption errors from transient `SQLITE_BUSY`/`SQLITE_LOCKED`, used by stores
-  deciding whether to delete-and-recreate a corrupted `.db` file).
+  escaping helpers), `shared/sqliteutil/sqlite.go` (`OpenWithPolicy` + `CorruptionPolicy` —
+  each SQLite store names at its constructor what happens on a recoverable I/O/corruption error,
+  `RebuildOnCorruption` for derived indexes, `QuarantineOnCorruption` / `FailOnCorruption`
+  (typed `*CorruptDatabaseError`) for real state, see
+  [ADR-0013](./adr/0013-per-store-sqlite-corruption-policy.md); `IsSQLiteRecoverableError`
+  distinguishes those errors from transient `SQLITE_BUSY`/`SQLITE_LOCKED`).
 - **`internal/core/tools`** — small operator CLI helpers, e.g. `adminreset.go`
   (`ResetAdminPassword`, behind the `leafwiki reset-admin-password` subcommand in `cli.go`).
 - **`internal/core/settings`** — shared persistence primitive for the small JSON settings files

@@ -255,3 +255,26 @@ func TestLinksStore_LegacyBrokenColumn_IsRecreatedWithStateColumn(t *testing.T) 
 		t.Fatalf("expected exactly the freshly added ambiguous row, got %#v", outs)
 	}
 }
+
+// links.db is a derived index (ADR-0001): a corrupt file is deleted with its
+// sidecars and rebuilt empty, unlike real-state stores (ADR-0013).
+func TestNewLinksStore_CorruptFile_Rebuilds(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "links.db")
+	test_utils.WriteCorruptSQLiteDB(t, dbPath)
+
+	store, err := NewLinksStore(dir)
+	if err != nil {
+		t.Fatalf("NewLinksStore: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
+
+	var tables int
+	if err := store.db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type = 'table'`).Scan(&tables); err != nil {
+		t.Fatalf("query rebuilt database: %v", err)
+	}
+	if tables == 0 {
+		t.Fatal("expected the rebuilt links.db to have its schema")
+	}
+	test_utils.AssertNoSQLiteQuarantine(t, dbPath)
+}
