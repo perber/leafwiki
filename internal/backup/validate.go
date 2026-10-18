@@ -45,7 +45,7 @@ func TestRemote(ctx context.Context, cfg Config) error {
 		if errors.Is(err, transport.ErrEmptyRemoteRepository) {
 			return nil
 		}
-		return describeRemoteErr(err)
+		return describeRemoteErr(redactCredentials(err, cfg))
 	}
 	return nil
 }

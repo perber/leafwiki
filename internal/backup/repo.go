@@ -328,6 +328,7 @@ func (r *Repository) initWithRemoteHistory(repoDir string) (*gogit.Repository, e
 	listCtx, listCancel := context.WithTimeout(context.Background(), networkTimeout)
 	defer listCancel()
 	refs, err := remote.ListContext(listCtx, &gogit.ListOptions{Auth: auth})
+	err = redactCredentials(err, r.cfg)
 	if err != nil {
 		returnErr = fmt.Errorf("initWithRemoteHistory: list remote: %w", err)
 		return nil, returnErr
@@ -359,7 +360,7 @@ func (r *Repository) initWithRemoteHistory(repoDir string) (*gogit.Repository, e
 		Auth:     auth,
 		RefSpecs: []config.RefSpec{refSpec},
 	}); err != nil && !errors.Is(err, gogit.NoErrAlreadyUpToDate) {
-		returnErr = fmt.Errorf("initWithRemoteHistory: fetch: %w", err)
+		returnErr = fmt.Errorf("initWithRemoteHistory: fetch: %w", redactCredentials(err, r.cfg))
 		return nil, returnErr
 	}
 
@@ -870,7 +871,7 @@ func (r *Repository) listRemoteBranch(remote *gogit.Remote, auth transport.AuthM
 		if errors.Is(err, transport.ErrEmptyRemoteRepository) {
 			return plumbing.ZeroHash, nil
 		}
-		return plumbing.ZeroHash, err
+		return plumbing.ZeroHash, redactCredentials(err, r.cfg)
 	}
 	target := plumbing.NewBranchReferenceName(r.cfg.Branch)
 	for _, ref := range refs {
@@ -897,7 +898,7 @@ func (r *Repository) fetchBranch(remote *gogit.Remote, auth transport.AuthMethod
 	if errors.Is(err, plumbing.ErrReferenceNotFound) || errors.Is(err, transport.ErrEmptyRemoteRepository) {
 		return nil // branch vanished between list and fetch — nothing to pull
 	}
-	return err
+	return redactCredentials(err, r.cfg)
 }
 
 // divergenceMessage is the status text for ConflictKindDiverged. It points to
@@ -988,6 +989,7 @@ func (r *Repository) push(force bool) error {
 		RefSpecs: []config.RefSpec{refSpec},
 		Force:    force,
 	})
+	err = redactCredentials(err, r.cfg)
 	if err != nil {
 		if errors.Is(err, gogit.NoErrAlreadyUpToDate) {
 			slog.Debug("push: remote already up-to-date")
