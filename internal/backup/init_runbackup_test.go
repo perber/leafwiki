@@ -422,7 +422,9 @@ func TestRunBackup_LocalNameRefusedByGit_SkippedAndLoggedOnce(t *testing.T) {
 		t.Fatalf("RunBackup after an external commit: %v", err)
 	}
 	readFileEqual(t, filepath.Join(rootDir, "ext.md"), "ext\n")
-	if strings.Contains(logs.String(), "level=WARN") {
+	// Match the skip warning itself: other warnings depend on the environment
+	// (e.g. no ~/.ssh/known_hosts in CI).
+	if strings.Contains(logs.String(), "backup: skipping a file name") {
 		t.Errorf("skipped names were warned about again:\n%s", logs.String())
 	}
 }
