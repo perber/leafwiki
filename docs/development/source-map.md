@@ -199,7 +199,11 @@ resync-derived state.
   `internal/importer/fixtures/`.
 - **`internal/http`** — the shared router *infrastructure* (not a domain slice itself).
   `router.go` builds the `gin.Engine`, embeds the built frontend (`//go:embed dist/**`, gated by
-  the `EmbedFrontend` build-time flag), sets up request logging via `slog`. `registrar.go` defines
+  the `EmbedFrontend` build-time flag), sets up request logging via `slog`. `shell.go` serves
+  the SPA fallback route: it runs the registered `ShellResponder`s and renders `index.html`
+  from the `ShellContributor`s on `FrontendConfig` (title, head, `#root` markup; built-ins for
+  the custom stylesheet and `InjectCodeInHeader` last), see
+  [ADR-0017](./adr/0017-spa-shell-contributors.md). `registrar.go` defines
   the `RouteRegistrar` interface and `RouterContext` (engine, auth cookie manager, CSRF cookie
   manager, options) that every `internal/wiki/<domain>` package's `Routes` implements/receives —
   this is the seam that lets each domain slice register its own routes/middleware without the
