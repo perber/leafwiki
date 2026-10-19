@@ -180,7 +180,7 @@ describe('BackupSettings conflict edge cases', () => {
         { length: 10 },
         (_, i) => `"root/Über uns/seite-${i}.md"`,
       ).join(', ') +
-      ' and 15 more; make each file match on both sides'
+      ' and 15 more; revert the change to each file on the remote'
     storeState = makeState({
       needsIntervention: true,
       conflictKind: 'fileConflict',
