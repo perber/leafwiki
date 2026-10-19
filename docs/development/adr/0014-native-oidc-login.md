@@ -138,8 +138,10 @@ login. Logout ends the LeafWiki session only.
 
 **Re-checking with the provider on session refresh (optional).** With
 `--oidc-refresh-with-provider` (default off), the callback also stores the provider's refresh
-token, encrypted at rest (AES-GCM, key from `--oidc-token-encryption-key`, at least 32 bytes;
-the encryption helper is extracted from `TOTPService` and shared).
+token, encrypted at rest with the existing `SecretBox` (`internal/core/shared/crypto`,
+AES-GCM, already used for TOTP secrets and backup credentials), keyed by
+`DeriveKey(--oidc-token-encryption-key, "<own label>")`; the operator key must be at least
+32 bytes.
 
 This needs two changes to the session layer in `core/auth`, made as general seams before
 OIDC uses them:
@@ -248,8 +250,7 @@ JSON, so the password login, the TOTP step, the refresh and the OIDC callback sh
 - Instances without `--oidc-issuer-url` are unchanged.
 - One new dependency pair (go-oidc, x/oauth2); both are pure Go and widely used.
 - The general pieces (login methods, cookie helper, session ID, refresh checks, user account
-  policy, admission check, deactivation, the *no local password* state, the encryption
-  helper) change nothing for instances without OIDC and can ship before it.
+  policy, admission check, deactivation, the *no local password* state) change nothing for instances without OIDC and can ship before it.
 - Accounts auto-created by reverse-proxy auth no longer accept a password reset (new accounts
   only).
 - In *roles at the provider* mode, API keys of OIDC users stop working once their owner has
