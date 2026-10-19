@@ -3013,6 +3013,101 @@ func TestGetPageByPathEndpoint_SectionReturnsDirectChildrenOnly(t *testing.T) {
 	}
 }
 
+func TestGetPageByPathEndpoint_ReturnsTagsAndProperties(t *testing.T) {
+	sectionKind := tree.NodeKindSection
+	frontmatter := func(id, title string) string {
+		return "---\nleafwiki_id: " + id + "\nleafwiki_title: " + title + `
+tags:
+  - Alpha
+  - beta
+status: published
+meta:
+  owner: alice
+priority: 2
+---
+# Body
+`
+	}
+
+	tests := []struct {
+		name           string
+		kind           *tree.NodeKind
+		markdownFile   func(storageDir string, page *apiPage) string
+		withMetadata   bool
+		wantRawSnippet []string
+	}{
+		{
+			name: "page with frontmatter",
+			kind: pageNodeKind(),
+			markdownFile: func(storageDir string, page *apiPage) string {
+				return filepath.Join(storageDir, "root", filepath.FromSlash(page.Path)+".md")
+			},
+			withMetadata:   true,
+			wantRawSnippet: []string{`"tags":["alpha","beta"]`},
+		},
+		{
+			name: "section with frontmatter",
+			kind: &sectionKind,
+			markdownFile: func(storageDir string, page *apiPage) string {
+				return filepath.Join(storageDir, "root", filepath.FromSlash(page.Path), "index.md")
+			},
+			withMetadata:   true,
+			wantRawSnippet: []string{`"tags":["alpha","beta"]`},
+		},
+		{
+			name:           "page without frontmatter serializes empty tags and properties",
+			kind:           pageNodeKind(),
+			wantRawSnippet: []string{`"tags":[]`, `"properties":{}`},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := createWikiTestInstance(t)
+			defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+			router := createRouterTestInstance(w, t)
+
+			page := createPageViaAPI(t, router, "Meta", "meta", nil, tt.kind)
+			if tt.withMetadata {
+				target := tt.markdownFile(w.GetStorageDir(), page)
+				if err := os.WriteFile(target, []byte(frontmatter(page.ID, "Meta")), 0o644); err != nil {
+					t.Fatalf("WriteFile(%s) failed: %v", target, err)
+				}
+			}
+
+			rec := authenticatedRequest(t, router, http.MethodGet, "/api/pages/by-path?path=meta", nil)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("Expected status 200, got %d - %s", rec.Code, rec.Body.String())
+			}
+			for _, snippet := range tt.wantRawSnippet {
+				if !strings.Contains(rec.Body.String(), snippet) {
+					t.Errorf("expected response to contain %s, got %s", snippet, rec.Body.String())
+				}
+			}
+
+			var resp apiPage
+			if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("Failed to parse JSON: %v", err)
+			}
+			if resp.Kind != *tt.kind {
+				t.Errorf("kind = %q, want %q", resp.Kind, *tt.kind)
+			}
+			if !tt.withMetadata {
+				return
+			}
+			wantProps := map[string]interface{}{"status": "published", "meta.owner": "alice"}
+			if len(resp.Properties) != len(wantProps) {
+				t.Fatalf("properties = %#v, want %#v", resp.Properties, wantProps)
+			}
+			for key, want := range wantProps {
+				if resp.Properties[key] != want {
+					t.Errorf("properties[%q] = %#v, want %#v", key, resp.Properties[key], want)
+				}
+			}
+		})
+	}
+}
+
 func TestGetPagePermalinkEndpoint_ReturnsCurrentPath(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
