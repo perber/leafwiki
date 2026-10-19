@@ -76,6 +76,31 @@ API refuses role changes for those users (`user_role_managed`). Unlike the proxy
 issuer; it still has to be configured explicitly. Without role groups, roles stay managed in
 LeafWiki and auto-created users get `--oidc-default-role` (default `viewer`, `admin` refused).
 
+**Where users are managed.** The user list always stays in LeafWiki: authorship,
+favorites, user settings, API keys and local accounts are attached to it. What the
+configuration decides is who controls access and roles:
+
+- *Roles in LeafWiki* (no role groups configured): the provider only authenticates. Admins
+  assign roles in LeafWiki as today and can pre-create a user with the right role and email,
+  which `--oidc-link-by-email` links on the first OIDC login. `--oidc-allowed-groups` can
+  still restrict who gets in.
+- *Roles at the provider* (`--oidc-admin-groups` or `--oidc-editor-groups` set): access and
+  role of OIDC users come from the provider; LeafWiki shows them read-only and marks them as
+  managed by single sign-on. If `--oidc-user-management-url` is set, the user list links
+  there for these users. The existing `--user-management-url`, which replaces the whole user
+  area with a link, keeps its meaning.
+
+In both modes, local password accounts can exist next to OIDC users and are managed in
+LeafWiki. The user list shows the last OIDC login, so that users who lost access at the
+provider can be recognised.
+
+**Deactivating users.** Deleting an OIDC user is not a way to keep them out: with
+`--oidc-auto-create` the next login recreates the account. LeafWiki therefore gets a
+`deactivated` state for users, independent of OIDC: a deactivated user cannot log in by any
+method (password, OIDC, reverse-proxy header, API key), their sessions are revoked, and their
+content and history stay. In *roles at the provider* mode the provider still decides first;
+deactivation in LeafWiki blocks in addition, never the other way round.
+
 **Password login next to OIDC.** Users created by OIDC have no usable password: password
 login, password reset and invite acceptance are refused for them, so the provider (and its
 MFA) cannot be bypassed. Linked users keep their password. `--oidc-disable-password-login`
@@ -113,7 +138,7 @@ sessions stay unchanged.
 `--oidc-button-label`, `--oidc-auto-create`, `--oidc-default-role`, `--oidc-link-by-email`,
 `--oidc-disable-password-login`, `--oidc-groups-claim`, `--oidc-allowed-groups`,
 `--oidc-admin-groups`, `--oidc-editor-groups`, `--oidc-refresh-with-provider`,
-`--oidc-token-encryption-key`, each with a `LEAFWIKI_OIDC_*` env var. The
+`--oidc-token-encryption-key`, `--oidc-user-management-url`, each with a `LEAFWIKI_OIDC_*` env var. The
 feature is on exactly when `--oidc-issuer-url` is set. Startup fails if the client ID, secret
 or `--public-url` (used for the redirect URI `<public-url>/api/auth/oidc/callback`) is missing,
 or if the issuer is not `https://` without `--allow-insecure`; with
@@ -163,6 +188,8 @@ login form gets an `if oidc` branch.
   Fully immediate revocation needs back-channel logout, which is out of scope here.
 - A role change at the provider can demote the last admin; it is logged as a warning, and
   `reset-admin-password` is the way back.
+- The `deactivated` user state is a separate, general change that OIDC depends on; it also
+  gives password and reverse-proxy setups a way to block a user without deleting them.
 - Operators who combine reverse-proxy auth and OIDC must know that a proxy-asserted identity
   applies per request and takes precedence.
 - Revisit when operators need more than one provider, RP-initiated or back-channel logout,
