@@ -12,7 +12,11 @@ vi.mock('child_process', async (importOriginal) => {
   }
 })
 
-import { chunkFileName, resolveAppVersion } from './vite.config'
+import {
+  chunkFileName,
+  resolveAppVersion,
+  stripDevShellBody,
+} from './vite.config'
 
 describe('resolveAppVersion', () => {
   const originalAppVersion = process.env.APP_VERSION
@@ -50,5 +54,18 @@ describe('chunkFileName', () => {
     expect(chunkFileName({ name: 'codemirror' })).toBe(
       'static/codemirror-[hash].js',
     )
+  })
+})
+
+describe('stripDevShellBody', () => {
+  it('empties #root in the dev server, where Go does not fill the shell', () => {
+    // The Go server replaces {{__BODY__}} with contributed markup; the Vite
+    // dev server serves index.html as is, so the placeholder would flash as
+    // text until React mounts.
+    expect(
+      stripDevShellBody(
+        '<title>{{__PAGE_TITLE__}}</title><div id="root">{{__BODY__}}</div>',
+      ),
+    ).toBe('<title>{{__PAGE_TITLE__}}</title><div id="root"></div>')
   })
 })
