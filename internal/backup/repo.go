@@ -935,7 +935,7 @@ func fileConflictMessage(paths []string) string {
 		quoted[i] = strconv.QuoteToGraphic(p)
 	}
 	return "pull conflict: changed both on the remote and locally: " + strings.Join(quoted, ", ") + more +
-		"; make each file match on both sides (revert the remote change or edit the page to match), " +
+		"; revert the change to each file on the remote (editing the page in the wiki does not clear it), " +
 		"the next backup cycle retries the pull"
 }
 
