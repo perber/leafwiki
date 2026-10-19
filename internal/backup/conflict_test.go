@@ -2,6 +2,7 @@ package backup
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -373,6 +374,155 @@ func TestConflict_ResolvedBySavingRemoteContentWithNewMetadata_Clears(t *testing
 	remote := remoteHeadCommit(t, bareDir)
 	assertFileInCommit(t, remote, "root/page.md", saved)
 	assertFileInCommit(t, remote, "root/from-remote.md", "remote page\n")
+}
+
+// leafwikiPage builds a page file the way a LeafWiki save writes it, with the
+// given save metadata and body.
+func leafwikiPage(t *testing.T, updatedAt, author, body string) string {
+	t.Helper()
+	content, err := markdown.BuildMarkdownWithFrontmatter(markdown.Frontmatter{
+		LeafWikiID:           "page1",
+		LeafWikiTitle:        "Page",
+		LeafWikiCreatedAt:    "2026-01-01T00:00:00Z",
+		LeafWikiUpdatedAt:    updatedAt,
+		LeafWikiCreatorID:    "alice",
+		LeafWikiLastAuthorID: author,
+	}, body)
+	if err != nil {
+		t.Fatalf("BuildMarkdownWithFrontmatter: %v", err)
+	}
+	return content
+}
+
+// TestConflict_EquivalentPageNextToRealConflict_AppliesNothing tests that a
+// page matching the remote except for save metadata does not let the rest of
+// the pull through while another file still really conflicts: nothing is
+// written, only the real conflict is reported, and it clears once resolved.
+func TestConflict_EquivalentPageNextToRealConflict_AppliesNothing(t *testing.T) {
+	bareDir := initBareRemote(t)
+	repo, rootDir := newRepoWithRemote(t, bareDir)
+	writeFileHelper(t, rootDir, "other.md", "other base\n")
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup (commit other.md): %v", err)
+	}
+	headBefore := headCommit(t, repo).Hash
+
+	remotePage := leafwikiPage(t, "2026-01-02T00:00:00Z", "remote-author", "version B\n")
+	commitFilesToRemote(t, bareDir, map[string]string{
+		"root/page.md":        remotePage,
+		"root/other.md":       "other remote\n",
+		"root/from-remote.md": "remote page\n",
+	})
+	saved := leafwikiPage(t, "2026-01-03T00:00:00Z", "local-author", "version B\n")
+	writeFileHelper(t, rootDir, "page.md", saved)
+	writeFileHelper(t, rootDir, "other.md", "other local\n")
+
+	if err := repo.RunBackup(); !errors.Is(err, errPullConflict) {
+		t.Fatalf("RunBackup err = %v, want errPullConflict", err)
+	}
+	details := repo.Status().ConflictDetails
+	if !strings.Contains(details, "root/other.md") || strings.Contains(details, "root/page.md") {
+		t.Errorf("ConflictDetails = %q, want root/other.md listed and root/page.md not", details)
+	}
+	readFileEqual(t, filepath.Join(rootDir, "page.md"), saved)
+	readFileEqual(t, filepath.Join(rootDir, "other.md"), "other local\n")
+	if _, err := os.Stat(filepath.Join(rootDir, "from-remote.md")); !os.IsNotExist(err) {
+		t.Errorf("from-remote.md was written despite the conflict (stat err = %v)", err)
+	}
+	if got := headCommit(t, repo).Hash; got != headBefore {
+		t.Errorf("HEAD moved to %s, want it to stay at %s", got, headBefore)
+	}
+
+	writeFileHelper(t, rootDir, "other.md", "other remote\n")
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup after resolving other.md: %v", err)
+	}
+	remote := remoteHeadCommit(t, bareDir)
+	assertFileInCommit(t, remote, "root/page.md", saved)
+	assertFileInCommit(t, remote, "root/other.md", "other remote\n")
+	assertFileInCommit(t, remote, "root/from-remote.md", "remote page\n")
+}
+
+// TestConflict_ResolvedBySavingRemoteContent_LaterCyclesConverge tests the
+// cycles after a conflict cleared through equivalent content: the next backup
+// pushes nothing new, and a later remote edit of the page reaches the
+// unedited local file byte for byte instead of conflicting again.
+func TestConflict_ResolvedBySavingRemoteContent_LaterCyclesConverge(t *testing.T) {
+	bareDir := initBareRemote(t)
+	repo, rootDir := newRepoWithRemote(t, bareDir)
+
+	commitFilesToRemote(t, bareDir, map[string]string{
+		"root/page.md": leafwikiPage(t, "2026-01-02T00:00:00Z", "remote-author", "version B\n"),
+	})
+	writeFileHelper(t, rootDir, "page.md", leafwikiPage(t, "2026-01-03T00:00:00Z", "local-author", "version C\n"))
+	if err := repo.RunBackup(); !errors.Is(err, errPullConflict) {
+		t.Fatalf("first RunBackup err = %v, want errPullConflict", err)
+	}
+	saved := leafwikiPage(t, "2026-01-04T00:00:00Z", "local-author", "version B\n")
+	writeFileHelper(t, rootDir, "page.md", saved)
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup after saving the remote content: %v", err)
+	}
+	pushed := remoteHeadCommit(t, bareDir).Hash
+
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("idle RunBackup: %v", err)
+	}
+	if got := remoteHeadCommit(t, bareDir).Hash; got != pushed {
+		t.Errorf("idle RunBackup moved the remote from %s to %s", pushed, got)
+	}
+
+	later := leafwikiPage(t, "2026-01-05T00:00:00Z", "remote-author", "version D\n")
+	commitFilesToRemote(t, bareDir, map[string]string{"root/page.md": later})
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup after a later remote edit: %v", err)
+	}
+	if snap := repo.Status(); snap.NeedsIntervention || snap.LastError != "" {
+		t.Errorf("expected a clean status, got NeedsIntervention=%v LastError=%q", snap.NeedsIntervention, snap.LastError)
+	}
+	readFileEqual(t, filepath.Join(rootDir, "page.md"), later)
+	assertFileInCommit(t, remoteHeadCommit(t, bareDir), "root/page.md", later)
+}
+
+// TestConflict_RemoteCaseRenameOfSavedPage_StaysConflict tests a remote
+// case-only rename plus a metadata change of a page that was saved locally
+// with the same body: the remote delete of the old-case name would remove the
+// local file, so it stays a conflict on both kinds of filesystem and the
+// local file is left as it is.
+func TestConflict_RemoteCaseRenameOfSavedPage_StaysConflict(t *testing.T) {
+	if filesystemIsCaseInsensitive(t) {
+		t.Skip("the remote case-only rename needs a case-sensitive filesystem to be committed")
+	}
+	// caseInsensitive simulates the Windows/macOS code path on this host.
+	for _, caseInsensitive := range []bool{false, true} {
+		t.Run(fmt.Sprintf("caseInsensitive=%v", caseInsensitive), func(t *testing.T) {
+			bareDir := initBareRemote(t)
+			repo, rootDir := newRepoWithRemote(t, bareDir)
+			repo.liveFSCaseInsensitive = caseInsensitive
+			writeFileHelper(t, rootDir, "page.md", leafwikiPage(t, "2026-01-01T00:00:00Z", "alice", "Body\n"))
+			if err := repo.RunBackup(); err != nil {
+				t.Fatalf("RunBackup (commit page): %v", err)
+			}
+
+			commitChangesToRemote(t, bareDir, map[string]string{
+				"root/Page.md": leafwikiPage(t, "2026-01-02T00:00:00Z", "remote-author", "Body\n"),
+			}, []string{"root/page.md"})
+			saved := leafwikiPage(t, "2026-01-03T00:00:00Z", "local-author", "Body\n")
+			writeFileHelper(t, rootDir, "page.md", saved)
+
+			if err := repo.RunBackup(); !errors.Is(err, errPullConflict) {
+				t.Fatalf("RunBackup err = %v, want errPullConflict", err)
+			}
+			readFileEqual(t, filepath.Join(rootDir, "page.md"), saved)
+			entries, err := os.ReadDir(rootDir)
+			if err != nil {
+				t.Fatalf("ReadDir: %v", err)
+			}
+			if len(entries) != 1 || entries[0].Name() != "page.md" {
+				t.Errorf("root/ holds %v, want only page.md", entries)
+			}
+		})
+	}
 }
 
 // TestConflict_RemoteAhead_RemoteTreeKeepsIncomingPages tests that a pull of

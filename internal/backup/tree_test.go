@@ -348,6 +348,11 @@ func TestPageContentEquivalent_Cases_FallsBackToNotEquivalent(t *testing.T) {
 		{name: "live file changed since it was hashed", rel: "p.md", live: savedPage, remote: remotePage, hashedAs: "older\n"},
 		{name: "live file missing", rel: "gone.md", remote: remotePage},
 		{name: "remote blob missing", rel: "p.md", live: savedPage, remote: remotePage, missing: true},
+		{name: "unicode and special characters in a nested file name", rel: "Über/日本 page & (1).md", live: savedPage, remote: remotePage, wantEqual: true},
+		// The file exists next to the live directory, so only the path check keeps it out.
+		{name: "path escaping the live directory", rel: "../p.md", live: savedPage, remote: remotePage},
+		{name: "asset with the same text under another extension", rel: "img.md.png", live: savedPage, remote: remotePage},
+		{name: "page whose frontmatter breaks only on the remote", rel: "p.md", live: savedPage, remote: brokenPage},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

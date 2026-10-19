@@ -909,6 +909,92 @@ func TestEquivalentIgnoringSaveMetadata_Cases_ComparesAllButSaveMetadata(t *test
 			b:    "Other\n",
 		},
 		{
+			name: "title key instead of leafwiki_title, same value",
+			a:    page(base, "Body\n"),
+			b:    page(replace("leafwiki_title: Page", "title: Page"), "Body\n"),
+		},
+		{
+			name: "save metadata key in another case is a real field",
+			a:    page(base, "Body\n"),
+			b:    page(base+"Leafwiki_Updated_At: 2026-05-05T00:00:00Z\n", "Body\n"),
+		},
+		{
+			name: "save metadata key nested in an extra field differs",
+			a:    page(base+"meta:\n  leafwiki_updated_at: 2026-01-02T00:00:00Z\n", "Body\n"),
+			b:    page(base+"meta:\n  leafwiki_updated_at: 2026-09-09T00:00:00Z\n", "Body\n"),
+		},
+		{
+			name: "extra field changes type only",
+			a:    page(base+"count: 1\n", "Body\n"),
+			b:    page(base+"count: \"1\"\n", "Body\n"),
+		},
+		{
+			name: "body in another Unicode normalization form",
+			a:    page(base, "Café über\n"),
+			b:    page(base, "Café über\n"),
+		},
+		{
+			name: "unicode and special characters in title and body, save metadata differs",
+			a:    page(replace("leafwiki_title: Page", `leafwiki_title: "Über: 日本語 / <a> & ..\\x"`), "Grüße 🌿\n"),
+			b: page(strings.Replace(replace("leafwiki_title: Page", `leafwiki_title: "Über: 日本語 / <a> & ..\\x"`),
+				"leafwiki_last_author_id: alice", "leafwiki_last_author_id: bob", 1), "Grüße 🌿\n"),
+			want: true,
+		},
+		{
+			name: "blank line after the frontmatter on one side",
+			a:    page(base, "Body\n"),
+			b:    page(base, "\nBody\n"),
+		},
+		{
+			name: "very long body differing in its last character",
+			a:    page(base, strings.Repeat("x", 1<<20)+"a"),
+			b:    page(base, strings.Repeat("x", 1<<20)+"b"),
+		},
+		{
+			name: "both files empty",
+			a:    "",
+			b:    "",
+			want: true,
+		},
+		{
+			name: "empty file against frontmatter with only save metadata",
+			a:    "",
+			b:    "---\nleafwiki_updated_at: 2026-01-02T00:00:00Z\n---\n",
+		},
+		{
+			// YAML formatting is documented as not mattering: a byte order
+			// mark, quoting, a comment or a repaired value all parse to the
+			// same page.
+			name: "byte order mark on one side",
+			a:    page(base, "Body\n"),
+			b:    "\xef\xbb\xbf" + page(base, "Body\n"),
+			want: true,
+		},
+		{
+			name: "quoted and unquoted values",
+			a:    page(base, "Body\n"),
+			b:    page(replace("leafwiki_title: Page", "leafwiki_title: \"Page\""), "Body\n"),
+			want: true,
+		},
+		{
+			name: "YAML comment on one side",
+			a:    page(base, "Body\n"),
+			b:    page(base+"# a comment\n", "Body\n"),
+			want: true,
+		},
+		{
+			name: "title that needs repair against the quoted title",
+			a:    page(replace("leafwiki_title: Page", "leafwiki_title: ADR-1: Page"), "Body\n"),
+			b:    page(replace("leafwiki_title: Page", "leafwiki_title: \"ADR-1: Page\""), "Body\n"),
+			want: true,
+		},
+		{
+			name:    "unparsable frontmatter on one side only",
+			a:       page("leafwiki_id: [invalid: yaml: structure\n", "Body\n"),
+			b:       page(base, "Body\n"),
+			wantErr: true,
+		},
+		{
 			name:    "unparsable frontmatter",
 			a:       page("leafwiki_id: [invalid: yaml: structure\n", "Body\n"),
 			b:       page("leafwiki_id: [invalid: yaml: structure\n", "Body\n"),
