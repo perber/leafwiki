@@ -305,32 +305,7 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 					return
 				}
 
-				siteName := "LeafWiki"
-				if frontendCfg.GetSiteName != nil {
-					if name := frontendCfg.GetSiteName(); name != "" {
-						siteName = name
-					}
-				}
-				faviconFile := ""
-				if frontendCfg.GetFaviconFile != nil {
-					faviconFile = frontendCfg.GetFaviconFile()
-				}
-
-				doc := indexTemplate
-				escapedBasePath := html.EscapeString(opts.BasePath)
-				doc = strings.ReplaceAll(doc, "{{__SITE_NAME__}}", html.EscapeString(siteName))
-				doc = strings.ReplaceAll(doc, "{{__BASE_PATH__}}", escapedBasePath)
-				doc = strings.ReplaceAll(doc, "{{__FAVICON_HREF__}}", html.EscapeString(BuildFrontendFaviconHref(opts.BasePath, faviconFile)))
-				// Rewrite Vite's relative "./static/" asset references to absolute paths
-				// so they resolve correctly when index.html is served for deep SPA routes.
-				// Lazy chunks still use import.meta.url for their own path resolution.
-				doc = strings.ReplaceAll(doc, `"./static/`, `"`+escapedBasePath+`/static/`)
-
-				doc = injectIntoHead(doc, buildCustomStylesheetTag(opts.BasePath, customStylesheetPath))
-
-				if opts.InjectCodeInHeader != "" {
-					doc = injectIntoHead(doc, opts.InjectCodeInHeader)
-				}
+				doc := renderIndex(indexTemplate, frontendCfg, opts, customStylesheetPath)
 				c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(doc))
 			} else {
 				c.String(http.StatusNotFound, "Page not found")
@@ -339,6 +314,37 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 	}
 
 	return engine
+}
+
+// renderIndex fills the SPA index template for one request.
+func renderIndex(indexTemplate string, frontendCfg FrontendConfig, opts RouterOptions, customStylesheetPath string) string {
+	siteName := "LeafWiki"
+	if frontendCfg.GetSiteName != nil {
+		if name := frontendCfg.GetSiteName(); name != "" {
+			siteName = name
+		}
+	}
+	faviconFile := ""
+	if frontendCfg.GetFaviconFile != nil {
+		faviconFile = frontendCfg.GetFaviconFile()
+	}
+
+	doc := indexTemplate
+	escapedBasePath := html.EscapeString(opts.BasePath)
+	doc = strings.ReplaceAll(doc, "{{__SITE_NAME__}}", html.EscapeString(siteName))
+	doc = strings.ReplaceAll(doc, "{{__BASE_PATH__}}", escapedBasePath)
+	doc = strings.ReplaceAll(doc, "{{__FAVICON_HREF__}}", html.EscapeString(BuildFrontendFaviconHref(opts.BasePath, faviconFile)))
+	// Rewrite Vite's relative "./static/" asset references to absolute paths
+	// so they resolve correctly when index.html is served for deep SPA routes.
+	// Lazy chunks still use import.meta.url for their own path resolution.
+	doc = strings.ReplaceAll(doc, `"./static/`, `"`+escapedBasePath+`/static/`)
+
+	doc = injectIntoHead(doc, buildCustomStylesheetTag(opts.BasePath, customStylesheetPath))
+
+	if opts.InjectCodeInHeader != "" {
+		doc = injectIntoHead(doc, opts.InjectCodeInHeader)
+	}
+	return doc
 }
 
 func BuildFrontendFaviconHref(basePath, faviconFile string) string {
