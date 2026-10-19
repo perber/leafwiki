@@ -77,6 +77,8 @@ func (w *Wiki) buildPagesRoutes() *wikipages.Routes {
 		ConvertPage:     wikipages.NewConvertPageUseCase(w.tree, w.revision, w.log),
 		CopyPage:        wikipages.NewCopyPageUseCase(w.tree, w.slug, o, w.asset, w.log),
 		Queries:         wikipages.NewPageQueries(w.tree),
+		PageViewByID:    wikipages.NewGetPageViewByIDUseCase(w.tree),
+		PageViewByPath:  wikipages.NewGetPageViewByPathUseCase(w.tree),
 		SortPages:       wikipages.NewSortPagesUseCase(w.tree),
 		EnsurePath:      wikipages.NewEnsurePathUseCase(w.tree, w.slug, o, w.log),
 		SuggestSlug:     wikipages.NewSuggestSlugUseCase(w.tree, w.slug),

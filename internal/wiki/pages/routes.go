@@ -31,6 +31,8 @@ type Routes struct {
 	convertPage     *ConvertPageUseCase
 	copyPage        *CopyPageUseCase
 	queries         *PageQueries
+	pageViewByID    *GetPageViewByIDUseCase
+	pageViewByPath  *GetPageViewByPathUseCase
 	sortPages       *SortPagesUseCase
 	ensurePath      *EnsurePathUseCase
 	suggestSlug     *SuggestSlugUseCase
@@ -54,6 +56,8 @@ type RoutesConfig struct {
 	ConvertPage     *ConvertPageUseCase
 	CopyPage        *CopyPageUseCase
 	Queries         *PageQueries
+	PageViewByID    *GetPageViewByIDUseCase
+	PageViewByPath  *GetPageViewByPathUseCase
 	SortPages       *SortPagesUseCase
 	EnsurePath      *EnsurePathUseCase
 	SuggestSlug     *SuggestSlugUseCase
@@ -78,6 +82,8 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 		convertPage:     cfg.ConvertPage,
 		copyPage:        cfg.CopyPage,
 		queries:         cfg.Queries,
+		pageViewByID:    cfg.PageViewByID,
+		pageViewByPath:  cfg.PageViewByPath,
 		sortPages:       cfg.SortPages,
 		ensurePath:      cfg.EnsurePath,
 		suggestSlug:     cfg.SuggestSlug,
@@ -148,31 +154,29 @@ func (r *Routes) handleGetTree(c *gin.Context) {
 }
 
 func (r *Routes) handleGetPage(c *gin.Context) {
-	id := strings.TrimSpace(c.Param("id"))
-	page, err := r.queries.GetPage(id)
+	view, err := r.pageViewByID.Execute(c.Request.Context(), GetPageViewByIDInput{
+		ID: strings.TrimSpace(c.Param("id")),
+	})
 	if err != nil {
 		respondWithPageError(c, err)
 		return
 	}
-	r.respondPage(c, http.StatusOK, page)
+	r.respondPageView(c, view, -1)
 }
 
 func (r *Routes) handleGetByPath(c *gin.Context) {
-	routePath := strings.TrimSpace(c.Query("path"))
-	if routePath == "" {
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageMissingPath, "Missing path", "missing path")
-		return
-	}
-	page, err := r.queries.FindByPath(routePath)
+	view, err := r.pageViewByPath.Execute(c.Request.Context(), GetPageViewByPathInput{
+		RoutePath: strings.TrimSpace(c.Query("path")),
+	})
 	if err != nil {
 		respondWithPageError(c, err)
 		return
 	}
 	depth := 0
-	if page.Kind == tree.NodeKindSection {
+	if view.Page.Kind == tree.NodeKindSection {
 		depth = 1
 	}
-	r.respondPageWithDepth(c, http.StatusOK, page, depth)
+	r.respondPageView(c, view, depth)
 }
 
 func (r *Routes) handleFindByTitle(c *gin.Context) {
@@ -572,10 +576,13 @@ func (r *Routes) respondPage(c *gin.Context, status int, page *tree.Page) {
 	c.JSON(status, apiPage)
 }
 
-func (r *Routes) respondPageWithDepth(c *gin.Context, status int, page *tree.Page, depth int) {
-	apiPage := dto.ToAPIPageWithDepth(page, r.userResolver, depth)
-	r.enrichPageMetadata(apiPage)
-	c.JSON(status, apiPage)
+// respondPageView writes a page view as returned by the read endpoints;
+// depth limits how many child levels are included (negative: all).
+func (r *Routes) respondPageView(c *gin.Context, view *PageView, depth int) {
+	apiPage := dto.ToAPIPageWithDepth(view.Page, r.userResolver, depth)
+	apiPage.Tags = view.Tags
+	apiPage.Properties = view.Properties
+	c.JSON(http.StatusOK, apiPage)
 }
 
 func (r *Routes) enrichPageMetadata(page *dto.Page) {
