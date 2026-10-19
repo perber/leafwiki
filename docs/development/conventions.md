@@ -77,6 +77,7 @@ Rules:
    |---|---|---|
    | `RouteRegistrar` | `internal/http/registrar.go` | each slice registers its own routes |
    | `PageSideEffect` | `internal/wiki/pagesave` | reactions to page create/update/move/delete/restore |
+   | `ShellResponder` / `ShellContributor` on `FrontendConfig` | `internal/http/shell.go` | the HTML document served for SPA routes: title, head and `#root` markup, or another response ([ADR-0017](./adr/0017-spa-shell-contributors.md)) |
    | `Provider` interfaces + `settings.Value` (`Managed`/`Fixed`) | `internal/publicaccess`, `internal/tocdisplay`, `internal/core/settings` | instance settings changeable at runtime or pinned by a flag |
    | Narrow consumer interfaces | e.g. `importer.ImporterWiki` | a package depends on what it needs, not on `*wiki.Wiki` |
    | State store registration (`stateDBs` + `restore.SwappableStore`) | `internal/restore/swap.go`, `Wiki.StateStores` | a new SQLite store with real state joins snapshots and live restore ([ADR-0016](./adr/0016-state-store-registration.md)) |
