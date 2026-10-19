@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/go-git/go-git/v5/plumbing"
@@ -25,6 +26,8 @@ func TestPlanContentChanges_PerPathCases_PlansExpectedChanges(t *testing.T) {
 	write := func(rel, content string) []plannedWrite {
 		return []plannedWrite{{rel: rel, blob: blob(content)}}
 	}
+	always := func(string) bool { return true }
+	never := func(string) bool { return false }
 
 	tests := []struct {
 		name         string
@@ -33,7 +36,11 @@ func TestPlanContentChanges_PerPathCases_PlansExpectedChanges(t *testing.T) {
 		live         map[string]plumbing.Hash
 		caseFold     bool
 		unbornBranch bool
-		want         contentChanges
+		// equivalent, when set, answers the content-equivalence check for
+		// every path; wantConsulted lists the paths it must be asked about.
+		equivalent    func(rel string) bool
+		wantConsulted []string
+		want          contentChanges
 	}{
 		{
 			name:   "remote unchanged, local edit is left for the backup",
@@ -218,12 +225,151 @@ func TestPlanContentChanges_PerPathCases_PlansExpectedChanges(t *testing.T) {
 			caseFold: true,
 			want:     contentChanges{conflicts: []string{"Foo.md", "foo.md"}},
 		},
+		{
+			name:          "remote and local edit the same file to equivalent content",
+			base:          files("p.md", "base"),
+			remote:        files("p.md", "remote"),
+			live:          files("p.md", "local"),
+			equivalent:    always,
+			wantConsulted: []string{"p.md"},
+		},
+		{
+			name:          "remote and local edit the same file to different content",
+			base:          files("p.md", "base"),
+			remote:        files("p.md", "remote"),
+			live:          files("p.md", "local"),
+			equivalent:    never,
+			wantConsulted: []string{"p.md"},
+			want:          contentChanges{conflicts: []string{"p.md"}},
+		},
+		{
+			name:          "remote adds a file that exists locally with equivalent content",
+			remote:        files("new.md", "remote"),
+			live:          files("new.md", "local"),
+			equivalent:    always,
+			wantConsulted: []string{"new.md"},
+		},
+		{
+			// Equivalence is only asked where a conflict would be recorded,
+			// so the remote's save metadata still reaches an unedited file.
+			name:       "live matches base, remote changes metadata only, still written",
+			base:       files("p.md", "base"),
+			remote:     files("p.md", "remote"),
+			live:       files("p.md", "base"),
+			equivalent: always,
+			want:       contentChanges{writes: write("p.md", "remote")},
+		},
+		{
+			name:       "equivalence is not asked for a remote delete of a locally edited file",
+			base:       files("p.md", "base"),
+			remote:     files(),
+			live:       files("p.md", "local"),
+			equivalent: always,
+			want:       contentChanges{conflicts: []string{"p.md"}},
+		},
+		{
+			name:       "equivalence is not asked for a remote edit of a locally deleted file",
+			base:       files("p.md", "base"),
+			remote:     files("p.md", "remote"),
+			live:       files(),
+			equivalent: always,
+			want:       contentChanges{conflicts: []string{"p.md"}},
+		},
+		{
+			name:         "equivalence is not asked on an unborn branch",
+			remote:       files("p.md", "remote"),
+			live:         files("p.md", "local"),
+			unbornBranch: true,
+			equivalent:   always,
+		},
+		{
+			// Keeping a file found under another case would let a delete of
+			// its old-case name in the same pull remove it (a remote
+			// case-only rename plus a metadata change), so it stays a conflict.
+			name:       "equivalence is not asked for a file found under another case",
+			base:       files("Foo.md", "page"),
+			remote:     files("foo.md", "remote"),
+			live:       files("Foo.md", "page"),
+			caseFold:   true,
+			equivalent: always,
+			want: contentChanges{
+				deletes:   []string{"Foo.md"},
+				conflicts: []string{"foo.md"},
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := planContentChanges(tc.base, tc.remote, tc.live, tc.caseFold, !tc.unbornBranch)
+			var consulted []string
+			var equivalent func(rel string, live, remote plumbing.Hash) bool
+			if tc.equivalent != nil {
+				equivalent = func(rel string, live, remote plumbing.Hash) bool {
+					consulted = append(consulted, rel)
+					if live != tc.live[rel] || remote != tc.remote[rel] {
+						t.Errorf("equivalent(%q) got live %s remote %s, want %s %s", rel, live, remote, tc.live[rel], tc.remote[rel])
+					}
+					return tc.equivalent(rel)
+				}
+			}
+			got := planContentChanges(tc.base, tc.remote, tc.live, tc.caseFold, !tc.unbornBranch, equivalent)
 			if !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("planContentChanges() = %+v, want %+v", got, tc.want)
+			}
+			if !reflect.DeepEqual(consulted, tc.wantConsulted) {
+				t.Errorf("equivalence consulted for %q, want %q", consulted, tc.wantConsulted)
+			}
+		})
+	}
+}
+
+// TestPageContentEquivalent_Cases_FallsBackToNotEquivalent tests the check a
+// pull asks before recording a conflict: pages are compared by content, and
+// anything it cannot compare that way stays a conflict.
+func TestPageContentEquivalent_Cases_FallsBackToNotEquivalent(t *testing.T) {
+	const (
+		remotePage = "---\nleafwiki_id: p1\nleafwiki_updated_at: 2026-01-01T00:00:00Z\n---\nBody\n"
+		savedPage  = "---\nleafwiki_id: p1\nleafwiki_updated_at: 2026-02-02T00:00:00Z\n---\nBody\n"
+		brokenPage = "---\nleafwiki_id: [invalid: yaml: structure\n---\nBody\n"
+	)
+	tests := []struct {
+		name      string
+		rel       string
+		live      string
+		remote    string
+		hashedAs  string // what the live file held when it was hashed; defaults to live
+		missing   bool   // the remote blob is not in the repository
+		wantEqual bool
+	}{
+		{name: "page differing only in save metadata", rel: "p.md", live: savedPage, remote: remotePage, wantEqual: true},
+		{name: "upper-case .MD extension", rel: "p.MD", live: savedPage, remote: remotePage, wantEqual: true},
+		{name: "page with other body", rel: "p.md", live: strings.Replace(savedPage, "Body", "Other", 1), remote: remotePage},
+		{name: "non-page file with the same text", rel: "p.txt", live: savedPage, remote: remotePage},
+		{name: "unparsable frontmatter", rel: "p.md", live: brokenPage, remote: brokenPage + " "},
+		{name: "live file changed since it was hashed", rel: "p.md", live: savedPage, remote: remotePage, hashedAs: "older\n"},
+		{name: "live file missing", rel: "gone.md", remote: remotePage},
+		{name: "remote blob missing", rel: "p.md", live: savedPage, remote: remotePage, missing: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, rootDir := newRepoWithRemote(t, initBareRemote(t))
+			if tc.live != "" {
+				writeFileHelper(t, rootDir, tc.rel, tc.live)
+			}
+			hashedAs := tc.live
+			if tc.hashedAs != "" {
+				hashedAs = tc.hashedAs
+			}
+			remote := plumbing.ComputeHash(plumbing.BlobObject, []byte(tc.remote))
+			if !tc.missing {
+				var err error
+				if remote, err = repo.writeBlob([]byte(tc.remote)); err != nil {
+					t.Fatalf("writeBlob: %v", err)
+				}
+			}
+
+			live := plumbing.ComputeHash(plumbing.BlobObject, []byte(hashedAs))
+			if got := repo.pageContentEquivalent(rootDir)(tc.rel, live, remote); got != tc.wantEqual {
+				t.Errorf("pageContentEquivalent(%q) = %v, want %v", tc.rel, got, tc.wantEqual)
 			}
 		})
 	}

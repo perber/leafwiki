@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -17,6 +18,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 	"github.com/go-git/go-git/v5/plumbing/object"
+
+	"github.com/perber/wiki/internal/core/markdown"
 )
 
 // This file implements LeafWiki's git backup using git plumbing rather than the
@@ -678,12 +681,46 @@ func (r *Repository) planMaterialize(baseCommit, remoteCommit *object.Commit) ([
 		if err != nil {
 			return nil, fmt.Errorf("read live %s: %w", t.liveDir, err)
 		}
-		plans = append(plans, targetPlan{
-			target:         t,
-			contentChanges: planContentChanges(baseFiles, remoteFiles, live, r.liveFSCaseInsensitive, baseCommit != nil),
-		})
+		changes := planContentChanges(baseFiles, remoteFiles, live, r.liveFSCaseInsensitive, baseCommit != nil,
+			r.pageContentEquivalent(t.liveDir))
+		plans = append(plans, targetPlan{target: t, contentChanges: changes})
 	}
 	return plans, nil
+}
+
+// pageContentEquivalent returns the equivalence check planContentChanges uses
+// for files under liveDir: a page saved in LeafWiki always gets a new
+// leafwiki_updated_at and leafwiki_last_author_id, so editing it to match the
+// remote never matches byte for byte. Only *.md files are compared by content;
+// anything else, a read or parse error, or a live file that changed since it
+// was hashed counts as not equivalent and stays a conflict.
+func (r *Repository) pageContentEquivalent(liveDir string) func(rel string, live, remote plumbing.Hash) bool {
+	return func(rel string, live, remote plumbing.Hash) bool {
+		if !strings.EqualFold(path.Ext(rel), ".md") {
+			return false
+		}
+		livePath, err := resolveLivePath(liveDir, rel)
+		if err != nil {
+			return false
+		}
+		liveContent, err := os.ReadFile(livePath)
+		if err != nil || plumbing.ComputeHash(plumbing.BlobObject, liveContent) != live {
+			return false
+		}
+		remoteContent, err := r.readBlob(remote)
+		if err != nil {
+			return false
+		}
+		equivalent, err := markdown.EquivalentIgnoringSaveMetadata(string(liveContent), string(remoteContent))
+		if err != nil {
+			slog.Debug("backup: page frontmatter does not parse, comparing bytes", "file", rel, "error", err)
+			return false
+		}
+		if equivalent {
+			slog.Debug("backup: page matches the remote except for save metadata, keeping the local file", "file", rel)
+		}
+		return equivalent
+	}
 }
 
 // planContentChanges decides, per path, how to bring the live files (live) from
@@ -699,10 +736,19 @@ func (r *Repository) planMaterialize(baseCommit, remoteCommit *object.Commit) ([
 //     applying the remote change would discard a local change.
 //   - Otherwise the remote version is written, or the file deleted.
 //
+// Before recording a conflict for a file present on both sides, equivalent
+// (if not nil) may declare the live and remote versions the same content; the
+// live file is then kept as it is and the next backup commit pushes it. It is
+// not asked anywhere else, so an unedited live file still gets the remote
+// version byte for byte.
+//
 // With caseFold, a live file recorded under a different case than the tree
 // path (a local rename on a case-insensitive filesystem) is the same physical
 // file the OS would write over, so it is found through a case-folded lookup.
-func planContentChanges(base, remote, live map[string]plumbing.Hash, caseFold, checkConflicts bool) contentChanges {
+// Such a file is never kept through equivalent: a delete of its old-case name
+// in the same pull would remove it.
+func planContentChanges(base, remote, live map[string]plumbing.Hash, caseFold, checkConflicts bool,
+	equivalent func(rel string, live, remote plumbing.Hash) bool) contentChanges {
 	var liveFolded map[string]plumbing.Hash
 	if caseFold {
 		liveFolded = make(map[string]plumbing.Hash, len(live))
@@ -742,6 +788,9 @@ func planContentChanges(base, remote, live map[string]plumbing.Hash, caseFold, c
 			continue
 		}
 		if liveOK != baseOK || liveHash != baseHash {
+			if equivalent != nil && liveOK && remoteOK && !folded && equivalent(rel, liveHash, remoteHash) {
+				continue
+			}
 			out.conflicts = append(out.conflicts, rel)
 			continue
 		}

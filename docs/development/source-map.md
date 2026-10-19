@@ -168,6 +168,14 @@ resync-derived state.
   (a remote change hits a locally changed file; nothing is applied, local stays behind the
   remote, and `ForcePush` refuses with `ErrForcePushRemoteAhead` → 409
   `backup_force_push_conflict`, because overwriting would drop the remote commits).
+  Since 2026-10: a `.md` file whose content equals the remote except for `leafwiki_updated_at` /
+  `leafwiki_last_author_id` (`markdown.EquivalentIgnoringSaveMetadata`) is not a conflict; the
+  local file is kept and its save metadata wins in the next backup commit, because every page
+  save rewrites those two keys. Deliberate, so editing a page to match the remote clears the
+  conflict; any other body difference, even a trailing newline, still conflicts. Differences
+  that only change formatting, as LeafWiki parses the file (BOM, CRLF vs. LF, YAML quoting,
+  comments, key order), count as equal too; the local formatting then replaces the remote's at
+  the branch tip, and the remote version stays in git history.
   `compareWithRemote` decides the relation for both the pull and `ForcePush`; `ForcePush` leases
   its push on the remote tip it compared, so a commit pushed in between is not overwritten. Don't
   move the backup branch ref by hand to clear a conflict: a local branch behind the remote is

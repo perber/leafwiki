@@ -935,7 +935,8 @@ func fileConflictMessage(paths []string) string {
 		quoted[i] = strconv.QuoteToGraphic(p)
 	}
 	return "pull conflict: changed both on the remote and locally: " + strings.Join(quoted, ", ") + more +
-		"; make each file match on both sides (revert the remote change or edit the page to match), " +
+		"; make each file match on both sides (revert the remote change, or edit the page so its content matches; " +
+		"LeafWiki's own timestamp and author fields are ignored), " +
 		"the next backup cycle retries the pull"
 }
 

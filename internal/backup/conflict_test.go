@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/perber/wiki/internal/core/markdown"
 )
 
 // TestConflict_DivergedHistory tests that RunBackup sets NeedsIntervention when
@@ -319,6 +321,57 @@ func TestConflict_ResolvedByMatchingRemote_Clears(t *testing.T) {
 	readFileEqual(t, filepath.Join(rootDir, "from-remote.md"), "remote page\n")
 	remote := remoteHeadCommit(t, bareDir)
 	assertFileInCommit(t, remote, "root/page.md", "version B from remote\n")
+	assertFileInCommit(t, remote, "root/from-remote.md", "remote page\n")
+}
+
+// TestConflict_ResolvedBySavingRemoteContentWithNewMetadata_Clears tests that
+// a conflict also clears when the page is edited in LeafWiki to match the
+// remote: a save rewrites leafwiki_updated_at and leafwiki_last_author_id, so
+// the bytes never match, but the content does. The local file is kept as it
+// is (its save metadata wins) and the next backup commit pushes it.
+func TestConflict_ResolvedBySavingRemoteContentWithNewMetadata_Clears(t *testing.T) {
+	bareDir := initBareRemote(t)
+	repo, rootDir := newRepoWithRemote(t, bareDir)
+	page := func(updatedAt, author, body string) string {
+		t.Helper()
+		content, err := markdown.BuildMarkdownWithFrontmatter(markdown.Frontmatter{
+			LeafWikiID:           "page1",
+			LeafWikiTitle:        "Page",
+			LeafWikiCreatedAt:    "2026-01-01T00:00:00Z",
+			LeafWikiUpdatedAt:    updatedAt,
+			LeafWikiCreatorID:    "alice",
+			LeafWikiLastAuthorID: author,
+		}, body)
+		if err != nil {
+			t.Fatalf("BuildMarkdownWithFrontmatter: %v", err)
+		}
+		return content
+	}
+
+	commitFilesToRemote(t, bareDir, map[string]string{
+		"root/page.md":        page("2026-01-02T00:00:00Z", "remote-author", "version B from remote\n"),
+		"root/from-remote.md": "remote page\n",
+	})
+	writeFileHelper(t, rootDir, "page.md", page("2026-01-03T00:00:00Z", "local-author", "version C local\n"))
+	if err := repo.RunBackup(); !errors.Is(err, errPullConflict) {
+		t.Fatalf("first RunBackup err = %v, want errPullConflict", err)
+	}
+
+	// The admin edits the page in LeafWiki until its content matches the
+	// remote; the save stamps its own time and author.
+	saved := page("2026-01-04T00:00:00Z", "local-author", "version B from remote\n")
+	writeFileHelper(t, rootDir, "page.md", saved)
+
+	if err := repo.RunBackup(); err != nil {
+		t.Fatalf("RunBackup after saving the remote content: %v", err)
+	}
+	if snap := repo.Status(); snap.NeedsIntervention || snap.LastError != "" {
+		t.Errorf("expected a clean status, got NeedsIntervention=%v LastError=%q", snap.NeedsIntervention, snap.LastError)
+	}
+	readFileEqual(t, filepath.Join(rootDir, "page.md"), saved)
+	readFileEqual(t, filepath.Join(rootDir, "from-remote.md"), "remote page\n")
+	remote := remoteHeadCommit(t, bareDir)
+	assertFileInCommit(t, remote, "root/page.md", saved)
 	assertFileInCommit(t, remote, "root/from-remote.md", "remote page\n")
 }
 

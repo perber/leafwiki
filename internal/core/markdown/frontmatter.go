@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -19,6 +20,8 @@ func invalidYAMLKeyRune(r rune) bool {
 	return !(unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-')
 }
 
+// Frontmatter is the parsed form of a page's frontmatter. A field added only
+// for parsing (like repaired) must also be cleared in withoutSaveMetadata.
 type Frontmatter struct {
 	LeafWikiID           string                 `yaml:"leafwiki_id,omitempty" json:"id,omitempty"`
 	LeafWikiTitle        string                 `yaml:"leafwiki_title,omitempty" json:"title,omitempty"`
@@ -359,6 +362,40 @@ func ParseFrontmatter(md string) (fm Frontmatter, body string, has bool, err err
 		return Frontmatter{}, md, true, err
 	}
 	return fm, body, true, nil
+}
+
+// EquivalentIgnoringSaveMetadata reports whether two page files hold the same
+// content once the keys every save rewrites (leafwiki_updated_at,
+// leafwiki_last_author_id) are left out. Body, the other leafwiki_* keys and
+// all extra frontmatter fields must be equal as LeafWiki parses them
+// (ParseFrontmatter), so differences that parsing drops count as equal:
+// formatting only (key order, quoting, comments, a BOM, CRLF line endings,
+// YAML the sanitize fallback repaired) and whatever parseFrontmatterYAML
+// normalizes (trimmed whitespace and quotes, a non-bool leafwiki_pinned). A file whose
+// frontmatter does not parse returns an error wrapping ErrFrontmatterParse,
+// never true.
+func EquivalentIgnoringSaveMetadata(a, b string) (bool, error) {
+	fmA, bodyA, hasA, err := ParseFrontmatter(a)
+	if err != nil {
+		return false, err
+	}
+	fmB, bodyB, hasB, err := ParseFrontmatter(b)
+	if err != nil {
+		return false, err
+	}
+	if hasA != hasB || bodyA != bodyB {
+		return false, nil
+	}
+	return reflect.DeepEqual(withoutSaveMetadata(fmA), withoutSaveMetadata(fmB)), nil
+}
+
+// withoutSaveMetadata clears what EquivalentIgnoringSaveMetadata ignores:
+// the save metadata and how the YAML was parsed.
+func withoutSaveMetadata(fm Frontmatter) Frontmatter {
+	fm.LeafWikiUpdatedAt = ""
+	fm.LeafWikiLastAuthorID = ""
+	fm.repaired = false
+	return fm
 }
 
 func toYAMLNode(value interface{}) (*yaml.Node, error) {

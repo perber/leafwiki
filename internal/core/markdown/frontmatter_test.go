@@ -773,3 +773,168 @@ func TestKnownLeafWikiStringFrontmatterKeys_MatchesFrontmatterStruct(t *testing.
 		}
 	}
 }
+
+// TestEquivalentIgnoringSaveMetadata_Cases_ComparesAllButSaveMetadata covers
+// which differences between two page files count as a real change. Only the
+// keys a save rewrites (leafwiki_updated_at, leafwiki_last_author_id) are
+// ignored; everything else must match.
+func TestEquivalentIgnoringSaveMetadata_Cases_ComparesAllButSaveMetadata(t *testing.T) {
+	page := func(frontmatter, body string) string {
+		return "---\n" + frontmatter + "---\n" + body
+	}
+	const base = "leafwiki_id: abc123\n" +
+		"leafwiki_title: Page\n" +
+		"leafwiki_created_at: 2026-01-01T00:00:00Z\n" +
+		"leafwiki_updated_at: 2026-01-02T00:00:00Z\n" +
+		"leafwiki_creator_id: alice\n" +
+		"leafwiki_last_author_id: alice\n" +
+		"leafwiki_pinned: true\n" +
+		"tags:\n  - a\n"
+	replace := func(old, new string) string {
+		return strings.Replace(base, old, new, 1)
+	}
+
+	tests := []struct {
+		name    string
+		a, b    string
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "identical files",
+			a:    page(base, "Body\n"),
+			b:    page(base, "Body\n"),
+			want: true,
+		},
+		{
+			name: "only updated_at and last_author_id differ",
+			a:    page(base, "Body\n"),
+			b: page(strings.Replace(
+				replace("leafwiki_updated_at: 2026-01-02T00:00:00Z", "leafwiki_updated_at: 2026-03-04T05:06:07Z"),
+				"leafwiki_last_author_id: alice", "leafwiki_last_author_id: bob", 1), "Body\n"),
+			want: true,
+		},
+		{
+			name: "only updated_at differs",
+			a:    page(base, "Body\n"),
+			b: page(replace("leafwiki_updated_at: 2026-01-02T00:00:00Z", "leafwiki_updated_at: 2026-03-04T05:06:07Z"),
+				"Body\n"),
+			want: true,
+		},
+		{
+			name: "only last_author_id differs",
+			a:    page(base, "Body\n"),
+			b:    page(replace("leafwiki_last_author_id: alice", "leafwiki_last_author_id: bob"), "Body\n"),
+			want: true,
+		},
+		{
+			name: "save metadata missing on one side",
+			a:    page(base, "Body\n"),
+			b: page(strings.Replace(replace("leafwiki_updated_at: 2026-01-02T00:00:00Z\n", ""),
+				"leafwiki_last_author_id: alice\n", "", 1), "Body\n"),
+			want: true,
+		},
+		{
+			name: "same keys in another order",
+			a:    page(base, "Body\n"),
+			b:    page("tags:\n  - a\n"+replace("tags:\n  - a\n", ""), "Body\n"),
+			want: true,
+		},
+		{
+			name: "one body character differs",
+			a:    page(base, "Body\n"),
+			b:    page(base, "Bodx\n"),
+		},
+		{
+			name: "trailing newline of the body differs",
+			a:    page(base, "Body\n"),
+			b:    page(base, "Body"),
+		},
+		{
+			name: "body line endings differ",
+			a:    page(base, "Line 1\nLine 2\n"),
+			b:    strings.ReplaceAll(page(base, "Line 1\nLine 2\n"), "\n", "\r\n"),
+			want: true,
+		},
+		{
+			name: "title differs",
+			a:    page(base, "Body\n"),
+			b:    page(replace("leafwiki_title: Page", "leafwiki_title: Other"), "Body\n"),
+		},
+		{
+			name: "leafwiki_id differs",
+			a:    page(base, "Body\n"),
+			b:    page(replace("leafwiki_id: abc123", "leafwiki_id: xyz789"), "Body\n"),
+		},
+		{
+			name: "created_at differs",
+			a:    page(base, "Body\n"),
+			b: page(replace("leafwiki_created_at: 2026-01-01T00:00:00Z", "leafwiki_created_at: 2025-01-01T00:00:00Z"),
+				"Body\n"),
+		},
+		{
+			name: "creator_id differs",
+			a:    page(base, "Body\n"),
+			b:    page(replace("leafwiki_creator_id: alice", "leafwiki_creator_id: bob"), "Body\n"),
+		},
+		{
+			name: "pinned differs",
+			a:    page(base, "Body\n"),
+			b:    page(replace("leafwiki_pinned: true\n", ""), "Body\n"),
+		},
+		{
+			name: "an extra field differs",
+			a:    page(base, "Body\n"),
+			b:    page(replace("  - a\n", "  - b\n"), "Body\n"),
+		},
+		{
+			name: "an extra field is added",
+			a:    page(base, "Body\n"),
+			b:    page(base+"status: draft\n", "Body\n"),
+		},
+		{
+			name: "frontmatter on one side only",
+			a:    "---\nleafwiki_updated_at: 2026-01-02T00:00:00Z\n---\nBody\n",
+			b:    "Body\n",
+		},
+		{
+			name: "no frontmatter, same text",
+			a:    "Body\n",
+			b:    "Body\n",
+			want: true,
+		},
+		{
+			name: "no frontmatter, other text",
+			a:    "Body\n",
+			b:    "Other\n",
+		},
+		{
+			name:    "unparsable frontmatter",
+			a:       page("leafwiki_id: [invalid: yaml: structure\n", "Body\n"),
+			b:       page("leafwiki_id: [invalid: yaml: structure\n", "Body\n"),
+			wantErr: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, args := range [][2]string{{tc.a, tc.b}, {tc.b, tc.a}} {
+				got, err := EquivalentIgnoringSaveMetadata(args[0], args[1])
+				if tc.wantErr {
+					if !errors.Is(err, ErrFrontmatterParse) {
+						t.Fatalf("err = %v, want ErrFrontmatterParse", err)
+					}
+					if got {
+						t.Error("got equivalent = true together with an error")
+					}
+					continue
+				}
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if got != tc.want {
+					t.Errorf("EquivalentIgnoringSaveMetadata() = %v, want %v", got, tc.want)
+				}
+			}
+		})
+	}
+}
