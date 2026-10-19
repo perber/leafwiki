@@ -1,7 +1,7 @@
 import { execSync } from 'child_process'
 import react from '@vitejs/plugin-react'
 import path from 'path'
-import { defineConfig, type ConfigEnv } from 'vite'
+import { defineConfig, type ConfigEnv, type Plugin } from 'vite'
 
 // Mirrors scripts/resolve-version.sh's own env-var-override branch before
 // falling back to invoking the script. This isn't just an optimization: the
@@ -50,6 +50,19 @@ export function chunkFileName(chunk: { name: string }): string {
   return `static/${chunk.name.replace(/^[._]+/, '')}-[hash].js`
 }
 
+// The Go server fills {{__BODY__}} inside #root with server-rendered markup
+// (internal/http/shell.go). The dev server serves index.html unprocessed, so
+// drop the placeholder there instead of showing it until React mounts.
+export function stripDevShellBody(html: string): string {
+  return html.replaceAll('{{__BODY__}}', '')
+}
+
+const devShellPlaceholders: Plugin = {
+  name: 'leafwiki-dev-shell-placeholders',
+  apply: 'serve',
+  transformIndexHtml: stripDevShellBody,
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ command }: ConfigEnv) => ({
   // Relative base so asset paths in the built HTML are ./static/... instead of /static/...
@@ -60,7 +73,7 @@ export default defineConfig(({ command }: ConfigEnv) => ({
   define: {
     __APP_VERSION__: JSON.stringify(resolveAppVersion()),
   },
-  plugins: [react()],
+  plugins: [react(), devShellPlaceholders],
   server: {
     proxy: {
       '/assets': {

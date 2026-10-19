@@ -310,5 +310,9 @@ func (w *Wiki) FrontendConfig() httpinternal.FrontendConfig {
 			}
 			return cfg.FaviconFile
 		},
+		// SPA shell seam (ADR-0017): features register here, in the order
+		// they should run. Requests reaching them are always anonymous.
+		ShellResponders:   nil,
+		ShellContributors: nil,
 	}
 }
