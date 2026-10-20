@@ -3,11 +3,14 @@
 # images build with. CI reads Go from go.mod's toolchain line and Node from
 # .nvmrc; the Dockerfiles pin their base images separately, and Dependabot
 # bumps only those. Compared: the full Go version (so the Dockerfiles pin a
-# patch tag, never a floating one like 1.27-alpine), Node major.
+# patch tag, never a floating one like 1.27-alpine), Node major. The
+# committed mise config takes Node from .nvmrc and Go as a bootstrap only.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+# shellcheck source=lib/toolchain-versions.sh
+. scripts/lib/toolchain-versions.sh
 
 DOCKERFILES=(Dockerfile Dockerfile.builder)
 status=0
@@ -36,13 +39,12 @@ image_versions() {
     ' "$1"
 }
 
-go_version="$(sed -n -E 's/^toolchain go([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' go.mod)"
+go_version="$(toolchain_go_version || true)"
 if [[ -z "$go_version" ]]; then
     fail go.mod "go.mod has no toolchain go<major>.<minor>.<patch> line; CI reads the Go version from it."
 fi
 
-# The first non-blank line, without a leading v: 26, v26 and 26.10.0 give 26.
-node_version="$(awk 'NF { sub(/^v/, "", $1); sub(/[^0-9].*/, "", $1); print $1; exit }' .nvmrc 2>/dev/null || true)"
+node_version="$(toolchain_node_major || true)"
 if [[ -z "$node_version" ]]; then
     fail .nvmrc ".nvmrc is missing or has no Node major version; CI reads the Node version from it."
 fi
@@ -73,6 +75,34 @@ for dockerfile in "${DOCKERFILES[@]}"; do
     fi
     check "$dockerfile" golang Go "$go_version" "go.mod's toolchain line" 1-3
     check "$dockerfile" node Node "$node_version" .nvmrc 1
+done
+
+# The committed mise configs carry no versions of their own: Node comes from
+# .nvmrc and Go from go.mod's toolchain line. Deliberately strict and
+# syntax-blind, so no TOML spelling (aliases, backend prefixes, dotted keys,
+# inline tables) gets around it: after comments are stripped, any line naming
+# node fails, except the setting that makes mise read .nvmrc; a line naming
+# go or golang passes only as exactly go = "latest" (a bootstrap) or the
+# toolchain version. .tool-versions must not name either. Per-user overrides
+# (mise.local.toml, .config/) are left alone.
+# mise_violations <file>: prints "<line number>: <line>" per violation.
+mise_violations() {
+    awk -v strict="$([[ "$1" == .tool-versions ]] && echo 1)" -v want="$go_version" '
+        { sub(/\r$/, ""); sub(/#.*/, ""); line = tolower($0); bare = $0; gsub(/[ \t]/, "", bare) }
+        !strict && line ~ /^[ \t]*idiomatic_version_file_enable_tools[ \t]*=/ { next }
+        line ~ /(^|[^a-z0-9_])node/ { print FNR ": " $0; next }
+        line ~ /(^|[^a-z0-9_])go(lang)?([^a-z0-9_]|$)/ {
+            if (strict || (bare != "go=\"latest\"" && bare != "go=\047latest\047" &&
+                bare != "go=\"" want "\"" && bare != "go=\047" want "\047")) print FNR ": " $0
+        }
+    ' "$1"
+}
+
+for file in mise.toml .mise.toml mise/config.toml .mise/config.toml .tool-versions; do
+    [[ -f "$file" ]] || continue
+    while IFS= read -r violation; do
+        fail "$file" "$file:$violation: Node comes from .nvmrc and Go from go.mod; the only allowed entry is go = \"latest\" or go = \"$go_version\"."
+    done < <(mise_violations "$file")
 done
 
 if [[ "$status" -ne 0 ]]; then
