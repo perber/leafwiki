@@ -355,7 +355,8 @@ an ADR. Dependabot bumps are not new dependencies.
 Toolchain versions have one source each: Go in the `toolchain` line of `go.mod`, Node in
 `.nvmrc`; CI reads both. Dependabot bumps only the `golang`/`node` base images in the
 Dockerfiles, so such a PR updates the matching file too. *Enforced by `make verify`
-(`scripts/check-toolchain-versions.sh`): Go major.minor and Node major must match.*
+(`scripts/check-toolchain-versions.sh`): the full Go version must match, so the Dockerfiles
+pin a patch tag such as `golang:1.27.3-alpine`; Node must match in the major version.*
 CI jobs call Makefile targets; exceptions are listed at the `ci` target.
 
 ## On-disk format and migrations

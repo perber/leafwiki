@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-GO_FROM='FROM golang:1.27-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414 AS backend'
+GO_FROM='FROM golang:1.27.1-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414 AS backend'
 NODE_FROM='FROM node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80 AS frontend'
 
 FAILURES=0
@@ -38,14 +38,15 @@ expect() {
 
 BOTH="$NODE_FROM\n$GO_FROM\n"
 expect matching                ok   'toolchain go1.27.1' '26\n'      "$BOTH"
-expect toolchain-without-patch ok   'toolchain go1.27'   '26\n'      "$BOTH"
+expect toolchain-without-patch fail 'toolchain go1.27'   '26\n'      "$BOTH"
 expect nvmrc-v-prefix          ok   'toolchain go1.27.1' 'v26\n'     "$BOTH"
 expect nvmrc-full-version      ok   'toolchain go1.27.1' '26.10.0'   "$BOTH"
 expect nvmrc-crlf              ok   'toolchain go1.27.1' '26\r\n'    "$BOTH"
-expect image-patch-tag         ok   'toolchain go1.27.1' '26\n'      "$NODE_FROM\nFROM golang:1.27.1-alpine AS backend\n"
-expect platform-flag           ok   'toolchain go1.27.1' '26\n'      "$NODE_FROM\nFROM --platform=\$BUILDPLATFORM golang:1.27-alpine AS backend\n"
-expect lowercase-from          ok   'toolchain go1.27.1' '26\n'      "from node:26-alpine AS frontend\nfrom golang:1.27-alpine AS backend\n"
-expect docker-io-prefix        ok   'toolchain go1.27.1' '26\n'      "FROM docker.io/library/node:26-alpine\nFROM docker.io/library/golang:1.27-alpine\n"
+expect floating-image-tag      fail 'toolchain go1.27.1' '26\n'      "$NODE_FROM\nFROM golang:1.27-alpine AS backend\n"
+expect go-patch-drift          fail 'toolchain go1.27.2' '26\n'      "$BOTH"
+expect platform-flag           ok   'toolchain go1.27.1' '26\n'      "$NODE_FROM\nFROM --platform=\$BUILDPLATFORM golang:1.27.1-alpine AS backend\n"
+expect lowercase-from          ok   'toolchain go1.27.1' '26\n'      "from node:26-alpine AS frontend\nfrom golang:1.27.1-alpine AS backend\n"
+expect docker-io-prefix        ok   'toolchain go1.27.1' '26\n'      "FROM docker.io/library/node:26-alpine\nFROM docker.io/library/golang:1.27.1-alpine\n"
 expect nvmrc-leading-blank     ok   'toolchain go1.27.1' '\n\n26\n'  "$BOTH"
 expect go-drift                fail 'toolchain go1.27.1' '26\n'      "$NODE_FROM\nFROM golang:1.26-alpine AS backend\n"
 expect second-go-stage-drift   fail 'toolchain go1.27.1' '26\n'      "$BOTH""FROM golang:1.25-alpine AS tools\n"
