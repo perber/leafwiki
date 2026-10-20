@@ -118,6 +118,7 @@ To keep reviews efficient, please follow these guidelines:
 
 - **Every PR must reference an existing issue** (e.g. `Fixes #123`). PRs without a linked issue — or that weren't discussed on the issue first — may be closed and asked to go through the [issue process](#picking-up-an-issue) instead.
 - Keep pull requests **small and focused** ([size limits](./docs/development/conventions.md#pull-requests))
+- Give the PR a **[Conventional Commit](#commit-style) title** (`type(scope): description`); it becomes the squash commit and is checked in CI
 - Clearly **describe the change**
 - Avoid unrelated formatting changes
 - Update documentation if necessary
@@ -177,6 +178,10 @@ Common commit types:
 - `refactor` – internal improvements
 - `chore` – maintenance work
 - `test` – tests
+
+Also accepted: `perf`, `style`, `ci`, `build`, `revert`. A `!` after the type or scope marks a
+breaking change (`feat(api)!: …`). The PR title follows the same format; the
+`PR Title` workflow (`.github/workflows/pr-title.yml`) checks it.
 
 ---
 

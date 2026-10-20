@@ -564,3 +564,5 @@ the convention, remove dead helpers. Constraints:
 - One topic per PR; refactoring and behaviour changes in separate PRs.
 - One logical change per commit, in the [commit style](../../CONTRIBUTING.md#commit-style).
   Formatting is checked in CI (`npm run format:check`); run `npm run format` before committing.
+- The PR title is a Conventional Commit too; it becomes the squash commit.
+  *Enforced by `.github/workflows/pr-title.yml`.*

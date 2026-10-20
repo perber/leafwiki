@@ -1,0 +1,39 @@
+name: PR Title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches:
+      - main
+      - release/*
+      - releases/*
+
+permissions: {}
+
+jobs:
+  conventional-commit:
+    name: Check PR title is a Conventional Commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            // Squash merges use the PR title as the commit subject, and
+            // scripts/changelog.sh groups the release notes by its type.
+            // The title is read from the payload, never interpolated into
+            // the script, so it can't inject code.
+            const title = context.payload.pull_request.title.trim();
+            const types = ['build', 'chore', 'ci', 'docs', 'feat', 'fix', 'perf', 'refactor', 'revert', 'style', 'test'];
+            const conventional = new RegExp(`^(${types.join('|')})(\\([A-Za-z0-9][A-Za-z0-9._/-]*\\))?!?: \\S`);
+            // GitHub's "Revert" button produces `Revert "<original title>"`.
+            const githubRevert = /^Revert ".+"$/;
+            if (conventional.test(title) || githubRevert.test(title)) {
+              core.info(`PR title OK: ${title}`);
+              return;
+            }
+            core.setFailed(
+              `PR title "${title}" is not a Conventional Commit. ` +
+              `Use "type(scope): description" with type one of ${types.join(', ')}; ` +
+              'see CONTRIBUTING.md#commit-style.'
+            );
