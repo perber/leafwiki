@@ -107,6 +107,8 @@ http://localhost:5173
 
 Before submitting the code execute `npm run format` in the `ui/leafwiki-ui` directory.
 If you change the e2e tests, please also run `npm run format` in the `e2e` directory.
+In the repository root, `make verify` runs the small repository checks and `make cross`
+builds and vets for Windows and macOS, the same as CI.
 
 Translating the UI or adding a language? See [docs/i18n.md](docs/i18n.md).
 How the code is structured: [docs/development/](docs/development/README.md).
