@@ -31,11 +31,12 @@ Read before changing code — **[docs/development/](./docs/development/README.md
 | Frontend typecheck + build | `npm run build` (not `npx tsc --noEmit`, it checks nothing) | `ui/leafwiki-ui` |
 | Frontend tests / lint / format | `npm test` / `npm run lint -- --max-warnings=0` / `npm run format` | `ui/leafwiki-ui` |
 | E2E | `make run-e2e`; lint/format in `e2e` | repo root |
-| Local dev | backend: `go run . --jwt-secret=dev --admin-password=devpassword --public-access=true --allow-insecure=true` in `cmd/leafwiki`; frontend: `npm run dev` | |
+| Local dev | `make dev` (both, Ctrl-C stops both), or backend: `go run . --jwt-secret=dev --admin-password=devpassword --public-access=true --allow-insecure=true` in `cmd/leafwiki`; frontend: `npm run dev` | |
 
-A fresh worktree has no `node_modules`: run `npm ci --ignore-scripts` in `ui/leafwiki-ui` first
-(`make ui-check` does it). Toolchain versions have one source each: Go in `go.mod`'s `toolchain`
-line, Node in `.nvmrc`; `make verify` checks that the Dockerfiles match.
+A fresh worktree has no `node_modules`: run `make setup` (`npm ci --ignore-scripts` in
+`ui/leafwiki-ui` and `e2e`) first; `make doctor` checks the Go and Node versions. Toolchain
+versions have one source each: Go in `go.mod`'s `toolchain` line, Node in `.nvmrc`;
+`make verify` checks that the Dockerfiles and `mise.toml` match.
 
 ## Rules
 
