@@ -68,6 +68,12 @@ cross:
 verify:
 	./scripts/check-private-references.sh
 
+# Conventional Commit subjects for BASE..HEAD; CI runs the same script
+# (.github/workflows/commit-messages.yml).
+BASE ?= origin/main
+verify-commits:
+	./scripts/check-commit-messages.sh "$(BASE)..HEAD"
+
 # Build all platform targets
 release: $(PLATFORMS)
 	@echo "✅ All builds complete."
@@ -149,6 +155,7 @@ help:
 	@echo "  make clean                – Clean all generated files"
 	@echo "  make test                 – Run all Go tests"
 	@echo "  make verify               – Run small repository checks (private references)"
+	@echo "  make verify-commits       – Check commit subjects since BASE (default origin/main)"
 	@echo "  make bench                – Run Go benchmarks for links and revision"
 	@echo "  make cross                – Build and vet for windows/amd64 and darwin/arm64"
 	@echo "                              Optional: CROSS_PLATFORMS=\"<goos>/<goarch> ...\""
@@ -161,4 +168,4 @@ help:
 	@echo "  make docker-build-publish – Build and push multi-arch Docker image"
 	@echo "  make changelog            – Generate changelog"
 
-.PHONY: all build build-api ui run clean test bench cross verify fmt lint help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
+.PHONY: all build build-api ui run clean test bench cross verify verify-commits fmt lint help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e

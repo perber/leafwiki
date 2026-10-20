@@ -38,7 +38,9 @@ A fresh worktree has no `node_modules`: run `npm ci --ignore-scripts` in `ui/lea
 The rules live in **[docs/development/rules.md](./docs/development/rules.md)**, nowhere else.
 Read them before changing code; don't restate them in prompts, skills or roles, link there.
 Much of it is enforced in CI (import boundaries, ESLint XSS guard, i18n key parity,
-golangci-lint, Prettier); a red check is a real finding.
+golangci-lint, Prettier, Windows/macOS cross build, private references); a red check is a real
+finding. Commit subjects are checked too (`make verify-commits BASE=origin/main`), as
+information: messy contributor PRs get squash-merged.
 
 ## Commits and pull requests
 

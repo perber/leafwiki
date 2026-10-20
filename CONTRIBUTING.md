@@ -120,6 +120,7 @@ To keep reviews efficient, please follow these guidelines:
 
 - **Every PR must reference an existing issue** (e.g. `Fixes #123`). PRs without a linked issue — or that weren't discussed on the issue first — may be closed and asked to go through the [issue process](#picking-up-an-issue) instead.
 - Keep pull requests **small and focused** ([size limits](./docs/development/conventions.md#pull-requests))
+- Write every commit in the **[commit style](#commit-style)**; PRs are usually rebase-merged, so the commits land on `main` as they are
 - Clearly **describe the change**
 - Avoid unrelated formatting changes
 - Update documentation if necessary
@@ -179,6 +180,14 @@ Common commit types:
 - `refactor` – internal improvements
 - `chore` – maintenance work
 - `test` – tests
+
+Also accepted: `perf`, `style`, `ci`, `build`, `revert`. A `!` after the type or scope marks a
+breaking change (`feat(api)!: …`). Squash `fixup!`/`squash!`/WIP commits before review.
+
+The `Commit messages` workflow checks every commit of a PR; run it locally with
+`make verify-commits BASE=origin/main`. It is informational, not a required check: a PR with
+messy commits gets squash-merged instead, under a title the maintainer sets. The PR title
+only matters in that case.
 
 ---
 

@@ -1,0 +1,32 @@
+name: Commit messages
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+      - release/*
+      - releases/*
+
+permissions:
+  contents: read
+
+jobs:
+  # Most PRs are rebase-merged, so their commits land on main as they are.
+  # Informational, not a required check: a contributor PR with messy commits
+  # gets squash-merged under a title the maintainer sets.
+  commit-messages:
+    name: Commit messages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check commit subjects are Conventional Commits
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: ./scripts/check-commit-messages.sh "${BASE_SHA}..${HEAD_SHA}"
