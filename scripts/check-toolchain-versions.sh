@@ -2,7 +2,8 @@
 # Fails when the Go and Node versions CI uses drift from the ones the release
 # images build with. CI reads Go from go.mod's toolchain line and Node from
 # .nvmrc; the Dockerfiles pin their base images separately, and Dependabot
-# bumps only those. Compared: Go major.minor, Node major.
+# bumps only those. Compared: the full Go version (so the Dockerfiles pin a
+# patch tag, never a floating one like 1.27-alpine), Node major.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -17,7 +18,7 @@ fail() {
 }
 
 # Prints the tag version of every `FROM <image>:<version>-...` line, one per
-# line, e.g. 1.27 for `FROM golang:1.27-alpine@sha256:...`. Accepts any case
+# line, e.g. 1.27.3 for `FROM golang:1.27.3-alpine@sha256:...`. Accepts any case
 # of FROM, flags such as --platform=... and a docker.io/library/ prefix.
 image_versions() {
     awk -v image="$2" '
@@ -35,9 +36,9 @@ image_versions() {
     ' "$1"
 }
 
-go_version="$(sed -n -E 's/^toolchain go([0-9]+\.[0-9]+).*/\1/p' go.mod)"
+go_version="$(sed -n -E 's/^toolchain go([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' go.mod)"
 if [[ -z "$go_version" ]]; then
-    fail go.mod "go.mod has no toolchain line; CI reads the Go version from it."
+    fail go.mod "go.mod has no toolchain go<major>.<minor>.<patch> line; CI reads the Go version from it."
 fi
 
 # The first non-blank line, without a leading v: 26, v26 and 26.10.0 give 26.
@@ -70,7 +71,7 @@ for dockerfile in "${DOCKERFILES[@]}"; do
         fail "$dockerfile" "$dockerfile is missing."
         continue
     fi
-    check "$dockerfile" golang Go "$go_version" "go.mod's toolchain line" 1-2
+    check "$dockerfile" golang Go "$go_version" "go.mod's toolchain line" 1-3
     check "$dockerfile" node Node "$node_version" .nvmrc 1
 done
 
