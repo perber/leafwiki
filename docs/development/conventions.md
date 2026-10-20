@@ -306,7 +306,9 @@ LeafWiki ships for Linux (amd64, 386, arm64), Windows, macOS and Raspberry Pi as
 - OS-specific code goes into build-tagged files (`cmd/leafwiki/signals_unix.go` vs
   `signals_windows.go`, `internal/restore/selfrestart_*.go`).
 - No cgo. Keep memory and CPU use reasonable for a Raspberry Pi.
-- Check that it builds for Windows: `GOOS=windows go build ./...`.
+- Check that it builds for Windows and macOS: `make cross` (build and vet for
+  windows/amd64 and darwin/arm64). *Enforced by the `build-go-cross` job in
+  `.github/workflows/backend.yml`, which runs the same target.*
 
 ## Naming
 

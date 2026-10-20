@@ -16,6 +16,10 @@ PLATFORMS := \
   darwin/amd64 \
   darwin/arm64
 
+# Release targets other than linux, checked by `make cross` (and in CI) so a
+# platform-specific compile error doesn't first show up at the release tag.
+CROSS_PLATFORMS ?= windows/amd64 darwin/arm64
+
 all: build
 
 # Build the Vite SPA into internal/http/dist for go:embed.
@@ -48,6 +52,16 @@ test:
 
 bench:
 	go test -bench=. -benchmem -benchtime=3s ./internal/links/... ./internal/core/revision/...
+
+# Build and vet (which also type-checks _test.go files) for each of
+# CROSS_PLATFORMS, without cgo, like the release builds.
+cross:
+	@for platform in $(CROSS_PLATFORMS); do \
+	  goos=$${platform%/*}; goarch=$${platform#*/}; \
+	  echo "Building and vetting for $$goos/$$goarch..."; \
+	  CGO_ENABLED=0 GOOS=$$goos GOARCH=$$goarch go build ./... || exit 1; \
+	  CGO_ENABLED=0 GOOS=$$goos GOARCH=$$goarch go vet ./... || exit 1; \
+	done
 
 # Build all platform targets
 release: $(PLATFORMS)
@@ -130,6 +144,8 @@ help:
 	@echo "  make clean                – Clean all generated files"
 	@echo "  make test                 – Run all Go tests"
 	@echo "  make bench                – Run Go benchmarks for links and revision"
+	@echo "  make cross                – Build and vet for windows/amd64 and darwin/arm64"
+	@echo "                              Optional: CROSS_PLATFORMS=\"<goos>/<goarch> ...\""
 	@echo "  make run-e2e              – Run end-to-end tests (using Docker)"
 	@echo "  make run-proxy-e2e        – Run reverse-proxy auth E2E tests (Docker + nginx)"
 	@echo "  make run-e2e-local        – Run end-to-end tests via local fast path"
@@ -139,4 +155,4 @@ help:
 	@echo "  make docker-build-publish – Build and push multi-arch Docker image"
 	@echo "  make changelog            – Generate changelog"
 
-.PHONY: all build build-api ui run clean test bench fmt lint help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
+.PHONY: all build build-api ui run clean test bench cross fmt lint help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
