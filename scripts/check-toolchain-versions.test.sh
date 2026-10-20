@@ -110,6 +110,9 @@ expect mise-dotted-key         fail 'toolchain go1.27.1' '26\n'      "$BOTH" 'to
 expect mise-nodejs-alias       fail 'toolchain go1.27.1' '26\n'      "$BOTH" '[tools]\nnodejs = "24"\n'
 expect mise-golang-alias       fail 'toolchain go1.27.1' '26\n'      "$BOTH" '[tools]\ngolang = "1.20"\n'
 expect mise-core-prefix        fail 'toolchain go1.27.1' '26\n'      "$BOTH" '[tools]\n"core:node" = "24"\n'
+expect mise-top-inline-table   fail 'toolchain go1.27.1' '26\n'      "$BOTH" 'tools = { node = "24" }\n'
+expect mise-asdf-backend       fail 'toolchain go1.27.1' '26\n'      "$BOTH" '[tools]\n"asdf:nodejs" = "24"\n'
+expect mise-go-single-quoted   ok   'toolchain go1.27.1' '26\n'      "$BOTH" "[tools]\ngo = 'latest'\n"
 
 # Missing files must fail, never print the success line.
 dir="$WORK/missing"
