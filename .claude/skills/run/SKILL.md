@@ -12,10 +12,10 @@ and the Vite dev server (frontend, proxies `/api`, `/assets`, `/branding` to the
 
 ```bash
 cd cmd/leafwiki
-go run . --jwt-secret=dev --admin-password=dev --public-access=true --allow-insecure=true
+go run . --jwt-secret=dev --admin-password=devpassword --public-access=true --allow-insecure=true
 ```
 
-Runs on `http://localhost:8080`. Admin login: username `admin`, password `dev`.
+Runs on `http://localhost:8080`. Admin login: username `admin`, password `devpassword` (the minimum is 8 characters).
 `--public-access=true` lets you view pages without logging in; use the admin login for
 anything that touches the tree, settings, or editor.
 

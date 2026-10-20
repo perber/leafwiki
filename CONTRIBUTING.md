@@ -98,8 +98,12 @@ Start the backend (in another terminal):
 
 ``` bash
 cd cmd/leafwiki
-go run . --jwt-secret=dev --admin-password=dev --public-access=true --allow-insecure=true
+go run . --jwt-secret=dev --admin-password=devpassword --public-access=true --allow-insecure=true
 ```
+
+`--admin-password` only applies while no admin exists. If your `cmd/leafwiki/data` was created
+with another password, delete that directory for a fresh wiki or run
+`go run . reset-admin-password` in `cmd/leafwiki`, which prints a new one.
 
 The frontend dev server usually runs at:
 
