@@ -112,10 +112,10 @@ In the repository root, `make ci` runs `make verify` (small repository checks), 
 install, lint, format check, tests and build); each also runs on its own. CI additionally runs
 the linux/386 tests, govulncheck, Trivy, the install-script test, the e2e lint and the E2E
 suites. Trivy scans the Go and npm dependencies on every PR (filesystem scans in the backend
-and frontend workflows). It also scans the built Docker image, weekly and on PRs that change an
-image input such as `Dockerfile`, `go.mod` or `package.json` (those files only trigger the image
-scan; their dependencies are already covered by the filesystem scans). `make scan-image` runs
-the image scan locally (needs Docker and `trivy`).
+and frontend workflows). It also scans the built Docker image, weekly, before each release and
+on PRs that change an image input such as `Dockerfile`, `go.mod` or `package.json` (those files
+only trigger the image scan; their dependencies are already covered by the filesystem scans).
+`make scan-image` runs the image scan locally (needs Docker and `trivy`).
 Go and Node versions: the `toolchain` line in `go.mod` (the `go` command downloads it) and
 `.nvmrc` (`nvm use`).
 

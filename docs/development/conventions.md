@@ -360,7 +360,8 @@ pin a patch tag such as `golang:1.27.3-alpine`; Node must match in the major ver
 CI jobs call Makefile targets; exceptions are listed at the `ci` target.
 Trivy scans the dependencies (`go.sum`, `package-lock.json`) on every PR, and the final Docker
 image on PRs that change an image input (`make scan-image`) and weekly against the published
-image (`make scan-published-image`), both in `.github/workflows/image-scan.yml`. Fixable
+image (`make scan-published-image`), both in `.github/workflows/image-scan.yml`, and in the
+release workflow with `make scan-image` for amd64 and arm64 before the push. Fixable
 HIGH/CRITICAL findings fail the scan; a false positive goes into `.trivyignore` with a comment
 saying why.
 

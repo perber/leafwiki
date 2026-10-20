@@ -147,7 +147,8 @@ require-trivy:
 
 # Build the final image for one platform, load it into Docker and scan it.
 # CI runs it on PRs that touch the image inputs
-# (.github/workflows/image-scan.yml).
+# (.github/workflows/image-scan.yml) and in the release workflow before the
+# push, once per platform.
 SCAN_PLATFORM ?= linux/amd64
 SCAN_TAG ?= leafwiki:scan
 scan-image: require-trivy
