@@ -9,6 +9,22 @@ Whether you're fixing a typo, reporting a bug, improving documentation, or contr
 
 ---
 
+## Quick start
+
+Install [mise](https://mise.jdx.dev/getting-started.html), then in the repository root:
+
+``` bash
+mise install   # Node from .nvmrc, Go as a bootstrap (go.mod selects the exact version)
+make setup     # npm dependencies for the frontend and the e2e tests
+make dev       # backend and Vite together; open http://localhost:5173, Ctrl-C stops both
+```
+
+mise is optional: nvm or fnm with `.nvmrc` (`nvm use`) and any Go 1.21 or newer work just as
+well. `make doctor` shows whether your versions match. On Windows, run `make` in Git Bash.
+Details: [Development setup](#development-setup).
+
+---
+
 ## Ways to contribute
 
 There are many ways to help improve LeafWiki:
@@ -86,15 +102,22 @@ git clone https://github.com/perber/leafwiki.git
 cd leafwiki
 ```
 
-Start the frontend:
+Install the dependencies and start the backend and the frontend dev server together:
 
 ``` bash
-cd ui/leafwiki-ui
-npm install
-npm run dev
+make setup
+make dev
 ```
 
-Start the backend (in another terminal):
+Open http://localhost:5173 and log in as `admin` / `devpassword`; Vite proxies the API to the
+backend on port 8080. `make setup-e2e` additionally installs the Playwright browser for local
+E2E runs.
+
+Without `make dev`, start the two in separate terminals:
+
+``` bash
+cd ui/leafwiki-ui && npm run dev
+```
 
 ``` bash
 cd cmd/leafwiki
@@ -104,10 +127,6 @@ go run . --jwt-secret=dev --admin-password=devpassword --public-access=true --al
 `--admin-password` only applies while no admin exists. If your `cmd/leafwiki/data` was created
 with another password, delete that directory for a fresh wiki or run
 `go run . reset-admin-password` in `cmd/leafwiki`, which prints a new one.
-
-The frontend dev server usually runs at:
-
-http://localhost:5173
 
 Before submitting the code execute `npm run format` in the `ui/leafwiki-ui` directory.
 If you change the e2e tests, please also run `npm run format` in the `e2e` directory.
@@ -121,7 +140,7 @@ on PRs that change an image input such as `Dockerfile`, `go.mod` or `package.jso
 only trigger the image scan; their dependencies are already covered by the filesystem scans).
 `make scan-image` runs the image scan locally (needs Docker and `trivy`).
 Go and Node versions: the `toolchain` line in `go.mod` (the `go` command downloads it) and
-`.nvmrc` (`nvm use`).
+`.nvmrc` (`mise install` or `nvm use`); `make doctor` compares them with what you have.
 
 Translating the UI or adding a language? See [docs/i18n.md](docs/i18n.md).
 How the code is structured: [docs/development/](docs/development/README.md).
