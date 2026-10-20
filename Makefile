@@ -72,8 +72,9 @@ ui-test: ui-deps
 ui-check: ui-lint ui-test
 
 # The local subset of the pull-request checks. Not included: the linux/386
-# tests, govulncheck, Trivy, the install-script test, the e2e lint and the E2E
-# suites.
+# tests, govulncheck, Trivy (the dependency scans, and the image scan, which
+# `make scan-image` runs locally with Docker and trivy installed), the
+# install-script test, the e2e lint and the E2E suites.
 # CI jobs that keep their own command: test-go (go test with coverage for the
 # report artifact), lint-go (golangci-lint-action, for PR annotations and its
 # cache) and the e2e lint (npm in e2e/, which has no Make target).
@@ -132,16 +133,46 @@ $(PLATFORMS):
 	 tar -czf $(RELEASE_DIR)/$$OUTPUT.tar.gz -C $(RELEASE_DIR) $$OUTPUT ; \
 	 echo "📦 Compressed: zip and tar.gz"
 
+# Build inputs of the production image that don't depend on the platform.
+# docker-build-publish and scan-image share them, so the release scan checks
+# the image that gets pushed and the push reuses the scan's BuildKit cache.
+IMAGE_BUILD_FLAGS = --file Dockerfile --target final --build-arg APP_VERSION=$(VERSION)
+
+# Trivy settings shared by the image scans: fail only on HIGH/CRITICAL
+# findings that have a fix; .trivyignore holds the accepted false positives.
+TRIVY_IMAGE_FLAGS = --severity HIGH,CRITICAL --ignore-unfixed --ignorefile .trivyignore
+
+require-trivy:
+	@command -v trivy >/dev/null 2>&1 || { echo "trivy is not installed: https://trivy.dev/latest/getting-started/installation/"; exit 1; }
+
+# Build the final image for one platform, load it into Docker and scan it.
+# CI runs it on PRs that touch the image inputs
+# (.github/workflows/image-scan.yml).
+SCAN_PLATFORM ?= linux/amd64
+SCAN_TAG ?= leafwiki:scan
+scan-image: require-trivy
+	docker buildx build $(IMAGE_BUILD_FLAGS) --platform $(SCAN_PLATFORM) --load --tag $(SCAN_TAG) .
+	trivy image --image-src docker --platform $(SCAN_PLATFORM) $(TRIVY_IMAGE_FLAGS) \
+		--exit-code 1 $(SCAN_TAG)
+
+# Scan the published image straight from the registry (--image-src remote, so
+# a stale local copy with another platform isn't scanned instead). The weekly
+# CI run (.github/workflows/image-scan.yml) calls it twice: once with
+# TRIVY_EXIT_CODE=0 and SARIF output for code scanning, once as the gate.
+SCAN_IMAGE ?= ghcr.io/perber/leafwiki:latest
+TRIVY_EXIT_CODE ?= 1
+TRIVY_EXTRA_FLAGS ?=
+scan-published-image: require-trivy
+	trivy image --image-src remote --platform $(SCAN_PLATFORM) $(TRIVY_IMAGE_FLAGS) \
+		--exit-code $(TRIVY_EXIT_CODE) $(TRIVY_EXTRA_FLAGS) $(SCAN_IMAGE)
+
 # Final production Docker image
 docker-build-publish:
 ifndef REPO_OWNER
 	$(error REPO_OWNER is not set. Usage: make docker-build-publish VERSION=vX.Y.Z REPO_OWNER=your_github_username)
 endif
-	docker buildx build \
+	docker buildx build $(IMAGE_BUILD_FLAGS) \
 		--platform linux/amd64,linux/arm64 \
-		--file Dockerfile \
-		--target final \
-		--build-arg APP_VERSION=$(VERSION) \
 		--tag ghcr.io/$(REPO_OWNER)/leafwiki:$(VERSION) \
 		--tag ghcr.io/$(REPO_OWNER)/leafwiki:latest \
 		--annotation "index:org.opencontainers.image.title=LeafWiki" \
@@ -201,6 +232,10 @@ help:
 	@echo "                              Optional: GREP=<pattern> to filter tests"
 	@echo "  make run                  – Run development server (API only; use Vite for UI)"
 	@echo "  make docker-build-publish – Build and push multi-arch Docker image"
+	@echo "  make scan-image           – Build the Docker image for one platform and scan it with Trivy"
+	@echo "                              Optional: SCAN_PLATFORM=linux/arm64 SCAN_TAG=<tag>"
+	@echo "  make scan-published-image – Scan the published image (SCAN_IMAGE, default ghcr.io/perber/leafwiki:latest) with Trivy"
+	@echo "                              Optional: SCAN_PLATFORM, TRIVY_EXIT_CODE, TRIVY_EXTRA_FLAGS"
 	@echo "  make changelog            – Generate changelog"
 
-.PHONY: all build build-api ui run clean test lint ui-deps ui-lint ui-test ui-check ci bench cross verify verify-commits help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
+.PHONY: all build build-api ui run clean test lint ui-deps ui-lint ui-test ui-check ci bench cross verify verify-commits help docker-build-publish require-trivy scan-image scan-published-image changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
