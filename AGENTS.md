@@ -23,15 +23,19 @@ Read before changing code — **[docs/development/](./docs/development/README.md
 
 | What | Command | Where |
 |---|---|---|
-| Backend tests / lint | `go test ./...` / `golangci-lint run` (v2) | repo root |
-| Repository checks (private references) | `make verify` | repo root |
+| Local subset of the PR checks: verify, lint, test, cross, ui-check (not 386 tests, govulncheck, Trivy, install-script test, e2e lint, E2E) | `make ci` | repo root |
+| Backend tests / lint | `make test` / `make lint` (golangci-lint at the version in `.golangci-lint-version`) | repo root |
+| Repository checks (private references, toolchain versions) | `make verify` | repo root |
 | Windows/macOS build check | `make cross` (build + vet for windows/amd64, darwin/arm64) | repo root |
+| Frontend install + lint + format check + tests + build | `make ui-check` | repo root |
 | Frontend typecheck + build | `npm run build` (not `npx tsc --noEmit`, it checks nothing) | `ui/leafwiki-ui` |
 | Frontend tests / lint / format | `npm test` / `npm run lint -- --max-warnings=0` / `npm run format` | `ui/leafwiki-ui` |
 | E2E | `make run-e2e`; lint/format in `e2e` | repo root |
 | Local dev | backend: `go run . --jwt-secret=dev --admin-password=dev --public-access=true --allow-insecure=true` in `cmd/leafwiki`; frontend: `npm run dev` | |
 
-A fresh worktree has no `node_modules`: run `npm ci --ignore-scripts` in `ui/leafwiki-ui` first.
+A fresh worktree has no `node_modules`: run `npm ci --ignore-scripts` in `ui/leafwiki-ui` first
+(`make ui-check` does it). Toolchain versions have one source each: Go in `go.mod`'s `toolchain`
+line, Node in `.nvmrc`; `make verify` checks that the Dockerfiles match.
 
 ## Rules
 

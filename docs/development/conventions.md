@@ -352,6 +352,12 @@ A new dependency (Go module or npm package) needs a reason in the PR description
 A dependency with lasting weight (a runtime service, a database, a framework, a protocol) needs
 an ADR. Dependabot bumps are not new dependencies.
 
+Toolchain versions have one source each: Go in the `toolchain` line of `go.mod`, Node in
+`.nvmrc`; CI reads both. Dependabot bumps only the `golang`/`node` base images in the
+Dockerfiles, so such a PR updates the matching file too. *Enforced by `make verify`
+(`scripts/check-toolchain-versions.sh`): Go major.minor and Node major must match.*
+CI jobs call Makefile targets; exceptions are listed at the `ci` target.
+
 ## On-disk format and migrations
 
 The Markdown tree and its frontmatter are the user's data ([ADR-0001](./adr/0001-filesystem-source-of-truth.md)).

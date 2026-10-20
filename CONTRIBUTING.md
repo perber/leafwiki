@@ -107,8 +107,13 @@ http://localhost:5173
 
 Before submitting the code execute `npm run format` in the `ui/leafwiki-ui` directory.
 If you change the e2e tests, please also run `npm run format` in the `e2e` directory.
-In the repository root, `make verify` runs the small repository checks and `make cross`
-builds and vets for Windows and macOS, the same as CI.
+In the repository root, `make ci` runs `make verify` (small repository checks), `make lint`,
+`make test`, `make cross` (build and vet for Windows and macOS) and `make ui-check` (frontend
+install, lint, format check, tests and build); each also runs on its own. CI additionally runs
+the linux/386 tests, govulncheck, Trivy, the install-script test, the e2e lint and the E2E
+suites.
+Go and Node versions: the `toolchain` line in `go.mod` (the `go` command downloads it) and
+`.nvmrc` (`nvm use`).
 
 Translating the UI or adding a language? See [docs/i18n.md](docs/i18n.md).
 How the code is structured: [docs/development/](docs/development/README.md).
