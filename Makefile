@@ -43,6 +43,27 @@ build: ui
 build-api:
 	go build -ldflags "-X main.Version=$(VERSION)" -o $(BINARY_NAME) $(CMD_DIR)
 
+# npm dependencies for the frontend (ui-deps) and the e2e tests. Install
+# scripts stay off, like in CI and `make ui`.
+setup: ui-deps
+	cd e2e && npm ci --ignore-scripts
+
+# Only for running the E2E suites locally (make run-e2e-local); Chromium is
+# the browser the suites use. On Linux, `npx playwright install-deps chromium`
+# in e2e/ adds missing system libraries (needs sudo).
+setup-e2e: setup
+	cd e2e && npx playwright install chromium
+
+# Toolchain versions against .nvmrc and go.mod; exits 1 on a missing tool or
+# the wrong Node major.
+doctor:
+	@./scripts/doctor.sh
+
+# Backend and Vite dev server together; Ctrl-C stops both. ARGS go to the
+# backend.
+dev:
+	@./scripts/dev.sh $(ARGS)
+
 run:
 	go run -ldflags "-X main.Version=$(VERSION)" $(CMD_DIR)
 
@@ -211,6 +232,11 @@ run-e2e-local-fast:
 
 help:
 	@echo "Available commands:"
+	@echo "  make setup                – Install npm dependencies (frontend and e2e)"
+	@echo "  make setup-e2e            – make setup plus the Playwright browser for local E2E runs"
+	@echo "  make doctor               – Show Go, Node, npm and mise versions; check them against go.mod and .nvmrc"
+	@echo "  make dev                  – Run backend and Vite dev server together (http://localhost:5173)"
+	@echo "                              Optional: ARGS=\"<backend flags>\""
 	@echo "  make build                – Build self-contained binary with embedded UI (needs Node.js)"
 	@echo "  make build-api            – Build API-only binary (use with Vite in Dev Setup)"
 	@echo "  make ui                   – Build frontend into internal/http/dist for embedding"
@@ -239,4 +265,4 @@ help:
 	@echo "                              Optional: SCAN_PLATFORM, TRIVY_EXIT_CODE, TRIVY_EXTRA_FLAGS"
 	@echo "  make changelog            – Generate changelog"
 
-.PHONY: all build build-api ui run clean test lint ui-deps ui-lint ui-test ui-check ci bench cross verify verify-commits help docker-build-publish require-trivy scan-image scan-published-image changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
+.PHONY: all build build-api ui setup setup-e2e doctor dev run clean test lint ui-deps ui-lint ui-test ui-check ci bench cross verify verify-commits help docker-build-publish require-trivy scan-image scan-published-image changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
