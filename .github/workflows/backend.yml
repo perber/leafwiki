@@ -54,6 +54,49 @@ jobs:
           GOARCH: '386'
         run: go test ./...
 
+  # windows/amd64, darwin/amd64 and darwin/arm64 are release targets, but the
+  # release workflow is the only other place that builds them; without this a
+  # platform-specific compile error would first show up at the release tag.
+  # Build and vet only: the runner can't execute these binaries.
+  build-go-cross:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: windows, goarch: amd64 }
+          - { goos: darwin, goarch: amd64 }
+          - { goos: darwin, goarch: arm64 }
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.x'
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Build for ${{ matrix.goos }}/${{ matrix.goarch }}
+        env:
+          CGO_ENABLED: '0'
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go build ./...
+
+      # go build skips _test.go files; vet also type-checks the tests for
+      # this platform.
+      - name: Vet for ${{ matrix.goos }}/${{ matrix.goarch }}
+        env:
+          CGO_ENABLED: '0'
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go vet ./...
+
   test-install-scripts:
     runs-on: ubuntu-latest
     steps:
