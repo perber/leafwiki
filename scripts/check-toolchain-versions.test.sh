@@ -93,6 +93,23 @@ expect tool-versions-go-match  fail 'toolchain go1.27.1' '26\n'      "$BOTH" 'go
 expect tool-versions-other     ok   'toolchain go1.27.1' '26\n'      "$BOTH" '# node 24\npython 3.12\n' .tool-versions
 expect mise-local-override     ok   'toolchain go1.27.1' '26\n'      "$BOTH" '[tools]\nnode = "24"\n' mise.local.toml
 expect config-dir-override     ok   'toolchain go1.27.1' '26\n'      "$BOTH" '[tools]\nnode = "24"\n' .config/mise.toml
+expect mise-empty-file         ok   'toolchain go1.27.1' '26\n'      "$BOTH" ''
+expect mise-commented-out      ok   'toolchain go1.27.1' '26\n'      "$BOTH" '[tools]\n# node = "24"\n'
+expect mise-node-minor         fail 'toolchain go1.27.1' '26\n'      "$BOTH" '[tools]\nnode = "26.1"\n'
+expect mise-node-longer-major  fail 'toolchain go1.27.1' '26\n'      "$BOTH" '[tools]\nnode = "266"\n'
+expect mise-node-latest        fail 'toolchain go1.27.1' '26\n'      "$BOTH" '[tools]\nnode = "latest"\n'
+expect mise-go-empty           fail 'toolchain go1.27.1' '26\n'      "$BOTH" '[tools]\ngo = ""\n'
+expect mise-inline-comment     fail 'toolchain go1.27.1' '26\n'      "$BOTH" '[tools]\nnode = "24" # pinned\n'
+expect mise-indented-spaced    fail 'toolchain go1.27.1' '26\n'      "$BOTH" '[tools]\n  node   =   "24"\n'
+expect mise-header-comment     fail 'toolchain go1.27.1' '26\n'      "$BOTH" '[tools] # pins\nnode = "24"\n'
+expect mise-array-of-tables    fail 'toolchain go1.27.1' '26\n'      "$BOTH" '[tools]\ngo = "latest"\n[[tasks]]\nnode = "24"\n'
+# Spellings mise 2026.10 resolves to the same tool (checked with `mise ls --current`).
+expect mise-spaced-header      fail 'toolchain go1.27.1' '26\n'      "$BOTH" '[ tools ]\nnode = "24"\n'
+expect mise-node-subtable      fail 'toolchain go1.27.1' '26\n'      "$BOTH" '[tools.node]\nversion = "24"\n'
+expect mise-dotted-key         fail 'toolchain go1.27.1' '26\n'      "$BOTH" 'tools.node = "24"\n'
+expect mise-nodejs-alias       fail 'toolchain go1.27.1' '26\n'      "$BOTH" '[tools]\nnodejs = "24"\n'
+expect mise-golang-alias       fail 'toolchain go1.27.1' '26\n'      "$BOTH" '[tools]\ngolang = "1.20"\n'
+expect mise-core-prefix        fail 'toolchain go1.27.1' '26\n'      "$BOTH" '[tools]\n"core:node" = "24"\n'
 
 # Missing files must fail, never print the success line.
 dir="$WORK/missing"
