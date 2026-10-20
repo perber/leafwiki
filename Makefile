@@ -67,6 +67,7 @@ cross:
 # target (.github/workflows/verify.yml).
 verify:
 	./scripts/check-private-references.sh
+	./scripts/check-toolchain-versions.sh
 
 # Conventional Commit subjects for BASE..HEAD; CI runs the same script
 # (.github/workflows/commit-messages.yml).
@@ -154,7 +155,7 @@ help:
 	@echo "  make release              – Cross-compile binaries for all platforms (via Docker)"
 	@echo "  make clean                – Clean all generated files"
 	@echo "  make test                 – Run all Go tests"
-	@echo "  make verify               – Run small repository checks (private references)"
+	@echo "  make verify               – Run small repository checks (private references, toolchain versions)"
 	@echo "  make verify-commits       – Check commit subjects since BASE (default origin/main)"
 	@echo "  make bench                – Run Go benchmarks for links and revision"
 	@echo "  make cross                – Build and vet for windows/amd64 and darwin/arm64"
