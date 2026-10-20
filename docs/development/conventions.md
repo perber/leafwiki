@@ -446,6 +446,7 @@ language: [docs/i18n.md](../i18n.md). How to use i18n in code:
   `message` and a `template` that the frontend translates via `errors.json`.
 - Supported languages: `internal/usersettings/language.go` keeps an allow-list that must match
   the locale folders; adding a language means adding it there too (see docs/i18n.md).
+  *Enforced by `TestAllowedLanguages_MatchShippedUILocales`.*
 - Emails (password reset, invite) are English only today.
 
 ## Tests
