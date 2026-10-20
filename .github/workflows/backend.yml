@@ -28,6 +28,7 @@ jobs:
       - name: Lint with golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
+          version-file: .golangci-lint-version
           args: --timeout=5m
     
   # linux/386 is a release target. Building alone isn't enough: 32-bit-only
@@ -52,7 +53,7 @@ jobs:
           CGO_ENABLED: '0'
           GOOS: linux
           GOARCH: '386'
-        run: go test ./...
+        run: make test
 
   # windows/amd64 and darwin/arm64 are release targets, but the release
   # workflow is the only other place that builds them; without this a

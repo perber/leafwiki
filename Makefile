@@ -5,6 +5,9 @@ RELEASE_DIR := releases
 DOCKER_BUILDER := Dockerfile.builder
 UI_DIR := ui/leafwiki-ui
 HTTP_DIST := internal/http/dist
+# Single source for the golangci-lint version; the lint-go job in
+# .github/workflows/backend.yml reads the same file.
+GOLANGCI_LINT_VERSION ?= $(shell cat .golangci-lint-version)
 EMBED_LDFLAGS := -X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production
 LDFLAGS := -X main.Version=$(VERSION) $(EMBED_LDFLAGS)
 
@@ -49,6 +52,32 @@ clean:
 
 test:
 	go test ./...
+
+# Built with the toolchain from go.mod, so the result matches CI.
+lint:
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run
+
+# Frontend checks, in two halves so CI can run them as parallel jobs
+# (.github/workflows/frontend.yml); ui-check runs both.
+ui-deps:
+	cd $(UI_DIR) && npm ci --ignore-scripts
+
+ui-lint: ui-deps
+	cd $(UI_DIR) && npm run lint -- --max-warnings=0 && npm run format:check
+
+# `npm run build` is the type check (tsc -b).
+ui-test: ui-deps
+	cd $(UI_DIR) && npm test && npm run build
+
+ui-check: ui-lint ui-test
+
+# The local subset of the pull-request checks. Not included: the linux/386
+# tests, govulncheck, Trivy, the install-script test, the e2e lint and the E2E
+# suites.
+# CI jobs that keep their own command: test-go (go test with coverage for the
+# report artifact), lint-go (golangci-lint-action, for PR annotations and its
+# cache) and the e2e lint (npm in e2e/, which has no Make target).
+ci: verify lint test cross ui-check
 
 bench:
 	go test -bench=. -benchmem -benchtime=3s ./internal/links/... ./internal/core/revision/...
@@ -155,6 +184,10 @@ help:
 	@echo "  make release              – Cross-compile binaries for all platforms (via Docker)"
 	@echo "  make clean                – Clean all generated files"
 	@echo "  make test                 – Run all Go tests"
+	@echo "  make lint                 – Run golangci-lint (version from .golangci-lint-version)"
+	@echo "  make ui-check             – Frontend install, lint, format check, tests and build"
+	@echo "                              (ui-lint and ui-test run the two halves)"
+	@echo "  make ci                   – verify, lint, test, cross and ui-check, like CI"
 	@echo "  make verify               – Run small repository checks (private references, toolchain versions)"
 	@echo "  make verify-commits       – Check commit subjects since BASE (default origin/main)"
 	@echo "  make bench                – Run Go benchmarks for links and revision"
@@ -169,4 +202,4 @@ help:
 	@echo "  make docker-build-publish – Build and push multi-arch Docker image"
 	@echo "  make changelog            – Generate changelog"
 
-.PHONY: all build build-api ui run clean test bench cross verify verify-commits fmt lint help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
+.PHONY: all build build-api ui run clean test lint ui-deps ui-lint ui-test ui-check ci bench cross verify verify-commits help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
