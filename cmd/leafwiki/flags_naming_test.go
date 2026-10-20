@@ -63,16 +63,20 @@ func TestServerFlags_BoolFlagsUseOptInOrOptOutPrefix(t *testing.T) {
 	}
 }
 
-// TestLegacyBoolFlagNames_StillExist keeps the allowlist from outliving the
-// flags it excuses.
-func TestLegacyBoolFlagNames_StillExist(t *testing.T) {
-	var names []string
+// TestLegacyBoolFlagNames_NameExistingBoolFlags keeps the allowlist from outliving the
+// flags it excuses, and from excusing anything but a bool flag.
+func TestLegacyBoolFlagNames_NameExistingBoolFlags(t *testing.T) {
+	isBool := map[string]bool{}
 	for _, flag := range (&serverConfig{}).flags() {
-		names = append(names, flag.Names()[0])
+		_, isBool[flag.Names()[0]] = flag.(*cli.BoolFlag)
 	}
 	for _, legacy := range legacyBoolFlagNames {
-		if !slices.Contains(names, legacy) {
+		isBoolFlag, exists := isBool[legacy]
+		switch {
+		case !exists:
 			t.Errorf("legacyBoolFlagNames lists --%s, which no longer exists; remove it", legacy)
+		case !isBoolFlag:
+			t.Errorf("legacyBoolFlagNames lists --%s, which is not a bool flag; remove it", legacy)
 		}
 	}
 }
