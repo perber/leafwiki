@@ -565,3 +565,7 @@ the convention, remove dead helpers. Constraints:
 - One topic per PR; refactoring and behaviour changes in separate PRs.
 - One logical change per commit, in the [commit style](../../CONTRIBUTING.md#commit-style).
   Formatting is checked in CI (`npm run format:check`); run `npm run format` before committing.
+- Commit subjects are checked by `.github/workflows/commit-messages.yml`
+  (`make verify-commits BASE=origin/main` locally). Informational, not required: PRs are
+  usually rebase-merged; one with messy commits is squash-merged under a title the maintainer
+  sets, so the PR title only matters then.
