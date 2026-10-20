@@ -238,7 +238,7 @@ Default data directory is `./data`. Change with `--data-dir`.
 
 ### Build from source
 
-Requires Go and Node.js. `make build` compiles the UI, embeds it, and produces a self-contained `leafwiki` binary (same as release/Docker builds). Use HTTP (`http://localhost:8080/`), not HTTPS, unless you terminate TLS in front of LeafWiki.
+Requires Go and Node.js (versions: the `toolchain` line in `go.mod`, and `.nvmrc`). `make build` compiles the UI, embeds it, and produces a self-contained `leafwiki` binary (same as release/Docker builds). Use HTTP (`http://localhost:8080/`), not HTTPS, unless you terminate TLS in front of LeafWiki.
 
 ```bash
 git clone https://github.com/perber/leafwiki.git
