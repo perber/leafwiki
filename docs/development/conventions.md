@@ -313,7 +313,7 @@ LeafWiki ships for Linux (amd64, 386, arm64), Windows, macOS and Raspberry Pi as
 | What | Scheme | Examples |
 |---|---|---|
 | CLI flag | kebab-case, `<area>-<setting>`; every flag of one feature shares the area prefix | `smtp-host`, `git-backup-branch`, `snapshot-retention` |
-| Env var | exactly `LEAFWIKI_` + the flag in upper snake case, nothing else (all 66 current flags follow this) | `--smtp-host` → `LEAFWIKI_SMTP_HOST` |
+| Env var | exactly `LEAFWIKI_` + the flag in upper snake case, nothing else | `--smtp-host` → `LEAFWIKI_SMTP_HOST` |
 | Boolean flag, opt-in feature (default off) | `enable-<feature>` | `enable-metrics`, `enable-link-refactor` |
 | Boolean flag, opt-out (default on) | `disable-<thing>` | `disable-request-log` |
 | Boolean flag, loosens security (default off) | `allow-<thing>` | `allow-insecure` |
@@ -329,9 +329,12 @@ LeafWiki ships for Linux (amd64, 386, arm64), Windows, macOS and Raspberry Pi as
 | i18n key | `<area>.<element>` camelCase (see [i18n](#internationalization-i18n)) | `page404.createButton` |
 | Branch | `<type>/<short-topic>`, type as in Conventional Commits; issue number if there is one | `fix/1656-attachments-visibility`, `refactor/avatar-use-case-input` |
 
-Existing outliers, kept for compatibility: boolean features without `enable-` (`git-backup`,
-`snapshot`, `public-access`), `editor-limit`, `restore-upload-max-size`. New flags follow the
-table. Every flag is documented in the configuration reference under `docs/` and listed
+Existing outliers, kept for compatibility: boolean flags without `enable-`/`disable-`/`allow-`
+(`git-backup`, `snapshot`, `public-access`, `hide-link-metadata-section`,
+`smtp-insecure-skip-verify`), `editor-limit`, `restore-upload-max-size`. New flags follow the
+table. The env var scheme and the boolean prefixes are enforced by
+`cmd/leafwiki/flags_naming_test.go`; its `legacyBoolFlagNames` allowlist may only shrink.
+Every flag is documented in the configuration reference under `docs/` and listed
 (commented out) in `.env.example` in the same PR.
 
 ## Dependencies
