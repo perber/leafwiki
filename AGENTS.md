@@ -24,7 +24,7 @@ Read before changing code — **[docs/development/](./docs/development/README.md
 | What | Command | Where |
 |---|---|---|
 | Backend tests / lint | `go test ./...` / `golangci-lint run` (v2) | repo root |
-| Windows build check | `GOOS=windows go build ./...` | repo root |
+| Windows/macOS build check | `make cross` (build + vet for windows/amd64, darwin/arm64) | repo root |
 | Frontend typecheck + build | `npm run build` (not `npx tsc --noEmit`, it checks nothing) | `ui/leafwiki-ui` |
 | Frontend tests / lint / format | `npm test` / `npm run lint -- --max-warnings=0` / `npm run format` | `ui/leafwiki-ui` |
 | E2E | `make run-e2e`; lint/format in `e2e` | repo root |
