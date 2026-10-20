@@ -33,7 +33,8 @@ and this page gets fixed.
    [i18n](./conventions.md#internationalization-i18n) · *Enforced by `i18n.test.ts`.*
 8. **No raw HTML sinks** (`innerHTML`, `dangerouslySetInnerHTML`, …). *Enforced by ESLint.*
 9. **Comments explain why** and reference only GitHub issues or ADRs, never private notes,
-   local paths or chat history.
+   local paths or chat history. *Private-note tokens and home paths are caught by
+   `make verify` (`scripts/check-private-references.sh`).*
 
 ## Tests
 

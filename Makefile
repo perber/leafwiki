@@ -63,6 +63,11 @@ cross:
 	  CGO_ENABLED=0 GOOS=$$goos GOARCH=$$goarch go vet ./... || exit 1; \
 	done
 
+# Small repository checks that need neither Go nor Node; CI runs the same
+# target (.github/workflows/verify.yml).
+verify:
+	./scripts/check-private-references.sh
+
 # Build all platform targets
 release: $(PLATFORMS)
 	@echo "✅ All builds complete."
@@ -143,6 +148,7 @@ help:
 	@echo "  make release              – Cross-compile binaries for all platforms (via Docker)"
 	@echo "  make clean                – Clean all generated files"
 	@echo "  make test                 – Run all Go tests"
+	@echo "  make verify               – Run small repository checks (private references)"
 	@echo "  make bench                – Run Go benchmarks for links and revision"
 	@echo "  make cross                – Build and vet for windows/amd64 and darwin/arm64"
 	@echo "                              Optional: CROSS_PLATFORMS=\"<goos>/<goarch> ...\""
@@ -155,4 +161,4 @@ help:
 	@echo "  make docker-build-publish – Build and push multi-arch Docker image"
 	@echo "  make changelog            – Generate changelog"
 
-.PHONY: all build build-api ui run clean test bench cross fmt lint help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
+.PHONY: all build build-api ui run clean test bench cross verify fmt lint help docker-build-publish changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
