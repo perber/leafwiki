@@ -1,0 +1,12 @@
+# Toolchain for contributors using mise (https://mise.jdx.dev); nvm/fnm with
+# .nvmrc work just as well. No versions here: each has one source, checked by
+# scripts/check-toolchain-versions.sh.
+
+[settings]
+# Node from .nvmrc, the file CI reads too.
+idiomatic_version_file_enable_tools = ["node"]
+
+[tools]
+# Only a bootstrap: go.mod's toolchain line makes the go command download the
+# exact version (GOTOOLCHAIN=auto, Go >= 1.21).
+go = "latest"
