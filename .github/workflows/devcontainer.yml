@@ -1,0 +1,84 @@
+name: Dev Container
+
+# Builds .devcontainer/devcontainer.json, runs its postCreateCommand (mise
+# install, make setup) and make doctor inside, so a change that breaks the
+# container for Codespaces and VS Code shows up in the PR. amd64 only; nothing
+# is pushed.
+
+on:
+  pull_request:
+    branches:
+      - main
+      - release/*
+      - releases/*
+    paths:
+      - .devcontainer/**
+      - .devcontainer.json
+      - mise.toml
+      - .mise.toml
+      - mise/config.toml
+      - .mise/config.toml
+      - .tool-versions
+      - .nvmrc
+      - go.mod
+      - Makefile
+      - scripts/**
+      - ui/leafwiki-ui/package.json
+      - ui/leafwiki-ui/package-lock.json
+      - ui/leafwiki-ui/.npmrc
+      - e2e/package.json
+      - e2e/package-lock.json
+      - e2e/.npmrc
+      - .github/workflows/devcontainer.yml
+  push:
+    branches:
+      - main
+    paths:
+      - .devcontainer/**
+      - .devcontainer.json
+      - mise.toml
+      - .mise.toml
+      - mise/config.toml
+      - .mise/config.toml
+      - .tool-versions
+      - .nvmrc
+      - go.mod
+      - Makefile
+      - scripts/**
+      - ui/leafwiki-ui/package.json
+      - ui/leafwiki-ui/package-lock.json
+      - ui/leafwiki-ui/.npmrc
+      - e2e/package.json
+      - e2e/package-lock.json
+      - e2e/.npmrc
+      - .github/workflows/devcontainer.yml
+
+permissions:
+  contents: read
+
+env:
+  # Not covered by Dependabot; bump by hand to the latest release from
+  # https://www.npmjs.com/package/@devcontainers/cli.
+  DEVCONTAINER_CLI_VERSION: 0.89.0
+
+jobs:
+  devcontainer:
+    name: Build the Dev Container and run make doctor
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Build and start the Dev Container (runs postCreateCommand)
+        run: npx --yes "@devcontainers/cli@${DEVCONTAINER_CLI_VERSION}" up --workspace-folder .
+
+      - name: Run make doctor in the Dev Container
+        run: npx --yes "@devcontainers/cli@${DEVCONTAINER_CLI_VERSION}" exec --workspace-folder . make doctor

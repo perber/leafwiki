@@ -144,7 +144,8 @@ In the repository root, `make ci` runs `make verify` (small repository checks), 
 `make test`, `make cross` (build and vet for Windows and macOS) and `make ui-check` (frontend
 install, lint, format check, tests and build); each also runs on its own. CI additionally runs
 the linux/386 tests, govulncheck, Trivy, the install-script test, the e2e lint and the E2E
-suites. Trivy scans the Go and npm dependencies on every PR (filesystem scans in the backend
+suites, and builds the Dev Container (with `make doctor` inside) on PRs that change its
+inputs. Trivy scans the Go and npm dependencies on every PR (filesystem scans in the backend
 and frontend workflows). It also scans the built Docker image, weekly, before each release and
 on PRs that change an image input such as `Dockerfile`, `go.mod` or `package.json` (those files
 only trigger the image scan; their dependencies are already covered by the filesystem scans).

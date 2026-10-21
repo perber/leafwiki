@@ -23,7 +23,7 @@ Read before changing code — **[docs/development/](./docs/development/README.md
 
 | What | Command | Where |
 |---|---|---|
-| Local subset of the PR checks: verify, lint, test, cross, ui-check (not 386 tests, govulncheck, Trivy, install-script test, e2e lint, E2E) | `make ci` | repo root |
+| Local subset of the PR checks: verify, lint, test, cross, ui-check (not 386 tests, govulncheck, Trivy, install-script test, e2e lint, E2E, Dev Container build) | `make ci` | repo root |
 | Backend tests / lint | `make test` / `make lint` (golangci-lint at the version in `.golangci-lint-version`) | repo root |
 | Repository checks (private references, toolchain versions) | `make verify` | repo root |
 | Windows/macOS build check | `make cross` (build + vet for windows/amd64, darwin/arm64) | repo root |
