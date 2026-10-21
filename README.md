@@ -321,6 +321,8 @@ make dev       # backend + Vite; Ctrl-C stops both
 
 Vite starts on `http://localhost:5173` (login `admin` / `devpassword`) and proxies the API to
 the backend on `127.0.0.1:8080`. `make doctor` checks your Go and Node versions.
+No local toolchain? The [Dev Container](.devcontainer/devcontainer.json) sets everything up in
+VS Code or [GitHub Codespaces](https://codespaces.new/perber/leafwiki); then run `make dev`.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md#development-setup) for running the two separately and for contribution guidelines.
 
