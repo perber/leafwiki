@@ -14,6 +14,10 @@ func NewTagsService(store *TagsStore) *TagsService {
 	return &TagsService{store: store}
 }
 
+func (s *TagsService) Close() error {
+	return s.store.Close()
+}
+
 func (s *TagsService) ClearIndex() error {
 	return s.store.Clear()
 }
