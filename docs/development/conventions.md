@@ -358,7 +358,9 @@ Dockerfiles, so such a PR updates the matching file too. *Enforced by `make veri
 (`scripts/check-toolchain-versions.sh`): the full Go version must match, so the Dockerfiles
 pin a patch tag such as `golang:1.27.3-alpine`; Node must match in the major version. The
 committed `mise.toml` pins nothing of its own: a Node entry fails (mise reads `.nvmrc`), Go
-may only be `latest` (a bootstrap) or the exact toolchain version.*
+may only be `latest` (a bootstrap) or the exact toolchain version. The Dev Container config
+(`.devcontainer.json`, `.devcontainer/devcontainer.json` or `.devcontainer/*/devcontainer.json`)
+installs mise and names neither.*
 CI jobs call Makefile targets; exceptions are listed at the `ci` target.
 Trivy scans the dependencies (`go.sum`, `package-lock.json`) on every PR, and the final Docker
 image on PRs that change an image input (`make scan-image`) and weekly against the published

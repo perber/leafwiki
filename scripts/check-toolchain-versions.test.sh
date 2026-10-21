@@ -113,6 +113,14 @@ expect mise-core-prefix        fail 'toolchain go1.27.1' '26\n'      "$BOTH" '[t
 expect mise-top-inline-table   fail 'toolchain go1.27.1' '26\n'      "$BOTH" 'tools = { node = "24" }\n'
 expect mise-asdf-backend       fail 'toolchain go1.27.1' '26\n'      "$BOTH" '[tools]\n"asdf:nodejs" = "24"\n'
 expect mise-go-single-quoted   ok   'toolchain go1.27.1' '26\n'      "$BOTH" "[tools]\ngo = 'latest'\n"
+# The Dev Container gets Node and Go from mise too: naming either fails,
+# outside // comments.
+DEVC=.devcontainer/devcontainer.json
+expect devcontainer-mise-only  ok   'toolchain go1.27.1' '26\n'      "$BOTH" '// Node and Go come from mise.\n{\n  "features": { "ghcr.io/devcontainers-extra/features/mise:1": {} }\n}\n' "$DEVC"
+expect devcontainer-node-feature fail 'toolchain go1.27.1' '26\n'    "$BOTH" '{\n  "features": { "ghcr.io/devcontainers/features/node:1": { "version": "26" } }\n}\n' "$DEVC"
+expect devcontainer-go-feature fail 'toolchain go1.27.1' '26\n'      "$BOTH" '{\n  "features": { "ghcr.io/devcontainers/features/go:1": {} }\n}\n' "$DEVC"
+expect devcontainer-go-image   fail 'toolchain go1.27.1' '26\n'      "$BOTH" '{ "image": "mcr.microsoft.com/devcontainers/go:1-trixie" }\n' "$DEVC"
+expect devcontainer-go-latest  fail 'toolchain go1.27.1' '26\n'      "$BOTH" '{ "postCreateCommand": "mise use go@latest" }\n' "$DEVC"
 
 # Missing files must fail, never print the success line.
 dir="$WORK/missing"

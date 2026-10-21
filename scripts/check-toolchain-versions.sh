@@ -83,12 +83,30 @@ done
 # inline tables) gets around it: after comments are stripped, any line naming
 # node fails, except the setting that makes mise read .nvmrc; a line naming
 # go or golang passes only as exactly go = "latest" (a bootstrap) or the
-# toolchain version. .tool-versions must not name either. Per-user overrides
-# (mise.local.toml, .config/) are left alone.
+# toolchain version. .tool-versions and the Dev Container config (which
+# installs mise) must not name either; in the latter only // outside a string
+# starts a comment. Per-user overrides (mise.local.toml, .config/) are left
+# alone.
 # mise_violations <file>: prints "<line number>: <line>" per violation.
 mise_violations() {
-    awk -v strict="$([[ "$1" == .tool-versions ]] && echo 1)" -v want="$go_version" '
-        { sub(/\r$/, ""); sub(/#.*/, ""); line = tolower($0); bare = $0; gsub(/[ \t]/, "", bare) }
+    local strict="" json=""
+    case "$1" in
+        .tool-versions) strict=1 ;;
+        .devcontainer.json | .devcontainer/devcontainer.json | .devcontainer/*/devcontainer.json) strict=1 json=1 ;;
+    esac
+    awk -v strict="$strict" -v json="$json" -v want="$go_version" '
+        # The line up to a // comment that is not inside a JSON string.
+        function json_code(s,    i, c, quoted) {
+            for (i = 1; i <= length(s); i++) {
+                c = substr(s, i, 1)
+                if (quoted && c == "\\") i++
+                else if (c == "\"") quoted = !quoted
+                else if (!quoted && substr(s, i, 2) == "//") return substr(s, 1, i - 1)
+            }
+            return s
+        }
+        { sub(/\r$/, ""); if (json) $0 = json_code($0); else sub(/#.*/, "")
+          line = tolower($0); bare = $0; gsub(/[ \t]/, "", bare) }
         !strict && line ~ /^[ \t]*idiomatic_version_file_enable_tools[ \t]*=/ { next }
         line ~ /(^|[^a-z0-9_])node/ { print FNR ": " $0; next }
         line ~ /(^|[^a-z0-9_])go(lang)?([^a-z0-9_]|$)/ {
@@ -98,10 +116,15 @@ mise_violations() {
     ' "$1"
 }
 
-for file in mise.toml .mise.toml mise/config.toml .mise/config.toml .tool-versions; do
+for file in mise.toml .mise.toml mise/config.toml .mise/config.toml .tool-versions \
+    .devcontainer.json .devcontainer/devcontainer.json .devcontainer/*/devcontainer.json; do
     [[ -f "$file" ]] || continue
+    case "$file" in
+        *.toml) hint="the only allowed entry is go = \"latest\" or go = \"$go_version\"" ;;
+        *) hint="$file must not name either" ;;
+    esac
     while IFS= read -r violation; do
-        fail "$file" "$file:$violation: Node comes from .nvmrc and Go from go.mod; the only allowed entry is go = \"latest\" or go = \"$go_version\"."
+        fail "$file" "$file:$violation: Node comes from .nvmrc and Go from go.mod; $hint."
     done < <(mise_violations "$file")
 done
 
