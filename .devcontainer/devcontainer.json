@@ -1,0 +1,29 @@
+// Dev Container for VS Code and GitHub Codespaces. Versions are not pinned
+// here: mise reads Node from .nvmrc and installs Go as a bootstrap, go.mod's
+// toolchain line selects the exact Go (see mise.toml). Start with `make dev`.
+{
+  "name": "LeafWiki",
+  // Debian, published for amd64 and arm64.
+  "image": "mcr.microsoft.com/devcontainers/base:trixie",
+  "features": {
+    "ghcr.io/devcontainers-extra/features/mise:1": {}
+  },
+  // The feature installs only the mise binary. mise activate in the shell
+  // rc files puts Node, npm and Go on the PATH of terminals and, through the
+  // editor's environment probe, of extensions; postCreateCommand runs before
+  // that, hence mise exec.
+  "postCreateCommand": "mise trust && mise install && echo 'eval \"$(mise activate bash)\"' >> ~/.bashrc && echo 'eval \"$(mise activate zsh)\"' >> ~/.zshrc && mise exec -- make setup",
+  // Port forwarding tunnels into the container's localhost, where Vite and
+  // the backend listen.
+  "forwardPorts": [5173, 8080],
+  "portsAttributes": {
+    "5173": {
+      "label": "LeafWiki (Vite)",
+      "onAutoForward": "openBrowser"
+    },
+    "8080": {
+      "label": "LeafWiki backend",
+      "onAutoForward": "silent"
+    }
+  }
+}

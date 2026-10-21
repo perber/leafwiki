@@ -20,8 +20,18 @@ make dev       # backend and Vite together; open http://localhost:5173, Ctrl-C s
 ```
 
 mise is optional: nvm or fnm with `.nvmrc` (`nvm use`) and any Go 1.21 or newer work just as
-well. `make doctor` shows whether your versions match. On Windows, run `make` in Git Bash.
-Details: [Development setup](#development-setup).
+well. `make doctor` shows whether your versions match. Details:
+[Development setup](#development-setup).
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/perber/leafwiki)
+
+Or skip the local setup: the [Dev Container](.devcontainer/devcontainer.json) (GitHub
+Codespaces, or VS Code with Docker and "Reopen in Container") installs mise, Node, Go and the
+npm dependencies on creation; run `make dev` in its terminal, port 5173 opens in the browser.
+It is also the easiest way on Windows, which has no `make`: use "Dev Containers: Clone
+Repository in Container Volume", since a Git for Windows clone has CRLF line endings that break
+the shell scripts. The Playwright browser is not included; for E2E runs, `make setup-e2e` and
+`npx playwright install-deps chromium` in `e2e/`.
 
 ---
 
