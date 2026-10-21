@@ -278,6 +278,70 @@ func TestNewWiki_CorruptUsersDB_FailsWithoutCreatingDefaultAdmin(t *testing.T) {
 	test_utils.AssertFilesUnchanged(t, files)
 }
 
+// assertNoOpenSQLiteDBs fails for every *.db-wal file left in dir. SQLite
+// removes the WAL file when the last connection to a database closes, so a
+// leftover one means some store's handle was never closed — which on Windows
+// keeps the file locked.
+func assertNoOpenSQLiteDBs(t *testing.T, dir string) {
+	t.Helper()
+	leftovers, err := filepath.Glob(filepath.Join(dir, "*.db-wal"))
+	if err != nil {
+		t.Fatalf("glob WAL files: %v", err)
+	}
+	for _, wal := range leftovers {
+		t.Errorf("%s still open after Close (WAL file left behind)", strings.TrimSuffix(filepath.Base(wal), "-wal"))
+	}
+}
+
+// Regression test: tags.db and properties.db were opened at startup but
+// never closed by Wiki.Close.
+func TestWiki_Close_ClosesAllDatabases(t *testing.T) {
+	dir := t.TempDir()
+	w, err := NewWiki(&WikiOptions{
+		StorageDir:             dir,
+		AdminPassword:          "adminpassword",
+		JWTSecret:              "secretkey",
+		AccessTokenTimeout:     15 * time.Minute,
+		RefreshTokenTimeout:    7 * 24 * time.Hour,
+		EnableRevision:         true,
+		EnableAPIKeyManagement: true,
+	})
+	if err != nil {
+		t.Fatalf("NewWiki: %v", err)
+	}
+
+	if err := w.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	assertNoOpenSQLiteDBs(t, dir)
+}
+
+// Regression test: when a later boot step failed, NewWiki returned the error
+// but left the databases opened by earlier steps open.
+func TestNewWiki_FailedBoot_ClosesOpenedDatabases(t *testing.T) {
+	dir := t.TempDir()
+	// A regular file where the content directory belongs makes the tree
+	// load fail after the auth stores are already open.
+	if err := os.WriteFile(filepath.Join(dir, "root"), []byte("not a directory"), 0o644); err != nil {
+		t.Fatalf("write root file: %v", err)
+	}
+
+	w, err := NewWiki(&WikiOptions{
+		StorageDir:          dir,
+		AdminPassword:       "adminpassword",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+	})
+	if err == nil {
+		_ = w.Close()
+		t.Fatal("NewWiki: expected an error when root is not a directory, got nil")
+	}
+
+	assertNoOpenSQLiteDBs(t, dir)
+}
+
 func TestWiki_Login_SuccessAndFailure(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
