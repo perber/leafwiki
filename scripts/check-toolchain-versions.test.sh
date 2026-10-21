@@ -121,6 +121,22 @@ expect devcontainer-node-feature fail 'toolchain go1.27.1' '26\n'    "$BOTH" '{\
 expect devcontainer-go-feature fail 'toolchain go1.27.1' '26\n'      "$BOTH" '{\n  "features": { "ghcr.io/devcontainers/features/go:1": {} }\n}\n' "$DEVC"
 expect devcontainer-go-image   fail 'toolchain go1.27.1' '26\n'      "$BOTH" '{ "image": "mcr.microsoft.com/devcontainers/go:1-trixie" }\n' "$DEVC"
 expect devcontainer-go-latest  fail 'toolchain go1.27.1' '26\n'      "$BOTH" '{ "postCreateCommand": "mise use go@latest" }\n' "$DEVC"
+expect devcontainer-go-toml-latest fail 'toolchain go1.27.1' '26\n'  "$BOTH" 'go = "latest"\n' "$DEVC"
+expect devcontainer-golang-feature fail 'toolchain go1.27.1' '26\n'  "$BOTH" '{ "features": { "ghcr.io/devcontainers-extra/features/golang:1": {} } }\n' "$DEVC"
+expect devcontainer-node-image fail 'toolchain go1.27.1' '26\n'      "$BOTH" '{ "image": "mcr.microsoft.com/devcontainers/typescript-node:24" }\n' "$DEVC"
+expect devcontainer-node-option fail 'toolchain go1.27.1' '26\n'     "$BOTH" '{ "features": { "ghcr.io/x/features/y:1": { "nodeVersion": "24" } } }\n' "$DEVC"
+expect devcontainer-url        ok   'toolchain go1.27.1' '26\n'      "$BOTH" '{ "postCreateCommand": "curl https://example.com" }\n' "$DEVC"
+expect devcontainer-trailing-comment ok 'toolchain go1.27.1' '26\n'  "$BOTH" '{ "name": "x" // no Node or Go pin here\n}\n' "$DEVC"
+expect devcontainer-crlf-comment ok 'toolchain go1.27.1' '26\n'      "$BOTH" '// Node from .nvmrc\r\n{ "name": "x" }\r\n' "$DEVC"
+expect devcontainer-other-file ok   'toolchain go1.27.1' '26\n'      "$BOTH" 'FROM node:24\n' .devcontainer/Dockerfile
+# Comment markers inside JSON strings don't hide the rest of the line.
+expect devcontainer-url-then-node fail 'toolchain go1.27.1' '26\n'   "$BOTH" '{ "postCreateCommand": "curl -fsSL https://example.com/x.sh | sh && mise use -g node@24" }\n' "$DEVC"
+expect devcontainer-hash-then-node fail 'toolchain go1.27.1' '26\n'  "$BOTH" '{ "postCreateCommand": "echo \\"#\\" && mise use node@24" }\n' "$DEVC"
+expect devcontainer-escaped-quote-comment ok 'toolchain go1.27.1' '26\n' "$BOTH" '{ "name": "a \\"b\\"" } // Node from .nvmrc\n' "$DEVC"
+# The other places the Dev Container spec looks for the file.
+expect devcontainer-root-file  fail 'toolchain go1.27.1' '26\n'      "$BOTH" '{ "image": "mcr.microsoft.com/devcontainers/go:1" }\n' .devcontainer.json
+expect devcontainer-subdir-file fail 'toolchain go1.27.1' '26\n'     "$BOTH" '{ "image": "mcr.microsoft.com/devcontainers/go:1" }\n' .devcontainer/go/devcontainer.json
+expect devcontainer-subdir-ok  ok   'toolchain go1.27.1' '26\n'      "$BOTH" '// Go from go.mod\n{ "name": "x" }\n' .devcontainer/x/devcontainer.json
 
 # Missing files must fail, never print the success line.
 dir="$WORK/missing"
