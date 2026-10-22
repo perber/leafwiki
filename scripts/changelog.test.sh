@@ -159,6 +159,62 @@ out="$(changelog "$repo")"
 expect_line special-characters "$out" "- Rename \`LEAFWIKI_X\` to \$LEAFWIKI_Y; \"quotes\", 'single', \\n and \$(whoami) stay as-is."
 expect_line special-characters "$out" "- -n is no longer accepted."
 
+# Git trailer rules: keys match in any case, an indented continuation line
+# folds into the value, other trailers in the same block don't leak in, and
+# an empty value is skipped.
+repo="$(new_repo trailer-syntax "feat: folded
+
+Behavior-Change: A long sentence that wraps
+  onto an indented second line.
+Co-Authored-By: Someone <s@example.com>" "fix: lower case
+
+behavior-change: Lower-case key still counts.
+Behavior-Change:
+Signed-off-by: Tester <t@example.com>")"
+out="$(changelog "$repo")"
+expect_output trailer-syntax "$out" "## 📝 Changelog for v2
+
+### ⚠️ Behavior changes
+- Lower-case key still counts.
+- A long sentence that wraps onto an indented second line.
+
+### ✨ Features
+- feat: folded (Tester)
+
+### 🐛 Bug Fixes
+- fix: lower case (Tester)"
+
+# The British spelling counts too; the docs write "behaviour" everywhere.
+repo="$(new_repo british-spelling "chore: rename setting
+
+Behaviour-Change: The setting is renamed.")"
+out="$(changelog "$repo")"
+expect_line british-spelling "$out" "- The setting is renamed."
+
+# A trailer on a merged branch commit and on the merge commit itself both
+# land in the release, like the commits in the lists below.
+repo="$WORK/merge"
+git init -q "$repo"
+git -C "$repo" -c user.name=Tester -c user.email=t@example.com commit -q --allow-empty -m "chore: initial"
+git -C "$repo" tag v1
+git -C "$repo" checkout -q -b side
+git -C "$repo" -c user.name=Tester -c user.email=t@example.com commit -q --allow-empty -m "feat: on a branch
+
+Behavior-Change: From the branch."
+git -C "$repo" checkout -q -
+git -C "$repo" -c user.name=Tester -c user.email=t@example.com merge -q --no-ff side -m "Merge branch side
+
+Behavior-Change: From the merge."
+git -C "$repo" tag v2
+out="$(changelog "$repo")"
+expect_line merge "$out" "- From the branch."
+expect_line merge "$out" "- From the merge."
+
+# An empty range (both tags on one commit) has only the heading.
+repo="$(new_repo empty-range)"
+out="$(changelog "$repo")"
+expect_output empty-range "$out" "## 📝 Changelog for v2"
+
 if [[ "$FAILURES" -gt 0 ]]; then
     echo "$FAILURES failure(s)"
     exit 1
