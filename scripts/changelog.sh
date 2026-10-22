@@ -80,13 +80,14 @@ resolve_author() {
   git log -1 --format="%an" "$commit_hash"
 }
 
-# Collect commits
+# Collect commits. tformat ends every entry with a newline; with format: the
+# last entry (the oldest commit) had none, and `read` dropped it.
 COMMITS=""
 while IFS=$'\t' read -r hash subject; do
   [[ -z "$hash" ]] && continue
   author=$(resolve_author "$hash" "$subject")
   COMMITS+="$subject ($author)"$'\n'
-done < <(git log "$PREVIOUS_TAG".."$CURRENT_TAG" --pretty=format:"%H%x09%s")
+done < <(git log "$PREVIOUS_TAG".."$CURRENT_TAG" --pretty=tformat:"%H%x09%s")
 COMMITS="${COMMITS%$'\n'}"
 
 # Categorize exclusively

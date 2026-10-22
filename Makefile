@@ -121,6 +121,7 @@ verify:
 	./scripts/check-private-references.sh
 	./scripts/check-toolchain-versions.sh
 	./scripts/check-toolchain-versions.test.sh
+	./scripts/changelog.test.sh
 
 # Conventional Commit subjects for BASE..HEAD; CI runs the same script
 # (.github/workflows/commit-messages.yml).
