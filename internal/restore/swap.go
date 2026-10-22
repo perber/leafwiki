@@ -156,6 +156,7 @@ const (
 	APIKeysDBFile      = "api_keys.db"
 	FavoritesDBFile    = "favorites.db"
 	UserSettingsDBFile = "usersettings.db"
+	ShareLinksDBFile   = "share_links.db"
 )
 
 // stateDBs is the one place a new state store is registered for backup and
@@ -166,6 +167,7 @@ var stateDBs = []stateDB{
 	{File: APIKeysDBFile, Table: "api_keys", Columns: apiKeysRequiredColumns},
 	{File: FavoritesDBFile, Table: "favorites", Columns: favoritesRequiredColumns},
 	{File: UserSettingsDBFile, Table: "user_settings", Columns: userSettingsRequiredColumns},
+	{File: ShareLinksDBFile, Table: "share_links", Columns: shareLinksRequiredColumns},
 }
 
 // StateDBFiles returns the file names of every state database other than
@@ -179,7 +181,7 @@ func StateDBFiles() []string {
 }
 
 // usersRequiredColumns, apiKeysRequiredColumns, favoritesRequiredColumns,
-// and userSettingsRequiredColumns are the columns sanityCheckSQLiteDB probes
+// userSettingsRequiredColumns and shareLinksRequiredColumns are the columns sanityCheckSQLiteDB probes
 // for each staged database. usersRequiredColumns deliberately lists only the
 // columns present in users.db's original schema, not ones an additive
 // migration adds later (totp_secret_encrypted/totp_enabled/
@@ -189,7 +191,7 @@ func StateDBFiles() []string {
 // migrations is still legitimately restorable (Replace's fresh UserStore
 // reopen re-runs the migration against it afterward), and requiring those
 // columns here would reject it before it ever gets that chance. api_keys.db,
-// favorites.db, and usersettings.db have no such migration history (each is
+// favorites.db, usersettings.db and share_links.db have no such migration history (each is
 // created by a single CREATE TABLE IF NOT EXISTS with no later ALTER TABLE),
 // so their lists are simply their full current schemas.
 var (
@@ -197,6 +199,7 @@ var (
 	apiKeysRequiredColumns      = []string{"id", "name", "user_id", "prefix", "key_hash", "role", "expires_at", "created_by", "created_at", "last_used_at", "revoked_at"}
 	favoritesRequiredColumns    = []string{"user_id", "page_id", "created_at"}
 	userSettingsRequiredColumns = []string{"user_id", "language", "autosave", "updated_at"}
+	shareLinksRequiredColumns   = []string{"id", "token_hash", "page_id", "include_descendants", "expires_at", "created_by", "created_at"}
 )
 
 // sanityCheckSQLiteDB opens path, runs PRAGMA integrity_check, and probes

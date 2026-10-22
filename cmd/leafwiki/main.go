@@ -259,6 +259,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		AuthDisabled:           cfg.auth.disableAuth,
 		EnableRevision:         cfg.frontend.enableRevision,
 		EnableAPIKeyManagement: cfg.frontend.enableAPIKeyManagement,
+		EnableShareLinks:       cfg.frontend.enableShareLinks,
 		MaxRevisionHistory:     cfg.frontend.maxRevisionHistory,
 		EditorLimit:            cfg.auth.editorLimit,
 		RevisionCoalesceWindow: cfg.frontend.revisionCoalesceWindow,

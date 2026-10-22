@@ -12,6 +12,7 @@ import (
 	"time"
 
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
+	"github.com/perber/wiki/internal/sharing"
 	"github.com/perber/wiki/internal/test_utils"
 	_ "modernc.org/sqlite" // Import SQLite driver
 )
@@ -228,6 +229,16 @@ var stateDBCases = []struct {
 	{file: "api_keys.db", create: createTestAPIKeysDB},
 	{file: "favorites.db", create: createTestFavoritesDB},
 	{file: "usersettings.db", create: createTestUserSettingsDB},
+	{file: "share_links.db", create: createTestShareLinksDB},
+}
+
+func createTestShareLinksDB(t *testing.T, path string) {
+	t.Helper()
+	store, err := sharing.NewShareLinkStore(filepath.Dir(path), nil)
+	if err != nil {
+		t.Fatalf("NewShareLinkStore: %v", err)
+	}
+	test_utils.WrapCloseWithErrorCheck(store.Close, t)
 }
 
 // zipEntryNames returns the entry names of snapshot id's ZIP.
