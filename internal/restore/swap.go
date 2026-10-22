@@ -85,26 +85,18 @@ func extractAndValidateWithLimits(zipPath, dataDir string, limits shared.Extract
 		return "", backupMeta{}, fmt.Errorf("staged users.db failed sanity check: %w", err)
 	}
 
-	// api_keys.db, favorites.db, and usersettings.db are all optional (API
-	// key management is off by default; an older snapshot may predate the
-	// favorites/usersettings feature), so only sanity-check them when the
-	// snapshot actually staged one — same presence guard SwapAll itself uses.
-	if _, err := os.Stat(filepath.Join(stagingDir, "api_keys.db")); err == nil {
-		if err := sanityCheckSQLiteDB(filepath.Join(stagingDir, "api_keys.db"), "api_keys", apiKeysRequiredColumns); err != nil {
-			_ = os.RemoveAll(stagingDir)
-			return "", backupMeta{}, fmt.Errorf("staged api_keys.db failed sanity check: %w", err)
+	// Every database in stateDBs is optional (API key management is off by
+	// default; an older snapshot may predate a store), so only sanity-check
+	// one when the snapshot actually staged it — same presence guard SwapAll
+	// itself uses.
+	for _, db := range stateDBs {
+		staged := filepath.Join(stagingDir, db.File)
+		if _, err := os.Stat(staged); err != nil {
+			continue
 		}
-	}
-	if _, err := os.Stat(filepath.Join(stagingDir, "favorites.db")); err == nil {
-		if err := sanityCheckSQLiteDB(filepath.Join(stagingDir, "favorites.db"), "favorites", favoritesRequiredColumns); err != nil {
+		if err := sanityCheckSQLiteDB(staged, db.Table, db.Columns); err != nil {
 			_ = os.RemoveAll(stagingDir)
-			return "", backupMeta{}, fmt.Errorf("staged favorites.db failed sanity check: %w", err)
-		}
-	}
-	if _, err := os.Stat(filepath.Join(stagingDir, "usersettings.db")); err == nil {
-		if err := sanityCheckSQLiteDB(filepath.Join(stagingDir, "usersettings.db"), "user_settings", userSettingsRequiredColumns); err != nil {
-			_ = os.RemoveAll(stagingDir)
-			return "", backupMeta{}, fmt.Errorf("staged usersettings.db failed sanity check: %w", err)
+			return "", backupMeta{}, fmt.Errorf("staged %s failed sanity check: %w", db.File, err)
 		}
 	}
 
@@ -148,6 +140,42 @@ func extractZipEntry(f *zip.File, destDir string, limits shared.ExtractionLimits
 		return err
 	}
 	return nil
+}
+
+// stateDB is a SQLite database holding real state (ADR-0013), other than
+// users.db, that snapshots capture and a restore swaps in place.
+type stateDB struct {
+	File    string   // file name in the data dir and at the snapshot ZIP root
+	Table   string   // table sanityCheckSQLiteDB probes in a staged copy
+	Columns []string // columns that table must have
+}
+
+// File names of the state databases in stateDBs, for the composition root's
+// Config.Stores entries (Wiki.StateStores), so each name exists once.
+const (
+	APIKeysDBFile      = "api_keys.db"
+	FavoritesDBFile    = "favorites.db"
+	UserSettingsDBFile = "usersettings.db"
+)
+
+// stateDBs is the one place a new state store is registered for backup and
+// restore: snapshots capture these files (StateDBFiles), a restore
+// sanity-checks and swaps them (swapNames), and the composition root passes
+// the live store as a Config.Stores entry.
+var stateDBs = []stateDB{
+	{File: APIKeysDBFile, Table: "api_keys", Columns: apiKeysRequiredColumns},
+	{File: FavoritesDBFile, Table: "favorites", Columns: favoritesRequiredColumns},
+	{File: UserSettingsDBFile, Table: "user_settings", Columns: userSettingsRequiredColumns},
+}
+
+// StateDBFiles returns the file names of every state database other than
+// users.db, for the snapshot configuration.
+func StateDBFiles() []string {
+	files := make([]string, 0, len(stateDBs))
+	for _, db := range stateDBs {
+		files = append(files, db.File)
+	}
+	return files
 }
 
 // usersRequiredColumns, apiKeysRequiredColumns, favoritesRequiredColumns,
@@ -222,7 +250,7 @@ func sanityCheckSQLiteDB(path, table string, columns []string) error {
 // of being restored. "avatars" is a plain per-user-avatar asset directory
 // (like "assets"/"branding") — no hot-swappable service owns it, so it
 // carries no reload/rollback step of its own.
-var swapNames = []string{"root", "assets", "branding", "avatars", "branding.json", "public-access.json", "toc-display.json", "schema.json", "users.db", "api_keys.db", "favorites.db", "usersettings.db"}
+var swapNames = append([]string{"root", "assets", "branding", "avatars", "branding.json", "public-access.json", "toc-display.json", "schema.json", "users.db"}, StateDBFiles()...)
 
 // walSidecarDBNames lists every WAL-mode database whose stale -wal/-shm
 // sidecars may need cleaning up before a swap — derived from swapNames

@@ -325,14 +325,12 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 				filepath.Join(cfg.server.dataDir, "public-access.json"),
 				filepath.Join(cfg.server.dataDir, "toc-display.json"),
 			},
-			SchemaFile:         filepath.Join(cfg.server.dataDir, "schema.json"),
-			UsersDBPath:        filepath.Join(cfg.server.dataDir, "users.db"),
-			APIKeysDBPath:      filepath.Join(cfg.server.dataDir, "api_keys.db"),
-			FavoritesDBPath:    filepath.Join(cfg.server.dataDir, "favorites.db"),
-			UserSettingsDBPath: filepath.Join(cfg.server.dataDir, "usersettings.db"),
-			WikiVersion:        Version,
-			Interval:           cfg.backup.snapshotInterval,
-			RetentionCount:     cfg.backup.snapshotRetention,
+			SchemaFile:     filepath.Join(cfg.server.dataDir, "schema.json"),
+			UsersDBPath:    filepath.Join(cfg.server.dataDir, "users.db"),
+			StateDBPaths:   stateDBPaths(cfg.server.dataDir),
+			WikiVersion:    Version,
+			Interval:       cfg.backup.snapshotInterval,
+			RetentionCount: cfg.backup.snapshotRetention,
 		})
 		snapshotScheduler := snapshot.NewScheduler(snapshotManager)
 		defer snapshotScheduler.Stop()
@@ -345,9 +343,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 			WikiVersion:        Version,
 			WriteGate:          writeGate,
 			AuthService:        w.AuthService(),
-			APIKeyService:      w.APIKeyService(),
-			Favorites:          w.Favorites(),
-			UserSettings:       w.UserSettingsService(),
+			Stores:             w.StateStores(),
 			Reloadables:        []settings.Reloadable{w.BrandingService(), publicAccessService, tocDisplayService},
 			UserResolver:       w.UserResolver(),
 			TriggerResync:      w.TriggerResyncAsync,
@@ -415,6 +411,17 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 	}
 
 	return nil
+}
+
+// stateDBPaths returns the paths of every state database other than users.db
+// that a snapshot captures (see restore.StateDBFiles).
+func stateDBPaths(dataDir string) []string {
+	files := restore.StateDBFiles()
+	paths := make([]string, 0, len(files))
+	for _, f := range files {
+		paths = append(paths, filepath.Join(dataDir, f))
+	}
+	return paths
 }
 
 // buildPublicAccessService decides whether "public mode" is pinned by
