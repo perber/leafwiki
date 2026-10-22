@@ -143,6 +143,11 @@ resync-derived state.
 - **`internal/publicaccess`** — the public-access ("public mode") switch. `NewEnvManaged` when
   pinned by `--public-access`/`--disable-auth`, `NewSettingsManaged` when changeable at runtime
   via `internal/core/settings`.
+- **`internal/scopedread`** — the read boundary for callers that may see only part of the wiki
+  (share links, #1252): `ReadScope` (a root page, optionally with its subtree) and
+  `PageReader`, which checks the scope before reading and returns an allow-listed `PageView`.
+  Out of scope, unknown and deleted pages are the same `ErrNotFound`.
+  [ADR-0015](./adr/0015-scoped-read-boundary.md).
 - **`internal/tocdisplay`** — the instance-wide "always show table of contents" flag, same
   provider pattern (`Provider` interface, `Fixed` for flag-pinned values).
 - **`internal/favorites`** — per-user private favorited-pages list. `favorites_store.go`
