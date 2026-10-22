@@ -222,8 +222,9 @@ func TestCreateSnapshot_APIKeysDBIsOptional(t *testing.T) {
 	// The common case: API key management is off by default, so no
 	// api_keys.db exists on disk yet. createSnapshot must not fail over that
 	// (matches addFileToZip's existing "missing optional source" behavior) —
-	// newTestConfig doesn't set APIKeysDBPath, mirroring that default.
+	// The path is listed but the file doesn't exist.
 	cfg := newTestConfig(t)
+	cfg.StateDBPaths = []string{filepath.Join(t.TempDir(), "api_keys.db")}
 
 	id, err := createSnapshot(context.Background(), cfg)
 	if err != nil {
@@ -251,7 +252,7 @@ func TestCreateSnapshot_APIKeysDBIsOptional(t *testing.T) {
 func TestCreateSnapshot_APIKeysDBStatErrorOtherThanNotExist_FailsSnapshot(t *testing.T) {
 	cfg := newTestConfig(t)
 	blocker := test_utils.WriteFile(t, t.TempDir(), "not-a-directory", "x")
-	cfg.APIKeysDBPath = filepath.Join(blocker, "api_keys.db")
+	cfg.StateDBPaths = []string{filepath.Join(blocker, "api_keys.db")}
 
 	if _, err := createSnapshot(context.Background(), cfg); err == nil {
 		t.Fatal("expected createSnapshot to fail on an api_keys.db stat error other than not-exist")
@@ -262,7 +263,7 @@ func TestCreateSnapshot_ContainsAPIKeysDBWhenPresent(t *testing.T) {
 	cfg := newTestConfig(t)
 	apiKeysDBPath := filepath.Join(t.TempDir(), "api_keys.db")
 	createTestAPIKeysDB(t, apiKeysDBPath)
-	cfg.APIKeysDBPath = apiKeysDBPath
+	cfg.StateDBPaths = []string{apiKeysDBPath}
 
 	id, err := createSnapshot(context.Background(), cfg)
 	if err != nil {
@@ -290,8 +291,9 @@ func TestCreateSnapshot_ContainsAPIKeysDBWhenPresent(t *testing.T) {
 func TestCreateSnapshot_FavoritesDBIsOptional(t *testing.T) {
 	// A data dir predating this feature (or one where no user has favorited
 	// anything yet) has no favorites.db on disk. createSnapshot must not fail
-	// over that — newTestConfig doesn't set FavoritesDBPath, mirroring that.
+	// over that. The path is listed but the file doesn't exist.
 	cfg := newTestConfig(t)
+	cfg.StateDBPaths = []string{filepath.Join(t.TempDir(), "favorites.db")}
 
 	id, err := createSnapshot(context.Background(), cfg)
 	if err != nil {
@@ -316,7 +318,7 @@ func TestCreateSnapshot_ContainsFavoritesDBWhenPresent(t *testing.T) {
 	cfg := newTestConfig(t)
 	favoritesDBPath := filepath.Join(t.TempDir(), "favorites.db")
 	createTestFavoritesDB(t, favoritesDBPath)
-	cfg.FavoritesDBPath = favoritesDBPath
+	cfg.StateDBPaths = []string{favoritesDBPath}
 
 	id, err := createSnapshot(context.Background(), cfg)
 	if err != nil {
@@ -350,7 +352,7 @@ func TestCreateSnapshot_ContainsFavoritesDBWhenPresent(t *testing.T) {
 func TestCreateSnapshot_FavoritesDBStatErrorOtherThanNotExist_FailsSnapshot(t *testing.T) {
 	cfg := newTestConfig(t)
 	blocker := test_utils.WriteFile(t, t.TempDir(), "not-a-directory", "x")
-	cfg.FavoritesDBPath = filepath.Join(blocker, "favorites.db")
+	cfg.StateDBPaths = []string{filepath.Join(blocker, "favorites.db")}
 
 	if _, err := createSnapshot(context.Background(), cfg); err == nil {
 		t.Fatal("expected createSnapshot to fail on a favorites.db stat error other than not-exist")
@@ -363,7 +365,7 @@ func TestCreateSnapshot_FavoritesDBStatErrorOtherThanNotExist_FailsSnapshot(t *t
 func TestCreateSnapshot_UserSettingsDBStatErrorOtherThanNotExist_FailsSnapshot(t *testing.T) {
 	cfg := newTestConfig(t)
 	blocker := test_utils.WriteFile(t, t.TempDir(), "not-a-directory", "x")
-	cfg.UserSettingsDBPath = filepath.Join(blocker, "usersettings.db")
+	cfg.StateDBPaths = []string{filepath.Join(blocker, "usersettings.db")}
 
 	if _, err := createSnapshot(context.Background(), cfg); err == nil {
 		t.Fatal("expected createSnapshot to fail on a usersettings.db stat error other than not-exist")
@@ -373,9 +375,9 @@ func TestCreateSnapshot_UserSettingsDBStatErrorOtherThanNotExist_FailsSnapshot(t
 func TestCreateSnapshot_UserSettingsDBIsOptional(t *testing.T) {
 	// A data dir predating this feature (or one where no user has saved
 	// settings yet) has no usersettings.db on disk. createSnapshot must not
-	// fail over that — newTestConfig doesn't set UserSettingsDBPath, mirroring
-	// that.
+	// fail over that. The path is listed but the file doesn't exist.
 	cfg := newTestConfig(t)
+	cfg.StateDBPaths = []string{filepath.Join(t.TempDir(), "usersettings.db")}
 
 	id, err := createSnapshot(context.Background(), cfg)
 	if err != nil {
@@ -400,7 +402,7 @@ func TestCreateSnapshot_ContainsUserSettingsDBWhenPresent(t *testing.T) {
 	cfg := newTestConfig(t)
 	userSettingsDBPath := filepath.Join(t.TempDir(), "usersettings.db")
 	createTestUserSettingsDB(t, userSettingsDBPath)
-	cfg.UserSettingsDBPath = userSettingsDBPath
+	cfg.StateDBPaths = []string{userSettingsDBPath}
 
 	id, err := createSnapshot(context.Background(), cfg)
 	if err != nil {

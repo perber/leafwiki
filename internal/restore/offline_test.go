@@ -46,7 +46,7 @@ func TestRestoreOffline_SwapsFilesWithoutAnyLiveMachinery(t *testing.T) {
 // stale -wal/-shm files unconditionally, even for a database SwapAll would
 // then leave untouched because the snapshot never captured it (see
 // newSwapper's doc comment) — buildFixtureSnapshot's snapshot has no
-// favorites.db (FavoritesDBPath unset). Deleting that WAL sidecar first
+// favorites.db (not in StateDBPaths). Deleting that WAL sidecar first
 // would discard any committed-but-uncheckpointed data it holds, for a
 // database the restore was never even going to touch.
 func TestRestoreOffline_LeavesWALSidecarsUntouchedForDatabaseNotInSnapshot(t *testing.T) {
