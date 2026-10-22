@@ -586,3 +586,6 @@ the convention, remove dead helpers. Constraints:
   (`make verify-commits BASE=origin/main` locally). Informational, not required: PRs are
   usually rebase-merged; one with messy commits is squash-merged under a title the maintainer
   sets, so the PR title only matters then.
+- A change users or admins notice carries a `Behavior-Change:` trailer in its commit
+  ([commit style](../../CONTRIBUTING.md#commit-style)); `scripts/changelog.sh` lists these at
+  the top of the release notes.
