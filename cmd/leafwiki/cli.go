@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/urfave/cli/v3"
@@ -171,6 +172,27 @@ func unknownFlagName(err error) string {
 func validateLogFormatValue(v string) error {
 	if _, ok := parseLogFormat(v); !ok {
 		return fmt.Errorf("expected text or json, got %q", v)
+	}
+	return nil
+}
+
+// validatePortValue accepts a TCP port number. A value with a scheme is most
+// likely a variable Kubernetes or Docker injected for a Service or link with
+// the same name, so the error says how to stop that.
+func validatePortValue(v string) error {
+	if strings.Contains(v, "://") {
+		return fmt.Errorf("expected a port number (1-65535), got %q; this looks like a Kubernetes service link or Docker link variable, so set enableServiceLinks: false on the pod or rename the Service", v)
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return fmt.Errorf("expected a port number (1-65535), got %q", v)
+	}
+	return validatePortNumber(n)
+}
+
+func validatePortNumber(n int) error {
+	if n < 1 || n > 65535 {
+		return fmt.Errorf("expected a port number (1-65535), got %d", n)
 	}
 	return nil
 }

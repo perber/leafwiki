@@ -356,8 +356,16 @@ func TestRootCommand_InvalidEnvVarValueFailsFast(t *testing.T) {
 		{"LEAFWIKI_RESTORE_UPLOAD_MAX_SIZE", "0"},
 		{"LEAFWIKI_LOGIN_URL", "javascript:alert(1)"},
 		{"LEAFWIKI_TOTP_ENCRYPTION_KEY", "too-short"},
+		{"LEAFWIKI_PORT", "abc"},
+		{"LEAFWIKI_PORT", "0"},
+		{"LEAFWIKI_PORT", "65536"},
+		{"LEAFWIKI_PORT", "tcp://10.96.0.10:80"},
+		{"LEAFWIKI_METRICS_PORT", "abc"},
+		{"LEAFWIKI_METRICS_PORT", "-1"},
+		{"LEAFWIKI_SMTP_PORT", "0"},
+		{"LEAFWIKI_SMTP_PORT", "65536"},
 	} {
-		t.Run(tc.envVar, func(t *testing.T) {
+		t.Run(tc.envVar+"="+tc.value, func(t *testing.T) {
 			t.Setenv(tc.envVar, tc.value)
 
 			cmd := newRootCommand()
@@ -372,6 +380,37 @@ func TestRootCommand_InvalidEnvVarValueFailsFast(t *testing.T) {
 				t.Fatalf("expected an error for %s=%q, got nil", tc.envVar, tc.value)
 			}
 		})
+	}
+}
+
+// The port flags are checked when the command line is parsed, so a bad value
+// stops startup with the flag named instead of a listen error later on.
+func TestRootCommand_InvalidPortFlagFailsFast(t *testing.T) {
+	for _, arg := range []string{"--port=abc", "--port=99999", "--metrics-port=http", "--smtp-port=0"} {
+		t.Run(arg, func(t *testing.T) {
+			cmd := newRootCommand()
+			cmd.Writer = io.Discard
+			cmd.ErrWriter = io.Discard
+			cmd.Action = func(_ context.Context, _ *cli.Command) error {
+				t.Fatalf("expected %s to be rejected before the action runs", arg)
+				return nil
+			}
+			if err := cmd.Run(context.Background(), []string{"leafwiki", arg}); err == nil {
+				t.Fatalf("expected an error for %s, got nil", arg)
+			}
+		})
+	}
+}
+
+func TestValidatePortValue(t *testing.T) {
+	for _, v := range []string{"1", "8080", "65535"} {
+		if err := validatePortValue(v); err != nil {
+			t.Errorf("validatePortValue(%q) = %v, want nil", v, err)
+		}
+	}
+	err := validatePortValue("tcp://10.96.0.10:80")
+	if err == nil || !strings.Contains(err.Error(), "enableServiceLinks") {
+		t.Errorf("validatePortValue(tcp://…) = %v, want a hint at enableServiceLinks", err)
 	}
 }
 
