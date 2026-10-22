@@ -335,18 +335,13 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 		return nil, err
 	}
 
-	if in.RewriteLinks {
-		rule := links.RewriteRule{OldPath: plan.oldPath, NewPath: plan.newPath}
-		if in.Kind == RefactorKindRename && in.Title != plan.page.Title {
-			rule.OldTitle = plan.page.Title
-			rule.NewTitle = in.Title
-		}
-		stepStarted := time.Now()
-		err := uc.rewriteAffectedPages(in.UserID, plan.affectedPageIDs, []links.RewriteRule{rule})
-		uc.metrics.ObserveRefactorStep(in.Kind, "rewrite_affected_pages", stepStarted)
-		if err != nil {
-			return nil, err
-		}
+	// The rule is built before the target changes, but applied only after the
+	// update or move has passed its version check: a rejected refactor must not
+	// leave other pages linking to a path the target never moved to.
+	incomingRule := links.RewriteRule{OldPath: plan.oldPath, NewPath: plan.newPath}
+	if in.Kind == RefactorKindRename && in.Title != plan.page.Title {
+		incomingRule.OldTitle = plan.page.Title
+		incomingRule.NewTitle = in.Title
 	}
 
 	o := pagesave.NewPageSaveOrchestrator(
@@ -372,7 +367,7 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 		if err != nil {
 			return nil, err
 		}
-		return uc.finishPathChange(in, plan, snapshots, updated.Page.ID, started)
+		return uc.finishPathChange(in, plan, snapshots, incomingRule, updated.Page.ID, started)
 
 	case RefactorKindMove:
 		parentID := ""
@@ -386,7 +381,7 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 		if err != nil {
 			return nil, err
 		}
-		return uc.finishPathChange(in, plan, snapshots, in.PageID, started)
+		return uc.finishPathChange(in, plan, snapshots, incomingRule, in.PageID, started)
 
 	default:
 		return nil, fmt.Errorf("unsupported refactor kind: %s", in.Kind)
@@ -394,10 +389,18 @@ func (uc *ApplyPageRefactorUseCase) Execute(ctx context.Context, in RefactorAppl
 }
 
 // finishPathChange runs the steps rename and move share once the target page
-// itself has been updated: fix links inside the subtree whose path changed,
-// refresh the link state of pages whose incoming links were rewritten, and
-// reload the target page.
-func (uc *ApplyPageRefactorUseCase) finishPathChange(in RefactorApplyInput, plan *applyRefactorPlan, snapshots []pathChangeSnapshot, pageID string, started time.Time) (*tree.Page, error) {
+// itself has been updated: rewrite incoming links, fix links inside the
+// subtree whose path changed, refresh the link state of pages whose incoming
+// links were rewritten, and reload the target page.
+func (uc *ApplyPageRefactorUseCase) finishPathChange(in RefactorApplyInput, plan *applyRefactorPlan, snapshots []pathChangeSnapshot, incomingRule links.RewriteRule, pageID string, started time.Time) (*tree.Page, error) {
+	if in.RewriteLinks {
+		stepStarted := time.Now()
+		err := uc.rewriteAffectedPages(in.UserID, plan.affectedPageIDs, []links.RewriteRule{incomingRule})
+		uc.metrics.ObserveRefactorStep(in.Kind, "rewrite_affected_pages", stepStarted)
+		if err != nil {
+			return nil, err
+		}
+	}
 	subtreeStepStarted := time.Now()
 	err := uc.rewritePathChangedSubtree(in.UserID, snapshots, plan.oldPath, plan.newPath)
 	uc.metrics.ObserveRefactorStep(in.Kind, "rewrite_path_changed_subtree", subtreeStepStarted)
