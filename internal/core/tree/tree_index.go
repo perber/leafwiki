@@ -47,6 +47,32 @@ func (t *TreeService) FindPageByID(id string) (*PageNode, error) {
 	return result, err
 }
 
+// IsInSubtree reports whether the node id is rootID itself or one of its
+// descendants, as the tree is right now. It walks the parent chain under the
+// read lock: a caller holding a *PageNode from FindPageByID must not walk
+// Parent itself, because a concurrent move rewrites those pointers. Unknown
+// or empty ids return ErrPageNotFound.
+func (t *TreeService) IsInSubtree(id, rootID string) (bool, error) {
+	var in bool
+	err := t.withRLockedTree(func() error {
+		if t.tree == nil {
+			return ErrTreeNotLoaded
+		}
+		node := t.getNodeByIDLocked(id)
+		if node == nil || t.getNodeByIDLocked(rootID) == nil {
+			return ErrPageNotFound
+		}
+		for n := node; n != nil; n = n.Parent {
+			if n.ID == rootID {
+				in = true
+				return nil
+			}
+		}
+		return nil
+	})
+	return in, err
+}
+
 func (t *TreeService) getNodeByIDLocked(id string) *PageNode {
 	if id == "" {
 		return nil
