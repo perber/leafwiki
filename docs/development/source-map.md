@@ -143,6 +143,12 @@ resync-derived state.
 - **`internal/publicaccess`** — the public-access ("public mode") switch. `NewEnvManaged` when
   pinned by `--public-access`/`--disable-auth`, `NewSettingsManaged` when changeable at runtime
   via `internal/core/settings`.
+- **`internal/sharing`** — share links (#1252, experimental, `--enable-share-links`):
+  `share_link_store.go` (`share_links.db`, own file, real state, part of full backup/restore;
+  only a SHA-256 hash of each token is stored), `share_link_service.go` (create, revoke,
+  resolve a token to a `Grant`; unknown, malformed, expired and revoked tokens all give
+  `share_link_not_found`), `token.go` (256-bit `lws_` tokens). What a resolved link may read is
+  decided by the scoped read layer (`internal/scopedread`, ADR-0015).
 - **`internal/tocdisplay`** — the instance-wide "always show table of contents" flag, same
   provider pattern (`Provider` interface, `Fixed` for flag-pinned values).
 - **`internal/favorites`** — per-user private favorited-pages list. `favorites_store.go`

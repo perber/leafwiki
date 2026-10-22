@@ -833,12 +833,13 @@ func TestNewWiki_RelativeDataDir_UsersDB(t *testing.T) {
 // a restore would not swap it.
 func TestWiki_StateStores_AreRegisteredForBackupAndRestore(t *testing.T) {
 	tests := []struct {
-		name          string
-		enableAPIKeys bool
-		wantFiles     []string
+		name             string
+		enableAPIKeys    bool
+		enableShareLinks bool
+		wantFiles        []string
 	}{
-		{name: "api key management on", enableAPIKeys: true, wantFiles: []string{"api_keys.db", "favorites.db", "usersettings.db"}},
-		{name: "api key management off", enableAPIKeys: false, wantFiles: []string{"favorites.db", "usersettings.db"}},
+		{name: "optional features on", enableAPIKeys: true, enableShareLinks: true, wantFiles: []string{"api_keys.db", "favorites.db", "usersettings.db", "share_links.db"}},
+		{name: "optional features off", wantFiles: []string{"favorites.db", "usersettings.db"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -849,6 +850,7 @@ func TestWiki_StateStores_AreRegisteredForBackupAndRestore(t *testing.T) {
 				AccessTokenTimeout:     15 * time.Minute,
 				RefreshTokenTimeout:    7 * 24 * time.Hour,
 				EnableAPIKeyManagement: tc.enableAPIKeys,
+				EnableShareLinks:       tc.enableShareLinks,
 			})
 			if err != nil {
 				t.Fatalf("NewWiki: %v", err)

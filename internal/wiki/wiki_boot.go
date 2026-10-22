@@ -16,6 +16,7 @@ import (
 	"github.com/perber/wiki/internal/links"
 	"github.com/perber/wiki/internal/properties"
 	"github.com/perber/wiki/internal/search"
+	"github.com/perber/wiki/internal/sharing"
 	"github.com/perber/wiki/internal/tags"
 	"github.com/perber/wiki/internal/usersettings"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
@@ -166,6 +167,20 @@ func (w *Wiki) initUserSettingsService() error {
 		return fmt.Errorf("failed to init user settings store: %w", err)
 	}
 	w.userSettings = usersettings.NewUserSettingsService(store)
+	return nil
+}
+
+// initShareLinks opens share_links.db only when the experimental share links
+// feature (#1252) is enabled. Needs the tree from initCoreServices.
+func (w *Wiki) initShareLinks(options *WikiOptions) error {
+	if !options.EnableShareLinks {
+		return nil
+	}
+	store, err := sharing.NewShareLinkStore(w.storageDir, w.log)
+	if err != nil {
+		return fmt.Errorf("failed to init share links store: %w", err)
+	}
+	w.shareLinks = sharing.NewShareLinkService(store, w.tree, w.log)
 	return nil
 }
 
