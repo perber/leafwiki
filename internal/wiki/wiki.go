@@ -22,6 +22,7 @@ import (
 	"github.com/perber/wiki/internal/properties"
 	"github.com/perber/wiki/internal/restore"
 	"github.com/perber/wiki/internal/search"
+	"github.com/perber/wiki/internal/sharing"
 	"github.com/perber/wiki/internal/tags"
 	"github.com/perber/wiki/internal/usersettings"
 	wikiapikeys "github.com/perber/wiki/internal/wiki/apikeys"
@@ -52,6 +53,7 @@ type Wiki struct {
 	userResolver      *auth.UserResolver
 	user              *auth.UserService
 	apiKeys           *auth.APIKeyService
+	shareLinks        *sharing.ShareLinkService
 	totp              *auth.TOTPService
 	emailTokenStore   *auth.EmailTokenStore
 	emailTokenService *auth.EmailTokenService
@@ -111,6 +113,7 @@ type WikiOptions struct {
 	AuthDisabled            bool          // Whether authentication is disabled
 	EnableRevision          bool          // Whether revision recording/storage is enabled
 	EnableAPIKeyManagement  bool          // Whether the experimental API key management feature is enabled
+	EnableShareLinks        bool          // Whether the experimental share links feature (#1252) is enabled
 	MaxRevisionHistory      int           // Max revisions kept per page; 0 = unlimited
 	EditorLimit             int           // Max admin+editor users allowed; 0 = unlimited
 	MaxAssetUploadSizeBytes int64         // Maximum allowed size in bytes for asset/import uploads; 0 = default
@@ -161,6 +164,9 @@ func (w *Wiki) boot(options *WikiOptions) error {
 		return err
 	}
 	if err := w.initFavoritesService(); err != nil {
+		return err
+	}
+	if err := w.initShareLinks(options); err != nil {
 		return err
 	}
 	if err := w.initUserSettingsService(); err != nil {
@@ -265,6 +271,9 @@ func (w *Wiki) StateStores() []restore.LiveStore {
 	if w.userSettings != nil {
 		stores = append(stores, restore.LiveStore{File: restore.UserSettingsDBFile, Store: w.userSettings})
 	}
+	if w.shareLinks != nil {
+		stores = append(stores, restore.LiveStore{File: restore.ShareLinksDBFile, Store: w.shareLinks})
+	}
 	return stores
 }
 
@@ -339,6 +348,12 @@ func (w *Wiki) Close() error {
 	if w.favorites != nil {
 		if err := w.favorites.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("close favorites store: %w", err))
+		}
+	}
+
+	if w.shareLinks != nil {
+		if err := w.shareLinks.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("close share links store: %w", err))
 		}
 	}
 

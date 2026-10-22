@@ -692,15 +692,15 @@ func writeRawZip(t *testing.T, entries map[string]string) string {
 // in walSidecarDBNames, and in StateDBFiles — pinned so the table-derived
 // lists can't silently drop or reorder a database.
 func TestSwapNames_StateDBsDerivedInOrder(t *testing.T) {
-	wantSwap := []string{"root", "assets", "branding", "avatars", "branding.json", "public-access.json", "toc-display.json", "schema.json", "users.db", "api_keys.db", "favorites.db", "usersettings.db"}
+	wantSwap := []string{"root", "assets", "branding", "avatars", "branding.json", "public-access.json", "toc-display.json", "schema.json", "users.db", "api_keys.db", "favorites.db", "usersettings.db", "share_links.db"}
 	if fmt.Sprint(swapNames) != fmt.Sprint(wantSwap) {
 		t.Errorf("swapNames = %v, want %v", swapNames, wantSwap)
 	}
-	wantWAL := []string{"users.db", "api_keys.db", "favorites.db", "usersettings.db"}
+	wantWAL := []string{"users.db", "api_keys.db", "favorites.db", "usersettings.db", "share_links.db"}
 	if fmt.Sprint(walSidecarDBNames) != fmt.Sprint(wantWAL) {
 		t.Errorf("walSidecarDBNames = %v, want %v", walSidecarDBNames, wantWAL)
 	}
-	wantFiles := []string{"api_keys.db", "favorites.db", "usersettings.db"}
+	wantFiles := []string{"api_keys.db", "favorites.db", "usersettings.db", "share_links.db"}
 	if fmt.Sprint(StateDBFiles()) != fmt.Sprint(wantFiles) {
 		t.Errorf("StateDBFiles() = %v, want %v", StateDBFiles(), wantFiles)
 	}
