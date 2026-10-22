@@ -52,6 +52,54 @@ out="$(changelog "$repo")"
 expect_line oldest-commit "$out" "- fix: oldest change (Tester)"
 expect_line oldest-commit "$out" "- fix: newest change (Tester)"
 
+expect_no_line() {
+    local name="$1" output="$2" line="$3"
+    if grep -qF -- "$line" <<< "$output"; then
+        echo "FAIL $name: unexpected '$line'"
+        FAILURES=$((FAILURES + 1))
+    else
+        echo "PASS $name: no '$line'"
+    fi
+}
+
+# Users see what they notice; internal work collapses into one count line.
+repo="$(new_repo filter \
+    "feat(editor): new thing" \
+    "fix(preview): visible bug" \
+    "perf(search): faster" \
+    "style: nicer blocks" \
+    "fix(test): flaky test" \
+    "fix(ci): broken job" \
+    "docs(development): notes" \
+    "refactor(tree): split files" \
+    "test: more cases" \
+    "chore: tidy" \
+    "ci: new check" \
+    "build: pin go" \
+    "refactor(api)!: drop old route" \
+    "Update README")"
+out="$(changelog "$repo")"
+expect_line filter "$out" "### ✨ Features"
+expect_line filter "$out" "- feat(editor): new thing (Tester)"
+expect_line filter "$out" "### 🐛 Bug Fixes"
+expect_line filter "$out" "- fix(preview): visible bug (Tester)"
+expect_line filter "$out" "### ⚡ Performance"
+expect_line filter "$out" "- perf(search): faster (Tester)"
+expect_line filter "$out" "### 💅 Style"
+expect_line filter "$out" "- style: nicer blocks (Tester)"
+expect_line filter "$out" "### 🔹 Other Changes"
+expect_line filter "$out" "- refactor(api)!: drop old route (Tester)"
+expect_line filter "$out" "- Update README (Tester)"
+for hidden in "fix(test)" "fix(ci)" "docs(development)" "refactor(tree)" "test: more" "chore: tidy" "ci: new" "build: pin"; do
+    expect_no_line filter "$out" "$hidden"
+done
+expect_line filter "$out" "Plus 8 internal changes (refactoring, tests, CI, build and developer docs) that don't change how LeafWiki behaves. Full list: [v1...v2](https://github.com/perber/leafwiki/compare/v1...v2)"
+
+# No internal commits, no count line.
+repo="$(new_repo no-internal "fix: only a fix")"
+out="$(changelog "$repo")"
+expect_no_line no-internal "$out" "internal change"
+
 if [[ "$FAILURES" -gt 0 ]]; then
     echo "$FAILURES failure(s)"
     exit 1
