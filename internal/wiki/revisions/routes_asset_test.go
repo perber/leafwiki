@@ -57,14 +57,14 @@ func TestHandleGetRevisionAsset_ActiveContent_IsForcedDownload(t *testing.T) {
 	const payload = `<script>alert(document.domain)</script>`
 	engine, pageID, revID := newRevisionAssetRouter(t, map[string]string{
 		"poc.html":  payload,
-		"poc.HTML":  payload,
+		"case.HTML": payload,
 		"poc.xhtml": payload,
 		"poc.xml":   payload,
 		"x.svg":     `<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>`,
 		"noext":     "<html>" + payload + "</html>",
 	})
 
-	for _, name := range []string{"poc.html", "poc.HTML", "poc.xhtml", "poc.xml", "x.svg", "noext"} {
+	for _, name := range []string{"poc.html", "case.HTML", "poc.xhtml", "poc.xml", "x.svg", "noext"} {
 		rec := httptest.NewRecorder()
 		engine.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/pages/"+pageID+"/revisions/"+revID+"/assets/"+name, nil))
 		if rec.Code != http.StatusOK {

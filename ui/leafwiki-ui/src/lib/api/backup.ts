@@ -9,6 +9,10 @@ const BACKUP_CONFIG_URL = '/api/admin/backup/config'
 const BACKUP_CONFIG_TEST_URL = '/api/admin/backup/config/test'
 const BACKUP_DISABLE_URL = '/api/admin/backup/disable'
 
+// Which NeedsIntervention state the backup is in (backup.ConflictKind). Force
+// Push only resolves 'diverged'; the server refuses it for 'fileConflict'.
+export type BackupConflictKind = 'diverged' | 'fileConflict'
+
 export interface BackupStatusResponse {
   enabled: boolean
   envManaged?: boolean
@@ -18,6 +22,7 @@ export interface BackupStatusResponse {
     lastError: string
     needsIntervention: boolean
     conflictDetails: string
+    conflictKind?: BackupConflictKind
   }
 }
 

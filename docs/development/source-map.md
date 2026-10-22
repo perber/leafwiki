@@ -92,9 +92,12 @@ filesystem-canonical (`tree`, `revision`) and SQLite-derived (`links`, `tags`, `
   `shared/errors/localized_error.go` (`*LocalizedError` — the required domain-error type for all
   backend domain errors per `AGENTS.md`, with `internal/backup` as the one documented legacy
   exception), `shared/htmlutil/html.go` (HTML
-  escaping helpers), `shared/sqliteutil/sqlite.go` (`IsSQLiteRecoverableError` — distinguishes
-  recoverable I/O/corruption errors from transient `SQLITE_BUSY`/`SQLITE_LOCKED`, used by stores
-  deciding whether to delete-and-recreate a corrupted `.db` file).
+  escaping helpers), `shared/sqliteutil/sqlite.go` (`OpenWithPolicy` + `CorruptionPolicy` —
+  each SQLite store names at its constructor what happens on a recoverable I/O/corruption error,
+  `RebuildOnCorruption` for derived indexes, `QuarantineOnCorruption` / `FailOnCorruption`
+  (typed `*CorruptDatabaseError`) for real state, see
+  [ADR-0013](./adr/0013-per-store-sqlite-corruption-policy.md); `IsSQLiteRecoverableError`
+  distinguishes those errors from transient `SQLITE_BUSY`/`SQLITE_LOCKED`).
 - **`internal/core/tools`** — small operator CLI helpers, e.g. `adminreset.go`
   (`ResetAdminPassword`, behind the `leafwiki reset-admin-password` subcommand in `cli.go`).
 - **`internal/core/settings`** — shared persistence primitive for the small JSON settings files
@@ -160,7 +163,16 @@ resync-derived state.
 - **`internal/backup`** — git-based off-site backup of the markdown tree (`repo.go`, `go-git/go-git`
   — no shell-out to a `git` binary, matters for the single-binary story), `scheduler.go` (same
   manual-mode-at-interval-0 pattern as `snapshot`), `conflict_test.go`/`gitignore.go`,
-  `status.go`. Documented exception to the `*sharederrors.LocalizedError` convention (uses plain
+  `status.go`. A pull that cannot proceed sets `NeedsIntervention` with a `ConflictKind`:
+  `diverged` (no fast-forward either way; `ForcePush` overwrites the remote) or `fileConflict`
+  (a remote change hits a locally changed file; nothing is applied, local stays behind the
+  remote, and `ForcePush` refuses with `ErrForcePushRemoteAhead` → 409
+  `backup_force_push_conflict`, because overwriting would drop the remote commits).
+  `compareWithRemote` decides the relation for both the pull and `ForcePush`; `ForcePush` leases
+  its push on the remote tip it compared, so a commit pushed in between is not overwritten. Don't
+  move the backup branch ref by hand to clear a conflict: a local branch behind the remote is
+  exactly the state `ForcePush` refuses. `redact.go` masks remote credentials in transport
+  errors before they reach logs or the status. Documented exception to the `*sharederrors.LocalizedError` convention (uses plain
   `errors`/`fmt.Errorf`) — see `AGENTS.md`.
 - **`internal/branding`** — custom logo/favicon/site-name: `branding_service.go`,
   `branding_store.go`, `models.go`, `utils.go`.
@@ -289,7 +301,8 @@ light/dark mode application).
 - **`features/auth`** — login form (`LoginForm.tsx`), route guards (`RequireAuth.tsx`,
   `AuthRedirect.test.tsx`), external-IdP redirect handling (`ExternalRedirect.tsx`).
 - **`features/backup`** — git backup settings panel and its warning indicator when backup needs
-  manual intervention (conflict) — `BackupSettings.tsx`, `BackupWarningIndicator.tsx`.
+  manual intervention (conflict) — `BackupSettings.tsx` (Force Push only for the `diverged`
+  conflict kind, an explanation for `fileConflict`), `BackupWarningIndicator.tsx`.
 - **`features/branding`** — branding settings form (`BrandingSettings.tsx`).
 - **`features/designtoggle`** — light/dark mode toggle (`DesignToggle.tsx`, `designmode.ts`).
 - **`features/editor`** — the markdown editor, the single biggest feature folder:

@@ -64,6 +64,11 @@ python3 .claude/skills/docs-review/scripts/check_links.py README.md CONTRIBUTING
   when `--git-backup` is not `true` (`buildBackupManager` in `cmd/leafwiki/main.go`).
 - **Developer docs and ADRs** (`docs/development/`, `AGENTS.md`): file paths, function names and
   commands they mention still exist; an ADR whose decision was reversed is marked superseded.
+- **Rules in one place:** rules live only in `docs/development/rules.md` (details in
+  `conventions.md`). Flag rule statements restated elsewhere (`AGENTS.md`, `CONTRIBUTING.md`,
+  `.github/PULL_REQUEST_TEMPLATE.md`, `.claude/agents/`, `.claude/skills/`), e.g. limits like
+  "400–500", "must"/"never" sentences, or a second wording of a rule; propose a link instead.
+  Checklists in roles may name what to check, but quote the rule by number, not a new wording.
 - **Dates/offers** that go stale: time-limited offers and beta wording, "Since" columns, version-pinned commands
   (`git switch --detach vX.Y.Z` in `docs/install/binary.md` → latest tag).
 

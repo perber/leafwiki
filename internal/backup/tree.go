@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,8 +26,8 @@ import (
 // monorepo remote keeps files outside the configured prefix untouched.
 
 // errPullConflict marks a remote content change that would clobber a dirty live
-// file. materializeContent sets NeedsIntervention itself; callers match on this
-// sentinel so they don't overwrite that status with a generic error.
+// file. materializeContent returns it wrapped in a *pullConflictError;
+// pullBeforeBackup reports it as NeedsIntervention.
 var errPullConflict = errors.New("pull conflict")
 
 // writeBlob stores data as a git blob object and returns its hash. Content
@@ -113,6 +114,12 @@ func (r *Repository) buildDirTree(dir string, rel []string, patterns []gitignore
 			slog.Debug("backup: skipping ignored path", "path", strings.Join(childRel, "/"))
 			continue
 		}
+		// The pull refuses such names, so committing one would make every
+		// later pull of this backup fail; leave it out instead.
+		if err := validateTreeEntryName(name); err != nil {
+			r.warnSkippedName(strings.Join(childRel, "/"), err)
+			continue
+		}
 		full := filepath.Join(dir, name)
 
 		if entry.IsDir() {
@@ -172,6 +179,20 @@ func (r *Repository) buildDirTree(dir string, rel []string, patterns []gitignore
 		return plumbing.ZeroHash, false, err
 	}
 	return h, true, nil
+}
+
+// warnSkippedName logs once per path that buildDirTree left it out of the
+// backup. The path is quoted so control characters stay readable in the log.
+func (r *Repository) warnSkippedName(path string, reason error) {
+	if _, seen := r.skippedNames[path]; seen {
+		return
+	}
+	if r.skippedNames == nil {
+		r.skippedNames = map[string]struct{}{}
+	}
+	r.skippedNames[path] = struct{}{}
+	slog.Warn("backup: skipping a file name the backup cannot store on this system; rename it to include it in the backup",
+		"path", strconv.Quote(path), "reason", reason.Error())
 }
 
 // ignorePatternsIn reads dir/.gitignore if present and parses its patterns with
@@ -449,6 +470,12 @@ func (r *Repository) flattenTree(treeHash plumbing.Hash, prefix string, out map[
 		return err
 	}
 	for _, entry := range tree.Entries {
+		if err := validateTreeEntryName(entry.Name); err != nil {
+			if prefix != "" {
+				return fmt.Errorf("%w (in %q)", err, prefix)
+			}
+			return err
+		}
 		name := entry.Name
 		if prefix != "" {
 			name = prefix + "/" + name
@@ -543,7 +570,10 @@ func (r *Repository) syncContentFromRemote(commitHash plumbing.Hash) (int, error
 			return synced, fmt.Errorf("read remote %s tree: %w", t.treePath, err)
 		}
 		for rel, blobHash := range files {
-			livePath := filepath.Join(t.liveDir, filepath.FromSlash(rel))
+			livePath, err := resolveLivePath(t.liveDir, rel)
+			if err != nil {
+				return synced, err
+			}
 			if _, err := os.Stat(livePath); err == nil {
 				continue // keep the local copy; never overwrite
 			} else if !os.IsNotExist(err) {
@@ -574,101 +604,194 @@ func (r *Repository) syncContentFromRemote(commitHash plumbing.Hash) (int, error
 // in the running wiki. It only touches the configured content directories;
 // sibling files in a monorepo prefix are left alone.
 //
-// A file that changed on the remote is a conflict when the live copy deviates
-// from the local HEAD version — whether it was edited *or deleted* — matching
-// git's "would be overwritten" refusal, which the caller surfaces as
-// NeedsIntervention. materialize sets that status itself and returns an error.
-//
-// When baseCommit is nil (the local branch is still unborn, e.g. Init() found
-// nothing to commit before the remote gained history), there is no local HEAD
-// to compare against, so conflict detection is meaningless. That case falls
-// back to the same additive, local-wins policy as the first-contact sync in
-// syncContentFromRemote: a path already present locally is left untouched
-// instead of being overwritten or deleted.
+// It plans every content directory first and writes nothing while any path
+// conflicts, so a conflict never leaves remote changes half-applied on disk.
+// A conflict is returned as a *pullConflictError; the caller reports it. An
+// I/O failure during the apply pass can still leave some files written, but
+// the next pull converges: a file that already holds the remote version counts
+// as applied, not as a conflict.
 func (r *Repository) materializeContent(baseCommit, remoteCommit *object.Commit) error {
+	plans, err := r.planMaterialize(baseCommit, remoteCommit)
+	if err != nil {
+		return err
+	}
+	var conflicts []string
+	for _, p := range plans {
+		for _, rel := range p.conflicts {
+			conflicts = append(conflicts, p.target.treePath+"/"+rel)
+		}
+	}
+	if len(conflicts) > 0 {
+		return &pullConflictError{Paths: conflicts}
+	}
+	return r.applyMaterialize(plans)
+}
+
+// pullConflictError lists the content paths (repository-relative) that changed
+// on the remote and deviate locally. It matches errPullConflict.
+type pullConflictError struct {
+	Paths []string
+}
+
+func (e *pullConflictError) Error() string {
+	return fmt.Sprintf("%v: %s", errPullConflict, strings.Join(e.Paths, ", "))
+}
+
+func (e *pullConflictError) Unwrap() error { return errPullConflict }
+
+// targetPlan is what a pull does to one content target's live directory.
+type targetPlan struct {
+	target contentTarget
+	contentChanges
+}
+
+// contentChanges holds paths relative to a content target, each list sorted.
+type contentChanges struct {
+	writes    []plannedWrite
+	deletes   []string
+	conflicts []string
+}
+
+type plannedWrite struct {
+	rel  string
+	blob plumbing.Hash
+}
+
+// planMaterialize reads the base and remote trees and the live directories of
+// every content target and decides what the pull has to do. It writes nothing.
+func (r *Repository) planMaterialize(baseCommit, remoteCommit *object.Commit) ([]targetPlan, error) {
 	var baseTree plumbing.Hash
-	checkConflicts := baseCommit != nil
 	if baseCommit != nil {
 		baseTree = baseCommit.TreeHash
 	}
-	remoteTree := remoteCommit.TreeHash
-
-	targets := r.cfg.contentTargets()
-
-	for _, t := range targets {
+	var plans []targetPlan
+	for _, t := range r.cfg.contentTargets() {
 		baseFiles, err := r.filesUnder(baseTree, t.treePath)
 		if err != nil {
-			return fmt.Errorf("read base %s tree: %w", t.treePath, err)
+			return nil, fmt.Errorf("read base %s tree: %w", t.treePath, err)
 		}
-		remoteFiles, err := r.filesUnder(remoteTree, t.treePath)
+		remoteFiles, err := r.filesUnder(remoteCommit.TreeHash, t.treePath)
 		if err != nil {
-			return fmt.Errorf("read remote %s tree: %w", t.treePath, err)
+			return nil, fmt.Errorf("read remote %s tree: %w", t.treePath, err)
 		}
 		live, err := liveFiles(t.liveDir)
 		if err != nil {
-			return fmt.Errorf("read live %s: %w", t.liveDir, err)
+			return nil, fmt.Errorf("read live %s: %w", t.liveDir, err)
 		}
-		// On a filesystem that folds case, a live file recorded under a
-		// different case than the tree path (e.g. a local rename) is still
-		// the same physical file the OS would write over. Fall back to a
-		// case-folded lookup so it isn't treated as absent.
-		var liveFolded map[string]plumbing.Hash
-		if r.liveFSCaseInsensitive {
-			liveFolded = make(map[string]plumbing.Hash, len(live))
-			for k, v := range live {
-				liveFolded[strings.ToLower(k)] = v
-			}
+		plans = append(plans, targetPlan{
+			target:         t,
+			contentChanges: planContentChanges(baseFiles, remoteFiles, live, r.liveFSCaseInsensitive, baseCommit != nil),
+		})
+	}
+	return plans, nil
+}
+
+// planContentChanges decides, per path, how to bring the live files (live) from
+// the local HEAD version (base) to the remote version (remote). All three map
+// paths relative to one content target to blob hashes.
+//
+//   - The remote did not change the path → nothing to do.
+//   - The live file already equals the remote version → already applied.
+//   - checkConflicts is false (unborn local branch, no HEAD to compare
+//     against) → additive and local-wins like syncContentFromRemote: write
+//     only paths that are absent locally, never overwrite or delete.
+//   - The live file deviates from base, edited or deleted → conflict, as
+//     applying the remote change would discard a local change.
+//   - Otherwise the remote version is written, or the file deleted.
+//
+// With caseFold, a live file recorded under a different case than the tree
+// path (a local rename on a case-insensitive filesystem) is the same physical
+// file the OS would write over, so it is found through a case-folded lookup.
+func planContentChanges(base, remote, live map[string]plumbing.Hash, caseFold, checkConflicts bool) contentChanges {
+	var liveFolded map[string]plumbing.Hash
+	if caseFold {
+		liveFolded = make(map[string]plumbing.Hash, len(live))
+		for k, v := range live {
+			liveFolded[strings.ToLower(k)] = v
 		}
+	}
 
-		for _, rel := range unionKeys(baseFiles, remoteFiles) {
-			baseHash, baseOK := baseFiles[rel]
-			remoteHash, remoteOK := remoteFiles[rel]
-			if baseOK == remoteOK && baseHash == remoteHash {
-				continue // remote did not change this path
+	var out contentChanges
+	paths := unionKeys(base, remote)
+	sort.Strings(paths)
+	for _, rel := range paths {
+		baseHash, baseOK := base[rel]
+		remoteHash, remoteOK := remote[rel]
+		if baseOK == remoteOK && baseHash == remoteHash {
+			continue
+		}
+		liveHash, liveOK := live[rel]
+		folded := false
+		if !liveOK && liveFolded != nil {
+			liveHash, liveOK = liveFolded[strings.ToLower(rel)]
+			folded = liveOK
+		}
+		if liveOK == remoteOK && liveHash == remoteHash {
+			if folded {
+				// Same content under another case: rewrite it anyway, so a
+				// delete of the old-case name in this pull (a remote
+				// case-only rename) does not remove the physical file.
+				out.writes = append(out.writes, plannedWrite{rel: rel, blob: remoteHash})
 			}
+			continue
+		}
+		if !checkConflicts {
+			if !liveOK && remoteOK {
+				out.writes = append(out.writes, plannedWrite{rel: rel, blob: remoteHash})
+			}
+			continue
+		}
+		if liveOK != baseOK || liveHash != baseHash {
+			out.conflicts = append(out.conflicts, rel)
+			continue
+		}
+		if remoteOK {
+			out.writes = append(out.writes, plannedWrite{rel: rel, blob: remoteHash})
+		} else {
+			out.deletes = append(out.deletes, rel)
+		}
+	}
+	return out
+}
 
-			liveHash, liveOK := live[rel]
-			if !liveOK && liveFolded != nil {
-				liveHash, liveOK = liveFolded[strings.ToLower(rel)]
+// applyMaterialize carries out plans: deletes first, so a write that lands on
+// the same physical file under a different case is not removed again. Every
+// path is resolved before anything changes, so a path outside the live
+// directory leaves the plan entirely unapplied.
+func (r *Repository) applyMaterialize(plans []targetPlan) error {
+	type resolved struct {
+		deletes []string
+		writes  []string
+	}
+	paths := make([]resolved, len(plans))
+	for i, p := range plans {
+		for _, rel := range p.deletes {
+			livePath, err := resolveLivePath(p.target.liveDir, rel)
+			if err != nil {
+				return err
 			}
-			livePath := filepath.Join(t.liveDir, filepath.FromSlash(rel))
+			paths[i].deletes = append(paths[i].deletes, livePath)
+		}
+		for _, w := range p.writes {
+			livePath, err := resolveLivePath(p.target.liveDir, w.rel)
+			if err != nil {
+				return err
+			}
+			paths[i].writes = append(paths[i].writes, livePath)
+		}
+	}
 
-			if !checkConflicts {
-				// No local HEAD to compare against: additive only, matching
-				// syncContentFromRemote. Never touch a path that already
-				// exists locally.
-				if liveOK || !remoteOK {
-					continue
-				}
-				if err := r.writeLiveBlob(livePath, remoteHash); err != nil {
-					return fmt.Errorf("read remote blob for %s: %w", rel, err)
-				}
-				continue
-			}
-
-			// The live copy deviates from base when it was edited (hash
-			// differs) OR deleted (liveOK != baseOK) — either way, the remote
-			// also changed this path, so applying the remote change would
-			// silently discard a local change.
-			localMatchesBase := liveOK == baseOK && (!liveOK || liveHash == baseHash)
-			if !localMatchesBase {
-				msg := "pull conflict: a wiki file has been modified both on the remote and locally; " +
-					"reset the conflicting file on the remote or wait for the next backup cycle to retry"
-				slog.Error("pullBeforeBackup: "+msg, "remote", r.remoteForLog(), "file", rel)
-				r.status.SetNeedsIntervention(msg)
-				return fmt.Errorf("%w: %s", errPullConflict, msg)
-			}
-
-			if remoteOK {
-				if err := r.writeLiveBlob(livePath, remoteHash); err != nil {
-					return fmt.Errorf("read remote blob for %s: %w", rel, err)
-				}
-				continue
-			}
+	for i, p := range plans {
+		for _, livePath := range paths[i].deletes {
 			if err := os.Remove(livePath); err != nil && !os.IsNotExist(err) {
 				return err
 			}
-			removeEmptyParents(filepath.Dir(livePath), t.liveDir)
+			removeEmptyParents(filepath.Dir(livePath), p.target.liveDir)
+		}
+		for j, w := range p.writes {
+			if err := r.writeLiveBlob(paths[i].writes[j], w.blob); err != nil {
+				return fmt.Errorf("read remote blob for %s: %w", w.rel, err)
+			}
 		}
 	}
 	return nil

@@ -3,43 +3,42 @@ package backup
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
-func TestNormalizeBackupPath(t *testing.T) {
-	cases := []struct {
+// TestNormalizeBackupPath_Prefixes_CleansOrRejects tests how a user-supplied
+// backup prefix is cleaned and which prefixes are rejected.
+func TestNormalizeBackupPath_Prefixes_CleansOrRejects(t *testing.T) {
+	tests := []struct {
+		name    string
 		in      string
 		want    string
 		wantErr bool
 	}{
-		{"", "", false},
-		{"docs/wiki", "docs/wiki", false},
-		{"docs\\wiki", "docs/wiki", false},
-		{"  docs/wiki  ", "docs/wiki", false},
-		{"docs//wiki", "docs/wiki", false},
-		{"docs/./wiki", "docs/wiki", false},
-		{"/abs", "", true},
-		{"../up", "", true},
-		{"docs/../wiki", "", true},
-		{".", "", true},
+		{name: "empty means top level", in: "", want: ""},
+		{name: "slash separated", in: "docs/wiki", want: "docs/wiki"},
+		{name: "backslash separated", in: "docs\\wiki", want: "docs/wiki"},
+		{name: "surrounding spaces trimmed", in: "  docs/wiki  ", want: "docs/wiki"},
+		{name: "double slash collapsed", in: "docs//wiki", want: "docs/wiki"},
+		{name: "dot segment removed", in: "docs/./wiki", want: "docs/wiki"},
+		{name: "absolute", in: "/abs", wantErr: true},
+		{name: "leading dot dot", in: "../up", wantErr: true},
+		{name: "inner dot dot", in: "docs/../wiki", wantErr: true},
+		{name: "dot only", in: ".", wantErr: true},
 	}
-	for _, tc := range cases {
-		got, err := normalizeBackupPath(tc.in)
-		if tc.wantErr {
-			if err == nil {
-				t.Errorf("normalizeBackupPath(%q) expected error, got %q", tc.in, got)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := normalizeBackupPath(tc.in)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("normalizeBackupPath(%q) = %q, %v, wantErr %v", tc.in, got, err, tc.wantErr)
 			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("normalizeBackupPath(%q) unexpected error: %v", tc.in, err)
-			continue
-		}
-		if got != tc.want {
-			t.Errorf("normalizeBackupPath(%q) = %q, want %q", tc.in, got, tc.want)
-		}
+			if got != tc.want {
+				t.Errorf("normalizeBackupPath(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
 	}
 }
 
@@ -378,5 +377,39 @@ func TestRunBackup_WithPath_RemoteDeletionMaterialized(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(rootDir, "page.md")); !os.IsNotExist(err) {
 		t.Fatalf("expected live page.md to be removed, stat err = %v", err)
+	}
+}
+
+// TestResolveLivePath_TreePaths_StayInsideLiveDir tests that a tree path is
+// only resolved to a location strictly inside the live content directory.
+func TestResolveLivePath_TreePaths_StayInsideLiveDir(t *testing.T) {
+	liveDir := filepath.Join(t.TempDir(), "root")
+	tests := []struct {
+		name    string
+		rel     string
+		want    string
+		wantErr bool
+	}{
+		{name: "file", rel: "page.md", want: filepath.Join(liveDir, "page.md")},
+		{name: "nested file", rel: "sec/page.md", want: filepath.Join(liveDir, "sec", "page.md")},
+		{name: "dot dot inside", rel: "sec/../page.md", want: filepath.Join(liveDir, "page.md")},
+		{name: "empty is the directory itself", rel: "", wantErr: true},
+		{name: "dot is the directory itself", rel: ".", wantErr: true},
+		{name: "parent", rel: "..", wantErr: true},
+		{name: "sibling", rel: "../existing.txt", wantErr: true},
+		{name: "nested parent", rel: "sec/../../existing.txt", wantErr: true},
+		{name: "sibling with the same prefix", rel: "../root2/x", wantErr: true},
+		{name: "backslash parent", rel: `..\existing.txt`, wantErr: runtime.GOOS == "windows"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := resolveLivePath(liveDir, tc.rel)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("resolveLivePath(%q) = %q, %v, wantErr %v", tc.rel, got, err, tc.wantErr)
+			}
+			if !tc.wantErr && tc.want != "" && got != tc.want {
+				t.Errorf("resolveLivePath(%q) = %q, want %q", tc.rel, got, tc.want)
+			}
+		})
 	}
 }

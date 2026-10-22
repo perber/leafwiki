@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import { asApiLocalizedError, mapApiError } from '@/lib/api/errors'
 import { useDateTimeFormat } from '@/lib/useDateTimeFormat'
 import { useBackupStore } from '@/stores/backup'
 import { CloudUpload, GitMerge, Loader2, TriangleAlert } from 'lucide-react'
@@ -9,6 +10,7 @@ import { useSetTitle } from '../viewer/setTitle'
 import BackupConfigForm from './BackupConfigForm'
 
 const POLL_INTERVAL_MS = 5000
+const FORCE_PUSH_CONFLICT_CODE = 'backup_force_push_conflict'
 
 export default function BackupSettings() {
   const { t } = useTranslation('backup')
@@ -21,6 +23,7 @@ export default function BackupSettings() {
     lastError,
     needsIntervention,
     conflictDetails,
+    conflictKind,
     isLoading,
     isPolling,
     pollingFromAt,
@@ -67,6 +70,13 @@ export default function BackupSettings() {
       await forcePush()
       toast.success(t('toast.forcePushSuccess'))
     } catch (err) {
+      if (asApiLocalizedError(err)?.code === FORCE_PUSH_CONFLICT_CODE) {
+        // The remote moved ahead since the status was loaded; reload it so the
+        // view shows the current conflict instead of the stale one.
+        toast.error(mapApiError(err, t('toast.forcePushFailed')).message)
+        await loadStatus()
+        return
+      }
       toast.error(
         err instanceof Error ? err.message : t('toast.forcePushFailed'),
       )
@@ -152,7 +162,7 @@ export default function BackupSettings() {
           </div>
         )}
 
-        {!isLoading && needsIntervention && (
+        {!isLoading && needsIntervention && conflictKind === 'diverged' && (
           <div className="settings__preview border-warning/20 bg-warning/5">
             <span className="settings__preview-label flex items-center gap-1.5">
               <GitMerge className="text-warning h-3.5 w-3.5" />
@@ -180,6 +190,24 @@ export default function BackupSettings() {
                   {isForcePushing ? t('pushing') : t('forcePushButton')}
                 </Button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* A file conflict is resolved by making the files match, not by
+            Force Push: the local backup is behind the remote, so overwriting
+            would drop the remote commits. */}
+        {!isLoading && needsIntervention && conflictKind !== 'diverged' && (
+          <div className="settings__preview border-warning/20 bg-warning/5">
+            <span className="settings__preview-label flex items-center gap-1.5">
+              <TriangleAlert className="text-warning h-3.5 w-3.5" />
+              {t('fileConflictTitle')}
+            </span>
+            <div className="flex flex-col gap-2">
+              <span className="text-warning text-sm font-medium">
+                {t('fileConflictDescription')}
+              </span>
+              <span className="text-muted text-xs">{conflictDetails}</span>
             </div>
           </div>
         )}

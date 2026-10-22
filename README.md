@@ -238,7 +238,7 @@ Default data directory is `./data`. Change with `--data-dir`.
 
 ### Build from source
 
-Requires Go and Node.js. `make build` compiles the UI, embeds it, and produces a self-contained `leafwiki` binary (same as release/Docker builds). Use HTTP (`http://localhost:8080/`), not HTTPS, unless you terminate TLS in front of LeafWiki.
+Requires Go and Node.js (versions: the `toolchain` line in `go.mod`, and `.nvmrc`). `make build` compiles the UI, embeds it, and produces a self-contained `leafwiki` binary (same as release/Docker builds). Use HTTP (`http://localhost:8080/`), not HTTPS, unless you terminate TLS in front of LeafWiki.
 
 ```bash
 git clone https://github.com/perber/leafwiki.git
@@ -313,22 +313,18 @@ git clone https://github.com/perber/leafwiki.git
 cd leafwiki
 ```
 
-**Terminal 1 — Frontend:**
 ```bash
-cd ui/leafwiki-ui
-npm install
-npm run dev
+mise install   # optional: Node from .nvmrc and Go; nvm/fnm and any Go >= 1.21 work too
+make setup     # npm dependencies
+make dev       # backend + Vite; Ctrl-C stops both
 ```
 
-**Terminal 2 — Backend:**
-```bash
-cd cmd/leafwiki
-go run . --jwt-secret=yoursecret --allow-insecure=true --admin-password=yourpassword
-```
+Vite starts on `http://localhost:5173` (login `admin` / `devpassword`) and proxies the API to
+the backend on `127.0.0.1:8080`. `make doctor` checks your Go and Node versions.
+No local toolchain? The [Dev Container](.devcontainer/devcontainer.json) sets everything up in
+VS Code or [GitHub Codespaces](https://codespaces.new/perber/leafwiki); then run `make dev`.
 
-Vite starts on `http://localhost:5173`. The backend binds to `127.0.0.1` by default.
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md#development-setup) for running the two separately and for contribution guidelines.
 
 ---
 

@@ -14,10 +14,6 @@ jobs:
   lint-frontend:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: ui/leafwiki-ui
-
     steps:
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -25,16 +21,10 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint with ESLint
-        run: npm run lint -- --max-warnings=0
-
-      - name: Run Prettier check
-        run: npm run format:check
+      - name: Install, lint with ESLint and check formatting (make ui-lint)
+        run: make ui-lint
 
       - name: Scan dependencies with Trivy
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
@@ -49,10 +39,6 @@ jobs:
   test-frontend:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: ui/leafwiki-ui
-
     steps:
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -60,11 +46,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run unit tests
-        run: npm test
+      - name: Install, run unit tests and build (make ui-test)
+        run: make ui-test
           

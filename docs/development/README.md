@@ -3,6 +3,8 @@
 How LeafWiki is built, for contributors and their coding agents. Setup and contribution rules
 are in [CONTRIBUTING.md](../../CONTRIBUTING.md); agent instructions in [AGENTS.md](../../AGENTS.md).
 
+- [Rules](./rules.md): the short list of rules for every change; read this first.
+- [Conventions](./conventions.md): the reference behind the rules, by area.
 - [Source map](./source-map.md): what every backend and frontend directory does.
 - [Architecture](./architecture.md): layering, init order, storage model (derived vs. real
   state), auth model, Markdown rendering pipeline.

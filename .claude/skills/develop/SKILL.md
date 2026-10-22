@@ -1,6 +1,6 @@
 ---
 name: develop
-description: Run a LeafWiki change through the full agent workflow — plan, architecture check, implement test-first, independent architecture and code review, independent test, independent security review — with a human gate before implementation (tier feature) and before push. Use for any feature, refactor or non-trivial bug fix; pass the issue number or a description as argument.
+description: Run a LeafWiki change through the full agent workflow — plan, architecture check, implement test-first, independent test, independent architecture, code and security review — with a human gate before implementation (tier feature) and before push. Use for any feature, refactor or non-trivial bug fix; pass the issue number or a description as argument.
 ---
 
 # Develop a change
@@ -11,7 +11,9 @@ diff, never the implementer's reasoning, so they judge the code and not the inte
 
 **Keep the orchestrating session small.** Its whole context is re-read on every turn, including
 every wake-up from a background task. Leave long test runs, waiting and browser checks
-(screenshots) to the roles and take back only their short reports. Once a PR step is handed over,
+(screenshots) to the roles and take back only their short reports. The orchestrator is
+usually the most expensive part of a run (see `agent_cost.py` below): a session that grows to
+hundreds of turns costs more than all its subagents together. Once a PR step is handed over,
 continue in a fresh session; the plan and state live where the local overlay says, not in the chat.
 
 ## 0. Pick the tier
@@ -22,9 +24,9 @@ never lower it.
 | Tier | Typical changes | Phases |
 |---|---|---|
 | **trivial** | typo, rename, comment, docs, dependency bump | implementer → CI checks. No plan gate. |
-| **normal** | bug fix or small change inside one slice/feature, no new extension point, no API change | implementer (test-first) → architecture-reviewer + reviewer → tester (edge cases only) |
+| **normal** | bug fix or small change inside one slice/feature, no new extension point, no API change | implementer (test-first) → tester (edge cases only) → architecture-reviewer + reviewer |
 | **feature** | new feature, new extension point, API or format change, change across several slices | all phases, plan gate |
-| **+ security** | anything touching rendering, URLs, uploads, served files, auth, roles, routes, paths, archives — any tier | add security-reviewer |
+| **+ security** | anything touching rendering, URLs, uploads, served files, auth, roles, routes, paths, archives — any tier | add security-reviewer, in parallel with the reviewers |
 
 When unsure between two tiers, take the higher one. Skip the phases a tier doesn't list; don't
 skip the ones it does.
@@ -45,42 +47,41 @@ One PR-sized step at a time, in an isolated git worktree on its own branch (crea
 checkout's `node_modules`, versions may differ. Pass the approved
 plan and the step number. The implementer works test-first and reports commands and results.
 
-## 3. Review — `architecture-reviewer` and `reviewer`
+## 3. Test — `tester`
 
-Pass both the plan and `git diff <base>...HEAD`. The architecture-reviewer checks SOLID,
-Open/Closed, extension points and layering; the reviewer checks correctness, conventions,
-tests and size. Blocking findings from either → back to step 2 with the findings list. Repeat
-until nothing is blocking.
+Pass the plan and the diff. Failures → back to step 2. The tester runs before the reviews so
+that its new tests are part of the reviewed diff: commit them as `test(<area>): …` before
+step 4. The tester's manual checklist for UI changes goes to the person; it holds only what
+e2e, component or unit tests can't cover.
 
-## 4. Test — `tester`
+## 4. Review — `architecture-reviewer`, `reviewer`, `security-reviewer`
 
-Pass the plan and the diff. Failures → back to step 2. The tester's manual checklist for UI
-changes goes to the person; it holds only what e2e, component or unit tests can't cover.
+Pass the plan and `git diff <base>...HEAD`; the reviewers run in parallel, each once. The
+architecture-reviewer checks SOLID, Open/Closed, extension points and layering; the reviewer
+checks correctness, conventions, tests (including the tester's) and size.
 
-## 5. Security review — `security-reviewer`
+The security-reviewer is required when the plan's "Security surface" section says yes, and
+always for changes under `ui/leafwiki-ui/src/features/preview/`, file serving, uploads, auth,
+routes, paths or archives. It covers both the LeafWiki checklist and a general sweep, so no
+second security pass (such as the built-in `/security-review`) runs on the same diff.
 
-Required when the plan's "Security surface" section says yes, and always for changes under
-`ui/leafwiki-ui/src/features/preview/`, file serving, uploads, auth, routes, paths or archives.
-Also run the built-in `/security-review` on the same diff and merge both results; the role adds
-the LeafWiki-specific checklist, the built-in one a general sweep. Findings `medium` or higher
-→ back to step 2.
+Blocking findings (security: `medium` or higher) → back to step 2 with the findings list.
 
-The checkers in steps 3–5 are independent of each other and can run in parallel once the implementation is
-done. After a fix round, rerun every checker whose area the fix touched.
+**Fix rounds check the delta, not the whole change.** Only the checker that raised a blocking
+finding looks again, and it is continued (`SendMessage` to the same agent) rather than started
+fresh: it already knows the conventions and the diff. Give it `git diff <fix-base>..HEAD` and
+ask whether its findings are resolved and the fix broke nothing nearby. A fix that changes
+behaviour also goes back to the tester the same way.
 
 **Different eyes:** the checking roles share the implementer's blind spots when they run on the
 same model. Where the tool allows it, run them on a different model (`model:` in the agent
 file's frontmatter); keep the implementer on the strongest coding model.
 
-**Tests added by the tester** were not seen by the reviewer (they ran in parallel). Before
-hand-over, give the tester's new or changed test files a short reviewer pass, or check them
-yourself: exact assertions (one expected status, not "401 or 403"), fixtures reused, right file.
-
 **Findings need evidence.** Only findings with a concrete location and proof (file:line plus
 a failing test, a triggering input, or the exact rule violated) can block. Everything else is
 a note for the person, not a fix round.
 
-## 6. Hand over
+## 5. Hand over
 
 Check the commit history before hand-over: the implementer commits the production change (with
 the minimal call-site/test updates it forces) and `test: tidy <area>` separately; tests the
@@ -93,6 +94,8 @@ docs PR.
 Stop after three fix rounds without convergence and ask the person. Otherwise report:
 - the diff summary and changed-lines count (code only, ≤ 400–500),
 - test, review and security results,
+- the token cost per role: `python3 .claude/skills/develop/agent_cost.py <session-id>` (the
+  orchestrating session's id; it includes its subagents),
 - the manual test checklist for UI changes, limited to what automation can't cover — **a UI
   change with manual items is not done until a person ran them** (no items: say why),
 - anything noticed out of scope (as follow-up issues),

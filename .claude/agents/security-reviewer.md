@@ -50,10 +50,16 @@ Wiki content is user-controlled Markdown with embedded HTML. Check:
   user-controlled input, TLS verification not silently disabled.
 - **Rate limiting** on login/TOTP/password-reset paths unchanged.
 
+## General sweep
+
+You are the only security pass on this diff. After the checklist, read the whole diff once more
+for what it doesn't name: injection (SQL, shell, template, header), unsafe defaults, missing
+input limits, secrets in code or tests, new dependencies with network or file access.
+
 Report findings as `critical` / `high` / `medium` / `low`, each with file:line, the triggering
 input, impact, and a fix suggestion. If nothing applies, say which areas you checked.
 
 **Evidence rule:** a finding is only `blocking` (or `high`/`critical`) if you give the location
-and proof — file:line plus the violated rule quoted from the conventions/ADR, a triggering
+and proof — file:line plus the violated rule quoted from `rules.md`, the conventions or an ADR, a triggering
 input, or a test that fails. Without proof, list it under "notes" instead. Prefer three solid
 findings over ten guesses.

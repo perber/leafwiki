@@ -2,29 +2,10 @@
 
 How code in this repository is shaped, so new code looks like the code around it. Most rules
 describe what the code already does; where the code doesn't follow a rule yet, the exception is
-listed and has a cleanup plan. **When in doubt, read two neighbouring files in the same package
-and copy their shape. A new pattern needs an [ADR](./adr/README.md).**
+listed and has a cleanup plan.
 
-> **The rules that matter most** — if you read nothing else:
->
-> 1. **Open/Closed:** new features plug into an extension point; shared code registers
->    features, it never grows `if feature` branches. No fitting seam → add the seam first.
-> 2. **Layers:** dependencies point down the [layer table](#layers-and-where-code-goes).
->    *Enforced by `internal/architecture_test.go`.*
-> 3. **Cross-cutting rules** (visibility, drafts, access control) live in one layer above the
->    tree, never in `core/tree` or single handlers.
-> 4. **Tests first;** a bug gets a failing regression test before the fix.
-> 5. **UI changes are tested by a person** in the browser before they count as done.
-> 6. **Use cases** take `Execute(ctx, in XxxInput)`; domain errors are `LocalizedError` with
->    `<domain>_<reason>` codes.
-> 7. **Every UI string through i18n**, in every locale (*enforced by `i18n.test.ts`*); form
->    controls are shadcn primitives.
-> 8. **No raw HTML sinks** (`innerHTML`, `dangerouslySetInnerHTML`, …). *Enforced by ESLint.*
-> 9. **Reuse:** the same logic a second time gets extracted, placed by its dependencies.
-> 10. **PRs:** ≤ 400–500 lines of production code, one topic, `main` always works (unfinished
->     work behind a default-off flag).
->
-> Everything below is reference: look up the section for the area you are working in.
+The short list of rules that matter most is in [rules.md](./rules.md); this page is the
+reference behind it. Look up the section for the area you are working in.
 
 ## Goal
 
@@ -325,14 +306,16 @@ LeafWiki ships for Linux (amd64, 386, arm64), Windows, macOS and Raspberry Pi as
 - OS-specific code goes into build-tagged files (`cmd/leafwiki/signals_unix.go` vs
   `signals_windows.go`, `internal/restore/selfrestart_*.go`).
 - No cgo. Keep memory and CPU use reasonable for a Raspberry Pi.
-- Check that it builds for Windows: `GOOS=windows go build ./...`.
+- Check that it builds for Windows and macOS: `make cross` (build and vet for
+  windows/amd64 and darwin/arm64). *Enforced by the `build-go-cross` job in
+  `.github/workflows/backend.yml`, which runs the same target.*
 
 ## Naming
 
 | What | Scheme | Examples |
 |---|---|---|
 | CLI flag | kebab-case, `<area>-<setting>`; every flag of one feature shares the area prefix | `smtp-host`, `git-backup-branch`, `snapshot-retention` |
-| Env var | exactly `LEAFWIKI_` + the flag in upper snake case, nothing else (all 66 current flags follow this) | `--smtp-host` → `LEAFWIKI_SMTP_HOST` |
+| Env var | exactly `LEAFWIKI_` + the flag in upper snake case, nothing else | `--smtp-host` → `LEAFWIKI_SMTP_HOST` |
 | Boolean flag, opt-in feature (default off) | `enable-<feature>` | `enable-metrics`, `enable-link-refactor` |
 | Boolean flag, opt-out (default on) | `disable-<thing>` | `disable-request-log` |
 | Boolean flag, loosens security (default off) | `allow-<thing>` | `allow-insecure` |
@@ -348,9 +331,12 @@ LeafWiki ships for Linux (amd64, 386, arm64), Windows, macOS and Raspberry Pi as
 | i18n key | `<area>.<element>` camelCase (see [i18n](#internationalization-i18n)) | `page404.createButton` |
 | Branch | `<type>/<short-topic>`, type as in Conventional Commits; issue number if there is one | `fix/1656-attachments-visibility`, `refactor/avatar-use-case-input` |
 
-Existing outliers, kept for compatibility: boolean features without `enable-` (`git-backup`,
-`snapshot`, `public-access`), `editor-limit`, `restore-upload-max-size`. New flags follow the
-table. Every flag is documented in the configuration reference under `docs/` and listed
+Existing outliers, kept for compatibility: boolean flags without `enable-`/`disable-`/`allow-`
+(`git-backup`, `snapshot`, `public-access`, `hide-link-metadata-section`,
+`smtp-insecure-skip-verify`), `editor-limit`, `restore-upload-max-size`. New flags follow the
+table. The env var scheme and the boolean prefixes are enforced by
+`cmd/leafwiki/flags_naming_test.go`; its `legacyBoolFlagNames` allowlist may only shrink.
+Every flag is documented in the configuration reference under `docs/` and listed
 (commented out) in `.env.example` in the same PR.
 
 ## Dependencies
@@ -366,6 +352,23 @@ A new dependency (Go module or npm package) needs a reason in the PR description
 A dependency with lasting weight (a runtime service, a database, a framework, a protocol) needs
 an ADR. Dependabot bumps are not new dependencies.
 
+Toolchain versions have one source each: Go in the `toolchain` line of `go.mod`, Node in
+`.nvmrc`; CI reads both. Dependabot bumps only the `golang`/`node` base images in the
+Dockerfiles, so such a PR updates the matching file too. *Enforced by `make verify`
+(`scripts/check-toolchain-versions.sh`): the full Go version must match, so the Dockerfiles
+pin a patch tag such as `golang:1.27.3-alpine`; Node must match in the major version. The
+committed `mise.toml` pins nothing of its own: a Node entry fails (mise reads `.nvmrc`), Go
+may only be `latest` (a bootstrap) or the exact toolchain version. The Dev Container config
+(`.devcontainer.json`, `.devcontainer/devcontainer.json` or `.devcontainer/*/devcontainer.json`)
+installs mise and names neither.*
+CI jobs call Makefile targets; exceptions are listed at the `ci` target.
+Trivy scans the dependencies (`go.sum`, `package-lock.json`) on every PR, and the final Docker
+image on PRs that change an image input (`make scan-image`) and weekly against the published
+image (`make scan-published-image`), both in `.github/workflows/image-scan.yml`, and in the
+release workflow with `make scan-image` for amd64 and arm64 before the push. Fixable
+HIGH/CRITICAL findings fail the scan; a false positive goes into `.trivyignore` with a comment
+saying why.
+
 ## On-disk format and migrations
 
 The Markdown tree and its frontmatter are the user's data ([ADR-0001](./adr/0001-filesystem-source-of-truth.md)).
@@ -380,6 +383,10 @@ A change to how pages, frontmatter, folders or links are stored on disk:
 
 Starting an older binary on a newer schema fails with a clear error; keep that behaviour.
 Derived indexes (SQLite) don't need a migration: bump their schema and rebuild via resync.
+
+A new SQLite store chooses a `CorruptionPolicy` at its constructor
+([ADR-0013](./adr/0013-per-store-sqlite-corruption-policy.md)): derived index →
+`RebuildOnCorruption`; real state → `FailOnCorruption` or `QuarantineOnCorruption`, never Rebuild.
 
 ## Deprecation
 
@@ -461,6 +468,7 @@ language: [docs/i18n.md](../i18n.md). How to use i18n in code:
   `message` and a `template` that the frontend translates via `errors.json`.
 - Supported languages: `internal/usersettings/language.go` keeps an allow-list that must match
   the locale folders; adding a language means adding it there too (see docs/i18n.md).
+  *Enforced by `TestAllowedLanguages_MatchShippedUILocales`.*
 - Emails (password reset, invite) are English only today.
 
 ## Tests
@@ -572,5 +580,9 @@ the convention, remove dead helpers. Constraints:
   `main` never advertises an unreleased feature. Reference docs under `docs/` that belong to a
   change go in the same PR as the code.
 - One topic per PR; refactoring and behaviour changes in separate PRs.
-- Conventional Commits (`type(scope): description`); one logical change per commit. Run
-  `npm run format` in `ui/leafwiki-ui` (and `e2e` if touched) before committing.
+- One logical change per commit, in the [commit style](../../CONTRIBUTING.md#commit-style).
+  Formatting is checked in CI (`npm run format:check`); run `npm run format` before committing.
+- Commit subjects are checked by `.github/workflows/commit-messages.yml`
+  (`make verify-commits BASE=origin/main` locally). Informational, not required: PRs are
+  usually rebase-merged; one with messy commits is squash-merged under a title the maintainer
+  sets, so the PR title only matters then.

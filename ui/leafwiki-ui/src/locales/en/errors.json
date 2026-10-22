@@ -26,6 +26,7 @@
   "circular reference detected": "Move would create a circular reference",
   "convert not allowed": "Convert operation not allowed",
   "editor limit reached for this plan": "This plan's editor limit has been reached. Upgrade your plan to add more editors.",
+  "force push refused: the remote has changes the local backup has not applied yet": "Force push refused: the remote has changes this wiki has not applied yet. Overwriting them would lose those changes.",
   "email disabled": "Email is not configured on this server",
   "failed to clear authentication cookies": "Failed to clear authentication cookies",
   "failed to clear csrf cookie": "Failed to clear CSRF cookie",

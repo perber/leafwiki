@@ -53,6 +53,32 @@ test.describe('Asset Uploads', () => {
     test.expect(await viewPage.amountOfImages()).toBe(1);
   });
 
+  test('drop-text-file-uploads-it-instead-of-inlining-its-content', async ({ page }) => {
+    const title = `Text Drop Page ${Date.now()}`;
+
+    const treeView = new TreeView(page);
+    await treeView.clickRootAddButton();
+
+    const addPageDialog = new AddPageDialog(page);
+    await addPageDialog.fillTitle(title);
+    await addPageDialog.submitWithoutRedirect();
+    await treeView.clickPageByTitle(title);
+
+    const viewPage = new ViewPage(page);
+    await viewPage.clickEditPageButton();
+
+    const editPage = new EditPage(page);
+    await editPage.dropFileOnEditor({
+      name: 'dropped-notes.txt',
+      content: 'secret text body of the dropped file',
+      type: 'text/plain',
+    });
+
+    const editorContent = page.locator('.cm-content');
+    await test.expect(editorContent).toContainText(/\[dropped-notes\.txt\]\(\/assets\/.+\)/);
+    test.expect(await editPage.getEditorContent()).not.toContain('secret text body');
+  });
+
   test('upload-image-asset-and-insert-it-as-link', async ({ page }) => {
     const title = `Linked Image Page ${Date.now()}`;
 

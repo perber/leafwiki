@@ -1,0 +1,4 @@
+# Check out text files with LF on every platform. A Git for Windows clone
+# (core.autocrlf=true) would otherwise get CRLF, and the shell scripts then
+# fail inside the Dev Container or WSL.
+* text=auto eol=lf

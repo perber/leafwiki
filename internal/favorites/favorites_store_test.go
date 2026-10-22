@@ -275,3 +275,43 @@ func TestFavoritesStore_Replace_ReopensAgainstNewFileAndClosesOld(t *testing.T) 
 		t.Fatalf("expected Replace to reflect the file actually on disk (restored-page), got %v", got)
 	}
 }
+
+// A corrupt favorites.db is moved aside with its sidecars, never deleted,
+// and the store keeps working on an empty database (ADR-0013); a 0-byte file
+// is a valid empty database and stays where it is.
+func TestNewFavoritesStore_UnreadableOrEmptyFile(t *testing.T) {
+	tests := []struct {
+		name           string
+		setup          func(t *testing.T, dbPath string) map[string]string
+		wantQuarantine bool
+	}{
+		{name: "corrupt file is quarantined", setup: test_utils.WriteCorruptSQLiteDB, wantQuarantine: true},
+		{name: "0-byte file is a valid database", setup: func(t *testing.T, dbPath string) map[string]string {
+			test_utils.WriteFile(t, filepath.Dir(dbPath), filepath.Base(dbPath), "")
+			return nil
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			dbPath := filepath.Join(dir, "favorites.db")
+			files := tt.setup(t, dbPath)
+
+			store, err := NewFavoritesStore(dir, nil)
+			if err != nil {
+				t.Fatalf("NewFavoritesStore: %v", err)
+			}
+			defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
+			if err := store.Add("user-1", "page-1"); err != nil {
+				t.Fatalf("Add: %v", err)
+			}
+
+			if tt.wantQuarantine {
+				test_utils.AssertSQLiteQuarantined(t, dbPath, files)
+			} else {
+				test_utils.AssertNoSQLiteQuarantine(t, dbPath)
+			}
+		})
+	}
+}

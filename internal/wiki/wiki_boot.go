@@ -25,9 +25,11 @@ import (
 // ─── Subsystem initializers ───────────────────────────────────────────────────
 
 func (w *Wiki) initAuth(options *WikiOptions) error {
+	// A corrupt users.db fails here, before InitDefaultAdmin could create
+	// an admin in an empty replacement (ADR-0013).
 	store, err := auth.NewUserStore(w.storageDir)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to init user store: %w", err)
 	}
 	w.user = auth.NewUserService(store)
 	w.user.SetEditorLimit(options.EditorLimit)

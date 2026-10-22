@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -102,6 +103,33 @@ func testSSHKeyPEM(t *testing.T) string {
 // here would silently discard the actual (and, for conflicts, actionable)
 // error detail in err.Error() and show the literal template string instead.
 func TestHandleTriggerPull_ErrorHasEmptyTemplate(t *testing.T) {
+	routes := newFileConflictRoutes(t)
+	c, rec := newTestGinContext()
+
+	routes.handleTriggerPull(c)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d, body: %s", http.StatusInternalServerError, rec.Code, rec.Body.String())
+	}
+
+	var body BackupErrorResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("failed to unmarshal response body: %v", err)
+	}
+	if body.Error.Template != "" {
+		t.Errorf("expected empty template so the frontend surfaces the real message, got %q", body.Error.Template)
+	}
+	if !strings.Contains(body.Error.Message, "conflict") {
+		t.Errorf("expected message to contain the conflict detail, got %q", body.Error.Message)
+	}
+}
+
+// newFileConflictRoutes returns Routes over a backup whose root/page.md was
+// backed up, then changed on the remote by an external commit and changed
+// differently on local disk: the next pull conflicts and local HEAD is behind
+// the remote tip.
+func newFileConflictRoutes(t *testing.T) *Routes {
+	t.Helper()
 	bareDir := t.TempDir()
 	if _, err := gogit.PlainInit(bareDir, true); err != nil {
 		t.Fatalf("PlainInit bare remote: %v", err)
@@ -110,11 +138,10 @@ func TestHandleTriggerPull_ErrorHasEmptyTemplate(t *testing.T) {
 	tmpDir := t.TempDir()
 	rootDir := filepath.Join(tmpDir, "root")
 	assetsDir := filepath.Join(tmpDir, "assets")
-	if err := os.MkdirAll(rootDir, 0755); err != nil {
-		t.Fatalf("MkdirAll rootDir: %v", err)
-	}
-	if err := os.MkdirAll(assetsDir, 0755); err != nil {
-		t.Fatalf("MkdirAll assetsDir: %v", err)
+	for _, dir := range []string{rootDir, assetsDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatalf("MkdirAll %s: %v", dir, err)
+		}
 	}
 	if err := os.WriteFile(filepath.Join(rootDir, "page.md"), []byte("# Page\n"), 0644); err != nil {
 		t.Fatalf("WriteFile page.md: %v", err)
@@ -136,7 +163,6 @@ func TestHandleTriggerPull_ErrorHasEmptyTemplate(t *testing.T) {
 		t.Fatalf("initial RunBackup failed: %v", err)
 	}
 
-	// External client changes the same file on the remote...
 	cloneDir := t.TempDir()
 	cloned, err := gogit.PlainClone(cloneDir, false, &gogit.CloneOptions{
 		URL:           "file://" + bareDir,
@@ -170,29 +196,58 @@ func TestHandleTriggerPull_ErrorHasEmptyTemplate(t *testing.T) {
 		t.Fatalf("Push: %v", err)
 	}
 
-	// ...while the local wiki has an uncommitted change to the same file.
 	if err := os.WriteFile(filepath.Join(rootDir, "page.md"), []byte("version C local\n"), 0644); err != nil {
 		t.Fatalf("WriteFile local change: %v", err)
 	}
+	return &Routes{mgr: backupSvc.NewEnvManager(repo, nil)}
+}
 
-	routes := &Routes{mgr: backupSvc.NewEnvManager(repo, nil)}
+// TestHandleForcePush_RemoteAhead_Returns409 verifies that a force push the
+// backup refuses (local behind the remote) is reported as 409 with its own
+// code, so the UI can explain it instead of showing a generic failure.
+func TestHandleForcePush_RemoteAhead_Returns409(t *testing.T) {
+	routes := newFileConflictRoutes(t)
+	statusBefore, _ := routes.mgr.Status()
 	c, rec := newTestGinContext()
 
-	routes.handleTriggerPull(c)
+	routes.handleForcePush(c)
 
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status %d, got %d, body: %s", http.StatusInternalServerError, rec.Code, rec.Body.String())
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected status %d, got %d, body: %s", http.StatusConflict, rec.Code, rec.Body.String())
 	}
-
 	var body BackupErrorResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("failed to unmarshal response body: %v", err)
 	}
-	if body.Error.Template != "" {
-		t.Errorf("expected empty template so the frontend surfaces the real message, got %q", body.Error.Template)
+	if body.Error.Code != ErrCodeBackupForcePushConflict {
+		t.Errorf("code = %q, want %q", body.Error.Code, ErrCodeBackupForcePushConflict)
 	}
-	if !strings.Contains(body.Error.Message, "conflict") {
-		t.Errorf("expected message to contain the conflict detail, got %q", body.Error.Message)
+	if body.Error.Template == "" {
+		t.Error("expected a template so the frontend can translate the refusal")
+	}
+	// The frontend looks the template up verbatim in locales/*/errors.json
+	// (BackupSettings.test.tsx checks every locale for this exact key).
+	const wantTemplate = "force push refused: the remote has changes the local backup has not applied yet"
+	if body.Error.Template != wantTemplate {
+		t.Errorf("template = %q, want %q", body.Error.Template, wantTemplate)
+	}
+	if body.Error.Message != backupSvc.ErrForcePushRemoteAhead.Error() {
+		t.Errorf("message = %q, want %q", body.Error.Message, backupSvc.ErrForcePushRemoteAhead.Error())
+	}
+	if len(body.Error.Args) != 0 {
+		t.Errorf("args = %v, want none", body.Error.Args)
+	}
+	var raw map[string]map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &raw); err != nil {
+		t.Fatalf("unmarshal raw body: %v", err)
+	}
+	for _, key := range []string{"code", "message", "template"} {
+		if _, ok := raw["error"][key]; !ok {
+			t.Errorf("response body %s lacks error.%s", rec.Body.String(), key)
+		}
+	}
+	if statusAfter, _ := routes.mgr.Status(); !reflect.DeepEqual(statusAfter, statusBefore) {
+		t.Errorf("refused force push changed the status:\nbefore %+v\nafter  %+v", statusBefore, statusAfter)
 	}
 }
 

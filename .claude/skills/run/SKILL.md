@@ -8,31 +8,30 @@ description: Launch LeafWiki locally (Go backend + Vite frontend dev server) to 
 LeafWiki needs two processes running side by side: the Go backend (API + serves data)
 and the Vite dev server (frontend, proxies `/api`, `/assets`, `/branding` to the backend).
 
-## 1. Backend
+## Start
 
 ```bash
-cd cmd/leafwiki
-go run . --jwt-secret=dev --admin-password=dev --public-access=true --allow-insecure=true
+make setup   # first time, or after package-lock.json changed
+make dev
 ```
 
-Runs on `http://localhost:8080`. Admin login: username `admin`, password `dev`.
-`--public-access=true` lets you view pages without logging in; use the admin login for
-anything that touches the tree, settings, or editor.
+`make dev` builds and starts the backend on `http://localhost:8080` and Vite on
+`http://localhost:5173` — open :5173, not :8080, during development. Admin login: username
+`admin`, password `devpassword` (the minimum is 8 characters). `--public-access=true` lets you
+view pages without logging in; use the admin login for anything that touches the tree,
+settings, or editor. Extra backend flags: `make dev ARGS=--enable-revision=true`. Ctrl-C, or
+SIGTERM to the script, stops both.
 
-## 2. Frontend
-
-```bash
-cd ui/leafwiki-ui
-npm install   # first time only
-npm run dev
-```
-
-Runs on `http://localhost:5173` — open this URL, not :8080, during development.
+Without `make dev`: `go run . --jwt-secret=dev --admin-password=devpassword
+--public-access=true --allow-insecure=true` in `cmd/leafwiki`, and `npm run dev` in
+`ui/leafwiki-ui`.
 
 ## Notes
 
-- Run both in the background (e.g. two `run_in_background` Bash calls) and poll
+- Run `make dev` in the background (a `run_in_background` Bash call) and poll
   `http://localhost:5173` / `http://localhost:8080` readiness before navigating.
+  Stop it with `pkill -TERM -f scripts/dev.sh`: a background job ignores SIGINT, and the
+  script's trap stops both servers on SIGTERM.
 - Click-throughs and screenshots belong in a subagent that reports back a short text verdict.
   Every image read in the main session stays in its context and is paid for again on every
   later turn.

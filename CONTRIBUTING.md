@@ -9,6 +9,32 @@ Whether you're fixing a typo, reporting a bug, improving documentation, or contr
 
 ---
 
+## Quick start
+
+Install [mise](https://mise.jdx.dev/getting-started.html), then in the repository root:
+
+``` bash
+mise install   # Node from .nvmrc, Go as a bootstrap (go.mod selects the exact version)
+make setup     # npm dependencies for the frontend and the e2e tests
+make dev       # backend and Vite together; open http://localhost:5173, Ctrl-C stops both
+```
+
+mise is optional: nvm or fnm with `.nvmrc` (`nvm use`) and any Go 1.21 or newer work just as
+well. `make doctor` shows whether your versions match. Details:
+[Development setup](#development-setup).
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/perber/leafwiki)
+
+Or skip the local setup: the [Dev Container](.devcontainer/devcontainer.json) (GitHub
+Codespaces, or VS Code with Docker and "Reopen in Container") installs mise, Node, Go and the
+npm dependencies on creation; run `make dev` in its terminal, port 5173 opens in the browser.
+It is also the easiest way on Windows, which has no `make`: use "Dev Containers: Clone
+Repository in Container Volume", since a Git for Windows clone has CRLF line endings that break
+the shell scripts. The Playwright browser is not included; for E2E runs, `make setup-e2e` and
+`npx playwright install-deps chromium` in `e2e/`.
+
+---
+
 ## Ways to contribute
 
 There are many ways to help improve LeafWiki:
@@ -86,27 +112,46 @@ git clone https://github.com/perber/leafwiki.git
 cd leafwiki
 ```
 
-Start the frontend:
+Install the dependencies and start the backend and the frontend dev server together:
 
 ``` bash
-cd ui/leafwiki-ui
-npm install
-npm run dev
+make setup
+make dev
 ```
 
-Start the backend (in another terminal):
+Open http://localhost:5173 and log in as `admin` / `devpassword`; Vite proxies the API to the
+backend on port 8080. `make setup-e2e` additionally installs the Playwright browser for local
+E2E runs.
+
+Without `make dev`, start the two in separate terminals:
+
+``` bash
+cd ui/leafwiki-ui && npm run dev
+```
 
 ``` bash
 cd cmd/leafwiki
-go run . --jwt-secret=dev --admin-password=dev --public-access=true --allow-insecure=true
+go run . --jwt-secret=dev --admin-password=devpassword --public-access=true --allow-insecure=true
 ```
 
-The frontend dev server usually runs at:
-
-http://localhost:5173
+`--admin-password` only applies while no admin exists. If your `cmd/leafwiki/data` was created
+with another password, delete that directory for a fresh wiki or run
+`go run . reset-admin-password` in `cmd/leafwiki`, which prints a new one.
 
 Before submitting the code execute `npm run format` in the `ui/leafwiki-ui` directory.
 If you change the e2e tests, please also run `npm run format` in the `e2e` directory.
+In the repository root, `make ci` runs `make verify` (small repository checks), `make lint`,
+`make test`, `make cross` (build and vet for Windows and macOS) and `make ui-check` (frontend
+install, lint, format check, tests and build); each also runs on its own. CI additionally runs
+the linux/386 tests, govulncheck, Trivy, the install-script test, the e2e lint and the E2E
+suites, and builds the Dev Container (with `make doctor` inside) on PRs that change its
+inputs. Trivy scans the Go and npm dependencies on every PR (filesystem scans in the backend
+and frontend workflows). It also scans the built Docker image, weekly, before each release and
+on PRs that change an image input such as `Dockerfile`, `go.mod` or `package.json` (those files
+only trigger the image scan; their dependencies are already covered by the filesystem scans).
+`make scan-image` runs the image scan locally (needs Docker and `trivy`).
+Go and Node versions: the `toolchain` line in `go.mod` (the `go` command downloads it) and
+`.nvmrc` (`mise install` or `nvm use`); `make doctor` compares them with what you have.
 
 Translating the UI or adding a language? See [docs/i18n.md](docs/i18n.md).
 How the code is structured: [docs/development/](docs/development/README.md).
@@ -117,7 +162,8 @@ How the code is structured: [docs/development/](docs/development/README.md).
 To keep reviews efficient, please follow these guidelines:
 
 - **Every PR must reference an existing issue** (e.g. `Fixes #123`). PRs without a linked issue — or that weren't discussed on the issue first — may be closed and asked to go through the [issue process](#picking-up-an-issue) instead.
-- Keep pull requests **small and focused**
+- Keep pull requests **small and focused** ([size limits](./docs/development/conventions.md#pull-requests))
+- Write every commit in the **[commit style](#commit-style)**; PRs are usually rebase-merged, so the commits land on `main` as they are
 - Clearly **describe the change**
 - Avoid unrelated formatting changes
 - Update documentation if necessary
@@ -136,18 +182,16 @@ that matter more when code is generated:
 - **Say so in the PR.** Tick the AI box in the PR template and name the tool. This doesn't make a
   PR less welcome; it helps review.
 - **Test it yourself, by hand.** Generated code often passes its own tests and still does the
-  wrong thing. For **UI changes**, cover the behaviour with automated tests (e2e, component or
-  unit) wherever possible, then click through at least what tests can't show — how it looks in
-  light/dark mode and at mobile width, real-browser specifics — and tick both UI boxes in the
-  PR template. A screenshot or short recording is welcome but not required. UI PRs without the
-  boxes ticked will be asked to test before review.
+  wrong thing. For **UI changes**, follow [rule 11](./docs/development/rules.md#tests) and tick
+  both UI boxes in the PR template. A screenshot or short recording speeds up review but is not
+  required. UI PRs without the boxes ticked will be asked to test before review.
 - **Same scope rules.** One focused change per PR, linked to an issue. No drive-by refactors or
   reformatting the agent decided to do on the side.
 - **Don't paste unverified AI output into issues or security reports.** Reproduce the problem
   yourself first.
 
-[AGENTS.md](./AGENTS.md) holds the project conventions in a form agents follow. Point your agent
-at it; most tools read it automatically. Developer docs (architecture, source map, processes,
+The [rules](./docs/development/rules.md) are the same for people and agents.
+[AGENTS.md](./AGENTS.md) points agents at them; most tools read it automatically. Developer docs (architecture, source map, processes,
 ADRs) are in [docs/development/](./docs/development/README.md).
 
 ---
@@ -180,6 +224,14 @@ Common commit types:
 - `chore` – maintenance work
 - `test` – tests
 
+Also accepted: `perf`, `style`, `ci`, `build`, `revert`. A `!` after the type or scope marks a
+breaking change (`feat(api)!: …`). Squash `fixup!`/`squash!`/WIP commits before review.
+
+The `Commit messages` workflow checks every commit of a PR; run it locally with
+`make verify-commits BASE=origin/main`. It is informational, not a required check: a PR with
+messy commits gets squash-merged instead, under a title the maintainer sets. The PR title
+only matters in that case.
+
 ---
 
 ## Feature proposals
@@ -209,13 +261,9 @@ Examples include:
 
 ## Code style
 
-Please follow the existing project style.
-
-General guidelines:
-
-- prefer clarity over cleverness
-- avoid introducing unnecessary abstractions
-- keep the code easy to understand and maintain
+Please follow the existing project style: the [rules](./docs/development/rules.md) first, the
+[conventions](./docs/development/conventions.md) for details. In short, prefer clarity over
+cleverness and avoid abstractions the code doesn't need yet.
 
 ---
 

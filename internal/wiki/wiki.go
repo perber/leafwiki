@@ -2,6 +2,8 @@ package wiki
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -127,43 +129,55 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 		shutdownCancel: shutdownCancel,
 		metrics:        options.Metrics,
 	}
-	if err := w.initAuth(options); err != nil {
+	if err := w.boot(options); err != nil {
+		// Close what the steps before the failing one opened: a leaked
+		// database handle keeps the file locked on Windows.
+		if closeErr := w.Close(); closeErr != nil {
+			w.log.Error("error closing partially initialized wiki", "error", closeErr)
+		}
 		return nil, err
+	}
+	return w, nil
+}
+
+func (w *Wiki) boot(options *WikiOptions) error {
+	if err := w.initAuth(options); err != nil {
+		return err
 	}
 	if err := w.initEmail(options); err != nil {
-		return nil, err
+		return err
 	}
 	if err := w.initCoreServices(options); err != nil {
-		return nil, err
+		return err
 	}
 	if err := w.initLinkService(); err != nil {
-		return nil, err
+		return err
 	}
 	if err := w.initTagsService(); err != nil {
-		return nil, err
+		return err
 	}
 	if err := w.initPropertiesService(); err != nil {
-		return nil, err
+		return err
 	}
 	if err := w.initFavoritesService(); err != nil {
-		return nil, err
+		return err
 	}
 	if err := w.initUserSettingsService(); err != nil {
-		return nil, err
+		return err
 	}
 	w.bootstrapTagsAndProperties()
 	if err := w.initSearch(); err != nil {
-		return nil, err
+		return err
 	}
 	if err := w.initBranding(); err != nil {
-		return nil, err
+		return err
 	}
 	if err := w.initAvatarService(); err != nil {
-		return nil, err
+		return err
 	}
 	// Welcome page must exist before the revision service starts recording.
 	if err := w.EnsureWelcomePage(); err != nil {
-		return nil, err
+		return err
 	}
 	if options.EnableRevision {
 		w.revision = revision.NewService(w.storageDir, w.tree, w.log,
@@ -175,7 +189,7 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 	}
 	w.metrics.RegisterRuntimeStats(runtimeStatsSource{w: w})
 	w.buildRoutes(options)
-	return w, nil
+	return nil
 }
 
 // AuthService returns the authentication service.
@@ -247,21 +261,27 @@ func (w *Wiki) EmailTokenService() *auth.EmailTokenService {
 func (w *Wiki) Close() error {
 	w.shutdownCancel() // signal in-flight reloads to abort
 	w.reloadWG.Wait()  // drain goroutines before closing stores
-	w.status.Finish()
+	if w.status != nil {
+		w.status.Finish()
+	}
+
+	// Close every store even when an earlier one fails, so no handle is
+	// leaked. Fields stay nil when NewWiki failed before reaching them.
+	var errs []error
 	if w.auth != nil {
 		// When auth is enabled, AuthService owns both the session store and user store.
 		if err := w.auth.Close(); err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("close auth: %w", err))
 		}
 	} else if w.user != nil {
 		if err := w.user.Close(); err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("close user store: %w", err))
 		}
 	}
 
 	if w.apiKeys != nil {
 		if err := w.apiKeys.Close(); err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("close api keys: %w", err))
 		}
 	}
 
@@ -270,27 +290,45 @@ func (w *Wiki) Close() error {
 	}
 	if w.emailTokenStore != nil {
 		if err := w.emailTokenStore.Close(); err != nil {
-			w.log.Error("error closing email token store", "error", err)
+			errs = append(errs, fmt.Errorf("close email token store: %w", err))
 		}
 	}
 
 	if w.links != nil {
 		if err := w.links.Close(); err != nil {
-			w.log.Error("error closing links", "error", err)
+			errs = append(errs, fmt.Errorf("close links: %w", err))
+		}
+	}
+
+	if w.tags != nil {
+		if err := w.tags.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("close tags: %w", err))
+		}
+	}
+
+	if w.props != nil {
+		if err := w.props.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("close properties: %w", err))
 		}
 	}
 
 	if w.userSettings != nil {
 		if err := w.userSettings.Close(); err != nil {
-			w.log.Error("error closing user settings store", "error", err)
+			errs = append(errs, fmt.Errorf("close user settings store: %w", err))
 		}
 	}
 
 	if w.favorites != nil {
 		if err := w.favorites.Close(); err != nil {
-			w.log.Error("error closing favorites store", "error", err)
+			errs = append(errs, fmt.Errorf("close favorites store: %w", err))
 		}
 	}
 
-	return w.searchIndex.Close()
+	if w.searchIndex != nil {
+		if err := w.searchIndex.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("close search index: %w", err))
+		}
+	}
+
+	return errors.Join(errs...)
 }
