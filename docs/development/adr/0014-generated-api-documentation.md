@@ -1,4 +1,4 @@
-# ADR-0013: Generated, incrementally covered API documentation (Swagger 2.0 via pinned swag)
+# ADR-0014: Generated, incrementally covered API documentation (Swagger 2.0 via pinned swag)
 
 ## Status
 
