@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1355,4 +1356,59 @@ func withoutStore(stores []LiveStore, file string) []LiveStore {
 		}
 	}
 	return out
+}
+
+type recordingStore struct {
+	name string
+	log  *[]string
+	real SwappableStore
+}
+
+func (r *recordingStore) PauseForSwap() error {
+	*r.log = append(*r.log, "pause "+r.name)
+	return r.real.PauseForSwap()
+}
+
+func (r *recordingStore) Replace(dir string) error {
+	*r.log = append(*r.log, "replace "+r.name)
+	return r.real.Replace(dir)
+}
+
+// Stores are paused and reopened in registration order, and a database whose
+// live store is not registered is still swapped on disk.
+func TestManager_Restore_StoresPausedAndReopenedInOrder_UnregisteredDBStillSwapped(t *testing.T) {
+	f := newFullManagerFixtureWithBranding(t, `{"siteName":"Snapshot Site"}`)
+	var log []string
+	f.manager.cfg.Stores = []LiveStore{
+		{File: "api_keys.db", Store: &recordingStore{"api_keys.db", &log, f.apiKeyService}},
+		{File: "usersettings.db", Store: &recordingStore{"usersettings.db", &log, f.userSettings}},
+	}
+	// favorites.db is deliberately not registered (as if its feature were off):
+	// release its handle ourselves so Windows can rename the file.
+	if err := f.favoritesStore.PauseForSwap(); err != nil {
+		t.Fatalf("PauseForSwap: %v", err)
+	}
+	want, err := os.ReadFile(filepath.Join(f.dataDir, "favorites.db"))
+	if err != nil {
+		t.Fatalf("read live favorites.db: %v", err)
+	}
+
+	if err := f.manager.TriggerRestore(f.snapshotID); err != nil {
+		t.Fatalf("TriggerRestore failed: %v", err)
+	}
+	if status := waitForRestoreDone(t, f.manager); status.Error != "" {
+		t.Fatalf("restore failed: %s", status.Error)
+	}
+
+	wantLog := "[pause api_keys.db pause usersettings.db replace api_keys.db replace usersettings.db]"
+	if fmt.Sprint(log) != wantLog {
+		t.Errorf("store calls = %v, want %s", log, wantLog)
+	}
+	got, err := os.ReadFile(filepath.Join(f.dataDir, "favorites.db"))
+	if err != nil {
+		t.Fatalf("read favorites.db after restore: %v", err)
+	}
+	if string(got) == string(want) {
+		t.Error("favorites.db was not swapped although its store was unregistered")
+	}
 }
