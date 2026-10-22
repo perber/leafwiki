@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"net"
 	"os"
 	"slices"
 	"strconv"
@@ -106,6 +108,10 @@ func newRootCommandWithConfig(cfg *serverConfig) *cli.Command {
 			// cannot handle, including the default; this only normalizes the case.
 			format, _ := parseLogFormat(cfg.server.logFormat)
 			setupLogger(os.Stdout, format)
+			for _, key := range ignoredServiceLinkVars(cmd.Flags, cmd.IsSet) {
+				slog.Warn("ignoring environment variable that looks like a Kubernetes service link; set enableServiceLinks: false on the pod or rename the Service",
+					"variable", key)
+			}
 			return ctx, nil
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -245,6 +251,61 @@ func envBoolVars(keys ...string) cli.ValueSourceChain {
 	return cli.NewValueSourceChain(sources...)
 }
 
+// envPortVars is envVars for port flags. Kubernetes service links (on by
+// default) put <SERVICE_NAME>_PORT=tcp://<cluster-ip>:<port> into every pod,
+// so a Service named leafwiki sets LEAFWIKI_PORT. That value is the Service's
+// address, not the port to listen on, so it counts as unset; the root
+// command's Before hook warns about it once the logger is set up. Any other
+// value goes to the flag's validator as usual.
+func envPortVars(keys ...string) cli.ValueSourceChain {
+	sources := make([]cli.ValueSource, 0, len(keys))
+	for _, key := range keys {
+		sources = append(sources, &envVarSource{key: key, skipServiceLink: true})
+	}
+	return cli.NewValueSourceChain(sources...)
+}
+
+// isKubernetesServiceLink reports whether key=v is the <S>_PORT variable the
+// kubelet writes for a Service S. It always writes <S>_SERVICE_HOST and
+// <S>_SERVICE_PORT alongside, and <S>_PORT is exactly
+// <protocol>://<SERVICE_HOST>:<SERVICE_PORT>; matching all three keeps a
+// mistyped value from being skipped instead of rejected.
+func isKubernetesServiceLink(key, v string) bool {
+	prefix, ok := strings.CutSuffix(key, "_PORT")
+	if !ok {
+		return false
+	}
+	host, port := os.Getenv(prefix+"_SERVICE_HOST"), os.Getenv(prefix+"_SERVICE_PORT")
+	if host == "" || port == "" {
+		return false
+	}
+	addr := net.JoinHostPort(host, port)
+	for _, proto := range []string{"tcp", "udp", "sctp"} {
+		if v == proto+"://"+addr {
+			return true
+		}
+	}
+	return false
+}
+
+// ignoredServiceLinkVars lists the port variables envPortVars skipped as
+// Kubernetes service links, for flags not given on the command line.
+func ignoredServiceLinkVars(flags []cli.Flag, isSet func(string) bool) []string {
+	var keys []string
+	for _, flag := range flags {
+		envFlag, ok := flag.(cli.DocGenerationFlag)
+		if !ok || isSet(flag.Names()[0]) {
+			continue
+		}
+		for _, key := range envFlag.GetEnvVars() {
+			if isKubernetesServiceLink(key, strings.TrimSpace(os.Getenv(key))) {
+				keys = append(keys, key)
+			}
+		}
+	}
+	return keys
+}
+
 func normalizeBoolValue(raw string) string {
 	if b, ok := parseBool(raw); ok {
 		if b {
@@ -259,13 +320,17 @@ func normalizeBoolValue(raw string) string {
 // implements cli.EnvValueSource so that generated help still shows the
 // variable name next to its flag.
 type envVarSource struct {
-	key       string
-	normalize func(string) string
+	key             string
+	normalize       func(string) string
+	skipServiceLink bool
 }
 
 func (e *envVarSource) Lookup() (string, bool) {
 	val := strings.TrimSpace(os.Getenv(e.key))
 	if val == "" {
+		return "", false
+	}
+	if e.skipServiceLink && isKubernetesServiceLink(e.key, val) {
 		return "", false
 	}
 	if e.normalize != nil {
