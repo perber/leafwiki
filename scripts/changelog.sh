@@ -16,6 +16,8 @@
 #   Breaking changes (type!:) and subjects without a type go to "Other Changes".
 #   Everything else (docs, refactor, test, chore, ci, build, fix(test),
 #   fix(ci)) is internal: one line with the count and a compare link.
+#   Every "Behavior-Change: <sentence>" trailer becomes a bullet under
+#   "Behavior changes" at the top, whatever the commit's type.
 #
 # Usage:
 #   ./changelog.sh <previous_tag> <current_tag>
@@ -92,6 +94,14 @@ while IFS=$'\t' read -r hash subject; do
 done < <(git log "$PREVIOUS_TAG".."$CURRENT_TAG" --pretty=tformat:"%H%x09%s")
 COMMITS="${COMMITS%$'\n'}"
 
+# One entry per Behavior-Change (or Behaviour-Change) trailer value; unfold
+# joins wrapped values.
+BEHAVIOR_CHANGES=()
+while IFS= read -r change; do
+  [[ -z "$change" ]] && continue
+  BEHAVIOR_CHANGES+=("$change")
+done < <(git log "$PREVIOUS_TAG".."$CURRENT_TAG" --format="%(trailers:key=Behavior-Change,key=Behaviour-Change,valueonly,unfold)")
+
 # Categorize exclusively: user-facing types get a section, internal work is
 # only counted.
 TYPE_RE='^([a-z]+)(\(([^)]*)\))?(!)?:'
@@ -147,6 +157,11 @@ OUTFILE="current_release_changelog.md"
 {
   echo "## 📝 Changelog for $CURRENT_TAG"
   echo ""
+  if [[ "${#BEHAVIOR_CHANGES[@]}" -gt 0 ]]; then
+    echo "### ⚠️ Behavior changes"
+    printf -- '- %s\n' "${BEHAVIOR_CHANGES[@]}"
+    echo ""
+  fi
   print_section "✨ Features" "$FEATURES"
   print_section "🐛 Bug Fixes" "$FIXES"
   print_section "⚡ Performance" "$PERF"
