@@ -47,8 +47,9 @@ orchestration of several services or anything HTTP-shaped → `internal/wiki/<sl
 
 **Cross-cutting rules (visibility, drafts, access control, …) do not go into `core/tree`.** The
 tree stays a plain structure store; such rules sit in a layer above it that all readers go
-through. Until that layer exists, don't add `if`s for them to `TreeService`; open an issue
-instead.
+through. For callers that may see only part of the wiki (share links), that layer is
+`internal/scopedread` ([ADR-0015](./adr/0015-scoped-read-boundary.md)); normal reads don't go
+through it yet. Don't add `if`s for such rules to `TreeService`; open an issue instead.
 
 ## Extensibility (strict)
 
@@ -79,6 +80,7 @@ Rules:
    | `Provider` interfaces + `settings.Value` (`Managed`/`Fixed`) | `internal/publicaccess`, `internal/tocdisplay`, `internal/core/settings` | instance settings changeable at runtime or pinned by a flag |
    | Narrow consumer interfaces | e.g. `importer.ImporterWiki` | a package depends on what it needs, not on `*wiki.Wiki` |
    | State store registration (`stateDBs` + `restore.SwappableStore`) | `internal/restore/swap.go`, `Wiki.StateStores` | a new SQLite store with real state joins snapshots and live restore ([ADR-0016](./adr/0016-state-store-registration.md)) |
+   | Scoped readers (`ReadScope` + one reader per resource) | `internal/scopedread` | reading part of the wiki for a caller that may not see all of it ([ADR-0015](./adr/0015-scoped-read-boundary.md)) |
    | Dialog, panel-item and settings-section registries | `ui/leafwiki-ui/src/lib/registries/` | dialogs, sidebar panels, settings pages |
    | Toolbar actions | `useToolbarActions` per feature | toolbar buttons |
 
@@ -96,7 +98,9 @@ Rules:
    is an existing exception.)
 5. **Cross-cutting rules (visibility, drafts, access control) never go into `core/tree` or into
    individual handlers.** They belong in one layer above the tree that every reader goes
-   through. Until that layer exists, such a feature starts by building it.
+   through. For scoped callers this is `internal/scopedread`
+   ([ADR-0015](./adr/0015-scoped-read-boundary.md)); a feature that needs it for other reads
+   extends that layer rather than building a second one.
 6. **Depend on narrow interfaces at seams**, defined by the consumer ("accept interfaces"), so
    implementations can be swapped or added without touching the consumer.
 7. **Optional features can be switched off**: a flag or setting, read in one place (the

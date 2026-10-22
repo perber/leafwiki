@@ -59,4 +59,5 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Deprecated`, `Superseded by 
 | [0012](./0012-portable-markdown-link-format.md) | Portable on-disk Markdown link format | Proposed |
 | [0013](./0013-per-store-sqlite-corruption-policy.md) | Each SQLite store chooses its corruption policy; real state is never deleted automatically | Accepted |
 | [0014](./0014-generated-api-documentation.md) | API documentation is generated (Swagger 2.0, pinned swag) and covered incrementally with exact exceptions | Proposed |
+| [0015](./0015-scoped-read-boundary.md) | Scoped reads go through `internal/scopedread`, not through the core services | Proposed |
 | [0016](./0016-state-store-registration.md) | State stores register once for snapshots and live restore | Proposed |
