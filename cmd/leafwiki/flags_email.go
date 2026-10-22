@@ -39,7 +39,7 @@ func (o *emailOptions) Flags() []cli.Flag {
 			Category:         catEmail,
 			Usage:            "SMTP server port",
 			Value:            587,
-			Sources:          envVars("LEAFWIKI_SMTP_PORT"),
+			Sources:          envPortVars("LEAFWIKI_SMTP_PORT"),
 			Validator:        validatePortNumber,
 			ValidateDefaults: true,
 		},

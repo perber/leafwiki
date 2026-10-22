@@ -36,7 +36,7 @@ func (o *metricsOptions) Flags() []cli.Flag {
 			Category:         catMetrics,
 			Usage:            "port for the Prometheus metrics listener",
 			Value:            "9091",
-			Sources:          envVars("LEAFWIKI_METRICS_PORT"),
+			Sources:          envPortVars("LEAFWIKI_METRICS_PORT"),
 			Validator:        validatePortValue,
 			ValidateDefaults: true,
 			Config:           trimmed,

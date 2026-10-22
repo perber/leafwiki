@@ -34,7 +34,7 @@ func (o *serverOptions) Flags() []cli.Flag {
 			Category:         catServer,
 			Usage:            "port to run the server on",
 			Value:            "8080",
-			Sources:          envVars("LEAFWIKI_PORT"),
+			Sources:          envPortVars("LEAFWIKI_PORT"),
 			Validator:        validatePortValue,
 			ValidateDefaults: true,
 			Config:           trimmed,
