@@ -177,8 +177,18 @@ func Init(cfg Config) (*Repository, error) {
 		if fetchErr == nil {
 			slog.Info("backup: adopted remote history", "remote", redactRemote(cfg.RemoteURL), "branch", cfg.Branch)
 			r.repo = fetched
-			if err := r.disablePackDeltas(); err != nil {
+			// A .git left behind by a failed first contact would make the next
+			// start open it as an existing repo and skip the sync, so the first
+			// backup would commit every remote-only file as deleted. Remove it
+			// so the next start retries first contact.
+			abandon := func(err error) (*Repository, error) {
+				if rmErr := os.RemoveAll(filepath.Join(repoDir, ".git")); rmErr != nil {
+					slog.Error("backup: could not remove the .git of a failed first contact; delete it before the next start", "repoDir", repoDir, "error", rmErr)
+				}
 				return nil, err
+			}
+			if err := r.disablePackDeltas(); err != nil {
+				return abandon(err)
 			}
 			// Mark remote HEAD as already-pushed; first RunBackup will only push
 			// genuinely new local changes on top of the fetched history.
@@ -190,7 +200,7 @@ func Init(cfg Config) (*Repository, error) {
 				// wiki would seed a welcome page on top of the restored content.
 				synced, err := r.syncContentFromRemote(head.Hash())
 				if err != nil {
-					return nil, fmt.Errorf("failed to sync content from remote: %w", err)
+					return abandon(fmt.Errorf("failed to sync content from remote: %w", err))
 				}
 				// Reconfigure (settings UI, live process) can hit this same path
 				// against an already-running wiki whose tree/SQLite index was
@@ -199,7 +209,7 @@ func Init(cfg Config) (*Repository, error) {
 				r.syncedContentOnInit = synced > 0
 			}
 			if err := EnsureGitignore(repoDir); err != nil {
-				return nil, fmt.Errorf(errWriteGitignoreFailed, err)
+				return abandon(fmt.Errorf(errWriteGitignoreFailed, err))
 			}
 			return r, nil
 		}
