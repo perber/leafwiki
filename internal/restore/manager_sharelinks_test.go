@@ -93,3 +93,49 @@ func TestManager_Restore_HappyPath_PreservesShareLinks(t *testing.T) {
 		t.Error("a link that only existed on the live instance must be gone after restore")
 	}
 }
+
+// The live instance runs with share links off (no store registered, no
+// share_links.db) but the snapshot has the file: the restore must still put it
+// on disk, so enabling the flag later finds the snapshot's links.
+func TestManager_Restore_ShareLinksFlagOffLive_StillSwapsFileOnDisk(t *testing.T) {
+	src := t.TempDir()
+	test_utils.WriteFile(t, src, "root/welcome.md", "# Snapshot content\n")
+	createRealUsersDB(t, src, "snapshot-admin", "snapshot-admin@example.com", "snapshot-password-123")
+	snapshotLinks := newShareLinkService(t, src)
+	snapshotToken := createShareLink(t, snapshotLinks, "snapshot-page")
+
+	snapshotMgr := snapshotSvc.NewManager(snapshotSvc.Config{
+		BackupsDir:   filepath.Join(src, "backups"),
+		RootDir:      filepath.Join(src, "root"),
+		UsersDBPath:  filepath.Join(src, "users.db"),
+		StateDBPaths: []string{filepath.Join(src, "share_links.db")},
+		WikiVersion:  "v1.0.0",
+	})
+	if err := snapshotMgr.RunOnce(context.Background()); err != nil {
+		t.Fatalf("failed to build fixture snapshot: %v", err)
+	}
+	entries, err := snapshotMgr.List()
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("expected 1 fixture snapshot, got %v (err=%v)", entries, err)
+	}
+
+	dataDir := t.TempDir()
+	createRealUsersDB(t, dataDir, "live-admin", "live-admin@example.com", "live-password-123")
+	manager := NewManager(Config{
+		SnapshotManager: snapshotMgr,
+		DataDir:         dataDir,
+		WikiVersion:     "v1.0.0",
+		WriteGate:       NewWriteGate(),
+	})
+	if err := manager.TriggerRestore(entries[0].ID); err != nil {
+		t.Fatalf("TriggerRestore failed: %v", err)
+	}
+	if status := waitForRestoreDone(t, manager); status.Error != "" {
+		t.Fatalf("expected successful restore, got error: %s", status.Error)
+	}
+
+	restored := newShareLinkService(t, dataDir)
+	if _, err := restored.Resolve(context.Background(), snapshotToken); err != nil {
+		t.Fatalf("snapshot link must resolve from the swapped-in file: %v", err)
+	}
+}

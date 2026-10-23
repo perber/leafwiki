@@ -904,3 +904,34 @@ func TestWiki_StateStores_AreRegisteredForBackupAndRestore(t *testing.T) {
 		})
 	}
 }
+
+// Share links are experimental and off by default: with the flag off no
+// share_links.db may be created, with it on the file exists and the service is
+// reachable through the registered store.
+func TestNewWiki_ShareLinksFlag_ControlsDatabaseFile(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		dir := t.TempDir()
+		w, err := NewWiki(&WikiOptions{
+			StorageDir:          dir,
+			AdminPassword:       "adminpassword",
+			JWTSecret:           "secretkey",
+			AccessTokenTimeout:  15 * time.Minute,
+			RefreshTokenTimeout: 7 * 24 * time.Hour,
+			EnableShareLinks:    enabled,
+		})
+		if err != nil {
+			t.Fatalf("NewWiki(enabled=%v): %v", enabled, err)
+		}
+		_, statErr := os.Stat(filepath.Join(dir, "share_links.db"))
+		if enabled && statErr != nil {
+			t.Errorf("flag on: share_links.db missing: %v", statErr)
+		}
+		if !enabled && !os.IsNotExist(statErr) {
+			t.Errorf("flag off: share_links.db must not exist, stat err = %v", statErr)
+		}
+		// Close must be safe, and repeatable, in both modes.
+		if err := w.Close(); err != nil {
+			t.Errorf("Close(enabled=%v): %v", enabled, err)
+		}
+	}
+}
