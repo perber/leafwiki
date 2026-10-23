@@ -1,8 +1,10 @@
 package sharing
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"sync"
 	"testing"
@@ -166,6 +168,15 @@ func TestShareLinkService_Resolve_RejectsUniformly(t *testing.T) {
 		{name: "right prefix, wrong length", token: tokenPrefix + "abc", at: testNow},
 		{name: "well-formed but unknown", token: tokenPrefix + strings.Repeat("A", tokenLength-len(tokenPrefix)), at: testNow},
 		{name: "valid token with trailing space", token: valid + " ", at: testNow},
+		{name: "valid token with leading newline", token: "\n" + valid, at: testNow},
+		{name: "valid token with upper-cased prefix", token: strings.ToUpper(tokenPrefix) + valid[len(tokenPrefix):], at: testNow},
+		{name: "valid token with base64 padding", token: valid + "=", at: testNow},
+		{name: "valid token without prefix", token: valid[len(tokenPrefix):], at: testNow},
+		{name: "valid token with standard base64 chars", token: tokenPrefix + strings.Repeat("+", tokenLength-len(tokenPrefix)), at: testNow},
+		{name: "valid token with slash", token: tokenPrefix + strings.Repeat("/", tokenLength-len(tokenPrefix)), at: testNow},
+		{name: "unicode of the right byte length", token: tokenPrefix + strings.Repeat("é", (tokenLength-len(tokenPrefix))/2) + "A", at: testNow},
+		{name: "NUL byte inside", token: valid[:10] + "\x00" + valid[11:], at: testNow},
+		{name: "very long", token: tokenPrefix + strings.Repeat("A", 1<<20), at: testNow},
 		{name: "revoked", token: revoked, at: testNow},
 		{name: "expired exactly at expiry", token: expiring, at: expires},
 		{name: "expired after expiry", token: expiring, at: expires.Add(time.Second)},
@@ -261,5 +272,111 @@ func TestShareLinkService_Create_ConcurrentCreatesAllPersist(t *testing.T) {
 	}
 	if ids := storedLinkIDs(t, svc.store); len(ids) != n {
 		t.Fatalf("stored %d links, want %d", len(ids), n)
+	}
+}
+
+// A non-UTC ExpiresAt must be compared as an instant, and survive SQLite.
+func TestShareLinkService_Expiry_NonUTCZoneRoundTripsAsSameInstant(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+	zone := time.FixedZone("UTC+14", 14*3600)
+	// Local clock reads 02:00 next day, but the instant is testNow + 1h.
+	expires := testNow.Add(time.Hour).In(zone)
+	link, token := mustCreate(t, svc, CreateShareLinkInput{PageID: "page-1", ExpiresAt: &expires, CreatedBy: "editor-1"})
+
+	stored, err := svc.store.FindByTokenHash(ctx, hashToken(token))
+	if err != nil {
+		t.Fatalf("FindByTokenHash: %v", err)
+	}
+	if stored.ExpiresAt == nil || !stored.ExpiresAt.Equal(expires) {
+		t.Errorf("ExpiresAt = %v, want instant %v", stored.ExpiresAt, expires)
+	}
+	if !stored.CreatedAt.Equal(link.CreatedAt) {
+		t.Errorf("CreatedAt = %v, want %v", stored.CreatedAt, link.CreatedAt)
+	}
+
+	svc.now = func() time.Time { return testNow.Add(time.Hour - time.Nanosecond) }
+	if _, err := svc.Resolve(ctx, token); err != nil {
+		t.Errorf("just before the instant the link must resolve: %v", err)
+	}
+	svc.now = func() time.Time { return testNow.Add(time.Hour).In(time.FixedZone("UTC-12", -12*3600)) }
+	if _, err := svc.Resolve(ctx, token); !errors.Is(err, ErrShareLinkNotFound) {
+		t.Errorf("at the instant (other zone) err = %v, want not found", err)
+	}
+
+	// A past instant expressed in a far-ahead zone is still in the past.
+	past := testNow.Add(-time.Minute).In(zone)
+	if _, _, err := svc.Create(ctx, CreateShareLinkInput{PageID: "page-1", ExpiresAt: &past, CreatedBy: "editor-1"}); errorCode(err) != ErrCodeShareLinkInvalidExpiry {
+		t.Errorf("past instant in non-UTC zone: err = %v", err)
+	}
+}
+
+// Revoking twice, resolving after revoke, and the lifecycle after Close and
+// PauseForSwap must be safe and uniform.
+func TestShareLinkService_Lifecycle_RevokeTwiceAndClosedStore(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+	link, token := mustCreate(t, svc, CreateShareLinkInput{PageID: "page-1", CreatedBy: "editor-1"})
+
+	if err := svc.Revoke(ctx, link.ID); err != nil {
+		t.Fatalf("Revoke: %v", err)
+	}
+	if err := svc.Revoke(ctx, link.ID); errorCode(err) != ErrCodeShareLinkNotFound {
+		t.Errorf("second Revoke err = %v, want not found", err)
+	}
+	if _, err := svc.Resolve(ctx, token); !errors.Is(err, ErrShareLinkNotFound) {
+		t.Errorf("Resolve after Revoke err = %v", err)
+	}
+
+	for i := 0; i < 2; i++ {
+		if err := svc.PauseForSwap(); err != nil {
+			t.Fatalf("PauseForSwap #%d: %v", i+1, err)
+		}
+	}
+	if err := svc.Close(); err != nil {
+		t.Fatalf("Close after PauseForSwap: %v", err)
+	}
+	if err := svc.Close(); err != nil {
+		t.Fatalf("second Close: %v", err)
+	}
+	if _, _, err := svc.Create(ctx, CreateShareLinkInput{PageID: "page-1", CreatedBy: "editor-1"}); errorCode(err) != ErrCodeShareLinkStoreUnavailable {
+		t.Errorf("Create on closed store err = %v", err)
+	}
+	if err := svc.Revoke(ctx, "x"); errorCode(err) != ErrCodeShareLinkStoreUnavailable {
+		t.Errorf("Revoke on closed store err = %v", err)
+	}
+}
+
+// Neither log lines nor error messages may ever contain the token.
+func TestShareLinkService_NeverLogsOrReportsTheToken(t *testing.T) {
+	var buf bytes.Buffer
+	log := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	svc := NewShareLinkService(newTestStore(t), fakePages{"page-1": true}, log)
+	svc.now = func() time.Time { return testNow }
+	ctx := context.Background()
+
+	link, token := mustCreate(t, svc, CreateShareLinkInput{PageID: "page-1", CreatedBy: "editor-1"})
+	_, _ = svc.Resolve(ctx, token)
+	var msgs []string
+	if err := svc.Revoke(ctx, link.ID); err != nil {
+		t.Fatalf("Revoke: %v", err)
+	}
+	_, err := svc.Resolve(ctx, token)
+	msgs = append(msgs, err.Error())
+	_ = svc.PauseForSwap()
+	_, err = svc.Resolve(ctx, token)
+	msgs = append(msgs, err.Error())
+
+	secret := token[len(tokenPrefix):]
+	if strings.Contains(buf.String(), secret) || strings.Contains(buf.String(), hashToken(token)) {
+		t.Errorf("log output leaks the token or its hash: %s", buf.String())
+	}
+	if !strings.Contains(buf.String(), link.ID) || !strings.Contains(buf.String(), "createdBy=editor-1") {
+		t.Errorf("expected shareID and createdBy in log: %s", buf.String())
+	}
+	for _, m := range msgs {
+		if strings.Contains(m, secret) {
+			t.Errorf("error message leaks the token: %q", m)
+		}
 	}
 }
