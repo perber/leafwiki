@@ -55,10 +55,27 @@ func TestArchitecture_ImportBoundaries_FollowLayerRules(t *testing.T) {
 	}
 }
 
+// scopeUnawarePackages must not know about scoped reads (ADR-0015): the scoped
+// read layer is built on top of them, never the other way round. internal/core
+// is covered by its own layer rule.
+var scopeUnawarePackages = []string{
+	"internal/links",
+	"internal/search",
+	"internal/tags",
+	"internal/properties",
+}
+
 // violation returns why pkg must not import dep, or "" if the import is fine.
 // Both are module-relative paths like "internal/core/tree"; dep may also be a
 // third-party import path.
 func violation(pkg, dep string) string {
+	if isUnder(dep, "internal/scopedread") {
+		for _, p := range scopeUnawarePackages {
+			if isUnder(pkg, p) {
+				return "indexes must not depend on the scoped read layer (ADR-0015)"
+			}
+		}
+	}
 	switch {
 	case isUnder(pkg, "internal/core"):
 		if strings.HasPrefix(dep, "github.com/gin-gonic/") {
@@ -169,6 +186,13 @@ func TestArchitecture_Violation_DetectsForbiddenImports(t *testing.T) {
 		{"internal/wiki", "internal/wiki/pages", false},
 		{"internal/wiki/pages", "internal/wiki", false},
 		{"internal/wiki/pages", "internal/core/tree", false},
+		{"internal/core/tree", "internal/scopedread", true},
+		{"internal/search", "internal/scopedread", true},
+		{"internal/links", "internal/scopedread", true},
+		{"internal/tags", "internal/scopedread", true},
+		{"internal/properties", "internal/scopedread", true},
+		{"internal/scopedread", "internal/core/tree", false},
+		{"internal/wiki/pages", "internal/scopedread", false},
 	}
 	for _, tc := range cases {
 		got := violation(tc.pkg, tc.dep) != ""

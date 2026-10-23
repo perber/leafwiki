@@ -58,3 +58,4 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Deprecated`, `Superseded by 
 | [0011](./0011-smtp-cli-env-optional-feature.md) | SMTP as a CLI/ENV-only optional feature | Accepted |
 | [0012](./0012-portable-markdown-link-format.md) | Portable on-disk Markdown link format | Proposed |
 | [0013](./0013-per-store-sqlite-corruption-policy.md) | Each SQLite store chooses its corruption policy; real state is never deleted automatically | Accepted |
+| [0015](./0015-scoped-read-boundary.md) | Scoped reads go through `internal/scopedread`, not through the core services | Proposed |
