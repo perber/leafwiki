@@ -78,6 +78,7 @@ Rules:
    | `PageSideEffect` | `internal/wiki/pagesave` | reactions to page create/update/move/delete/restore |
    | `Provider` interfaces + `settings.Value` (`Managed`/`Fixed`) | `internal/publicaccess`, `internal/tocdisplay`, `internal/core/settings` | instance settings changeable at runtime or pinned by a flag |
    | Narrow consumer interfaces | e.g. `importer.ImporterWiki` | a package depends on what it needs, not on `*wiki.Wiki` |
+   | State store registration (`stateDBs` + `restore.SwappableStore`) | `internal/restore/swap.go`, `Wiki.StateStores` | a new SQLite store with real state joins snapshots and live restore ([ADR-0016](./adr/0016-state-store-registration.md)) |
    | Dialog, panel-item and settings-section registries | `ui/leafwiki-ui/src/lib/registries/` | dialogs, sidebar panels, settings pages |
    | Toolbar actions | `useToolbarActions` per feature | toolbar buttons |
 

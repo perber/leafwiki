@@ -11,6 +11,7 @@ import (
 	"time"
 
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
+	"github.com/perber/wiki/internal/sharing"
 	"github.com/perber/wiki/internal/test_utils"
 	_ "modernc.org/sqlite" // Import SQLite driver
 )
@@ -218,210 +219,100 @@ func TestCreateSnapshot_MissingSettingsFileIsSkipped(t *testing.T) {
 	}
 }
 
-func TestCreateSnapshot_APIKeysDBIsOptional(t *testing.T) {
-	// The common case: API key management is off by default, so no
-	// api_keys.db exists on disk yet. createSnapshot must not fail over that
-	// (matches addFileToZip's existing "missing optional source" behavior) —
-	// newTestConfig doesn't set APIKeysDBPath, mirroring that default.
-	cfg := newTestConfig(t)
+// stateDBCases are the state databases a snapshot captures through
+// StateDBPaths; each case builds a real database file of that kind.
+var stateDBCases = []struct {
+	file   string
+	create func(t *testing.T, path string)
+}{
+	{file: "api_keys.db", create: createTestAPIKeysDB},
+	{file: "favorites.db", create: createTestFavoritesDB},
+	{file: "usersettings.db", create: createTestUserSettingsDB},
+	{file: "share_links.db", create: createTestShareLinksDB},
+}
 
-	id, err := createSnapshot(context.Background(), cfg)
+func createTestShareLinksDB(t *testing.T, path string) {
+	t.Helper()
+	store, err := sharing.NewShareLinkStore(filepath.Dir(path), nil)
 	if err != nil {
-		t.Fatalf("createSnapshot failed: %v", err)
+		t.Fatalf("NewShareLinkStore: %v", err)
 	}
+	test_utils.WrapCloseWithErrorCheck(store.Close, t)
+}
 
-	zipPath := filepath.Join(cfg.BackupsDir, id+".zip")
-	r, err := zip.OpenReader(zipPath)
+// zipEntryNames returns the entry names of snapshot id's ZIP.
+func zipEntryNames(t *testing.T, cfg Config, id string) map[string]bool {
+	t.Helper()
+	r, err := zip.OpenReader(filepath.Join(cfg.BackupsDir, id+".zip"))
 	if err != nil {
 		t.Fatalf("failed to open zip: %v", err)
 	}
 	defer test_utils.WrapCloseWithErrorCheck(r.Close, t)
 
+	names := map[string]bool{}
 	for _, f := range r.File {
-		if f.Name == "api_keys.db" {
-			t.Error("expected no api_keys.db entry when the source file doesn't exist")
-		}
+		names[f.Name] = true
+	}
+	return names
+}
+
+// A state database can be missing: API key management is off by default, and
+// a data dir can predate favorites/usersettings or have no data in them yet.
+// createSnapshot must not fail over that (matches addFileToZip's "missing
+// optional source" behavior) and must not add an entry.
+func TestCreateSnapshot_StateDBIsOptional(t *testing.T) {
+	for _, tc := range stateDBCases {
+		t.Run(tc.file, func(t *testing.T) {
+			cfg := newTestConfig(t)
+			cfg.StateDBPaths = []string{filepath.Join(t.TempDir(), tc.file)}
+
+			id, err := createSnapshot(context.Background(), cfg)
+			if err != nil {
+				t.Fatalf("createSnapshot failed: %v", err)
+			}
+			if zipEntryNames(t, cfg, id)[tc.file] {
+				t.Errorf("expected no %s entry when the source file doesn't exist", tc.file)
+			}
+		})
 	}
 }
 
-// TestCreateSnapshot_APIKeysDBStatErrorOtherThanNotExist_FailsSnapshot is
-// the same stat-error-swallowing regression as the favorites/usersettings
-// tests below, for the pre-existing api_keys.db block this pattern was
-// originally copied from.
-func TestCreateSnapshot_APIKeysDBStatErrorOtherThanNotExist_FailsSnapshot(t *testing.T) {
-	cfg := newTestConfig(t)
-	blocker := test_utils.WriteFile(t, t.TempDir(), "not-a-directory", "x")
-	cfg.APIKeysDBPath = filepath.Join(blocker, "api_keys.db")
+func TestCreateSnapshot_ContainsStateDBWhenPresent(t *testing.T) {
+	for _, tc := range stateDBCases {
+		t.Run(tc.file, func(t *testing.T) {
+			cfg := newTestConfig(t)
+			path := filepath.Join(t.TempDir(), tc.file)
+			tc.create(t, path)
+			cfg.StateDBPaths = []string{path}
 
-	if _, err := createSnapshot(context.Background(), cfg); err == nil {
-		t.Fatal("expected createSnapshot to fail on an api_keys.db stat error other than not-exist")
+			id, err := createSnapshot(context.Background(), cfg)
+			if err != nil {
+				t.Fatalf("createSnapshot failed: %v", err)
+			}
+			if !zipEntryNames(t, cfg, id)[tc.file] {
+				t.Errorf("expected a %s entry when the source file exists", tc.file)
+			}
+		})
 	}
 }
 
-func TestCreateSnapshot_ContainsAPIKeysDBWhenPresent(t *testing.T) {
-	cfg := newTestConfig(t)
-	apiKeysDBPath := filepath.Join(t.TempDir(), "api_keys.db")
-	createTestAPIKeysDB(t, apiKeysDBPath)
-	cfg.APIKeysDBPath = apiKeysDBPath
+// TestCreateSnapshot_StateDBStatErrorOtherThanNotExist_FailsSnapshot is the
+// regression test for a real bug found in review: an os.Stat error other
+// than "file doesn't exist" (e.g. permission denied, or here a path component
+// that isn't a directory) used to be silently treated the same as "the
+// database just doesn't exist on this data dir yet", producing a snapshot
+// that quietly omits its data instead of failing loudly.
+func TestCreateSnapshot_StateDBStatErrorOtherThanNotExist_FailsSnapshot(t *testing.T) {
+	for _, tc := range stateDBCases {
+		t.Run(tc.file, func(t *testing.T) {
+			cfg := newTestConfig(t)
+			blocker := test_utils.WriteFile(t, t.TempDir(), "not-a-directory", "x")
+			cfg.StateDBPaths = []string{filepath.Join(blocker, tc.file)}
 
-	id, err := createSnapshot(context.Background(), cfg)
-	if err != nil {
-		t.Fatalf("createSnapshot failed: %v", err)
-	}
-
-	zipPath := filepath.Join(cfg.BackupsDir, id+".zip")
-	r, err := zip.OpenReader(zipPath)
-	if err != nil {
-		t.Fatalf("failed to open zip: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(r.Close, t)
-
-	found := false
-	for _, f := range r.File {
-		if f.Name == "api_keys.db" {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("expected an api_keys.db entry when the source file exists")
-	}
-}
-
-func TestCreateSnapshot_FavoritesDBIsOptional(t *testing.T) {
-	// A data dir predating this feature (or one where no user has favorited
-	// anything yet) has no favorites.db on disk. createSnapshot must not fail
-	// over that — newTestConfig doesn't set FavoritesDBPath, mirroring that.
-	cfg := newTestConfig(t)
-
-	id, err := createSnapshot(context.Background(), cfg)
-	if err != nil {
-		t.Fatalf("createSnapshot failed: %v", err)
-	}
-
-	zipPath := filepath.Join(cfg.BackupsDir, id+".zip")
-	r, err := zip.OpenReader(zipPath)
-	if err != nil {
-		t.Fatalf("failed to open zip: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(r.Close, t)
-
-	for _, f := range r.File {
-		if f.Name == "favorites.db" {
-			t.Error("expected no favorites.db entry when the source file doesn't exist")
-		}
-	}
-}
-
-func TestCreateSnapshot_ContainsFavoritesDBWhenPresent(t *testing.T) {
-	cfg := newTestConfig(t)
-	favoritesDBPath := filepath.Join(t.TempDir(), "favorites.db")
-	createTestFavoritesDB(t, favoritesDBPath)
-	cfg.FavoritesDBPath = favoritesDBPath
-
-	id, err := createSnapshot(context.Background(), cfg)
-	if err != nil {
-		t.Fatalf("createSnapshot failed: %v", err)
-	}
-
-	zipPath := filepath.Join(cfg.BackupsDir, id+".zip")
-	r, err := zip.OpenReader(zipPath)
-	if err != nil {
-		t.Fatalf("failed to open zip: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(r.Close, t)
-
-	found := false
-	for _, f := range r.File {
-		if f.Name == "favorites.db" {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("expected a favorites.db entry when the source file exists")
-	}
-}
-
-// TestCreateSnapshot_FavoritesDBStatErrorOtherThanNotExist_FailsSnapshot is
-// the regression test for a real bug found in review: an os.Stat error other
-// than "file doesn't exist" (e.g. permission denied, or here a path
-// component that isn't a directory) used to be silently treated the same as
-// "favorites.db just doesn't exist on this data dir yet", producing a
-// snapshot that quietly omits favorites data instead of failing loudly.
-func TestCreateSnapshot_FavoritesDBStatErrorOtherThanNotExist_FailsSnapshot(t *testing.T) {
-	cfg := newTestConfig(t)
-	blocker := test_utils.WriteFile(t, t.TempDir(), "not-a-directory", "x")
-	cfg.FavoritesDBPath = filepath.Join(blocker, "favorites.db")
-
-	if _, err := createSnapshot(context.Background(), cfg); err == nil {
-		t.Fatal("expected createSnapshot to fail on a favorites.db stat error other than not-exist")
-	}
-}
-
-// TestCreateSnapshot_UserSettingsDBStatErrorOtherThanNotExist_FailsSnapshot
-// mirrors TestCreateSnapshot_FavoritesDBStatErrorOtherThanNotExist_FailsSnapshot
-// for usersettings.db.
-func TestCreateSnapshot_UserSettingsDBStatErrorOtherThanNotExist_FailsSnapshot(t *testing.T) {
-	cfg := newTestConfig(t)
-	blocker := test_utils.WriteFile(t, t.TempDir(), "not-a-directory", "x")
-	cfg.UserSettingsDBPath = filepath.Join(blocker, "usersettings.db")
-
-	if _, err := createSnapshot(context.Background(), cfg); err == nil {
-		t.Fatal("expected createSnapshot to fail on a usersettings.db stat error other than not-exist")
-	}
-}
-
-func TestCreateSnapshot_UserSettingsDBIsOptional(t *testing.T) {
-	// A data dir predating this feature (or one where no user has saved
-	// settings yet) has no usersettings.db on disk. createSnapshot must not
-	// fail over that — newTestConfig doesn't set UserSettingsDBPath, mirroring
-	// that.
-	cfg := newTestConfig(t)
-
-	id, err := createSnapshot(context.Background(), cfg)
-	if err != nil {
-		t.Fatalf("createSnapshot failed: %v", err)
-	}
-
-	zipPath := filepath.Join(cfg.BackupsDir, id+".zip")
-	r, err := zip.OpenReader(zipPath)
-	if err != nil {
-		t.Fatalf("failed to open zip: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(r.Close, t)
-
-	for _, f := range r.File {
-		if f.Name == "usersettings.db" {
-			t.Error("expected no usersettings.db entry when the source file doesn't exist")
-		}
-	}
-}
-
-func TestCreateSnapshot_ContainsUserSettingsDBWhenPresent(t *testing.T) {
-	cfg := newTestConfig(t)
-	userSettingsDBPath := filepath.Join(t.TempDir(), "usersettings.db")
-	createTestUserSettingsDB(t, userSettingsDBPath)
-	cfg.UserSettingsDBPath = userSettingsDBPath
-
-	id, err := createSnapshot(context.Background(), cfg)
-	if err != nil {
-		t.Fatalf("createSnapshot failed: %v", err)
-	}
-
-	zipPath := filepath.Join(cfg.BackupsDir, id+".zip")
-	r, err := zip.OpenReader(zipPath)
-	if err != nil {
-		t.Fatalf("failed to open zip: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(r.Close, t)
-
-	found := false
-	for _, f := range r.File {
-		if f.Name == "usersettings.db" {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("expected a usersettings.db entry when the source file exists")
+			if _, err := createSnapshot(context.Background(), cfg); err == nil {
+				t.Fatalf("expected createSnapshot to fail on a %s stat error other than not-exist", tc.file)
+			}
+		})
 	}
 }
 

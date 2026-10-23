@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/perber/wiki/internal/core/shared/sqliteutil"
 	"github.com/perber/wiki/internal/core/tree"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
+	"github.com/perber/wiki/internal/restore"
 	"github.com/perber/wiki/internal/test_utils"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
 	wikiresync "github.com/perber/wiki/internal/wiki/resync"
@@ -824,4 +826,85 @@ func TestNewWiki_RelativeDataDir_UsersDB(t *testing.T) {
 		test_utils.AssertFilesUnchanged(t, files)
 		test_utils.AssertNoSQLiteQuarantine(t, filepath.Join("data", "users.db"))
 	})
+}
+
+// Every store the composition root registers for live restore must also be
+// listed in restore.StateDBFiles, or snapshots would not capture its file and
+// a restore would not swap it.
+func TestWiki_StateStores_AreRegisteredForBackupAndRestore(t *testing.T) {
+	tests := []struct {
+		name             string
+		enableAPIKeys    bool
+		enableShareLinks bool
+		wantFiles        []string
+	}{
+		{name: "optional features on", enableAPIKeys: true, enableShareLinks: true, wantFiles: []string{"api_keys.db", "favorites.db", "usersettings.db", "share_links.db"}},
+		{name: "optional features off", wantFiles: []string{"favorites.db", "usersettings.db"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w, err := NewWiki(&WikiOptions{
+				StorageDir:             t.TempDir(),
+				AdminPassword:          "adminpassword",
+				JWTSecret:              "secretkey",
+				AccessTokenTimeout:     15 * time.Minute,
+				RefreshTokenTimeout:    7 * 24 * time.Hour,
+				EnableAPIKeyManagement: tc.enableAPIKeys,
+				EnableShareLinks:       tc.enableShareLinks,
+			})
+			if err != nil {
+				t.Fatalf("NewWiki: %v", err)
+			}
+			t.Cleanup(func() { _ = w.Close() })
+
+			registered := map[string]bool{}
+			for _, f := range restore.StateDBFiles() {
+				registered[f] = true
+			}
+			var got []string
+			for _, s := range w.StateStores() {
+				if s.Store == nil || reflect.ValueOf(s.Store).IsNil() {
+					t.Errorf("StateStores lists %s with a nil store", s.File)
+				}
+				if !registered[s.File] {
+					t.Errorf("StateStores lists %s, which restore.StateDBFiles does not capture", s.File)
+				}
+				got = append(got, s.File)
+			}
+			if !reflect.DeepEqual(got, tc.wantFiles) {
+				t.Errorf("StateStores files = %v, want %v", got, tc.wantFiles)
+			}
+		})
+	}
+}
+
+// Share links are experimental and off by default: with the flag off no
+// share_links.db may be created, with it on the file exists and the service is
+// reachable through the registered store.
+func TestNewWiki_ShareLinksFlag_ControlsDatabaseFile(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		dir := t.TempDir()
+		w, err := NewWiki(&WikiOptions{
+			StorageDir:          dir,
+			AdminPassword:       "adminpassword",
+			JWTSecret:           "secretkey",
+			AccessTokenTimeout:  15 * time.Minute,
+			RefreshTokenTimeout: 7 * 24 * time.Hour,
+			EnableShareLinks:    enabled,
+		})
+		if err != nil {
+			t.Fatalf("NewWiki(enabled=%v): %v", enabled, err)
+		}
+		_, statErr := os.Stat(filepath.Join(dir, "share_links.db"))
+		if enabled && statErr != nil {
+			t.Errorf("flag on: share_links.db missing: %v", statErr)
+		}
+		if !enabled && !os.IsNotExist(statErr) {
+			t.Errorf("flag off: share_links.db must not exist, stat err = %v", statErr)
+		}
+		// Close must be safe, and repeatable, in both modes.
+		if err := w.Close(); err != nil {
+			t.Errorf("Close(enabled=%v): %v", enabled, err)
+		}
+	}
 }

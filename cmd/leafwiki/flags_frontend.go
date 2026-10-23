@@ -16,6 +16,7 @@ type frontendOptions struct {
 	enableRevision          bool
 	enableLinkRefactor      bool
 	enableAPIKeyManagement  bool
+	enableShareLinks        bool
 	maxRevisionHistory      int
 	revisionCoalesceWindow  time.Duration
 }
@@ -87,6 +88,13 @@ func (o *frontendOptions) Flags() []cli.Flag {
 			Category:    catFeatures,
 			Usage:       "enable the experimental API key management feature",
 			Sources:     envBoolVars("LEAFWIKI_ENABLE_API_KEY_MANAGEMENT"),
+		},
+		&cli.BoolFlag{
+			Name:        "enable-share-links",
+			Destination: &o.enableShareLinks,
+			Category:    catFeatures,
+			Usage:       "enable the experimental share links feature (read-only links to a page for people without an account; not usable yet)",
+			Sources:     envBoolVars("LEAFWIKI_ENABLE_SHARE_LINKS"),
 		},
 		&cli.IntFlag{
 			Name:        "max-revision-history",
