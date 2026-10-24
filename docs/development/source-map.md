@@ -245,7 +245,7 @@ shape for that domain.
 
 - **`internal/wiki/pages`** — the largest domain slice: CRUD + tree operations exposed over HTTP.
   One file per use case — `create_page.go`, `update_page.go`, `move_page.go`, `copy_page.go`,
-  `delete_page.go`, `convert_page.go` (page↔section), `get_page.go` (`PageQueries` — the read-only page lookups: by ID, path, title, permalink), `pin_page.go` (global editorial pin, see
+  `delete_page.go`, `convert_page.go` (page↔section), `get_page_view.go` (`GetPageViewByIDUseCase`/`GetPageViewByPathUseCase` — the single-page view shared by API and SEO: page plus frontmatter tags and properties via `page_metadata.go`; not a visibility layer), `get_page.go` (`PageQueries` — the remaining read-only lookups: path lookup, title, permalink), `pin_page.go` (global editorial pin, see
   distinction from favorites below), `ensure_path.go`, `refactor.go` (link-refactor
   trigger), `add_favorite.go`/`remove_favorite.go`/`list_favorites.go` (per-user favorites, note the explicit distinction: pin is global/editorial via
   `tree.SetPinned` in page frontmatter, favorites is per-user via `internal/favorites`, deliberately
