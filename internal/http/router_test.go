@@ -3224,6 +3224,7 @@ func TestGetPageEndpoints_BlankIdentifier_ReturnsBadRequest(t *testing.T) {
 		url      string
 		wantCode string
 	}{
+		{name: "whitespace id", url: "/api/pages/%20%20", wantCode: "page_missing_id"},
 		{name: "empty path", url: "/api/pages/by-path?path=", wantCode: "page_missing_path"},
 		{name: "whitespace path", url: "/api/pages/by-path?path=%20", wantCode: "page_missing_path"},
 	}

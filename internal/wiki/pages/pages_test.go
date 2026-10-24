@@ -927,7 +927,7 @@ func TestGetPageView_MissingPage_ReturnsError(t *testing.T) {
 		wantCode string
 	}{
 		{name: "by id not found", get: getPageViewByID("nonexistent"), wantErr: tree.ErrPageNotFound},
-		{name: "by id empty", get: getPageViewByID(""), wantErr: tree.ErrPageNotFound},
+		{name: "by id empty", get: getPageViewByID(""), wantCode: pages.ErrCodePageMissingID},
 		{name: "by route path not found", get: getPageViewByPath("does/not/exist"), wantErr: tree.ErrPageNotFound},
 		{name: "by route path empty", get: getPageViewByPath(""), wantCode: pages.ErrCodePageMissingPath},
 	}
