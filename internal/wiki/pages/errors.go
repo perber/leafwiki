@@ -41,8 +41,12 @@ func newPageRootOperationError(operation string) *sharederrors.LocalizedError {
 	)
 }
 
-// newPageMissingPathError keeps the message and template the handler
-// returned before the check moved into the use case.
+// newPageMissingIDError and newPageMissingPathError keep the message and
+// template the handlers returned for a missing ID or path.
+func newPageMissingIDError() *sharederrors.LocalizedError {
+	return sharederrors.NewLocalizedError(ErrCodePageMissingID, "Page ID is required", "page id is required", nil)
+}
+
 func newPageMissingPathError() *sharederrors.LocalizedError {
 	return sharederrors.NewLocalizedError(ErrCodePageMissingPath, "Missing path", "missing path", nil)
 }

@@ -41,6 +41,9 @@ func NewGetPageViewByIDUseCase(t *tree.TreeService) *GetPageViewByIDUseCase {
 
 // Execute returns the page view; tree.ErrPageNotFound is passed through.
 func (uc *GetPageViewByIDUseCase) Execute(_ context.Context, in GetPageViewByIDInput) (*PageView, error) {
+	if in.ID == "" {
+		return nil, newPageMissingIDError()
+	}
 	page, err := uc.tree.GetPage(in.ID)
 	if err != nil {
 		return nil, err
