@@ -854,7 +854,7 @@ func createPageViewFixture(t *testing.T, deps *testDeps, withMetadata bool) *tre
 	return updated.Page
 }
 
-func TestGetPageView_ReturnsPageWithMetadata(t *testing.T) {
+func TestGetPageView_ExistingPage_ReturnsPageWithMetadata(t *testing.T) {
 	tests := []struct {
 		name         string
 		withMetadata bool
@@ -919,7 +919,7 @@ func TestGetPageView_ReturnsPageWithMetadata(t *testing.T) {
 	}
 }
 
-func TestGetPageView_Errors(t *testing.T) {
+func TestGetPageView_MissingPage_ReturnsError(t *testing.T) {
 	tests := []struct {
 		name     string
 		get      getPageViewCall

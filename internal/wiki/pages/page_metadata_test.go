@@ -9,7 +9,7 @@ import (
 	"github.com/perber/wiki/internal/core/tree"
 )
 
-func TestFlattenMetadataEntry(t *testing.T) {
+func TestFlattenMetadataEntry_ValueShapes_FlattenToStrings(t *testing.T) {
 	tests := []struct {
 		name   string
 		prefix string
@@ -102,7 +102,7 @@ func TestFlattenMetadataEntry_DepthLimitDoesNotPanic(t *testing.T) {
 	flattenMetadataEntry("root", inner, result)
 }
 
-func TestExtractPageMetadata(t *testing.T) {
+func TestExtractPageMetadata_Fields_SplitIntoTagsAndProperties(t *testing.T) {
 	tests := []struct {
 		name      string
 		fields    map[string]interface{}
@@ -177,10 +177,10 @@ func TestExtractPageMetadata(t *testing.T) {
 	}
 }
 
-// TestReadPageMetadata covers the read step shared by the page view use cases
+// TestReadPageMetadata_PageFile_ReturnsNonNilMetadata covers the read step shared by the page view use cases
 // and the create/update/move responses, including a page whose file is gone
 // by the time its metadata is read.
-func TestReadPageMetadata(t *testing.T) {
+func TestReadPageMetadata_PageFile_ReturnsNonNilMetadata(t *testing.T) {
 	tests := []struct {
 		name      string
 		content   *string // nil removes the file

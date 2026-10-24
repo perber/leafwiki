@@ -3108,10 +3108,10 @@ priority: 2
 	}
 }
 
-// TestGetPageEndpoints_MetadataEdgeCases pins the exact tags/properties JSON
+// TestGetPageEndpoints_UnusualFrontmatter_ReturnsSameMetadata pins the exact tags/properties JSON
 // that GET /api/pages/:id and GET /api/pages/by-path return for unusual
 // frontmatter; both endpoints must agree.
-func TestGetPageEndpoints_MetadataEdgeCases(t *testing.T) {
+func TestGetPageEndpoints_UnusualFrontmatter_ReturnsSameMetadata(t *testing.T) {
 	tests := []struct {
 		name      string
 		extraYAML string // appended after the leafwiki_* system keys
@@ -3218,7 +3218,7 @@ func TestGetPageEndpoints_MetadataEdgeCases(t *testing.T) {
 	}
 }
 
-func TestGetPageEndpoints_BlankIdentifierIsBadRequest(t *testing.T) {
+func TestGetPageEndpoints_BlankIdentifier_ReturnsBadRequest(t *testing.T) {
 	tests := []struct {
 		name     string
 		url      string
@@ -3245,10 +3245,10 @@ func TestGetPageEndpoints_BlankIdentifierIsBadRequest(t *testing.T) {
 	}
 }
 
-// TestGetPageEndpoints_SectionChildrenDepth pins that by-path returns a
+// TestGetPageEndpoints_Section_ChildDepthPerEndpoint pins that by-path returns a
 // section with direct children only while by-id returns the full subtree,
 // and that the children never carry the parent's or their own metadata.
-func TestGetPageEndpoints_SectionChildrenDepth(t *testing.T) {
+func TestGetPageEndpoints_Section_ChildDepthPerEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
 	router := createRouterTestInstance(w, t)
