@@ -21,7 +21,7 @@ const shellTestTemplate = `<head><link rel="icon" href="{{__FAVICON_HREF__}}"><m
 
 func siteName(name string) func() string { return func() string { return name } }
 
-func TestRenderShell_Characterization(t *testing.T) {
+func TestRenderShell_ExistingConfig_MatchesPreviousOutput(t *testing.T) {
 	tests := []struct {
 		name     string
 		template string
@@ -83,15 +83,6 @@ func TestRenderShell_Characterization(t *testing.T) {
 			want:     `<head><link rel="icon" href="/favicon.svg"><meta name="base-path" content=""><title>LeafWiki</title><script src="/static/a.js"></script></head><body><div id="root"></div></body>`,
 		},
 		{
-			// Rendering is a single pass, so a placeholder inside the site name
-			// stays literal; before the seam it was expanded by the next replace.
-			name:     "placeholder in site name is not expanded",
-			template: shellTestTemplate,
-			cfg:      wikihttp.FrontendConfig{GetSiteName: siteName("{{__BASE_PATH__}}{{__FAVICON_HREF__}}")},
-			opts:     wikihttp.RouterOptions{BasePath: "/wiki"},
-			want:     `<head><link rel="icon" href="/wiki/favicon.svg"><meta name="base-path" content="/wiki"><title>{{__BASE_PATH__}}{{__FAVICON_HREF__}}</title><script src="/wiki/static/a.js"></script></head><body><div id="root"></div></body>`,
-		},
-		{
 			name:     "template without head end tag gets no injection",
 			template: `<title>{{__SITE_NAME__}}</title>`,
 			opts:     wikihttp.RouterOptions{InjectCodeInHeader: `<meta name="x">`},
@@ -122,7 +113,7 @@ func shellRouter(t *testing.T, embed bool, cfg wikihttp.FrontendConfig, basePath
 
 // Requests the SPA fallback never answers with the shell; independent of
 // whether dist/index.html was built.
-func TestSPAFallback_NonShellRequests(t *testing.T) {
+func TestSPAFallback_NonShellRequest_Returns404(t *testing.T) {
 	tests := []struct {
 		name     string
 		embed    bool
@@ -160,7 +151,7 @@ func parts(p wikihttp.ShellParts) wikihttp.ShellContributor {
 	return wikihttp.ShellContributorFunc(func(context.Context, wikihttp.ShellRequest) wikihttp.ShellParts { return p })
 }
 
-func TestRenderShell_Contributors(t *testing.T) {
+func TestRenderShell_WithContributors_ComposesParts(t *testing.T) {
 	tests := []struct {
 		name         string
 		template     string
@@ -245,6 +236,15 @@ func TestRenderShell_Contributors(t *testing.T) {
 				`  </head><body><div id="root"></div></body>`,
 		},
 		{
+			// Rendering is a single pass, so a placeholder inside the site name
+			// stays literal; before the seam it was expanded by the next replace.
+			name:     "placeholder in site name is not expanded",
+			template: shellTestTemplate,
+			siteName: "{{__BASE_PATH__}}{{__FAVICON_HREF__}}",
+			opts:     wikihttp.RouterOptions{BasePath: "/wiki"},
+			want:     `<head><link rel="icon" href="/wiki/favicon.svg"><meta name="base-path" content="/wiki"><title>{{__BASE_PATH__}}{{__FAVICON_HREF__}}</title><script src="/wiki/static/a.js"></script></head><body><div id="root"></div></body>`,
+		},
+		{
 			// All head parts go in with one injection, so a literal </head>
 			// inside an earlier part can't pull later parts (admin code) into it.
 			name:     "head end tag in a head part does not capture later parts",
@@ -271,7 +271,7 @@ func TestRenderShell_Contributors(t *testing.T) {
 	}
 }
 
-func TestRenderShell_ContributorsSeeStrippedRoutePath(t *testing.T) {
+func TestRenderShell_Contributor_SeesStrippedRoutePath(t *testing.T) {
 	var got wikihttp.ShellRequest
 	cfg := wikihttp.FrontendConfig{ShellContributors: []wikihttp.ShellContributor{
 		wikihttp.ShellContributorFunc(func(_ context.Context, req wikihttp.ShellRequest) wikihttp.ShellParts {
@@ -305,7 +305,7 @@ func (r *recordingResponder) RespondShell(w http.ResponseWriter, req wikihttp.Sh
 	return r.handle
 }
 
-func TestShellResponders_FirstHandledWins(t *testing.T) {
+func TestShellResponders_SeveralHandle_FirstWins(t *testing.T) {
 	for _, embed := range []bool{true, false} {
 		t.Run(fmt.Sprintf("embed=%v", embed), func(t *testing.T) {
 			declining := &recordingResponder{header: "X-A"}
@@ -333,7 +333,7 @@ func TestShellResponders_FirstHandledWins(t *testing.T) {
 	}
 }
 
-func TestShellResponders_WriteWithoutWriteHeaderIs200(t *testing.T) {
+func TestShellResponders_WriteWithoutWriteHeader_Is200(t *testing.T) {
 	responder := wikihttp.ShellResponderFunc(func(w http.ResponseWriter, _ wikihttp.ShellRequest) bool {
 		_, _ = w.Write([]byte("ok"))
 		return true
@@ -346,7 +346,7 @@ func TestShellResponders_WriteWithoutWriteHeaderIs200(t *testing.T) {
 	}
 }
 
-func TestShellResponders_BasePathRootIsSlash(t *testing.T) {
+func TestShellResponders_BasePathRoot_IsSlash(t *testing.T) {
 	for _, path := range []string{"/wiki", "/wiki/"} {
 		t.Run(path, func(t *testing.T) {
 			responder := &recordingResponder{handle: true, header: "X"}
@@ -359,7 +359,7 @@ func TestShellResponders_BasePathRootIsSlash(t *testing.T) {
 	}
 }
 
-func TestShellResponders_NotCalledForNonShellRequests(t *testing.T) {
+func TestShellResponders_NonShellRequest_NotCalled(t *testing.T) {
 	tests := []struct {
 		name   string
 		method string
@@ -392,7 +392,7 @@ func TestShellResponders_NotCalledForNonShellRequests(t *testing.T) {
 	}
 }
 
-func TestShellTagHelpers(t *testing.T) {
+func TestShellTagHelpers_SpecialCharacters_AreEscaped(t *testing.T) {
 	tests := []struct {
 		name string
 		got  template.HTML
@@ -415,7 +415,7 @@ func TestShellTagHelpers(t *testing.T) {
 
 // RoutePath is the decoded, uncleaned URL path with the base path stripped;
 // contributors must not use it as a file system path.
-func TestShellResponders_RoutePath(t *testing.T) {
+func TestShellResponders_EncodedPath_RoutePathIsDecoded(t *testing.T) {
 	tests := []struct {
 		path string
 		want string
@@ -441,7 +441,7 @@ func TestShellResponders_RoutePath(t *testing.T) {
 
 // Without an embedded frontend (dev builds) declining responders leave gin's
 // default 404 in place, but the headers they set survive.
-func TestShellResponders_AllDeclineWithoutEmbeddedFrontend(t *testing.T) {
+func TestShellResponders_AllDeclineWithoutEmbed_KeepGin404(t *testing.T) {
 	responder := &recordingResponder{header: "Accept"}
 	router := shellRouter(t, false, wikihttp.FrontendConfig{ShellResponders: []wikihttp.ShellResponder{responder}}, "")
 	rec := httptest.NewRecorder()
@@ -456,7 +456,7 @@ func TestShellResponders_AllDeclineWithoutEmbeddedFrontend(t *testing.T) {
 
 // The contract forbids panics; if one happens anyway, the engine's recovery
 // middleware turns it into a 500 and the router keeps serving.
-func TestShellResponders_PanicIsRecovered(t *testing.T) {
+func TestShellResponders_Panic_IsRecovered(t *testing.T) {
 	panicking := wikihttp.ShellResponderFunc(func(http.ResponseWriter, wikihttp.ShellRequest) bool {
 		panic("responder bug")
 	})
@@ -476,7 +476,7 @@ func TestShellResponders_PanicIsRecovered(t *testing.T) {
 
 // Responders get gin's writer, so the metrics middleware records the status
 // they wrote, and the restored 404 when they decline.
-func TestShellResponders_MetricsSeeResponderStatus(t *testing.T) {
+func TestShellResponders_Metrics_SeeResponderStatus(t *testing.T) {
 	old := wikihttp.EmbedFrontend
 	wikihttp.EmbedFrontend = "false"
 	t.Cleanup(func() { wikihttp.EmbedFrontend = old })
