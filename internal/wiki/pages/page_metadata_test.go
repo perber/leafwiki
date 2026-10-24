@@ -1,8 +1,12 @@
 package pages
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/perber/wiki/internal/core/tree"
 )
 
 func TestFlattenMetadataEntry(t *testing.T) {
@@ -134,6 +138,30 @@ func TestExtractPageMetadata(t *testing.T) {
 			wantTags:  []string{},
 			wantProps: map[string]string{"status": "draft"},
 		},
+		{
+			name: "keys are trimmed and tags match case-insensitively",
+			fields: map[string]interface{}{
+				" TAGS ":   []interface{}{"Go", 7, "go"},
+				"  owner ": "alice",
+			},
+			wantTags:  []string{"go"},
+			wantProps: map[string]string{"owner": "alice"},
+		},
+		{
+			name: "upper-case system key is excluded",
+			fields: map[string]interface{}{
+				"LEAFWIKI_ID": "abc",
+				"größe":       "groß",
+			},
+			wantTags:  []string{},
+			wantProps: map[string]string{"größe": "groß"},
+		},
+		{
+			name:      "no fields",
+			fields:    map[string]interface{}{},
+			wantTags:  []string{},
+			wantProps: map[string]string{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -148,3 +176,88 @@ func TestExtractPageMetadata(t *testing.T) {
 		})
 	}
 }
+
+// TestReadPageMetadata covers the read step shared by the page view use cases
+// and the create/update/move responses, including a page whose file is gone
+// by the time its metadata is read.
+func TestReadPageMetadata(t *testing.T) {
+	tests := []struct {
+		name      string
+		content   *string // nil removes the file
+		pageID    string  // overrides the created page's ID when set
+		wantTags  []string
+		wantProps map[string]string
+	}{
+		{
+			name:      "only tags",
+			content:   ptr("---\nleafwiki_id: ID\ntags:\n  - B\n  - a\n---\n# x\n"),
+			wantTags:  []string{"b", "a"}, // order kept, lower-cased
+			wantProps: map[string]string{},
+		},
+		{
+			name:      "no frontmatter",
+			content:   ptr("# just markdown\n"),
+			wantTags:  []string{},
+			wantProps: map[string]string{},
+		},
+		{
+			name:      "invalid frontmatter",
+			content:   ptr("---\ntags: [unclosed\n---\n# x\n"),
+			wantTags:  []string{},
+			wantProps: map[string]string{},
+		},
+		{
+			name:      "file removed after lookup",
+			content:   nil,
+			wantTags:  []string{},
+			wantProps: map[string]string{},
+		},
+		{
+			name:      "unknown page id",
+			content:   ptr("# x\n"),
+			pageID:    "does-not-exist",
+			wantTags:  []string{},
+			wantProps: map[string]string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			storageDir := t.TempDir()
+			ts := tree.NewTreeService(storageDir)
+			if err := ts.LoadTree(); err != nil {
+				t.Fatalf("LoadTree failed: %v", err)
+			}
+			kind := tree.NodeKindPage
+			id, err := ts.CreateNode("user1", nil, "Meta", "meta", &kind)
+			if err != nil {
+				t.Fatalf("CreateNode failed: %v", err)
+			}
+			file := filepath.Join(storageDir, "root", "meta.md")
+			if tt.content == nil {
+				if err := os.Remove(file); err != nil {
+					t.Fatalf("Remove failed: %v", err)
+				}
+			} else if err := os.WriteFile(file, []byte(*tt.content), 0o644); err != nil {
+				t.Fatalf("WriteFile failed: %v", err)
+			}
+			pageID := *id
+			if tt.pageID != "" {
+				pageID = tt.pageID
+			}
+
+			tags, props := readPageMetadata(ts, pageID)
+			if tags == nil || props == nil {
+				t.Fatalf("tags and properties must be non-nil, got %#v / %#v", tags, props)
+			}
+			if !reflect.DeepEqual(tags, tt.wantTags) {
+				t.Errorf("tags = %#v, want %#v", tags, tt.wantTags)
+			}
+			if !reflect.DeepEqual(props, tt.wantProps) {
+				t.Errorf("properties = %#v, want %#v", props, tt.wantProps)
+			}
+		})
+	}
+}
+
+func ptr(s string) *string { return &s }

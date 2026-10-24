@@ -3108,6 +3108,208 @@ priority: 2
 	}
 }
 
+// TestGetPageEndpoints_MetadataEdgeCases pins the exact tags/properties JSON
+// that GET /api/pages/:id and GET /api/pages/by-path return for unusual
+// frontmatter; both endpoints must agree.
+func TestGetPageEndpoints_MetadataEdgeCases(t *testing.T) {
+	tests := []struct {
+		name      string
+		extraYAML string // appended after the leafwiki_* system keys
+		rawBody   string // replaces the whole file when set
+		wantTags  string
+		wantProps string
+		// wantStatus defaults to 200. Invalid YAML already fails while the
+		// tree reads the page content, before metadata is extracted.
+		wantStatus int
+	}{
+		{
+			name:      "only tags",
+			extraYAML: "tags:\n  - One\n  - two\n",
+			wantTags:  `"tags":["one","two"]`,
+			wantProps: `"properties":{}`,
+		},
+		{
+			name:      "tags key in upper case",
+			extraYAML: "Tags:\n  - X\n",
+			wantTags:  `"tags":["x"]`,
+			wantProps: `"properties":{}`,
+		},
+		{
+			name:      "tags as scalar are ignored",
+			extraYAML: "tags: single\n",
+			wantTags:  `"tags":[]`,
+			wantProps: `"properties":{}`,
+		},
+		{
+			name:      "list, number, bool and multiline properties are skipped",
+			extraYAML: "list:\n  - a\n  - b\nnum: 3\nflag: true\nmulti: |\n  l1\n  l2\nkeep: yes please\n",
+			wantTags:  `"tags":[]`,
+			wantProps: `"properties":{"keep":"yes please"}`,
+		},
+		{
+			name:      "nested properties are flattened without leafwiki children",
+			extraYAML: "meta:\n  owner: alice\n  leafwiki_hidden: x\n  deep:\n    level: two\n",
+			wantTags:  `"tags":[]`,
+			wantProps: `"properties":{"meta.deep.level":"two","meta.owner":"alice"}`,
+		},
+		{
+			name:      "unicode keys, values and tags",
+			extraYAML: "tags:\n  - Über\n  - 日本\ngröße: groß\n\"emoji 🎉\": \"ja ✓\"\n",
+			wantTags:  `"tags":["über","日本"]`,
+			wantProps: `"properties":{"emoji 🎉":"ja ✓","größe":"groß"}`,
+		},
+		{
+			name:      "unknown leafwiki_ system key is excluded",
+			extraYAML: "leafwiki_future: secret\nstatus: ok\n",
+			wantTags:  `"tags":[]`,
+			wantProps: `"properties":{"status":"ok"}`,
+		},
+		{
+			name:       "invalid frontmatter fails the content read",
+			rawBody:    "---\ntags: [unclosed\nstatus: : :\n---\n# Body\n",
+			wantStatus: http.StatusInternalServerError,
+		},
+		{
+			name:      "unterminated frontmatter yields empty metadata",
+			rawBody:   "---\ntags:\n  - a\n# Body without closing fence\n",
+			wantTags:  `"tags":[]`,
+			wantProps: `"properties":{}`,
+		},
+	}
+
+	// One instance for all rows keeps this test cheap; each row owns its page.
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			slug := fmt.Sprintf("meta-%d", i)
+			page := createPageViaAPI(t, router, "Meta", slug, nil, pageNodeKind())
+			content := tt.rawBody
+			if content == "" {
+				content = "---\nleafwiki_id: " + page.ID + "\nleafwiki_title: Meta\n" + tt.extraYAML + "---\n# Body\n"
+			}
+			target := filepath.Join(w.GetStorageDir(), "root", slug+".md")
+			if err := os.WriteFile(target, []byte(content), 0o644); err != nil {
+				t.Fatalf("WriteFile(%s) failed: %v", target, err)
+			}
+
+			wantStatus := tt.wantStatus
+			if wantStatus == 0 {
+				wantStatus = http.StatusOK
+			}
+			for _, url := range []string{"/api/pages/" + page.ID, "/api/pages/by-path?path=" + slug} {
+				rec := authenticatedRequest(t, router, http.MethodGet, url, nil)
+				if rec.Code != wantStatus {
+					t.Fatalf("GET %s: expected %d, got %d - %s", url, wantStatus, rec.Code, rec.Body.String())
+				}
+				if wantStatus != http.StatusOK {
+					continue
+				}
+				body := rec.Body.String()
+				for _, want := range []string{tt.wantTags, tt.wantProps} {
+					if !strings.Contains(body, want) {
+						t.Errorf("GET %s: expected %s in %s", url, want, body)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestGetPageEndpoints_BlankIdentifierIsBadRequest(t *testing.T) {
+	tests := []struct {
+		name     string
+		url      string
+		wantCode string
+	}{
+		{name: "empty path", url: "/api/pages/by-path?path=", wantCode: "page_missing_path"},
+		{name: "whitespace path", url: "/api/pages/by-path?path=%20", wantCode: "page_missing_path"},
+	}
+
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := authenticatedRequest(t, router, http.MethodGet, tt.url, nil)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d - %s", rec.Code, rec.Body.String())
+			}
+			if !strings.Contains(rec.Body.String(), `"code":"`+tt.wantCode+`"`) {
+				t.Errorf("expected error code %q, got %s", tt.wantCode, rec.Body.String())
+			}
+		})
+	}
+}
+
+// TestGetPageEndpoints_SectionChildrenDepth pins that by-path returns a
+// section with direct children only while by-id returns the full subtree,
+// and that the children never carry the parent's or their own metadata.
+func TestGetPageEndpoints_SectionChildrenDepth(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := createRouterTestInstance(w, t)
+
+	sectionKind := tree.NodeKindSection
+	section := createPageViaAPI(t, router, "Docs", "docs", nil, &sectionKind)
+	child := createPageViaAPI(t, router, "Child", "child", &section.ID, pageNodeKind())
+	createPageViaAPI(t, router, "Grand", "grand", &child.ID, pageNodeKind())
+
+	childFile := filepath.Join(w.GetStorageDir(), "root", "docs", "child", "index.md")
+	if _, err := os.Stat(childFile); err != nil {
+		t.Fatalf("expected child converted to section at %s: %v", childFile, err)
+	}
+	childContent := "---\nleafwiki_id: " + child.ID + "\nleafwiki_title: Child\ntags:\n  - childtag\nowner: bob\n---\n# Child\n"
+	if err := os.WriteFile(childFile, []byte(childContent), 0o644); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	sectionFile := filepath.Join(w.GetStorageDir(), "root", "docs", "index.md")
+	sectionContent := "---\nleafwiki_id: " + section.ID + "\nleafwiki_title: Docs\ntags:\n  - sectiontag\n---\n# Docs\n"
+	if err := os.WriteFile(sectionFile, []byte(sectionContent), 0o644); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+
+	tests := []struct {
+		name           string
+		url            string
+		wantGrandchild bool
+	}{
+		{name: "by path", url: "/api/pages/by-path?path=docs", wantGrandchild: false},
+		{name: "by id", url: "/api/pages/" + section.ID, wantGrandchild: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := authenticatedRequest(t, router, http.MethodGet, tt.url, nil)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("expected 200, got %d - %s", rec.Code, rec.Body.String())
+			}
+			var resp map[string]interface{}
+			if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("Failed to parse JSON: %v", err)
+			}
+			if !strings.Contains(rec.Body.String(), `"tags":["sectiontag"]`) || !strings.Contains(rec.Body.String(), `"properties":{}`) {
+				t.Errorf("expected section's own metadata, got %s", rec.Body.String())
+			}
+			if strings.Contains(rec.Body.String(), "childtag") || strings.Contains(rec.Body.String(), "bob") {
+				t.Errorf("child metadata must not leak into the response, got %s", rec.Body.String())
+			}
+			children, ok := resp["children"].([]interface{})
+			if !ok || len(children) != 1 {
+				t.Fatalf("expected one child, got %v", resp["children"])
+			}
+			first := children[0].(map[string]interface{})
+			grand, _ := first["children"].([]interface{})
+			if got := len(grand) == 1; got != tt.wantGrandchild {
+				t.Errorf("grandchild present = %v, want %v (children: %v)", got, tt.wantGrandchild, first["children"])
+			}
+		})
+	}
+}
+
 func TestGetPagePermalinkEndpoint_ReturnsCurrentPath(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
