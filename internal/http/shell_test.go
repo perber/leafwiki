@@ -6,11 +6,13 @@ import (
 	"html/template"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 
 	wikihttp "github.com/perber/wiki/internal/http"
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 )
 
 // shellTestTemplate mirrors the placeholders and the relative asset reference
@@ -79,6 +81,15 @@ func TestRenderShell_Characterization(t *testing.T) {
 			template: shellTestTemplate,
 			opts:     wikihttp.RouterOptions{InjectCodeInHeader: " \n "},
 			want:     `<head><link rel="icon" href="/favicon.svg"><meta name="base-path" content=""><title>LeafWiki</title><script src="/static/a.js"></script></head><body><div id="root"></div></body>`,
+		},
+		{
+			// Rendering is a single pass, so a placeholder inside the site name
+			// stays literal; before the seam it was expanded by the next replace.
+			name:     "placeholder in site name is not expanded",
+			template: shellTestTemplate,
+			cfg:      wikihttp.FrontendConfig{GetSiteName: siteName("{{__BASE_PATH__}}{{__FAVICON_HREF__}}")},
+			opts:     wikihttp.RouterOptions{BasePath: "/wiki"},
+			want:     `<head><link rel="icon" href="/wiki/favicon.svg"><meta name="base-path" content="/wiki"><title>{{__BASE_PATH__}}{{__FAVICON_HREF__}}</title><script src="/wiki/static/a.js"></script></head><body><div id="root"></div></body>`,
 		},
 		{
 			name:     "template without head end tag gets no injection",
@@ -199,6 +210,26 @@ func TestRenderShell_Contributors(t *testing.T) {
 			want: `<head><title>LeafWiki</title></head><body><div id="root"><p>{{__PAGE_TITLE__}}</p><a href="./static/x">x</a></div></body>`,
 		},
 		{
+			name:     "head end tag in body does not attract head injection",
+			template: seamTestTemplate,
+			opts:     wikihttp.RouterOptions{InjectCodeInHeader: `<meta name="admin">`},
+			contributors: []wikihttp.ShellContributor{
+				parts(wikihttp.ShellParts{Body: `<pre>&lt;/head&gt;</head>{{__BASE_PATH__}}</pre>`}),
+			},
+			want: `<head><title>LeafWiki</title>  <meta name="admin">` + "\n" +
+				`  </head><body><div id="root"><pre>&lt;/head&gt;</head>{{__BASE_PATH__}}</pre></div></body>`,
+		},
+		{
+			name:     "placeholders in head are not expanded",
+			template: seamTestTemplate,
+			opts:     wikihttp.RouterOptions{BasePath: "/wiki"},
+			contributors: []wikihttp.ShellContributor{
+				parts(wikihttp.ShellParts{Head: `<meta content="{{__BASE_PATH__}}{{__PAGE_TITLE__}}"><script src="./static/x.js"></script>`}),
+			},
+			want: `<head><title>LeafWiki</title>  <meta content="{{__BASE_PATH__}}{{__PAGE_TITLE__}}"><script src="./static/x.js"></script>` + "\n" +
+				`  </head><body><div id="root"></div></body>`,
+		},
+		{
 			name:     "head in registration order, before stylesheet and header code",
 			template: seamTestTemplate,
 			opts:     wikihttp.RouterOptions{InjectCodeInHeader: `<script>x()</script>`},
@@ -211,6 +242,21 @@ func TestRenderShell_Contributors(t *testing.T) {
 				`    <meta name="b">` + "\n" +
 				`    <link rel="stylesheet" href="/custom.css">` + "\n" +
 				`    <script>x()</script>` + "\n" +
+				`  </head><body><div id="root"></div></body>`,
+		},
+		{
+			// All head parts go in with one injection, so a literal </head>
+			// inside an earlier part can't pull later parts (admin code) into it.
+			name:     "head end tag in a head part does not capture later parts",
+			template: seamTestTemplate,
+			opts:     wikihttp.RouterOptions{InjectCodeInHeader: `<!--admin-->`},
+			contributors: []wikihttp.ShellContributor{
+				parts(wikihttp.ShellParts{Head: `<script type="application/ld+json">{"d":"</head>"}</script>`}),
+				parts(wikihttp.ShellParts{Head: `<meta name="b">`}),
+			},
+			want: `<head><title>LeafWiki</title>  <script type="application/ld+json">{"d":"</head>"}</script>` + "\n" +
+				`    <meta name="b">` + "\n" +
+				`    <!--admin-->` + "\n" +
 				`  </head><body><div id="root"></div></body>`,
 		},
 	}
@@ -325,7 +371,10 @@ func TestShellResponders_NotCalledForNonShellRequests(t *testing.T) {
 		{name: "branding", method: http.MethodGet, path: "/wiki/branding/x.png"},
 		{name: "POST", method: http.MethodPost, path: "/wiki/page"},
 		{name: "HEAD", method: http.MethodHead, path: "/wiki/page"},
+		{name: "OPTIONS", method: http.MethodOptions, path: "/wiki/page"},
 		{name: "outside base path", method: http.MethodGet, path: "/other/page"},
+		{name: "base path as prefix of another segment", method: http.MethodGet, path: "/wikix/page"},
+		{name: "double slash outside base path", method: http.MethodGet, path: "//"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -361,5 +410,98 @@ func TestShellTagHelpers(t *testing.T) {
 				t.Fatalf("got %s, want %s", tt.got, tt.want)
 			}
 		})
+	}
+}
+
+// RoutePath is the decoded, uncleaned URL path with the base path stripped;
+// contributors must not use it as a file system path.
+func TestShellResponders_RoutePath(t *testing.T) {
+	tests := []struct {
+		path string
+		want string
+	}{
+		{path: "/wiki/a%2Fb", want: "/a/b"},
+		{path: "/wiki/%E2%9C%93/%C3%BCber", want: "/✓/über"},
+		{path: "/wiki//x", want: "//x"},
+		{path: "/wiki/../etc", want: "/../etc"},
+		{path: "/wiki/a%5Cb", want: `/a\b`},
+		{path: "/wiki/deep/page?q=1#f", want: "/deep/page"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			responder := &recordingResponder{handle: true, header: "X"}
+			router := shellRouter(t, false, wikihttp.FrontendConfig{ShellResponders: []wikihttp.ShellResponder{responder}}, "/wiki")
+			router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, tt.path, nil))
+			if len(responder.calls) != 1 || responder.calls[0].RoutePath != tt.want {
+				t.Fatalf("calls = %+v, want RoutePath %q", responder.calls, tt.want)
+			}
+		})
+	}
+}
+
+// Without an embedded frontend (dev builds) declining responders leave gin's
+// default 404 in place, but the headers they set survive.
+func TestShellResponders_AllDeclineWithoutEmbeddedFrontend(t *testing.T) {
+	responder := &recordingResponder{header: "Accept"}
+	router := shellRouter(t, false, wikihttp.FrontendConfig{ShellResponders: []wikihttp.ShellResponder{responder}}, "")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/page", nil))
+	if rec.Code != http.StatusNotFound || rec.Body.String() != "404 page not found" || rec.Header().Get("Content-Type") != "text/plain" {
+		t.Fatalf("status=%d body=%q headers=%v", rec.Code, rec.Body.String(), rec.Header())
+	}
+	if len(responder.calls) != 1 || rec.Header().Get("Vary") != "Accept" {
+		t.Fatalf("calls=%d Vary=%q", len(responder.calls), rec.Header().Get("Vary"))
+	}
+}
+
+// The contract forbids panics; if one happens anyway, the engine's recovery
+// middleware turns it into a 500 and the router keeps serving.
+func TestShellResponders_PanicIsRecovered(t *testing.T) {
+	panicking := wikihttp.ShellResponderFunc(func(http.ResponseWriter, wikihttp.ShellRequest) bool {
+		panic("responder bug")
+	})
+	router := shellRouter(t, false, wikihttp.FrontendConfig{ShellResponders: []wikihttp.ShellResponder{panicking}}, "")
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/page", nil))
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", rec.Code)
+	}
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/unknown", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status after panic = %d, want 404", rec.Code)
+	}
+}
+
+// Responders get gin's writer, so the metrics middleware records the status
+// they wrote, and the restored 404 when they decline.
+func TestShellResponders_MetricsSeeResponderStatus(t *testing.T) {
+	old := wikihttp.EmbedFrontend
+	wikihttp.EmbedFrontend = "false"
+	t.Cleanup(func() { wikihttp.EmbedFrontend = old })
+	responder := wikihttp.ShellResponderFunc(func(w http.ResponseWriter, req wikihttp.ShellRequest) bool {
+		if req.RoutePath != "/teapot" {
+			return false
+		}
+		w.WriteHeader(http.StatusTeapot)
+		return true
+	})
+	m := httpmetrics.NewHTTPMetrics("test")
+	router := wikihttp.NewRouter(nil, wikihttp.FrontendConfig{ShellResponders: []wikihttp.ShellResponder{responder}},
+		wikihttp.RouterOptions{DisableRequestLog: true, Metrics: m})
+	for _, path := range []string{"/teapot", "/declined"} {
+		router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, path, nil))
+	}
+
+	rec := httptest.NewRecorder()
+	m.HTTPHandler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	for _, want := range []string{
+		`leafwiki_http_requests_total{method="GET",route="unmatched",status="418"} 1`,
+		`leafwiki_http_requests_total{method="GET",route="unmatched",status="404"} 1`,
+	} {
+		if !strings.Contains(rec.Body.String(), want) {
+			t.Fatalf("metrics missing %s", want)
+		}
 	}
 }
