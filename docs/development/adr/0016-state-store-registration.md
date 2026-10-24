@@ -40,7 +40,9 @@ fourth copy, against the reuse rule and the Open/Closed rule in the
    cache) and its own restore phase.
 
 Adding a state store now means: one file name constant and one row in `stateDBs`, one entry in
-`Wiki.StateStores` that uses the constant.
+`Wiki.StateStores` that uses the constant. The store package still names the file it opens
+itself; the `Wiki.StateStores` test reopens each listed store and fails if the file it creates
+is not the one its entry names.
 
 ## Alternatives considered
 
