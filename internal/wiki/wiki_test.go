@@ -830,7 +830,9 @@ func TestNewWiki_RelativeDataDir_UsersDB(t *testing.T) {
 
 // Every store the composition root registers for live restore must also be
 // listed in restore.StateDBFiles, or snapshots would not capture its file and
-// a restore would not swap it.
+// a restore would not swap it. Its File label must also be the database the
+// store actually opens: the store packages name their files themselves, so a
+// renamed file or a mixed-up label would otherwise drop it from snapshots.
 func TestWiki_StateStores_AreRegisteredForBackupAndRestore(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -842,8 +844,9 @@ func TestWiki_StateStores_AreRegisteredForBackupAndRestore(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			storageDir := t.TempDir()
 			w, err := NewWiki(&WikiOptions{
-				StorageDir:             t.TempDir(),
+				StorageDir:             storageDir,
 				AdminPassword:          "adminpassword",
 				JWTSecret:              "secretkey",
 				AccessTokenTimeout:     15 * time.Minute,
@@ -871,6 +874,30 @@ func TestWiki_StateStores_AreRegisteredForBackupAndRestore(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tc.wantFiles) {
 				t.Errorf("StateStores files = %v, want %v", got, tc.wantFiles)
+			}
+
+			// Release every store and delete its files, then reopen one store
+			// at a time: the file named by its label must be the one that
+			// comes back.
+			for _, s := range w.StateStores() {
+				if err := s.Store.PauseForSwap(); err != nil {
+					t.Fatalf("PauseForSwap %s: %v", s.File, err)
+				}
+			}
+			for _, f := range restore.StateDBFiles() {
+				for _, suffix := range []string{"", "-wal", "-shm"} {
+					if err := os.Remove(filepath.Join(storageDir, f+suffix)); err != nil && !os.IsNotExist(err) {
+						t.Fatalf("remove %s%s: %v", f, suffix, err)
+					}
+				}
+			}
+			for _, s := range w.StateStores() {
+				if err := s.Store.Replace(storageDir); err != nil {
+					t.Fatalf("Replace %s: %v", s.File, err)
+				}
+				if _, err := os.Stat(filepath.Join(storageDir, s.File)); err != nil {
+					t.Errorf("StateStores lists %s, but its store does not open that file: %v", s.File, err)
+				}
 			}
 		})
 	}
