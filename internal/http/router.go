@@ -2,7 +2,6 @@ package http
 
 import (
 	"embed"
-	"html"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -142,6 +141,12 @@ type FrontendConfig struct {
 	CustomStylesheetPath string
 	// StorageDir is used to validate that CustomStylesheet in RouterOptions is within the storage dir.
 	StorageDir string
+	// ShellResponders may answer SPA requests instead of the shell; the first
+	// that handles a request wins. See shell.go for the contract.
+	ShellResponders []ShellResponder
+	// ShellContributors add title, head and body markup to the SPA shell, in
+	// this order, before the built-in custom stylesheet and InjectCodeInHeader.
+	ShellContributors []ShellContributor
 }
 
 // NewRouter creates the HTTP engine, builds the shared RouterContext, delegates all
@@ -257,7 +262,8 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 		})
 	}
 
-	// Serve the embedded frontend SPA on all unknown routes.
+	// Unknown routes: shell responders, then the embedded SPA shell (see shell.go).
+	shell := newShellHandler(frontendCfg, opts, customStylesheetPath)
 	if EmbedFrontend == "true" {
 		fsys, err := fs.Sub(frontend, "dist")
 		if err != nil {
@@ -277,66 +283,9 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 			c.Data(http.StatusOK, "image/svg+xml", []byte(DefaultFaviconSVG))
 		})
 
-		indexData, indexErr := fs.ReadFile(fsys, "index.html")
-		indexTemplate := string(indexData)
-
-		engine.NoRoute(func(c *gin.Context) {
-			path := c.Request.URL.Path
-			if opts.BasePath != "" {
-				if path != opts.BasePath && !strings.HasPrefix(path, opts.BasePath+"/") {
-					c.String(http.StatusNotFound, "Page not found")
-					return
-				}
-				path = strings.TrimPrefix(path, opts.BasePath)
-				if path == "" {
-					path = "/"
-				}
-			}
-
-			if c.Request.Method == http.MethodGet &&
-				!strings.HasPrefix(path, "/api") &&
-				!strings.HasPrefix(path, "/assets") &&
-				!strings.HasPrefix(path, "/static") &&
-				!strings.HasPrefix(path, "/branding") {
-
-				c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
-				if indexErr != nil {
-					c.Status(http.StatusNotFound)
-					return
-				}
-
-				siteName := "LeafWiki"
-				if frontendCfg.GetSiteName != nil {
-					if name := frontendCfg.GetSiteName(); name != "" {
-						siteName = name
-					}
-				}
-				faviconFile := ""
-				if frontendCfg.GetFaviconFile != nil {
-					faviconFile = frontendCfg.GetFaviconFile()
-				}
-
-				doc := indexTemplate
-				escapedBasePath := html.EscapeString(opts.BasePath)
-				doc = strings.ReplaceAll(doc, "{{__SITE_NAME__}}", html.EscapeString(siteName))
-				doc = strings.ReplaceAll(doc, "{{__BASE_PATH__}}", escapedBasePath)
-				doc = strings.ReplaceAll(doc, "{{__FAVICON_HREF__}}", html.EscapeString(BuildFrontendFaviconHref(opts.BasePath, faviconFile)))
-				// Rewrite Vite's relative "./static/" asset references to absolute paths
-				// so they resolve correctly when index.html is served for deep SPA routes.
-				// Lazy chunks still use import.meta.url for their own path resolution.
-				doc = strings.ReplaceAll(doc, `"./static/`, `"`+escapedBasePath+`/static/`)
-
-				doc = injectIntoHead(doc, buildCustomStylesheetTag(opts.BasePath, customStylesheetPath))
-
-				if opts.InjectCodeInHeader != "" {
-					doc = injectIntoHead(doc, opts.InjectCodeInHeader)
-				}
-				c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(doc))
-			} else {
-				c.String(http.StatusNotFound, "Page not found")
-			}
-		})
+		shell.setIndex(fs.ReadFile(fsys, "index.html"))
 	}
+	engine.NoRoute(shell.serve)
 
 	return engine
 }

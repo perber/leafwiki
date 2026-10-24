@@ -58,4 +58,5 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Deprecated`, `Superseded by 
 | [0011](./0011-smtp-cli-env-optional-feature.md) | SMTP as a CLI/ENV-only optional feature | Accepted |
 | [0012](./0012-portable-markdown-link-format.md) | Portable on-disk Markdown link format | Proposed |
 | [0013](./0013-per-store-sqlite-corruption-policy.md) | Each SQLite store chooses its corruption policy; real state is never deleted automatically | Accepted |
+| [0015](./0015-spa-shell-contributors.md) | The SPA shell is rendered through registered responders and contributors | Proposed |
 | [0016](./0016-state-store-registration.md) | State stores register once for snapshots and live restore | Proposed |
