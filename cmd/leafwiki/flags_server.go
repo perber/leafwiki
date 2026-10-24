@@ -9,6 +9,7 @@ type serverOptions struct {
 	unixSocket        string
 	dataDir           string
 	basePath          string
+	publicBaseURL     string
 	allowInsecure     bool
 	logFormat         string
 	disableRequestLog bool
@@ -60,6 +61,14 @@ func (o *serverOptions) Flags() []cli.Flag {
 			Category:    catServer,
 			Usage:       "URL prefix when served behind a reverse proxy (e.g. /wiki)",
 			Sources:     envVars("LEAFWIKI_BASE_PATH"),
+			Config:      trimmed,
+		},
+		&cli.StringFlag{
+			Name:        "public-base-url",
+			Destination: &o.publicBaseURL,
+			Category:    catServer,
+			Usage:       "absolute origin (e.g. https://wiki.example.com) used for canonical/OpenGraph URLs and sitemap.xml",
+			Sources:     envVars("LEAFWIKI_PUBLIC_BASE_URL"),
 			Config:      trimmed,
 		},
 		&cli.BoolFlag{
