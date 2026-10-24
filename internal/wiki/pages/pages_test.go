@@ -1519,6 +1519,74 @@ func TestApplyPageRefactorUseCase_RenameRewritesIncomingLinks(t *testing.T) {
 	}
 }
 
+// TestApplyPageRefactorUseCase_StaleVersion_LeavesIncomingLinksUntouched tests
+// that a refactor rejected for a stale version changes no other page: incoming
+// links must not point at a path the target never moved to.
+func TestApplyPageRefactorUseCase_StaleVersion_LeavesIncomingLinksUntouched(t *testing.T) {
+	cases := []struct {
+		name  string
+		input func(target, archive *tree.Page) pages.RefactorPreviewInput
+	}{
+		{"rename", func(target, _ *tree.Page) pages.RefactorPreviewInput {
+			return pages.RefactorPreviewInput{
+				PageID: target.ID, Kind: pages.RefactorKindRename, Title: "Renamed", Slug: "renamed", Content: &target.Content,
+			}
+		}},
+		{"move", func(target, archive *tree.Page) pages.RefactorPreviewInput {
+			return pages.RefactorPreviewInput{PageID: target.ID, Kind: pages.RefactorKindMove, NewParentID: &archive.ID}
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			deps := newTestDeps(t)
+			createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default(), nil)
+			updateUC := pages.NewUpdatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default(), nil)
+			applyUC := pages.NewApplyPageRefactorUseCase(deps.tree, deps.slug, deps.revision, deps.links, slog.Default(), nil)
+
+			target, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+				UserID: "system", Title: "Target", Slug: "target", Kind: pageKind(),
+			})
+			archive, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+				UserID: "system", Title: "Archive", Slug: "archive", Kind: pageKind(),
+			})
+			source, _ := createUC.Execute(context.Background(), pages.CreatePageInput{
+				UserID: "system", Title: "Source", Slug: "source", Kind: pageKind(),
+			})
+			content := "[Target](/target)"
+			if _, err := updateUC.Execute(context.Background(), pages.UpdatePageInput{
+				UserID: "system", ID: source.Page.ID, Version: source.Page.Version(), Title: source.Page.Title, Slug: source.Page.Slug, Content: &content, Kind: pageKind(),
+			}); err != nil {
+				t.Fatalf("UpdatePage(source) failed: %v", err)
+			}
+
+			_, err := applyUC.Execute(context.Background(), pages.RefactorApplyInput{
+				UserID:               "system",
+				Version:              "stale-version",
+				RefactorPreviewInput: tc.input(target.Page, archive.Page),
+				RewriteLinks:         true,
+			})
+			if !errors.Is(err, tree.ErrVersionConflict) {
+				t.Fatalf("expected tree.ErrVersionConflict, got %v", err)
+			}
+
+			sourcePage, err := deps.tree.GetPage(source.Page.ID)
+			if err != nil {
+				t.Fatalf("GetPage(source) failed: %v", err)
+			}
+			if sourcePage.Content != content {
+				t.Fatalf("source content = %q, want %q", sourcePage.Content, content)
+			}
+			targetPage, err := deps.tree.GetPage(target.Page.ID)
+			if err != nil {
+				t.Fatalf("GetPage(target) failed: %v", err)
+			}
+			if targetPage.CalculatePath() != "/target" {
+				t.Fatalf("target path = %q, want /target", targetPage.CalculatePath())
+			}
+		})
+	}
+}
+
 func TestApplyPageRefactorUseCase_RenameRewritesTitleBasedWikiLinks(t *testing.T) {
 	deps := newTestDeps(t)
 	createUC := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default(), nil)

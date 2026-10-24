@@ -160,6 +160,10 @@ resync-derived state.
   (OS-specific self-restart after restore, same unix/windows split pattern as `cmd/leafwiki`),
   `offline.go` (CLI-driven restore path outside the running server). See
   [ADR-0009: Session Manager Extraction](./adr/0009-session-manager-extraction.md) for why session invalidation is its own restore phase.
+  State databases other than `users.db` are registered once in `stateDBs` (`swap.go`): snapshots
+  capture them (`StateDBFiles`), a restore sanity-checks and swaps them, and the composition root
+  passes the live stores as `Config.Stores` (`Wiki.StateStores`).
+  [ADR-0016](./adr/0016-state-store-registration.md).
 - **`internal/backup`** — git-based off-site backup of the markdown tree (`repo.go`, `go-git/go-git`
   — no shell-out to a `git` binary, matters for the single-binary story), `scheduler.go` (same
   manual-mode-at-interval-0 pattern as `snapshot`), `conflict_test.go`/`gitignore.go`,

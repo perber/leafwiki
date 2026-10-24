@@ -24,14 +24,17 @@ type Config struct {
 	// SettingsFiles are instance-setting JSON files from the data directory
 	// (public-access.json, toc-display.json). Each is stored at the ZIP root
 	// under its base name; a file that doesn't exist yet is skipped.
-	SettingsFiles      []string
-	AvatarsDir         string // storageDir/avatars — one <userID>.png per user with a self-service avatar; may not exist on a data dir predating this feature, addDirToZip's os.Stat guard makes an absent dir a safe no-op
-	SchemaFile         string
-	UsersDBPath        string
-	APIKeysDBPath      string // storageDir/api_keys.db — may not exist (API key management is disabled by default); addFileToZip/os.Stat guards make an absent file a safe no-op
-	FavoritesDBPath    string // storageDir/favorites.db — may not exist on a data dir predating this feature; addFileToZip/os.Stat guards make an absent file a safe no-op
-	UserSettingsDBPath string // storageDir/usersettings.db — may not exist on a data dir predating this feature; addFileToZip/os.Stat guards make an absent file a safe no-op
-	WikiVersion        string // injected from build info
+	SettingsFiles []string
+	AvatarsDir    string // storageDir/avatars — one <userID>.png per user with a self-service avatar; may not exist on a data dir predating this feature, addDirToZip's os.Stat guard makes an absent dir a safe no-op
+	SchemaFile    string
+	UsersDBPath   string
+	// StateDBPaths are the state databases other than users.db (api_keys.db,
+	// favorites.db, usersettings.db, …; see restore.StateDBFiles). Each is
+	// copied with VACUUM INTO and stored at the ZIP root under its base name;
+	// a file that doesn't exist (feature off, or a data dir predating the
+	// store) is skipped.
+	StateDBPaths []string
+	WikiVersion  string // injected from build info
 
 	// Interval is the automatic snapshot interval; 0 means manual-only
 	// (no ticker, only explicit triggers). Mirrors backup.Config.Interval.
@@ -69,52 +72,31 @@ func createSnapshot(ctx context.Context, cfg Config) (string, error) {
 		return "", fmt.Errorf("failed to vacuum users database: %w", err)
 	}
 
-	// api_keys.db is optional (API key management is off by default). Unlike
-	// addFileToZip's silent-skip-on-missing, VACUUM INTO against a
-	// nonexistent source doesn't fail the same clean way, so the missing-file
-	// case is checked explicitly here rather than left to vacuumSQLiteDB.
-	var apiKeysDBCopy string
-	if cfg.APIKeysDBPath != "" {
-		if _, statErr := os.Stat(cfg.APIKeysDBPath); statErr == nil {
-			apiKeysDBCopy = filepath.Join(tmpDir, "api_keys.db")
-			if err := vacuumSQLiteDB(ctx, cfg.APIKeysDBPath, apiKeysDBCopy); err != nil {
-				return "", fmt.Errorf("failed to vacuum api keys database: %w", err)
+	// Every state database other than users.db is optional: a feature can be
+	// off (API key management is by default) or a data dir can predate a
+	// store. Unlike addFileToZip's silent-skip-on-missing, VACUUM INTO against
+	// a nonexistent source doesn't fail the same clean way, so the
+	// missing-file case is checked explicitly here rather than left to
+	// vacuumSQLiteDB.
+	var stateDBCopies []string
+	for _, src := range cfg.StateDBPaths {
+		name := filepath.Base(src)
+		if _, statErr := os.Stat(src); statErr != nil {
+			if os.IsNotExist(statErr) {
+				continue
 			}
-		} else if !os.IsNotExist(statErr) {
-			return "", fmt.Errorf("failed to stat api keys database: %w", statErr)
+			return "", fmt.Errorf("failed to stat %s: %w", name, statErr)
 		}
-	}
-
-	// favorites.db and usersettings.db are always-on features (unlike
-	// api_keys.db), but a data dir predating this feature may not have them
-	// yet — same missing-file handling as api_keys.db above.
-	var favoritesDBCopy string
-	if cfg.FavoritesDBPath != "" {
-		if _, statErr := os.Stat(cfg.FavoritesDBPath); statErr == nil {
-			favoritesDBCopy = filepath.Join(tmpDir, "favorites.db")
-			if err := vacuumSQLiteDB(ctx, cfg.FavoritesDBPath, favoritesDBCopy); err != nil {
-				return "", fmt.Errorf("failed to vacuum favorites database: %w", err)
-			}
-		} else if !os.IsNotExist(statErr) {
-			return "", fmt.Errorf("failed to stat favorites database: %w", statErr)
+		dst := filepath.Join(tmpDir, name)
+		if err := vacuumSQLiteDB(ctx, src, dst); err != nil {
+			return "", fmt.Errorf("failed to vacuum %s: %w", name, err)
 		}
-	}
-
-	var userSettingsDBCopy string
-	if cfg.UserSettingsDBPath != "" {
-		if _, statErr := os.Stat(cfg.UserSettingsDBPath); statErr == nil {
-			userSettingsDBCopy = filepath.Join(tmpDir, "usersettings.db")
-			if err := vacuumSQLiteDB(ctx, cfg.UserSettingsDBPath, userSettingsDBCopy); err != nil {
-				return "", fmt.Errorf("failed to vacuum user settings database: %w", err)
-			}
-		} else if !os.IsNotExist(statErr) {
-			return "", fmt.Errorf("failed to stat user settings database: %w", statErr)
-		}
+		stateDBCopies = append(stateDBCopies, dst)
 	}
 
 	createdAt := time.Now().UTC()
 	zipPath := filepath.Join(cfg.BackupsDir, id+".zip")
-	if err := writeSnapshotZip(zipPath, cfg, id, createdAt, usersDBCopy, apiKeysDBCopy, favoritesDBCopy, userSettingsDBCopy); err != nil {
+	if err := writeSnapshotZip(zipPath, cfg, id, createdAt, usersDBCopy, stateDBCopies); err != nil {
 		_ = os.Remove(zipPath) // best-effort cleanup of a partial/invalid zip left by the failed write
 		return "", fmt.Errorf("failed to write snapshot zip: %w", err)
 	}
@@ -185,7 +167,7 @@ func vacuumSQLiteDB(ctx context.Context, srcPath, dstPath string) error {
 	return nil
 }
 
-func writeSnapshotZip(zipPath string, cfg Config, id string, createdAt time.Time, usersDBPath, apiKeysDBPath, favoritesDBPath, userSettingsDBPath string) error {
+func writeSnapshotZip(zipPath string, cfg Config, id string, createdAt time.Time, usersDBPath string, stateDBPaths []string) error {
 	f, err := os.Create(zipPath)
 	if err != nil {
 		return fmt.Errorf("failed to create zip file: %w", err)
@@ -220,14 +202,10 @@ func writeSnapshotZip(zipPath string, cfg Config, id string, createdAt time.Time
 	if err := addFileToZip(w, usersDBPath, "users.db"); err != nil {
 		return err
 	}
-	if err := addFileToZip(w, apiKeysDBPath, "api_keys.db"); err != nil {
-		return err
-	}
-	if err := addFileToZip(w, favoritesDBPath, "favorites.db"); err != nil {
-		return err
-	}
-	if err := addFileToZip(w, userSettingsDBPath, "usersettings.db"); err != nil {
-		return err
+	for _, p := range stateDBPaths {
+		if err := addFileToZip(w, p, filepath.Base(p)); err != nil {
+			return err
+		}
 	}
 
 	metaBytes, err := json.Marshal(backupMeta{ID: id, CreatedAt: createdAt, Version: cfg.WikiVersion})

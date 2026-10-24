@@ -3,6 +3,7 @@ package backup
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -128,4 +129,52 @@ func readFileEqual(t *testing.T, path, want string) {
 	if string(got) != want {
 		t.Fatalf("%s = %q, want %q", path, string(got), want)
 	}
+}
+
+// TestScenario_FailedFirstContactSyncRetriesOnRestart tests that a first-contact
+// sync that fails part-way does not leave the fetched history behind. If it
+// did, the next start would open that repo, skip the sync, and the first
+// backup would commit every remote-only file as deleted.
+func TestScenario_FailedFirstContactSyncRetriesOnRestart(t *testing.T) {
+	bareDir := initBareRemote(t)
+	repoA, rootA := newRepoWithRemote(t, bareDir)
+	writeFileHelper(t, rootA, "docs/guide.md", "guide\n")
+	if err := repoA.RunBackup(); err != nil {
+		t.Fatalf("repoA.RunBackup: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	rootB := filepath.Join(tmpDir, "root")
+	assetsB := filepath.Join(tmpDir, "assets")
+	if err := os.MkdirAll(assetsB, 0755); err != nil {
+		t.Fatal(err)
+	}
+	// A file where the remote has a directory makes the sync fail.
+	writeFileHelper(t, rootB, "docs", "blocker\n")
+	cfg := Config{
+		RootDir:     rootB,
+		AssetsDir:   assetsB,
+		AuthorName:  "Test Author",
+		AuthorEmail: "test@example.com",
+		Branch:      "main",
+		RemoteURL:   "file://" + bareDir,
+		SSHKey:      testSSHKeyPEM,
+	}
+	if _, err := Init(cfg); err == nil || !strings.Contains(err.Error(), "failed to sync content from remote") {
+		t.Fatalf("first Init error = %v, want a failed sync while root/docs is a file", err)
+	}
+
+	if err := os.Remove(filepath.Join(rootB, "docs")); err != nil {
+		t.Fatal(err)
+	}
+	repoB, err := Init(cfg)
+	if err != nil {
+		t.Fatalf("Init after the cause was fixed: %v", err)
+	}
+	readFileEqual(t, filepath.Join(rootB, "docs", "guide.md"), "guide\n")
+
+	if err := repoB.RunBackup(); err != nil {
+		t.Fatalf("repoB.RunBackup: %v", err)
+	}
+	assertFileInCommit(t, remoteHeadCommit(t, bareDir), "root/docs/guide.md", "guide\n")
 }
