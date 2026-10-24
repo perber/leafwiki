@@ -52,7 +52,7 @@ spec:
       labels:
         app: leafwiki
     spec:
-      # Required — see "Gotcha: enableServiceLinks" below.
+      # Recommended — see "Gotcha: enableServiceLinks" below.
       enableServiceLinks: false
       containers:
         - name: leafwiki
@@ -182,9 +182,13 @@ This wasn't re-verified with a live Gateway API controller (only the Ingress pat
 
 ## Gotcha: `enableServiceLinks`
 
-Kubernetes injects one environment variable per Service in the same namespace, named `<SERVICE_NAME>_PORT` (e.g. `LEAFWIKI_PORT=tcp://10.96.x.x:8080`) into every pod — this is the legacy "service links" mechanism, still on by default. If your Service is named `leafwiki` (as above), that variable collides with LeafWiki's own `LEAFWIKI_*` environment variable namespace and overrides `--port`, and the server fails to start with `listen tcp: address 0.0.0.0:tcp://10.96.x.x:8080: too many colons in address`.
+Kubernetes injects environment variables for every Service in the same namespace into every pod, among them `<SERVICE_NAME>_PORT` (e.g. `LEAFWIKI_PORT=tcp://10.96.x.x:8080`). This is the legacy "service links" mechanism, still on by default. A Service named `leafwiki` (as above) therefore sets `LEAFWIKI_PORT`, and Services named `leafwiki-metrics` or `leafwiki-smtp` set `LEAFWIKI_METRICS_PORT` and `LEAFWIKI_SMTP_PORT`.
 
-`enableServiceLinks: false` on the pod spec disables the injection and avoids this entirely. It's not specific to any one Service name — any Service name that happens to prefix-match `LEAFWIKI_*` triggers it, so set it regardless of what you end up naming the Service.
+LeafWiki recognises these exact values (they always match the `<SERVICE_NAME>_SERVICE_HOST` and `<SERVICE_NAME>_SERVICE_PORT` variables Kubernetes writes alongside), ignores them, keeps the flag's default and logs a warning naming the variable. Any other value that is not a port number between 1 and 65535 stops startup with an error naming the variable. Older versions took the value literally and failed to start with `listen tcp: address 0.0.0.0:tcp://10.96.x.x:8080: too many colons in address`.
+
+To listen on another port while service links stay on, set `LEAFWIKI_PORT` explicitly under the container's `env:`; an explicit entry wins over the injected one.
+
+`enableServiceLinks: false` on the pod spec turns the injection off, which keeps the pod's environment free of variables LeafWiki never reads and avoids the warning. Set it regardless of what you name the Service.
 
 ## Non-root containers
 
