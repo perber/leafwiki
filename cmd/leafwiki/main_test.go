@@ -12,8 +12,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -319,6 +321,138 @@ func TestRootCommand_EmptyEnvVarIsUnset(t *testing.T) {
 	})
 }
 
+// setServiceLink sets the variables the kubelet writes for a Service whose
+// name upper-cases to prefix.
+func setServiceLink(t *testing.T, prefix, proto, host, port string) {
+	t.Helper()
+	t.Setenv(prefix+"_SERVICE_HOST", host)
+	t.Setenv(prefix+"_SERVICE_PORT", port)
+	t.Setenv(prefix+"_PORT", proto+"://"+net.JoinHostPort(host, port))
+}
+
+// A Kubernetes service link value names the Service's port, not the one the
+// server should listen on, so it counts as unset instead of failing startup.
+// Services named leafwiki, leafwiki-metrics and leafwiki-smtp set the three.
+func TestRootCommand_KubernetesServiceLinkPortIsUnset(t *testing.T) {
+	for _, tc := range []struct{ proto, host string }{
+		{"tcp", "10.96.165.88"},
+		{"udp", "10.96.165.88"},
+		{"sctp", "fd00::1"},
+	} {
+		t.Run(tc.proto+" "+tc.host, func(t *testing.T) {
+			for _, prefix := range []string{"LEAFWIKI", "LEAFWIKI_METRICS", "LEAFWIKI_SMTP"} {
+				setServiceLink(t, prefix, tc.proto, tc.host, "80")
+			}
+			runRootCommand(t, nil, func(cfg *serverConfig) {
+				if got, want := cfg.server.port, "8080"; got != want {
+					t.Errorf("port = %q, want %q", got, want)
+				}
+				if got, want := cfg.metrics.metricsPort, "9091"; got != want {
+					t.Errorf("metrics-port = %q, want %q", got, want)
+				}
+				if got, want := cfg.email.smtpPort, 587; got != want {
+					t.Errorf("smtp-port = %d, want %d", got, want)
+				}
+			})
+		})
+	}
+}
+
+// Only the exact value the kubelet writes is skipped; anything else that
+// merely looks like one is a configuration mistake and stops startup.
+func TestRootCommand_PortResemblingServiceLinkFailsFast(t *testing.T) {
+	for _, tc := range []struct{ name, host, port, value string }{
+		{"no service host", "", "", "tcp://10.96.0.10:80"},
+		{"other host", "10.96.0.10", "80", "tcp://10.96.0.11:80"},
+		{"other port", "10.96.0.10", "80", "tcp://10.96.0.10:81"},
+		{"other protocol", "10.96.0.10", "80", "http://10.96.0.10:80"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("LEAFWIKI_SERVICE_HOST", tc.host)
+			t.Setenv("LEAFWIKI_SERVICE_PORT", tc.port)
+			t.Setenv("LEAFWIKI_PORT", tc.value)
+
+			cmd := newRootCommand()
+			cmd.Writer = io.Discard
+			cmd.ErrWriter = io.Discard
+			cmd.Action = func(_ context.Context, _ *cli.Command) error {
+				t.Fatalf("expected LEAFWIKI_PORT=%q to be rejected before the action runs", tc.value)
+				return nil
+			}
+			if err := cmd.Run(context.Background(), []string{"leafwiki"}); err == nil {
+				t.Fatalf("expected an error for LEAFWIKI_PORT=%q, got nil", tc.value)
+			}
+		})
+	}
+}
+
+func TestIgnoredServiceLinkVars_ListsSkippedPortVarsNotSetOnCommandLine(t *testing.T) {
+	setServiceLink(t, "LEAFWIKI", "tcp", "10.96.165.88", "80")
+	setServiceLink(t, "LEAFWIKI_METRICS", "tcp", "10.96.165.89", "9100")
+	t.Setenv("LEAFWIKI_SMTP_PORT", "2525")
+
+	isSet := func(name string) bool { return name == "metrics-port" }
+	got := ignoredServiceLinkVars((&serverConfig{}).flags(), isSet)
+	if want := []string{"LEAFWIKI_PORT"}; !slices.Equal(got, want) {
+		t.Errorf("ignoredServiceLinkVars = %v, want %v", got, want)
+	}
+}
+
+// kubeletVarPatterns match every variable the kubelet writes for a Service S:
+// S_SERVICE_HOST, S_SERVICE_PORT[_<name>], S_PORT and
+// S_PORT_<n>_<PROTO>[_ADDR|_PORT|_PROTO]. A Service whose name starts with
+// leafwiki writes them into the LEAFWIKI_ namespace.
+var kubeletVarPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`_SERVICE_HOST$`),
+	regexp.MustCompile(`_SERVICE_PORT(_|$)`),
+	regexp.MustCompile(`_PORT$`),
+	regexp.MustCompile(`_PORT_[0-9]+_(TCP|UDP|SCTP)(_|$)`),
+}
+
+// TestServerFlags_KubeletCanOnlyShadowPortVarsThatSkipServiceLinks keeps new
+// collisions out: a flag variable the kubelet can write must be a port read
+// through envPortVars, every other flag needs a name outside the patterns.
+func TestServerFlags_KubeletCanOnlyShadowPortVarsThatSkipServiceLinks(t *testing.T) {
+	for _, flag := range (&serverConfig{}).flags() {
+		envFlag, ok := flag.(cli.DocGenerationFlag)
+		if !ok {
+			continue
+		}
+		for _, key := range envFlag.GetEnvVars() {
+			shadowable := slices.ContainsFunc(kubeletVarPatterns, func(re *regexp.Regexp) bool { return re.MatchString(key) })
+			if !shadowable {
+				continue
+			}
+			if !strings.HasSuffix(key, "_PORT") {
+				t.Errorf("%s can be written by the kubelet for a Service; rename flag --%s", key, flag.Names()[0])
+				continue
+			}
+			if !skipsServiceLinks(flag, key) {
+				t.Errorf("%s can be written by the kubelet for a Service; read it with envPortVars", key)
+			}
+		}
+	}
+}
+
+// skipsServiceLinks reports whether flag reads key through envPortVars. The
+// flag types share no accessor for their sources, hence the reflection.
+func skipsServiceLinks(flag cli.Flag, key string) bool {
+	sources := reflect.ValueOf(flag).Elem().FieldByName("Sources")
+	if !sources.IsValid() {
+		return false
+	}
+	chain, ok := sources.Interface().(cli.ValueSourceChain)
+	if !ok {
+		return false
+	}
+	for _, src := range chain.Chain {
+		if env, ok := src.(*envVarSource); ok && env.key == key && env.skipServiceLink {
+			return true
+		}
+	}
+	return false
+}
+
 func TestRootCommand_BoolEnvVarSpellings(t *testing.T) {
 	for _, tc := range []struct {
 		env  string
@@ -356,8 +490,16 @@ func TestRootCommand_InvalidEnvVarValueFailsFast(t *testing.T) {
 		{"LEAFWIKI_RESTORE_UPLOAD_MAX_SIZE", "0"},
 		{"LEAFWIKI_LOGIN_URL", "javascript:alert(1)"},
 		{"LEAFWIKI_TOTP_ENCRYPTION_KEY", "too-short"},
+		{"LEAFWIKI_PORT", "abc"},
+		{"LEAFWIKI_PORT", "0"},
+		{"LEAFWIKI_PORT", "65536"},
+		{"LEAFWIKI_PORT", "tcp://10.96.0.10:80"},
+		{"LEAFWIKI_METRICS_PORT", "abc"},
+		{"LEAFWIKI_METRICS_PORT", "-1"},
+		{"LEAFWIKI_SMTP_PORT", "0"},
+		{"LEAFWIKI_SMTP_PORT", "65536"},
 	} {
-		t.Run(tc.envVar, func(t *testing.T) {
+		t.Run(tc.envVar+"="+tc.value, func(t *testing.T) {
 			t.Setenv(tc.envVar, tc.value)
 
 			cmd := newRootCommand()
@@ -372,6 +514,37 @@ func TestRootCommand_InvalidEnvVarValueFailsFast(t *testing.T) {
 				t.Fatalf("expected an error for %s=%q, got nil", tc.envVar, tc.value)
 			}
 		})
+	}
+}
+
+// The port flags are checked when the command line is parsed, so a bad value
+// stops startup with the flag named instead of a listen error later on.
+func TestRootCommand_InvalidPortFlagFailsFast(t *testing.T) {
+	for _, arg := range []string{"--port=abc", "--port=99999", "--metrics-port=http", "--smtp-port=0"} {
+		t.Run(arg, func(t *testing.T) {
+			cmd := newRootCommand()
+			cmd.Writer = io.Discard
+			cmd.ErrWriter = io.Discard
+			cmd.Action = func(_ context.Context, _ *cli.Command) error {
+				t.Fatalf("expected %s to be rejected before the action runs", arg)
+				return nil
+			}
+			if err := cmd.Run(context.Background(), []string{"leafwiki", arg}); err == nil {
+				t.Fatalf("expected an error for %s, got nil", arg)
+			}
+		})
+	}
+}
+
+func TestValidatePortValue(t *testing.T) {
+	for _, v := range []string{"1", "8080", "65535"} {
+		if err := validatePortValue(v); err != nil {
+			t.Errorf("validatePortValue(%q) = %v, want nil", v, err)
+		}
+	}
+	err := validatePortValue("tcp://10.96.0.10:80")
+	if err == nil || !strings.Contains(err.Error(), "enableServiceLinks") {
+		t.Errorf("validatePortValue(tcp://…) = %v, want a hint at enableServiceLinks", err)
 	}
 }
 
