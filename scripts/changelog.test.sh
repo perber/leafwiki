@@ -100,6 +100,121 @@ repo="$(new_repo no-internal "fix: only a fix")"
 out="$(changelog "$repo")"
 expect_no_line no-internal "$out" "internal change"
 
+# expect_output <name> <output> <want>: the whole changelog, byte for byte.
+expect_output() {
+    local name="$1" output="$2" want="$3"
+    if [[ "$output" == "$want" ]]; then
+        echo "PASS $name: output matches"
+    else
+        echo "FAIL $name: output differs"
+        diff <(printf '%s\n' "$want") <(printf '%s\n' "$output") | sed 's/^/    /'
+        FAILURES=$((FAILURES + 1))
+    fi
+}
+
+COUNT_LINE="Plus 1 internal change (refactoring, tests, CI, build and developer docs) that don't change how LeafWiki behaves. Full list: [v1...v2](https://github.com/perber/leafwiki/compare/v1...v2)"
+
+# Without a Behavior-Change trailer the output is what it was before the
+# trailer existed. A "Behavior-Change:" line followed by prose isn't a trailer.
+repo="$(new_repo no-trailer "refactor: internal" "feat: a toggle
+
+Behavior-Change: is only mentioned here,
+so this paragraph is not a trailer block.")"
+out="$(changelog "$repo")"
+expect_output no-trailer "$out" "## 📝 Changelog for v2
+
+### ✨ Features
+- feat: a toggle (Tester)
+
+$COUNT_LINE"
+
+# Each trailer value is one bullet in a section above all others, newest
+# commit first; a trailer on an internal commit still shows up.
+repo="$(new_repo trailers "fix(search): rank titles higher
+
+Behavior-Change: Search results are ordered differently; rebuild the index once." "refactor(storage): move attachments
+
+Behavior-Change: Attachments move to data/assets on first start; back up first.
+Behavior-Change: The --assets-dir flag is gone.")"
+out="$(changelog "$repo")"
+expect_output trailers "$out" "## 📝 Changelog for v2
+
+### ⚠️ Behavior changes
+- Attachments move to data/assets on first start; back up first.
+- The --assets-dir flag is gone.
+- Search results are ordered differently; rebuild the index once.
+
+### 🐛 Bug Fixes
+- fix(search): rank titles higher (Tester)
+
+$COUNT_LINE"
+
+# Values are printed literally: no expansion, no escapes, no option parsing.
+repo="$(new_repo special-characters "chore: rename env var
+
+Behavior-Change: Rename \`LEAFWIKI_X\` to \$LEAFWIKI_Y; \"quotes\", 'single', \\n and \$(whoami) stay as-is." "chore: drop flag
+
+Behavior-Change: -n is no longer accepted.")"
+out="$(changelog "$repo")"
+expect_line special-characters "$out" "- Rename \`LEAFWIKI_X\` to \$LEAFWIKI_Y; \"quotes\", 'single', \\n and \$(whoami) stay as-is."
+expect_line special-characters "$out" "- -n is no longer accepted."
+
+# Git trailer rules: keys match in any case, an indented continuation line
+# folds into the value, other trailers in the same block don't leak in, and
+# an empty value is skipped.
+repo="$(new_repo trailer-syntax "feat: folded
+
+Behavior-Change: A long sentence that wraps
+  onto an indented second line.
+Co-Authored-By: Someone <s@example.com>" "fix: lower case
+
+behavior-change: Lower-case key still counts.
+Behavior-Change:
+Signed-off-by: Tester <t@example.com>")"
+out="$(changelog "$repo")"
+expect_output trailer-syntax "$out" "## 📝 Changelog for v2
+
+### ⚠️ Behavior changes
+- Lower-case key still counts.
+- A long sentence that wraps onto an indented second line.
+
+### ✨ Features
+- feat: folded (Tester)
+
+### 🐛 Bug Fixes
+- fix: lower case (Tester)"
+
+# The British spelling counts too; the docs write "behaviour" everywhere.
+repo="$(new_repo british-spelling "chore: rename setting
+
+Behaviour-Change: The setting is renamed.")"
+out="$(changelog "$repo")"
+expect_line british-spelling "$out" "- The setting is renamed."
+
+# A trailer on a merged branch commit and on the merge commit itself both
+# land in the release, like the commits in the lists below.
+repo="$WORK/merge"
+git init -q "$repo"
+git -C "$repo" -c user.name=Tester -c user.email=t@example.com commit -q --allow-empty -m "chore: initial"
+git -C "$repo" tag v1
+git -C "$repo" checkout -q -b side
+git -C "$repo" -c user.name=Tester -c user.email=t@example.com commit -q --allow-empty -m "feat: on a branch
+
+Behavior-Change: From the branch."
+git -C "$repo" checkout -q -
+git -C "$repo" -c user.name=Tester -c user.email=t@example.com merge -q --no-ff side -m "Merge branch side
+
+Behavior-Change: From the merge."
+git -C "$repo" tag v2
+out="$(changelog "$repo")"
+expect_line merge "$out" "- From the branch."
+expect_line merge "$out" "- From the merge."
+
+# An empty range (both tags on one commit) has only the heading.
+repo="$(new_repo empty-range)"
+out="$(changelog "$repo")"
+expect_output empty-range "$out" "## 📝 Changelog for v2"
+
 if [[ "$FAILURES" -gt 0 ]]; then
     echo "$FAILURES failure(s)"
     exit 1

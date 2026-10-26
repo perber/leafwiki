@@ -27,6 +27,10 @@ notice something there, mention it briefly and move on.
 4. **Size and scope** — ≤ 400–500 changed lines of production code (tests excluded; ~1,000 total
    soft limit), one topic, unfinished features behind
    a default-off flag, no README changes in a feature PR.
+5. **Behavior-Change trailer** — if users or admins will notice the change (defaults, flags,
+   config, migrations, different behaviour), does a commit carry a `Behavior-Change:` trailer
+   that says what they notice and what to do? A missing trailer is `should fix`
+   ([commit style](../../CONTRIBUTING.md#commit-style)).
 
 Report findings ranked by severity: `blocking` / `should fix` / `nit`, each with file:line, what
 is wrong, and why. If there is nothing blocking, say so explicitly. Don't pad the list.
