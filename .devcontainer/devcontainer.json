@@ -1,12 +1,19 @@
-// Dev Container for VS Code and GitHub Codespaces. Versions are not pinned
-// here: mise reads Node from .nvmrc and installs Go as a bootstrap, go.mod's
-// toolchain line selects the exact Go (see mise.toml). Start with `make dev`.
+// Dev Container for VS Code and GitHub Codespaces. Toolchain versions are not
+// pinned here: mise reads Node from .nvmrc and installs Go as a bootstrap,
+// go.mod's toolchain line selects the exact Go (see mise.toml). Start with
+// `make dev`.
 {
   "name": "LeafWiki",
   // Debian, published for amd64 and arm64.
   "image": "mcr.microsoft.com/devcontainers/base:trixie",
   "features": {
-    "ghcr.io/devcontainers-extra/features/mise:1": {}
+    // mise itself is pinned. For "latest" the feature sorts all jdx/mise tags
+    // and picks vfox-v*, a sibling tag without a release; the GitHub API
+    // fallback is then rate limited in CI. Bump by hand to a release from
+    // https://github.com/jdx/mise/releases.
+    "ghcr.io/devcontainers-extra/features/mise:1": {
+      "version": "2026.10.19"
+    }
   },
   // The feature installs only the mise binary. mise activate in the shell
   // rc files puts Node, npm and Go on the PATH of terminals and, through the
