@@ -155,3 +155,27 @@ func TestNormalizeFilenameToValidSlug_UnderscoreFilename(t *testing.T) {
 		t.Fatalf("NormalizeFilenameToValidSlug = %q, want code-of-conduct.md", got)
 	}
 }
+
+func TestGenerateUniqueChildSlug_SymbolOnlyTitleFallsBack(t *testing.T) {
+	s := NewSlugService()
+	for _, title := range []string{"\U0001F3E0", "", "   ", "\u2192", "\u2605 \u2606"} {
+		parent := &PageNode{Children: []*PageNode{}}
+		if got := s.GenerateUniqueChildSlug(parent, "", title); got != "page" {
+			t.Errorf("title %q: expected 'page', got '%s'", title, got)
+		}
+	}
+}
+
+func TestGenerateUniqueChildSlug_SymbolOnlyTitleWithConflict(t *testing.T) {
+	parent := &PageNode{
+		Children: []*PageNode{
+			{ID: "id1", Slug: "page"},
+			{ID: "id2", Slug: "page-1"},
+		},
+	}
+
+	s := NewSlugService()
+	if got := s.GenerateUniqueChildSlug(parent, "other", "\U0001F3E0"); got != "page-2" {
+		t.Errorf("Expected 'page-2', got '%s'", got)
+	}
+}

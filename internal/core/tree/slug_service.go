@@ -24,6 +24,9 @@ var reservedSlugs = map[string]bool{
 	"settings": true,
 }
 
+// defaultSlug is used when a title yields no usable characters.
+const defaultSlug = "page"
+
 var slugPattern = regexp.MustCompile(`^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$`)
 
 type SlugService struct {
@@ -37,6 +40,12 @@ func NewSlugService() *SlugService {
 // Use this when creating or renaming a page in the actual tree, where sibling collisions matter.
 func (s *SlugService) GenerateUniqueChildSlug(parent *PageNode, currentID, desired string) string {
 	slug := normalizeSlug(desired)
+	if slug == "" {
+		// A title made only of symbols (e.g. a lone emoji while typing) normalizes to "".
+		// Suffixing "" gives "-1", "-2"… which never pass IsValidSlug: the loop below
+		// would spin forever and pin a CPU core per request.
+		slug = defaultSlug
+	}
 	original := slug
 	i := 1
 
