@@ -67,6 +67,10 @@ dev:
 run:
 	go run -ldflags "-X main.Version=$(VERSION)" $(CMD_DIR)
 
+# Regenerate the experimental Swagger 2.0 spec in docs/api (pinned swag, not a go.mod dependency).
+api-docs:
+	go run github.com/swaggo/swag/cmd/swag@v1.16.6 init --generalInfo api_docs.go --dir ./cmd/leafwiki,./internal --parseInternal --output ./docs/api --outputTypes json,yaml
+
 clean:
 	rm -f $(BINARY_NAME)
 	rm -rf $(RELEASE_DIR)
@@ -244,6 +248,7 @@ help:
 	@echo "  make ui                   – Build frontend into internal/http/dist for embedding"
 	@echo "  make release              – Cross-compile binaries for all platforms (via Docker)"
 	@echo "  make clean                – Clean all generated files"
+	@echo "  make api-docs             – Regenerate the experimental Swagger spec in docs/api"
 	@echo "  make test                 – Run all Go tests"
 	@echo "  make lint                 – Run golangci-lint (version from .golangci-lint-version)"
 	@echo "  make ui-check             – Frontend install, lint, format check, tests and build"
@@ -267,4 +272,4 @@ help:
 	@echo "                              Optional: SCAN_PLATFORM, TRIVY_EXIT_CODE, TRIVY_EXTRA_FLAGS"
 	@echo "  make changelog            – Generate changelog"
 
-.PHONY: all build build-api ui setup setup-e2e doctor dev run clean test lint ui-deps ui-lint ui-test ui-check ci bench cross verify verify-commits help docker-build-publish require-trivy scan-image scan-published-image changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
+.PHONY: all build build-api ui setup setup-e2e doctor dev run api-docs clean test lint ui-deps ui-lint ui-test ui-check ci bench cross verify verify-commits help docker-build-publish require-trivy scan-image scan-published-image changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
