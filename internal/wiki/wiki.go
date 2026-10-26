@@ -20,6 +20,7 @@ import (
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/links"
 	"github.com/perber/wiki/internal/properties"
+	"github.com/perber/wiki/internal/restore"
 	"github.com/perber/wiki/internal/search"
 	"github.com/perber/wiki/internal/tags"
 	"github.com/perber/wiki/internal/usersettings"
@@ -248,6 +249,23 @@ func (w *Wiki) Favorites() *favorites.FavoritesStore {
 // into restore.Config.
 func (w *Wiki) UserSettingsService() *usersettings.UserSettingsService {
 	return w.userSettings
+}
+
+// StateStores returns the state stores (other than users.db) that exist in
+// this process, for restore.Config.Stores. A store whose feature is off is
+// not listed; a nil pointer must never be wrapped in the interface.
+func (w *Wiki) StateStores() []restore.LiveStore {
+	var stores []restore.LiveStore
+	if w.apiKeys != nil {
+		stores = append(stores, restore.LiveStore{File: restore.APIKeysDBFile, Store: w.apiKeys})
+	}
+	if w.favorites != nil {
+		stores = append(stores, restore.LiveStore{File: restore.FavoritesDBFile, Store: w.favorites})
+	}
+	if w.userSettings != nil {
+		stores = append(stores, restore.LiveStore{File: restore.UserSettingsDBFile, Store: w.userSettings})
+	}
+	return stores
 }
 
 // EmailTokenService returns the password-reset/invite token service, or nil

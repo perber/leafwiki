@@ -3,10 +3,29 @@ package restore
 import (
 	"github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/core/settings"
-	"github.com/perber/wiki/internal/favorites"
 	"github.com/perber/wiki/internal/snapshot"
-	"github.com/perber/wiki/internal/usersettings"
 )
+
+// SwappableStore is a SQLite store holding real state (ADR-0013) that a live
+// restore releases before the file swap and reopens afterwards.
+//
+// PauseForSwap closes the store's connection and keeps it closed (requests
+// get a "store unavailable" error) until Replace; it is idempotent. On
+// Windows an open handle blocks renaming the file, which is why every store
+// must be paused before SwapAll. Replace reopens the store from dataDir,
+// whatever is on disk there now.
+type SwappableStore interface {
+	PauseForSwap() error
+	Replace(dataDir string) error
+}
+
+// LiveStore is a SwappableStore together with its database file name in the
+// data directory (e.g. "favorites.db"), used in errors and logs. File must be
+// listed in stateDBs so snapshots capture it and restores swap it.
+type LiveStore struct {
+	File  string
+	Store SwappableStore
+}
 
 // Config holds everything the restore Manager needs to validate, stage, and
 // swap a snapshot back into a live instance.
@@ -29,20 +48,14 @@ type Config struct {
 	// AuthService's user store (users.db) is hot-swapped in place; its
 	// session store is untouched (sessions.db isn't part of the snapshot).
 	AuthService *auth.AuthService
-	// APIKeyService's key store (api_keys.db) is hot-swapped in place,
-	// mirroring AuthService's users.db handling. nil when API key management
-	// is disabled (the common case, off by default) — every use below is
-	// nil-guarded, matching the existing AuthService nil-guard used for
-	// --disable-auth.
-	APIKeyService *auth.APIKeyService
-	// Favorites' store (favorites.db) is hot-swapped in place, mirroring
-	// AuthService's users.db handling. Always on (no disabled mode), but
-	// nil-guarded anyway for test-fixture parity with the existing style.
-	Favorites *favorites.FavoritesStore
-	// UserSettings' store (usersettings.db) is hot-swapped in place, mirroring
-	// AuthService's users.db handling. Always on (no disabled mode), but
-	// nil-guarded anyway for test-fixture parity with the existing style.
-	UserSettings *usersettings.UserSettingsService
+	// Stores are the live state stores (api_keys.db, favorites.db,
+	// usersettings.db, …) that are hot-swapped in place, mirroring
+	// AuthService's users.db handling. The composition root registers only
+	// the stores that exist in this process: a disabled optional feature
+	// (e.g. API key management, off by default) is simply not listed. Its
+	// file is still swapped on disk if the snapshot holds one (see
+	// stateDBs), so enabling the feature later picks up the restored data.
+	Stores []LiveStore
 	// Reloadables are the settings-managed JSON-config services (branding,
 	// public-access, and future ones built on internal/core/settings.Store[T])
 	// whose in-memory cache is reloaded from disk after the file swap. A nil

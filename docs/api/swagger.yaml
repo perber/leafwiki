@@ -1,0 +1,83 @@
+basePath: /api
+definitions:
+  dto.LegacyError:
+    properties:
+      error:
+        description: Error is the human-readable error message.
+        type: string
+    type: object
+  health.HealthResponse:
+    properties:
+      checks:
+        additionalProperties:
+          type: string
+        description: |-
+          Checks maps each check name (sqlite, data_dir, search) to its result:
+          "ok" or "failed" for sqlite and data_dir; "ok", "indexing" or "failed" for search.
+        type: object
+      status:
+        description: Status is "ok" when every check passes, otherwise "degraded".
+        type: string
+    type: object
+info:
+  contact: {}
+  description: |-
+    Development API of LeafWiki. This documentation is incomplete, experimental and may change before v1; only a few operations are described so far.
+    API keys (Bearer authentication) are available only when LeafWiki runs with `--enable-api-key-management` and authentication enabled. Existing browser API routes are not newly hidden behind that flag.
+    Browser sessions use the access and refresh cookies (`__Host-leafwiki_at` and `__Host-leafwiki_rt` on secure connections, unprefixed names for allowed insecure development). Session writes are protected by CSRF double-submit: send the `X-CSRF-Token` header matching the CSRF cookie (the `csrf_token` form field is accepted as a fallback).
+    The documented base path is the default mount. A deployment started with `--base-path=/wiki` prepends `/wiki` to every documented URL.
+  license:
+    name: MIT
+    url: https://github.com/perber/leafwiki/blob/main/LICENSE
+  title: LeafWiki API
+  version: 0.x
+paths:
+  /health:
+    get:
+      description: 'Public liveness and readiness probe; no authentication is required
+        and session cookies are never validated. Global middleware can still reject
+        a request before the handler runs: 401 for an invalid, revoked or expired
+        API key (only when API-key management is enabled) or for an identity asserted
+        by a trusted reverse proxy that LeafWiki rejects (only when reverse-proxy
+        authentication is enabled), and 429 when API-key attempts are throttled.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: All checks passed (ongoing search indexing still counts as
+            healthy)
+          schema:
+            $ref: '#/definitions/health.HealthResponse'
+        "401":
+          description: 'Invalid, revoked or expired API key (when API-key management
+            is enabled), or a rejected trusted-proxy identity: unknown user or auto-provisioning
+            email conflict (when reverse-proxy authentication is enabled)'
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "429":
+          description: API-key attempts throttled
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "503":
+          description: 'Degraded: the body is a HealthResponse with failed checks.
+            If API-key resolution cannot reach its store, the body is a LegacyError
+            instead. Swagger 2.0 cannot express this alternative, so the schema is
+            a broad object.'
+          schema:
+            type: object
+      summary: Check instance health
+      tags:
+      - health
+securityDefinitions:
+  BearerAuth:
+    description: API key sent as the entire header value `Bearer lw_<prefix>_<secret>`,
+      not just the secret. A request authenticated by a resolved key acts with the
+      effective role of the lesser of the key owner's role and the key's role. A resolved
+      key skips CSRF checks; a header merely being present does not. Routes that reject
+      API-key authentication are browser-session only and say so. Cookies remain an
+      alternative authentication path and are described in prose because Swagger 2.0
+      cannot express them.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
