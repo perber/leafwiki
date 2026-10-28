@@ -73,6 +73,51 @@ func FromBody(body string) string {
 	return strings.TrimSpace(truncated) + "..."
 }
 
+// startBytes bounds how much of a body FromBodyStart reads. It holds far more
+// than MaxRunes of text for any page that isn't mostly code.
+const startBytes = 2 << 10
+
+// FromBodyStart is FromBody over the start of body only, so its cost doesn't
+// grow with the page size: rendering the whole body costs ~40 ms for a 100 KB
+// page. Use it where an excerpt is built per request (page meta tags). It
+// differs from FromBody only when the first 2 KB hold less than MaxRunes of
+// text.
+func FromBodyStart(body string) string {
+	return FromBody(bodyStart(body))
+}
+
+// bodyStart cuts body at the first line end past startBytes that is outside a
+// code fence (also one inside a block quote or list item), so an open fence
+// is never cut and turned into excerpt text.
+func bodyStart(body string) string {
+	if len(body) <= startBytes {
+		return body
+	}
+	var fence *fenceState
+	for offset := 0; offset < len(body); {
+		next := len(body)
+		if i := strings.IndexByte(body[offset:], '\n'); i >= 0 {
+			next = offset + i + 1
+		}
+		fence = getFenceState(fenceCandidate(body[offset:next]), fence)
+		offset = next
+		if offset >= startBytes && fence == nil {
+			return body[:offset]
+		}
+	}
+	return body
+}
+
+// fenceCandidate strips what can stand before a fence marker in a block
+// quote or list item (indentation, "> " prefixes), so bodyStart sees every
+// fence that FromBody strips. Counting an indented code line that starts with
+// a fence marker as a fence only moves the cut later.
+func fenceCandidate(line string) string {
+	line = strings.TrimLeft(strings.TrimRight(line, "\r\n"), " \t")
+	line = blockQuotePrefix.ReplaceAllString(line, "")
+	return strings.TrimLeft(line, " \t")
+}
+
 // NormalizeMarkdownBody removes non-content markdown constructs that should not leak into excerpts or search text.
 func NormalizeMarkdownBody(body string) string {
 	normalized := strings.ReplaceAll(body, "\r\n", "\n")

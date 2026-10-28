@@ -234,3 +234,53 @@ func TestFromBody_StripsHTMLAndMarkdown(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+func TestFromBodyStart_ReadsOnlyTheStart(t *testing.T) {
+	prose := strings.Repeat("Some prose sentence here.\n", 2000) // ~52 KB
+	tests := []struct {
+		name string
+		body string
+		want string
+	}{
+		{name: "short body equals FromBody", body: "# Title\n\nShort *body*.", want: FromBody("# Title\n\nShort *body*.")},
+		{name: "long prose equals FromBody", body: prose, want: FromBody(prose)},
+		// Cut inside the fence, the unclosed code would become excerpt text.
+		{name: "fence crossing the limit does not leak code", body: "Intro.\n```\n" + strings.Repeat("secret code\n", 2000) + "```\nAfter the code.", want: "Intro."},
+		{name: "text after the limit is not read", body: strings.Repeat("\n", startBytes+1) + "Late text.", want: ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := FromBodyStart(tc.body); got != tc.want {
+				t.Errorf("FromBodyStart = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestBodyStart_CutsAtLineEndOutsideFences(t *testing.T) {
+	fenced := strings.Repeat("a\n", startBytes/2-1) + "```\ncode\n```\nrest"
+	tests := []struct {
+		name string
+		body string
+		want string
+	}{
+		{name: "within the limit", body: "a\nb", want: "a\nb"},
+		{name: "cut at the first line end past the limit", body: strings.Repeat("a\n", startBytes) + "tail", want: strings.Repeat("a\n", startBytes/2)},
+		{name: "fence open at the limit is kept until it closes", body: fenced, want: strings.Repeat("a\n", startBytes/2-1) + "```\ncode\n```\n"},
+		{name: "fence never closes", body: strings.Repeat("a\n", startBytes/2-1) + "```\n" + strings.Repeat("c\n", startBytes), want: strings.Repeat("a\n", startBytes/2-1) + "```\n" + strings.Repeat("c\n", startBytes)},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := bodyStart(tc.body); got != tc.want {
+				t.Errorf("bodyStart = %d bytes %q…, want %d bytes", len(got), firstBytes(got, 40), len(tc.want))
+			}
+		})
+	}
+}
+
+func firstBytes(s string, n int) string {
+	if len(s) < n {
+		return s
+	}
+	return s[:n]
+}
