@@ -115,3 +115,11 @@ Contract for responders and contributors:
   `strings.ReplaceAll`). This is the only output change for existing configurations.
 - The custom stylesheet tag still inserts the base path unescaped; this predates the seam and is
   tracked separately.
+
+## Later changes
+
+- **2026-10 (#1292, `ShellParts.NoCache`):** contributors whose parts depend on page content
+  set `NoCache`; the router then answers the shell with `Cache-Control: no-cache` (caches
+  revalidate instead of serving an outdated title or description). When no contributor sets it,
+  the shell has no `Cache-Control` header, as before. The `Vary` field planned above is still
+  left for the first contributor that depends on a request header.
