@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 )
@@ -60,12 +61,15 @@ func TestStore_Put_WritesFileWithGivenPermAndIndentedJSON(t *testing.T) {
 		t.Fatalf("Put err: %v", err)
 	}
 
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatalf("Stat err: %v", err)
-	}
-	if runtime := info.Mode().Perm(); runtime != 0o600 {
-		t.Fatalf("file perm = %v, want 0600", runtime)
+	// Windows has no Unix permission bits (#1698).
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("Stat err: %v", err)
+		}
+		if perm := info.Mode().Perm(); perm != 0o600 {
+			t.Fatalf("file perm = %v, want 0600", perm)
+		}
 	}
 
 	raw, err := os.ReadFile(path)

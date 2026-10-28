@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -100,6 +101,9 @@ func TestConfigStore_Save_DoesNotWriteSecretsInPlaintext(t *testing.T) {
 }
 
 func TestConfigStore_Save_FileIs0600(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has no Unix permission bits")
+	}
 	dir := t.TempDir()
 	s := NewConfigStore(dir, testBox(t))
 	if err := s.Save(Config{Enabled: false}); err != nil {
@@ -170,8 +174,11 @@ func TestConfigStore_Save_NoBox_StoresSecretInPlaintext(t *testing.T) {
 	if !strings.Contains(string(raw), secret) {
 		t.Fatalf("expected the secret in plaintext on disk under --disable-auth, got:\n%s", raw)
 	}
-	if info, _ := os.Stat(filepath.Join(dir, ConfigFileName)); info.Mode().Perm() != 0o600 {
-		t.Fatalf("git-backup.json perm = %o, want 600", info.Mode().Perm())
+	// Windows has no Unix permission bits (#1698).
+	if runtime.GOOS != "windows" {
+		if info, _ := os.Stat(filepath.Join(dir, ConfigFileName)); info.Mode().Perm() != 0o600 {
+			t.Fatalf("git-backup.json perm = %o, want 600", info.Mode().Perm())
+		}
 	}
 
 	got, enabled, err := s.Load()
