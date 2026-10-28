@@ -136,7 +136,9 @@ func TestWriteStreamAtomic_TargetIsEmptyDirectory_FailsAndKeepsDirectory(t *test
 
 // Whether replacing a file that a reader holds open succeeds depends on the
 // OS, but the target must never end up missing: either the old or the new
-// content has to be readable afterwards.
+// content has to be readable afterwards. This passes on every OS, before and
+// after the Windows fix of #1698; it documents the cross-OS guarantee rather
+// than catching a regression of that fix.
 func TestWriteFileAtomic_TargetOpenForReading_NeverLeavesTargetMissing(t *testing.T) {
 	target := filepath.Join(t.TempDir(), "asset.bin")
 	if err := os.WriteFile(target, []byte("old"), 0o644); err != nil {
