@@ -113,10 +113,11 @@ the current code.
 See [ADR-0002: Wikilink Sentinel Encoding](./adr/0002-wikilink-sentinel-encoding.md) first — this section is the runtime mechanics
 that ADR describes.
 
-**Parsing.** `wikiLinkRe` (`internal/links/helpers.go`) matches `[[Target]]` and
-`[[Target|Alias]]`, capturing the target in group 1. It excludes `]`, `|`, `#` and `\n` from the
-target and requires a non-space first character (so bash-style `[[ -n … ]]` doesn't match).
-`extractWikiLinksFromMarkdown` (`helpers.go`) runs this regex over content, skipping
+**Parsing.** `markdown.ParseWikiLinks` (`internal/core/markdown/links.go`) matches `[[Target]]`
+and `[[Target|Alias]]` and returns target, alias and byte offsets. It excludes `]`, `|`, `#` and
+`\n` from the target and requires a non-space first character (so bash-style `[[ -n … ]]` doesn't
+match); it knows nothing about code. `extractWikiLinksFromMarkdown` (`internal/links/helpers.go`)
+calls it, skipping
 matches inside `MarkdownRefactorEngine.collectExcludedRanges` (code spans/blocks) and
 de-duplicating targets.
 

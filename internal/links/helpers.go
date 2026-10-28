@@ -1,21 +1,14 @@
 package links
 
 import (
-	"net/url"
-	"regexp"
 	"strings"
 
+	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
 )
-
-// wikiLinkRe matches [[Target]] and [[Target|Alias]] syntax.
-// Capture group 1 is the target (title or path hint).
-// \S as first character rejects bash-style [[ -n ... ]] conditionals (which always
-// start with a space after [[) without affecting real wiki-link titles.
-var wikiLinkRe = regexp.MustCompile(`\[\[(\S[^\]|#\n]*?)(?:\|[^\]\n]+?)?\]\]`)
 
 // wikilinkSentinelPrefix is the to_path prefix used for broken wiki-link
 // records in the link store. It must never collide with real wiki route paths
@@ -121,18 +114,18 @@ func extractLinksFromMarkdown(content string) []string {
 // [[Target|Alias]] syntax found in content. The returned strings are the raw
 // target values (may be a title or a "Folder/Title" path hint).
 func extractWikiLinksFromMarkdown(content string) []string {
-	matches := wikiLinkRe.FindAllStringSubmatchIndex(content, -1)
-	if len(matches) == 0 {
+	wikiLinks := markdown.ParseWikiLinks(content)
+	if len(wikiLinks) == 0 {
 		return nil
 	}
 	excluded := NewMarkdownRefactorEngine().collectExcludedRanges(content)
-	seen := make(map[string]struct{}, len(matches))
-	targets := make([]string, 0, len(matches))
-	for _, m := range matches {
-		if isExcludedOffset(m[0], excluded) || m[2] == -1 {
+	seen := make(map[string]struct{}, len(wikiLinks))
+	targets := make([]string, 0, len(wikiLinks))
+	for _, link := range wikiLinks {
+		if isExcludedOffset(link.Start, excluded) {
 			continue
 		}
-		target := strings.TrimSpace(content[m[2]:m[3]])
+		target := link.Target
 		if target == "" {
 			continue
 		}
@@ -175,7 +168,7 @@ func resolveWikiLinkTargets(treeService *tree.TreeService, targets []string) []T
 			if err == nil && page != nil {
 				result = append(result, TargetLink{
 					TargetPageID:   page.ID,
-					TargetPagePath: normalizeWikiPath(page.CalculatePath()),
+					TargetPagePath: markdown.NormalizeRoutePath(page.CalculatePath()),
 					State:          LinkResolved,
 				})
 				continue
@@ -214,66 +207,6 @@ func collectTargetsFromContent(treeService *tree.TreeService, pagePath string, c
 	return append(mdTargets, wikiResolved...)
 }
 
-// normalizeWikiPath normalizes a wiki path:
-// - removes query/hash (if any)
-// - ensures leading "/"
-// - removes trailing "/" (except root "/")
-func normalizeWikiPath(p string) string {
-	if p == "" {
-		return ""
-	}
-
-	// strip hash/query defensively (caller already does, but keep consistent)
-	if i := strings.Index(p, "#"); i != -1 {
-		p = p[:i]
-	}
-	if i := strings.Index(p, "?"); i != -1 {
-		p = p[:i]
-	}
-
-	if !strings.HasPrefix(p, "/") {
-		p = "/" + p
-	}
-
-	// collapse multiple slashes
-	for strings.Contains(p, "//") {
-		p = strings.ReplaceAll(p, "//", "/")
-	}
-
-	// strip trailing slash except root
-	if len(p) > 1 {
-		p = strings.TrimRight(p, "/")
-	}
-
-	return p
-}
-
-// resolveURLPath resolves href against currentPath using "page is folder" semantics.
-func resolveURLPath(currentPath, href string) (string, error) {
-	currentPath = normalizeWikiPath(currentPath)
-
-	// treat currentPath as folder by forcing trailing slash
-	folderBase := currentPath
-	if !strings.HasSuffix(folderBase, "/") {
-		folderBase += "/"
-	}
-
-	base, err := url.Parse("https://example.com" + folderBase)
-	if err != nil {
-		return "", err
-	}
-
-	ref, err := url.Parse(href)
-	if err != nil {
-		return "", err
-	}
-
-	resolved := base.ResolveReference(ref)
-
-	// normalize result path (strip trailing slash etc.)
-	return normalizeWikiPath(resolved.Path), nil
-}
-
 func resolveTargetLinks(tree *tree.TreeService, currentPath string, links []string) []TargetLink {
 	if !tree.IsLoaded() {
 		return nil
@@ -287,7 +220,7 @@ func resolveTargetLinks(tree *tree.TreeService, currentPath string, links []stri
 		}
 
 		// resolve link against current path
-		resolvedPath, err := resolveURLPath(currentPath, link)
+		resolvedPath, err := markdown.ResolveFolderRelative(currentPath, link)
 		if err != nil || resolvedPath == "" {
 			continue
 		}
