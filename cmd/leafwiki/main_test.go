@@ -1347,18 +1347,16 @@ func TestDockerfileBuilder_GoBuildStage_DeclaresAppVersionArg(t *testing.T) {
 func TestResolveVersionScript_AppVersionEnvOverride_ReturnsEnvValue(t *testing.T) {
 	scriptPath := filepath.Join("..", "..", "scripts", "resolve-version.sh")
 
-	// Elsewhere the shebang picks bash. Windows can't execute a shell script
-	// directly, so run it through the sh of Git for Windows, which is bash.
-	// Not bash from PATH (it can be the WSL launcher) and not sh elsewhere (the
-	// script uses `set -o pipefail`, which dash rejects).
-	cmd := exec.Command(scriptPath)
+	// Windows can't execute a shell script directly, and no shell can be
+	// assumed there: bash on PATH may be the WSL launcher, and sh is only
+	// there with Git for Windows. The script is a Unix build tool (make, vite),
+	// so run it where its shebang works. Not through sh elsewhere either: the
+	// script uses `set -o pipefail`, which dash rejects.
 	if runtime.GOOS == "windows" {
-		sh, err := exec.LookPath("sh")
-		if err != nil {
-			t.Skip("sh not on PATH; resolve-version.sh is a shell script")
-		}
-		cmd = exec.Command(sh, scriptPath)
+		t.Skip("resolve-version.sh is a Unix build script; Windows can't execute it directly")
 	}
+
+	cmd := exec.Command(scriptPath)
 	cmd.Env = append(os.Environ(), "APP_VERSION=v9.9.9-test")
 
 	out, err := cmd.Output()
