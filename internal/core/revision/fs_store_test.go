@@ -508,7 +508,11 @@ func TestFSStoreFailuresOnInvalidBasePath(t *testing.T) {
 	if err := store.SaveRevision(rev); err == nil {
 		t.Fatalf("expected SaveRevision to fail")
 	}
-	if _, err := store.ListRevisions("page-1"); err == nil {
+	// A path under a regular file reports not-exist on Windows, which
+	// ListRevisions treats as "no revisions" by design. A NUL byte makes
+	// ReadDir fail with an invalid-argument error on every OS (#1698).
+	nulBaseStore := NewFSStore(filepath.Join(root, "bad\x00base"), nil)
+	if _, err := nulBaseStore.ListRevisions("page-1"); err == nil {
 		t.Fatalf("expected ListRevisions to fail")
 	}
 }
