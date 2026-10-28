@@ -9,7 +9,6 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/teris-io/shortid"
@@ -186,14 +185,11 @@ func GenerateRandomPassword(length int) (string, error) {
 	return string(password), nil
 }
 
+// atomicReplace renames src over dst. os.Rename replaces an existing file on
+// every OS (MoveFileEx with MOVEFILE_REPLACE_EXISTING on Windows), so dst is
+// never removed first: that left a gap in which dst did not exist, and it
+// deleted an empty directory sitting at dst instead of failing (#1698).
 func atomicReplace(src, dst string) error {
-	// On Windows, os.Rename fails if dst already exists.
-	// On Unix, Rename is atomic and replaces dst.
-	if runtime.GOOS == "windows" {
-		if err := os.Remove(dst); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("remove existing file: %w", err)
-		}
-	}
 	return os.Rename(src, dst)
 }
 
