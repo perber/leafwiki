@@ -147,6 +147,10 @@ resync-derived state.
 - **`internal/publicaccess`** — the public-access ("public mode") switch. `NewEnvManaged` when
   pinned by `--public-access`/`--disable-auth`, `NewSettingsManaged` when changeable at runtime
   via `internal/core/settings`.
+- **`internal/render`** — `RenderHTML`: page Markdown → sanitized HTML for search-engine
+  crawlers (#1292). `wikilink.go` (goldmark inline parser, resolver callback), `links.go`
+  (folder-relative links, base path, asset images), `policy.go` (bluemonday allow-list, no
+  `id`/`name`/`class`/`style`). No tree, no HTTP. [ADR-0020](./adr/0020-server-rendered-page-html-for-crawlers.md).
 - **`internal/scopedread`** — the read boundary for callers that may see only part of the wiki
   (share links, #1252): `ReadScope` (a root page, optionally with its subtree) and
   `PageReader`, which checks the scope before reading and returns an allow-listed `PageView`.
