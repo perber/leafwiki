@@ -112,7 +112,7 @@ start_local() {
   echo "🔨 Building leafwiki binary for local E2E run..."
   (
     cd "$repo_root"
-    go build \
+    go build -tags nomsgpack \
       -ldflags="-X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production -X github.com/perber/wiki/internal/wiki/auth.DisableRefreshTokenRateLimit=true" \
       -o "$server_bin" \
       ./cmd/leafwiki
