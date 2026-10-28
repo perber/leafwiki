@@ -115,3 +115,19 @@ Contract for responders and contributors:
   `strings.ReplaceAll`). This is the only output change for existing configurations.
 - The custom stylesheet tag still inserts the base path unescaped; this predates the seam and is
   tracked separately.
+
+## Later changes
+
+- **2026-10 (#1292, `ShellParts.NoCache`):** contributors whose parts depend on page content
+  set `NoCache`; the router then answers the shell with `Cache-Control: no-cache` (caches
+  revalidate instead of serving an outdated title or description). When no contributor sets it,
+  the shell has no `Cache-Control` header, as before. The `Vary` field planned above is still
+  left for the first contributor that depends on a request header.
+- **2026-10 (#1292, first contributor):** the `seo` page meta contributor
+  ([ADR-0018](./0018-search-engine-rendering-for-public-wikis.md)) adds title, description and
+  Open Graph tags for page routes of public wikis. `BenchmarkPageMeta_LargePage`
+  (`internal/wiki/seo`, 100 KB page, fake reader, so without the two file reads) measured
+  39 ms, 7.5 MB and 82,800 allocations per request while the description excerpt rendered the
+  whole body; with `excerpt.FromBodyStart` (first 2 KB, never cut inside a code fence) it is
+  0.95 ms, 160 KB and 1,760 allocations, independent of the page size. Rerun it when the
+  description source changes.

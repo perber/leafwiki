@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -171,11 +172,18 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 	if err := validateSMTPConfig(cfg.email.smtpHost, cfg.email.smtpFrom, cfg.server.publicURL, cfg.email.smtpSecurity); err != nil {
 		fail("Invalid SMTP configuration", "error", err)
 	}
+	publicURL, publicURLWarning, err := validatePublicURL(cfg.server.publicURL, basePath, smtpEnabled)
+	if err != nil {
+		fail("Invalid SMTP configuration", "error", err)
+	}
+	if publicURLWarning != "" {
+		slog.Default().Warn(publicURLWarning)
+	}
 	if smtpEnabled {
 		// A misconfigured public URL produces broken links in emails that
 		// have already gone out — irreversible — so log the resolved value
 		// once at boot rather than only on first use.
-		slog.Default().Info("SMTP email enabled", "host", cfg.email.smtpHost, "port", cfg.email.smtpPort, "security", cfg.email.smtpSecurity, "publicUrl", cfg.server.publicURL)
+		slog.Default().Info("SMTP email enabled", "host", cfg.email.smtpHost, "port", cfg.email.smtpPort, "security", cfg.email.smtpSecurity, "publicUrl", redactURL(publicURL))
 	}
 
 	if cfg.proxy.enableHTTPRemoteUser {
@@ -218,6 +226,9 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 	}
 
 	publicAccessService := buildPublicAccessService(cmd, cfg)
+	if publicURL == "" && publicAccessService.Enabled() {
+		slog.Default().Info("set --public-url for canonical links")
+	}
 
 	tocDisplayService, err := tocdisplay.New(cfg.server.dataDir)
 	if err != nil {
@@ -273,10 +284,11 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 			Security:           email.Security(cfg.email.smtpSecurity),
 			InsecureSkipVerify: cfg.email.smtpInsecureSkipVerify,
 			Timeout:            cfg.email.smtpTimeout,
-			PublicURL:          cfg.server.publicURL,
+			PublicURL:          publicURL,
 		},
 		Metrics:      metrics,
 		PublicAccess: publicAccessService,
+		PublicURL:    publicURL,
 	})
 	if err != nil {
 		if msg, ok := corruptDatabaseMessage(err); ok {
@@ -668,9 +680,8 @@ func validateSMTPConfig(host, from, publicURL, security string) error {
 	if publicURL == "" {
 		return fmt.Errorf("--public-url is required when --smtp-host is set")
 	}
-	u, err := url.Parse(publicURL)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return fmt.Errorf("--public-url must be an absolute http(s):// URL, got %q", publicURL)
+	if _, err := parsePublicURL(publicURL); err != nil {
+		return err
 	}
 	switch email.Security(security) {
 	case email.SecurityNone, email.SecurityStartTLS, email.SecurityTLS:
@@ -678,6 +689,53 @@ func validateSMTPConfig(host, from, publicURL, security string) error {
 		return fmt.Errorf("--smtp-security must be one of none, starttls, tls, got %q", security)
 	}
 	return nil
+}
+
+// validatePublicURL checks --public-url, which outgoing email links and
+// canonical links share. An invalid value is fatal only with SMTP, where
+// email links depend on it (validateSMTPConfig reports that first); without
+// SMTP it is ignored with a warning, because canonical links just fall away.
+// resolved is the value to use, "" when unset or ignored.
+func validatePublicURL(publicURL, basePath string, smtpEnabled bool) (resolved, warning string, err error) {
+	if publicURL == "" {
+		return "", "", nil
+	}
+	u, err := parsePublicURL(publicURL)
+	if err != nil {
+		if smtpEnabled {
+			return "", "", err
+		}
+		return "", err.Error() + "; ignoring it", nil
+	}
+	if path := strings.TrimRight(u.Path, "/"); path != basePath {
+		warning = fmt.Sprintf("--public-url path %q does not match --base-path %q; canonical links use --base-path, email links use --public-url as given", path, basePath)
+	}
+	return publicURL, warning, nil
+}
+
+func parsePublicURL(publicURL string) (*url.URL, error) {
+	u, err := url.Parse(publicURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return nil, fmt.Errorf("--public-url must be an absolute http(s):// URL, got %q", redactURL(publicURL))
+	}
+	return u, nil
+}
+
+// userinfoPassword finds the password of "scheme://user:password@" in a URL
+// that url.Parse rejects.
+var userinfoPassword = regexp.MustCompile(`^([^:/?#]+://[^:@/?#]*:)[^@/?#]*@`)
+
+// redactURL replaces the password in raw, so --public-url can be logged and
+// put into errors without leaking credentials. Without a password raw is
+// returned as given (Redacted would normalize it).
+func redactURL(raw string) string {
+	if u, err := url.Parse(raw); err == nil {
+		if _, hasPassword := u.User.Password(); hasPassword {
+			return u.Redacted()
+		}
+		return raw
+	}
+	return userinfoPassword.ReplaceAllString(raw, "${1}xxxxx@")
 }
 
 // resolveLogoutURL resolves --logout-url/LEAFWIKI_LOGOUT_URL, falling back to

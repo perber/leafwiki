@@ -112,3 +112,23 @@ fixing that is a separate change.
 - Once anonymous readers may see only part of a wiki (drafts, public sections), the adapters
   switch to `internal/scopedread`; revisit this ADR then, because "public access on" will no
   longer mean "everything is public".
+
+## Later changes
+
+- **2026-10 (#1292, meta tags, PR 3c):** details fixed while implementing the meta tags:
+  - `<title>` is `<page title> - <site name>` (branding site name, `LeafWiki` when unset), the
+    format the SPA sets once it has loaded (`seo.DocumentTitle` and `documentTitle.ts` point at
+    each other). `og:type` is `website`.
+  - The description is the page property with the exact key `description`, whitespace
+    collapsed and capped at 360 runes (twice the excerpt length, cut the same way); otherwise an
+    excerpt of the first 2 KB of the body. A multi-line
+    value (`description: |`) is not a page property (the pages slice drops values with line
+    breaks), so such pages get the excerpt.
+  - The canonical link and `og:url` are the scheme and host of `--public-url` plus the base path
+    and the escaped route path. The path of `--public-url` is only checked against
+    `--base-path` at startup (warning on mismatch), because email links use `--public-url` as
+    given.
+  - `--public-url` is checked without SMTP: unset in a public wiki logs a hint; an invalid value
+    is ignored with a warning, and stays fatal with `--smtp-host`.
+  - Shells with page meta are served with `Cache-Control: no-cache` (`ShellParts.NoCache`,
+    ADR-0017). Non-page routes, unknown pages and a tree that is not loaded get the plain shell.

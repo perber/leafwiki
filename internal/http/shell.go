@@ -31,11 +31,16 @@ import (
 //     Vary header itself, also when it declines. A contributor has no writer;
 //     the first one whose parts depend on a header adds a Vary field to
 //     ShellParts.
+//   - A contributor that adds page-specific content sets ShellParts.NoCache,
+//     so caches revalidate the shell instead of serving a stale page title.
 //   - Registration order is the composition root's responsibility. The custom
 //     stylesheet and the admin's InjectCodeInHeader are built-in contributors
 //     that always come last, so admin code can override everything else.
 //   - Status codes other than 200 for the shell (404/410) belong in ShellParts
 //     once needed, not in a responder that re-renders the shell.
+
+// DefaultSiteName is the shell's site name when branding has none configured.
+const DefaultSiteName = "LeafWiki"
 
 // ShellRequest describes the request the shell is rendered for.
 type ShellRequest struct {
@@ -57,6 +62,10 @@ type ShellParts struct {
 	Head template.HTML
 	// Body is trusted markup placed inside #root; the contributor escapes it.
 	Body template.HTML
+	// NoCache makes the shell response carry "Cache-Control: no-cache" when
+	// any contributor sets it. Set it whenever the parts depend on the page
+	// content, so a cache never serves an outdated title or description.
+	NoCache bool
 }
 
 // ShellResponder may answer a shell request itself. It returns true when it
@@ -167,16 +176,23 @@ func (h *shellHandler) serve(c *gin.Context) {
 	if h.indexErr != nil {
 		return
 	}
-	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(h.render(req)))
+	doc, noCache := h.render(req)
+	if noCache {
+		c.Writer.Header().Set("Cache-Control", "no-cache")
+	}
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(doc))
 }
 
-func (h *shellHandler) render(req ShellRequest) string {
+// render returns the shell document and whether a contributor asked for
+// Cache-Control: no-cache.
+func (h *shellHandler) render(req ShellRequest) (doc string, noCache bool) {
 	ctx := req.Request.Context()
 	var title string
 	var body strings.Builder
 	var heads []template.HTML
 	for _, contributor := range h.contributors {
 		parts := contributor.ContributeShell(ctx, req)
+		noCache = noCache || parts.NoCache
 		if title == "" {
 			title = parts.Title
 		}
@@ -186,7 +202,7 @@ func (h *shellHandler) render(req ShellRequest) string {
 		}
 	}
 
-	siteName := "LeafWiki"
+	siteName := DefaultSiteName
 	if h.getSiteName != nil {
 		if name := h.getSiteName(); name != "" {
 			siteName = name
@@ -202,7 +218,7 @@ func (h *shellHandler) render(req ShellRequest) string {
 
 	// One pass, so contributed text is never scanned for placeholders.
 	escapedBasePath := html.EscapeString(h.basePath)
-	doc := strings.NewReplacer(
+	doc = strings.NewReplacer(
 		"{{__PAGE_TITLE__}}", html.EscapeString(title),
 		"{{__SITE_NAME__}}", html.EscapeString(siteName),
 		"{{__BASE_PATH__}}", escapedBasePath,
@@ -223,7 +239,7 @@ func (h *shellHandler) render(req ShellRequest) string {
 			parts = append(parts, string(head))
 		}
 	}
-	return injectIntoHead(doc, strings.Join(parts, "\n    "))
+	return injectIntoHead(doc, strings.Join(parts, "\n    ")), noCache
 }
 
 // shellRoutePath strips basePath from urlPath; ok is false outside basePath.

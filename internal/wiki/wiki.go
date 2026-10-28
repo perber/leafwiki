@@ -65,6 +65,7 @@ type Wiki struct {
 	status            *search.IndexingStatus
 	storageDir        string
 	publicAccess      publicaccess.ReadGate
+	publicURL         string
 
 	// Domain route registrars (populated by NewWiki).
 	pagesRoutes            *wikipages.Routes
@@ -127,6 +128,9 @@ type WikiOptions struct {
 	// features that serve anonymous visitors (search engine rendering). nil
 	// means public access is off.
 	PublicAccess publicaccess.ReadGate
+	// PublicURL is --public-url, already validated: the only source for
+	// absolute URLs such as canonical links (ADR-0018). "" means none.
+	PublicURL string
 }
 
 func NewWiki(options *WikiOptions) (*Wiki, error) {
@@ -139,6 +143,7 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 		shutdownCancel: shutdownCancel,
 		metrics:        options.Metrics,
 		publicAccess:   options.PublicAccess,
+		publicURL:      options.PublicURL,
 	}
 	if err := w.boot(options); err != nil {
 		// Close what the steps before the failing one opened: a leaked
