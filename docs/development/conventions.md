@@ -314,6 +314,14 @@ LeafWiki ships for Linux (amd64, 386, arm64), Windows, macOS and Raspberry Pi as
 - Check that it builds for Windows and macOS: `make cross` (build and vet for
   windows/amd64 and darwin/arm64). *Enforced by the `build-go-cross` job in
   `.github/workflows/backend.yml`, which runs the same target.*
+- Tests run on Windows too: *the `test-go-windows` job in `.github/workflows/backend.yml`
+  enforces it.* Compiling for Windows isn't enough, filesystem behaviour differs.
+- Close every file and database handle you open, in tests as well (register the close with
+  `t.Cleanup`). Windows can't delete an open file, so the `t.TempDir()` cleanup fails.
+- Build `file://` URLs from paths with `test_utils.FileURL`, never `"file://" + path`.
+- Skip or guard a test on Windows only for behaviour that doesn't exist there (Unix permission
+  bits, Unix shell scripts), with the reason in the message. Don't assume a tool is on the
+  runner's `PATH`.
 
 ## Naming
 
