@@ -275,7 +275,8 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 			Timeout:            cfg.email.smtpTimeout,
 			PublicURL:          cfg.server.publicURL,
 		},
-		Metrics: metrics,
+		Metrics:      metrics,
+		PublicAccess: publicAccessService,
 	})
 	if err != nil {
 		if msg, ok := corruptDatabaseMessage(err); ok {
