@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -99,6 +100,37 @@ func TestPageDTOs_Marshal_AuthorLabelWireShape(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assertMarshalsTo(t, tt.value(), strings.ReplaceAll(tt.want, "$ALICE", aliceID))
+		})
+	}
+}
+
+// dto.UserLabel replaces auth.UserLabel in responses and must marshal to the
+// same bytes.
+func TestUserLabel_Marshal_MatchesCoreType(t *testing.T) {
+	assertMarshalsTo(t, UserLabel{ID: "u1", Username: "alice"}, `{"id":"u1","username":"alice"}`)
+	assertMarshalsTo(t, auth.UserLabel{ID: "u1", Username: "alice"}, `{"id":"u1","username":"alice"}`)
+}
+
+func TestResolveUserLabel_ReturnsLabelOnlyForKnownUsers(t *testing.T) {
+	resolver, aliceID := newTestUserResolver(t)
+
+	tests := []struct {
+		name     string
+		resolver *auth.UserResolver
+		userID   string
+		want     *UserLabel
+	}{
+		{name: "known user", resolver: resolver, userID: aliceID, want: &UserLabel{ID: aliceID, Username: "alice"}},
+		{name: "unknown user is nil", resolver: resolver, userID: "ghost"},
+		{name: "empty ID is nil", resolver: resolver, userID: ""},
+		{name: "nil resolver is nil", resolver: nil, userID: aliceID},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ResolveUserLabel(tt.resolver, tt.userID)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ResolveUserLabel(%q) = %+v, want %+v", tt.userID, got, tt.want)
+			}
 		})
 	}
 }

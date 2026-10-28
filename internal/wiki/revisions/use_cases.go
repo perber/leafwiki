@@ -9,6 +9,7 @@ import (
 	"github.com/perber/wiki/internal/core/revision"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
+	"github.com/perber/wiki/internal/http/dto"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/wiki/pagesave"
 )
@@ -17,24 +18,24 @@ import (
 
 // RevisionResponse is the JSON representation of a revision.
 type RevisionResponse struct {
-	ID                string              `json:"id"`
-	PageID            string              `json:"pageId"`
-	ParentID          string              `json:"parentId,omitempty"`
-	Type              string              `json:"type"`
-	AuthorID          string              `json:"authorId"`
-	Author            *coreauth.UserLabel `json:"author,omitempty"`
-	CreatedAt         string              `json:"createdAt"`
-	Title             string              `json:"title"`
-	Slug              string              `json:"slug"`
-	Kind              string              `json:"kind"`
-	Path              string              `json:"path"`
-	ContentHash       string              `json:"contentHash"`
-	AssetManifestHash string              `json:"assetManifestHash"`
-	PageCreatedAt     string              `json:"pageCreatedAt,omitempty"`
-	PageUpdatedAt     string              `json:"pageUpdatedAt,omitempty"`
-	CreatorID         string              `json:"creatorId,omitempty"`
-	LastAuthorID      string              `json:"lastAuthorId,omitempty"`
-	Summary           string              `json:"summary,omitempty"`
+	ID                string         `json:"id"`
+	PageID            string         `json:"pageId"`
+	ParentID          string         `json:"parentId,omitempty"`
+	Type              string         `json:"type"`
+	AuthorID          string         `json:"authorId"`
+	Author            *dto.UserLabel `json:"author,omitempty"`
+	CreatedAt         string         `json:"createdAt"`
+	Title             string         `json:"title"`
+	Slug              string         `json:"slug"`
+	Kind              string         `json:"kind"`
+	Path              string         `json:"path"`
+	ContentHash       string         `json:"contentHash"`
+	AssetManifestHash string         `json:"assetManifestHash"`
+	PageCreatedAt     string         `json:"pageCreatedAt,omitempty"`
+	PageUpdatedAt     string         `json:"pageUpdatedAt,omitempty"`
+	CreatorID         string         `json:"creatorId,omitempty"`
+	LastAuthorID      string         `json:"lastAuthorId,omitempty"`
+	Summary           string         `json:"summary,omitempty"`
 }
 
 // RevisionAssetResponse is the JSON representation of a revision asset.
@@ -79,17 +80,13 @@ func toRevisionResponse(rev *revision.Revision, userResolver *coreauth.UserResol
 	if rev == nil {
 		return nil
 	}
-	var author *coreauth.UserLabel
-	if userResolver != nil {
-		author, _ = userResolver.ResolveUserLabel(rev.AuthorID)
-	}
 	return &RevisionResponse{
 		ID:                rev.ID,
 		PageID:            rev.PageID,
 		ParentID:          rev.ParentID,
 		Type:              string(rev.Type),
 		AuthorID:          rev.AuthorID,
-		Author:            author,
+		Author:            dto.ResolveUserLabel(userResolver, rev.AuthorID),
 		CreatedAt:         formatTime(rev.CreatedAt),
 		Title:             rev.Title,
 		Slug:              rev.Slug,

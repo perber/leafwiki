@@ -18,8 +18,8 @@ type NodeMetadata struct {
 	CreatorID    string `json:"creatorId"`
 	LastAuthorID string `json:"lastAuthorId"`
 
-	Creator    *auth.UserLabel `json:"creator,omitempty"`
-	LastAuthor *auth.UserLabel `json:"lastAuthor,omitempty"`
+	Creator    *UserLabel `json:"creator,omitempty"`
+	LastAuthor *UserLabel `json:"lastAuthor,omitempty"`
 }
 
 // Node is the HTTP representation of a page tree node.
@@ -88,12 +88,6 @@ func ToAPINode(node *tree.PageNode, parentPath string, userResolver *auth.UserRe
 		path = parentPath + "/" + node.Slug
 	}
 
-	var creator, lastAuthor *auth.UserLabel
-	if userResolver != nil {
-		creator, _ = userResolver.ResolveUserLabel(node.Metadata.CreatorID)
-		lastAuthor, _ = userResolver.ResolveUserLabel(node.Metadata.LastAuthorID)
-	}
-
 	apiNode := &Node{
 		ID:       node.ID,
 		Title:    node.Title,
@@ -108,8 +102,8 @@ func ToAPINode(node *tree.PageNode, parentPath string, userResolver *auth.UserRe
 			UpdatedAt:    node.Metadata.UpdatedAt.Format(time.RFC3339),
 			CreatorID:    node.Metadata.CreatorID,
 			LastAuthorID: node.Metadata.LastAuthorID,
-			Creator:      creator,
-			LastAuthor:   lastAuthor,
+			Creator:      ResolveUserLabel(userResolver, node.Metadata.CreatorID),
+			LastAuthor:   ResolveUserLabel(userResolver, node.Metadata.LastAuthorID),
 		},
 	}
 

@@ -40,7 +40,7 @@ type PropertyPage struct {
 	UpdatedAt    string                   `json:"updatedAt,omitempty"`
 	CreatorID    string                   `json:"creatorId,omitempty"`
 	LastAuthorID string                   `json:"lastAuthorId,omitempty"`
-	LastAuthor   *auth.UserLabel          `json:"lastAuthor,omitempty"`
+	LastAuthor   *UserLabel               `json:"lastAuthor,omitempty"`
 }
 
 // ToPropertyPage builds a PropertyPage from a PageNode, its properties, and an optional user resolver.
@@ -66,9 +66,7 @@ func ToPropertyPage(node *tree.PageNode, props map[string]coreprop.PropertyEntry
 		p.UpdatedAt = node.Metadata.UpdatedAt.Format(time.RFC3339)
 	}
 
-	if userResolver != nil {
-		p.LastAuthor, _ = userResolver.ResolveUserLabel(node.Metadata.LastAuthorID)
-	}
+	p.LastAuthor = ResolveUserLabel(userResolver, node.Metadata.LastAuthorID)
 
 	return p
 }
