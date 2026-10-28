@@ -165,10 +165,14 @@ func TestPull_UnbornLocalHead_RemoteAdvanced(t *testing.T) {
 }
 
 // TestPull_CaseInsensitiveFilesystem_DoesNotClobberDifferentlyCasedFile tests
-// that a live file is not silently overwritten via a differently-cased path
-// that the OS treats as the same file. Only meaningful on a case-insensitive
-// filesystem (default on Windows/macOS); skipped on a case-sensitive one
-// (default on Linux/CI), where this scenario cannot occur.
+// that a local case-only rename ("page.md" -> "Page.md", content unchanged)
+// plus a remote edit of "page.md" is applied to the one physical file: the
+// remote content lands in it, the local spelling is kept, no second file
+// appears, and nothing is reported as a conflict, since no local content is
+// discarded (planContentChanges finds the live file through its case-folded
+// lookup). Only meaningful on a case-insensitive filesystem (default on
+// Windows/macOS); skipped on a case-sensitive one (default on Linux/CI),
+// where this scenario cannot occur.
 func TestPull_CaseInsensitiveFilesystem_DoesNotClobberDifferentlyCasedFile(t *testing.T) {
 	if !filesystemIsCaseInsensitive(t) {
 		t.Skip("filesystem is case-sensitive; this scenario only applies on a case-insensitive filesystem (Windows/macOS)")
@@ -186,17 +190,30 @@ func TestPull_CaseInsensitiveFilesystem_DoesNotClobberDifferentlyCasedFile(t *te
 	// External client edits the file under its original (lowercase) path.
 	commitToRemote(t, bareDir, "root/page.md", "remote content\n")
 
-	err := repo.Pull()
-	if err == nil {
-		snap := repo.Status()
-		if snap.NeedsIntervention {
-			t.Fatal("Pull succeeded but left NeedsIntervention=true — inconsistent status")
-		}
-		t.Fatal("expected Pull to surface a conflict instead of silently resolving a case-only path mismatch")
+	if err := repo.Pull(); err != nil {
+		t.Fatalf("Pull: %v", err)
 	}
-	snap := repo.Status()
-	if !snap.NeedsIntervention {
-		t.Errorf("expected NeedsIntervention = true, got err=%v status=%+v", err, snap)
+	if snap := repo.Status(); snap.NeedsIntervention {
+		t.Errorf("expected no intervention for a case-only rename, got status=%+v", snap)
+	}
+
+	entries, err := os.ReadDir(rootDir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	if len(names) != 1 || names[0] != "Page.md" {
+		t.Fatalf("expected exactly the locally renamed Page.md, got %v", names)
+	}
+	got, err := os.ReadFile(filepath.Join(rootDir, "Page.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if string(got) != "remote content\n" {
+		t.Errorf("Page.md = %q, want the remote edit applied", got)
 	}
 }
 
@@ -208,8 +225,9 @@ func TestPull_CaseInsensitiveFilesystem_DoesNotClobberDifferentlyCasedFile(t *te
 // renamed file's *current* content (liveHash from the fold match) rather
 // than, say, coincidentally treating the plain lookup miss as "absent" (which
 // would also produce a conflict, just not for the reason under test — see the
-// end-to-end variant above for the case where content is unchanged, which can
-// only be exercised on a filesystem that genuinely folds case).
+// end-to-end variant above for the case where content is unchanged and the
+// remote edit is applied cleanly, which can only be exercised on a filesystem
+// that genuinely folds case).
 func TestPull_CaseFoldedLiveLookup_DetectsDivergedContentUnderDifferentCase(t *testing.T) {
 	bareDir := initBareRemote(t)
 	repo, rootDir := newRepoWithRemote(t, bareDir)
