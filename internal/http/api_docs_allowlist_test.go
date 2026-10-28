@@ -77,14 +77,6 @@ var undocumentedAPIRouteLiteral = map[string]string{
 	"GET /api/links/broken":     "links: pending package documentation",
 	"GET /api/pages/{id}/links": "links: pending package documentation",
 
-	// tags (internal/wiki/tags)
-	"GET /api/tags":       "tags: pending package documentation",
-	"GET /api/tags/pages": "tags: pending package documentation",
-
-	// properties (internal/wiki/properties)
-	"GET /api/properties":       "properties: pending package documentation",
-	"GET /api/properties/pages": "properties: pending package documentation",
-
 	// branding (internal/wiki/branding)
 	"GET /api/branding":            "branding: pending package documentation",
 	"PUT /api/branding":            "branding: pending package documentation",

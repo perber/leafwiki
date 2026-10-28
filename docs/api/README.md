@@ -2,7 +2,8 @@
 
 [`swagger.json`](./swagger.json) and [`swagger.yaml`](./swagger.yaml) describe LeafWiki's HTTP
 API as **Swagger 2.0**, version `0.x`. They are **experimental and incomplete**: so far only
-`GET /api/health` is documented, and anything may change before v1. Discussion, inconsistencies
+`GET /api/health` and the tag and property reads (`/api/tags`, `/api/properties`) are
+documented, and anything may change before v1. Discussion, inconsistencies
 and deferred decisions are tracked in [#1661](https://github.com/perber/leafwiki/issues/1661).
 
 The files are generated from Go comments and committed. Never edit them by hand. There is no
@@ -92,7 +93,7 @@ model that matches the code path, and report inconsistencies on #1661.
 | Flat (middleware and older handlers) | `{"error": "message"}` | `dto.LegacyError` |
 | Validation | `{"error": "validation_error", "fields": [...]}` | none yet (package-local; do not extend `ErrorDetail`) |
 
-Package helpers (for example in `internal/wiki/pages` and `internal/wiki/tags`) still declare
+Package helpers (for example in `internal/wiki/pages` and `internal/wiki/search`) still declare
 their own copies of the localized shape; migrating them to `dto` happens in each package's
 documentation PR with a wire-compatibility test.
 

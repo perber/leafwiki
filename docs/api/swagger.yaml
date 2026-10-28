@@ -1,9 +1,112 @@
 basePath: /api
 definitions:
+  auth.UserLabel:
+    properties:
+      id:
+        type: string
+      username:
+        type: string
+    type: object
+  dto.ErrorDetail:
+    properties:
+      args:
+        description: Args are the values substituted into Template; omitted when empty.
+        items:
+          type: string
+        type: array
+      code:
+        description: Code is the stable machine-readable error code, e.g. "page_not_found".
+        type: string
+      message:
+        description: Message is the English human-readable message.
+        type: string
+      template:
+        description: |-
+          Template is the localization key the client translates; it doubles as
+          the fallback message when no translation exists.
+        type: string
+    type: object
+  dto.ErrorResponse:
+    properties:
+      error:
+        allOf:
+        - $ref: '#/definitions/dto.ErrorDetail'
+        description: Error carries the localizable error details.
+    type: object
   dto.LegacyError:
     properties:
       error:
         description: Error is the human-readable error message.
+        type: string
+    type: object
+  dto.PropertyEntry:
+    properties:
+      type:
+        description: currently always "text"
+        type: string
+      value:
+        type: string
+    type: object
+  dto.PropertyKeyCount:
+    properties:
+      count:
+        type: integer
+      key:
+        type: string
+    type: object
+  dto.PropertyPage:
+    properties:
+      createdAt:
+        type: string
+      creatorId:
+        type: string
+      id:
+        type: string
+      lastAuthor:
+        $ref: '#/definitions/auth.UserLabel'
+      lastAuthorId:
+        type: string
+      path:
+        type: string
+      properties:
+        additionalProperties:
+          $ref: '#/definitions/dto.PropertyEntry'
+        type: object
+      title:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  dto.TagCount:
+    properties:
+      count:
+        type: integer
+      tag:
+        type: string
+    type: object
+  dto.TaggedPage:
+    properties:
+      createdAt:
+        type: string
+      creatorId:
+        type: string
+      excerpt:
+        type: string
+      id:
+        type: string
+      lastAuthor:
+        $ref: '#/definitions/auth.UserLabel'
+      lastAuthorId:
+        type: string
+      path:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      updatedAt:
         type: string
     type: object
   health.HealthResponse:
@@ -68,6 +171,236 @@ paths:
       summary: Check instance health
       tags:
       - health
+  /properties:
+    get:
+      description: |-
+        Lists the frontmatter property keys with the number of pages carrying each, ordered by count (descending), then by key. Nested properties use dot-joined keys such as `a.b`.
+        Access: a signed-in user (session cookie, API key or reverse-proxy identity); anonymous callers only when public access is on. With public access on, a missing or invalid session cookie is treated as anonymous instead of 401.
+      parameters:
+      - description: Prefix filter on the key; trimmed and lowercased before matching
+        in: query
+        name: q
+        type: string
+      - default: 50
+        description: Maximum number of keys; values below 1 mean 50, values above
+          200 mean 200
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Keys with page counts; empty array when nothing matches
+          schema:
+            items:
+              $ref: '#/definitions/dto.PropertyKeyCount'
+            type: array
+        "400":
+          description: limit is not an integer (code properties_invalid_limit)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: No valid session while public access is off, an invalid, revoked
+            or expired API key (when API-key management is enabled), or a rejected
+            trusted-proxy identity (when reverse-proxy authentication is enabled)
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "429":
+          description: API-key attempts throttled
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "500":
+          description: 'Index lookup failed: the body is an ErrorResponse (code properties_internal_error).
+            Authentication middleware failures return a LegacyError instead. Swagger
+            2.0 cannot express this alternative, so the schema is a broad object.'
+          schema:
+            type: object
+        "503":
+          description: API-key store unavailable during a live restore (when API-key
+            management is enabled)
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+      security:
+      - BearerAuth: []
+      summary: List property keys
+      tags:
+      - properties
+  /properties/pages:
+    get:
+      description: |-
+        Lists the pages whose property `key` has exactly the value `value`. Key and value are matched as given (not trimmed or lowercased); each must contain a non-space character.
+        Access: a signed-in user (session cookie, API key or reverse-proxy identity); anonymous callers only when public access is on. With public access on, a missing or invalid session cookie is treated as anonymous instead of 401.
+      parameters:
+      - description: Property key, for example `status` or a dot-joined nested key
+        in: query
+        name: key
+        required: true
+        type: string
+      - description: Exact property value
+        in: query
+        name: value
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Matching pages with all their properties; empty array when
+            none match
+          schema:
+            items:
+              $ref: '#/definitions/dto.PropertyPage'
+            type: array
+        "400":
+          description: key or value is missing or blank (code properties_missing_key
+            or properties_missing_value)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: No valid session while public access is off, an invalid, revoked
+            or expired API key (when API-key management is enabled), or a rejected
+            trusted-proxy identity (when reverse-proxy authentication is enabled)
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "429":
+          description: API-key attempts throttled
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "500":
+          description: 'Index lookup failed: the body is an ErrorResponse (code properties_internal_error).
+            Authentication middleware failures return a LegacyError instead. Swagger
+            2.0 cannot express this alternative, so the schema is a broad object.'
+          schema:
+            type: object
+        "503":
+          description: API-key store unavailable during a live restore (when API-key
+            management is enabled)
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+      security:
+      - BearerAuth: []
+      summary: List pages by property
+      tags:
+      - properties
+  /tags:
+    get:
+      description: |-
+        Lists tags with the number of pages carrying each, ordered by count (descending), then by tag. With `selected`, only pages carrying every selected tag are counted and the selected tags themselves are left out, so the result is the tags that can narrow the selection further.
+        Access: a signed-in user (session cookie, API key or reverse-proxy identity); anonymous callers only when public access is on. With public access on, a missing or invalid session cookie is treated as anonymous instead of 401.
+      parameters:
+      - description: Prefix filter on the tag name; trimmed and lowercased before
+          matching
+        in: query
+        name: q
+        type: string
+      - default: 50
+        description: Maximum number of tags; values below 1 mean 50, values above
+          200 mean 200
+        in: query
+        name: limit
+        type: integer
+      - collectionFormat: multi
+        description: Already selected tags; repeat the parameter or separate tags
+          with commas
+        in: query
+        items:
+          type: string
+        name: selected
+        type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Tags with page counts; empty array when nothing matches
+          schema:
+            items:
+              $ref: '#/definitions/dto.TagCount'
+            type: array
+        "400":
+          description: limit is not an integer (code tags_invalid_limit)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: No valid session while public access is off, an invalid, revoked
+            or expired API key (when API-key management is enabled), or a rejected
+            trusted-proxy identity (when reverse-proxy authentication is enabled)
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "429":
+          description: API-key attempts throttled
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "500":
+          description: 'Index lookup failed: the body is an ErrorResponse (code tags_internal_error).
+            Authentication middleware failures return a LegacyError instead. Swagger
+            2.0 cannot express this alternative, so the schema is a broad object.'
+          schema:
+            type: object
+        "503":
+          description: API-key store unavailable during a live restore (when API-key
+            management is enabled)
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+      security:
+      - BearerAuth: []
+      summary: List tags
+      tags:
+      - tags
+  /tags/pages:
+    get:
+      description: |-
+        Lists the pages that carry every given tag. Tags are trimmed and lowercased before matching.
+        Access: a signed-in user (session cookie, API key or reverse-proxy identity); anonymous callers only when public access is on. With public access on, a missing or invalid session cookie is treated as anonymous instead of 401.
+      parameters:
+      - collectionFormat: multi
+        description: Tags a page must all carry; repeat the parameter or separate
+          tags with commas
+        in: query
+        items:
+          type: string
+        name: tags
+        required: true
+        type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Matching pages; empty array when none match
+          schema:
+            items:
+              $ref: '#/definitions/dto.TaggedPage'
+            type: array
+        "400":
+          description: No non-empty tag given (code tags_missing_param)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: No valid session while public access is off, an invalid, revoked
+            or expired API key (when API-key management is enabled), or a rejected
+            trusted-proxy identity (when reverse-proxy authentication is enabled)
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "429":
+          description: API-key attempts throttled
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "500":
+          description: 'Index lookup failed: the body is an ErrorResponse (code tags_internal_error).
+            Authentication middleware failures return a LegacyError instead. Swagger
+            2.0 cannot express this alternative, so the schema is a broad object.'
+          schema:
+            type: object
+        "503":
+          description: API-key store unavailable during a live restore (when API-key
+            management is enabled)
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+      security:
+      - BearerAuth: []
+      summary: List pages by tags
+      tags:
+      - tags
 securityDefinitions:
   BearerAuth:
     description: API key sent as the entire header value `Bearer lw_<prefix>_<secret>`,

@@ -45,6 +45,22 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
 // handleGetPropertyKeys handles GET /api/properties?q=&limit=
+//
+//	@Summary		List property keys
+//	@Description	Lists the frontmatter property keys with the number of pages carrying each, ordered by count (descending), then by key. Nested properties use dot-joined keys such as `a.b`.
+//	@Description	Access: a signed-in user (session cookie, API key or reverse-proxy identity); anonymous callers only when public access is on. With public access on, a missing or invalid session cookie is treated as anonymous instead of 401.
+//	@Tags			properties
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			q		query		string					false	"Prefix filter on the key; trimmed and lowercased before matching"
+//	@Param			limit	query		integer					false	"Maximum number of keys; values below 1 mean 50, values above 200 mean 200"	default(50)
+//	@Success		200		{array}		dto.PropertyKeyCount	"Keys with page counts; empty array when nothing matches"
+//	@Failure		400		{object}	dto.ErrorResponse		"limit is not an integer (code properties_invalid_limit)"
+//	@Failure		401		{object}	dto.LegacyError			"No valid session while public access is off, an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)"
+//	@Failure		429		{object}	dto.LegacyError			"API-key attempts throttled"
+//	@Failure		500		{object}	object					"Index lookup failed: the body is an ErrorResponse (code properties_internal_error). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object."
+//	@Failure		503		{object}	dto.LegacyError			"API-key store unavailable during a live restore (when API-key management is enabled)"
+//	@Router			/properties [get]
 func (r *Routes) handleGetPropertyKeys(c *gin.Context) {
 	filter := c.DefaultQuery("q", "")
 	limitStr := c.DefaultQuery("limit", "50")
@@ -64,6 +80,22 @@ func (r *Routes) handleGetPropertyKeys(c *gin.Context) {
 }
 
 // handleGetPagesByProperty handles GET /api/properties/pages?key=status&value=draft
+//
+//	@Summary		List pages by property
+//	@Description	Lists the pages whose property `key` has exactly the value `value`. Key and value are matched as given (not trimmed or lowercased); each must contain a non-space character.
+//	@Description	Access: a signed-in user (session cookie, API key or reverse-proxy identity); anonymous callers only when public access is on. With public access on, a missing or invalid session cookie is treated as anonymous instead of 401.
+//	@Tags			properties
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			key		query		string				true	"Property key, for example `status` or a dot-joined nested key"
+//	@Param			value	query		string				true	"Exact property value"
+//	@Success		200		{array}		dto.PropertyPage	"Matching pages with all their properties; empty array when none match"
+//	@Failure		400		{object}	dto.ErrorResponse	"key or value is missing or blank (code properties_missing_key or properties_missing_value)"
+//	@Failure		401		{object}	dto.LegacyError		"No valid session while public access is off, an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)"
+//	@Failure		429		{object}	dto.LegacyError		"API-key attempts throttled"
+//	@Failure		500		{object}	object				"Index lookup failed: the body is an ErrorResponse (code properties_internal_error). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object."
+//	@Failure		503		{object}	dto.LegacyError		"API-key store unavailable during a live restore (when API-key management is enabled)"
+//	@Router			/properties/pages [get]
 func (r *Routes) handleGetPagesByProperty(c *gin.Context) {
 	key := c.Query("key")
 	value := c.Query("value")
