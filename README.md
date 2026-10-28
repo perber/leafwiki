@@ -292,6 +292,8 @@ Anyone can browse the wiki without logging in. Only authenticated users with an 
 
 Use this for open documentation or project wikis where readers don't need accounts, but you still want to control who can edit.
 
+A public wiki also serves each page with its title, a description (the page's `description` property, otherwise the start of the page) and Open Graph tags for search engines and link previews. Set `--public-url` (including `--base-path`) to add canonical links; without it they are left out.
+
 ### 3. No login — everyone can read and edit (`--disable-auth`)
 
 Authentication is completely disabled. Anyone who can reach the server can read and edit all pages.
@@ -358,7 +360,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--admin-email`                  | Initial admin email (only applied if no admin exists yet)               | `admin@localhost` | v0.12.0 |
 | `--public-access`                | Allow public read-only access                                           | `false`       | –       |
 | `--base-path`                    | URL prefix for reverse proxy setups (e.g. `/wiki`)                      | `""`          | v0.8.2  |
-| `--public-url`                   | Public base URL of this wiki (absolute `http(s)://`); used for links in outgoing email, required when `--smtp-host` is set | `""` | v0.13.0 |
+| `--public-url`                   | Public base URL of this wiki including `--base-path` (absolute `http(s)://`); used for links in outgoing email (required when `--smtp-host` is set) and for canonical links in public wikis | `""` | v0.13.0 |
 | `--allow-insecure`               | ⚠️ Enables HTTP for auth cookies (required for plain HTTP)              | `false`       | v0.7.0  |
 | `--disable-auth`                 | ⚠️ Disable all authentication (internal networks only)                  | `false`       | v0.7.0  |
 | `--access-token-timeout`         | Access token duration (e.g. `24h`, `15m`)                               | `15m`         | v0.7.0  |
@@ -431,7 +433,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_JWT_SECRET`                   | JWT signing secret *(required)*                      | –             | –       |
 | `LEAFWIKI_PUBLIC_ACCESS`                | Allow public read-only access                        | `false`       | –       |
 | `LEAFWIKI_BASE_PATH`                    | URL prefix for reverse proxy                         | `""`          | v0.8.2  |
-| `LEAFWIKI_PUBLIC_URL`                   | Public base URL of this wiki (absolute `http(s)://`); used for links in outgoing email, required with `LEAFWIKI_SMTP_HOST` | `""` | v0.13.0 |
+| `LEAFWIKI_PUBLIC_URL`                   | Public base URL of this wiki including the base path (absolute `http(s)://`); used for links in outgoing email (required with `LEAFWIKI_SMTP_HOST`) and for canonical links in public wikis | `""` | v0.13.0 |
 | `LEAFWIKI_ALLOW_INSECURE`               | ⚠️ HTTP auth cookies                                 | `false`       | v0.7.0  |
 | `LEAFWIKI_DISABLE_AUTH`                 | ⚠️ Disable authentication                            | `false`       | v0.7.0  |
 | `LEAFWIKI_ACCESS_TOKEN_TIMEOUT`         | Access token duration                                | `15m`         | v0.7.0  |
@@ -667,7 +669,7 @@ Available since v0.13.0. Configure an SMTP server to enable the **forgot-passwor
 ```
 
 - `--smtp-from` and `--public-url` are **required** once `--smtp-host` is set — the server refuses to start otherwise
-- `--public-url` must be an absolute `http(s)://` URL; it is the base for links in outgoing email
+- `--public-url` must be an absolute `http(s)://` URL; it is the base for links in outgoing email. Without SMTP an invalid value is ignored with a warning
 - `--smtp-security` is one of `none`, `starttls` (default), or `tls`
 - Prefer `LEAFWIKI_SMTP_PASSWORD` over the flag to keep the password out of process listings
 - `--smtp-insecure-skip-verify` disables TLS certificate verification — for testing only
