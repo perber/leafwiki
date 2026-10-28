@@ -4,8 +4,13 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -125,7 +130,7 @@ func TestSPAFallback_NonShellRequest_Returns404(t *testing.T) {
 		{name: "assets path", embed: true, method: http.MethodGet, path: "/wiki/assets/x.png", wantBody: "Page not found"},
 		{name: "branding path", embed: true, method: http.MethodGet, path: "/wiki/branding/x.png", wantBody: "Page not found"},
 		{name: "POST", embed: true, method: http.MethodPost, path: "/wiki/page", wantBody: "Page not found"},
-		{name: "HEAD", embed: true, method: http.MethodHead, path: "/wiki/page", wantBody: "Page not found"},
+		{name: "HEAD api path", embed: true, method: http.MethodHead, path: "/wiki/api/unknown", wantBody: "Page not found"},
 		{name: "outside base path", embed: true, method: http.MethodGet, path: "/other/page", wantBody: "Page not found"},
 		{name: "frontend not embedded", embed: false, method: http.MethodGet, path: "/wiki/page", wantBody: "404 page not found"},
 		{name: "frontend not embedded, outside base path", embed: false, method: http.MethodGet, path: "/other", wantBody: "404 page not found"},
@@ -370,7 +375,8 @@ func TestShellResponders_NonShellRequest_NotCalled(t *testing.T) {
 		{name: "assets", method: http.MethodGet, path: "/wiki/assets/x.png"},
 		{name: "branding", method: http.MethodGet, path: "/wiki/branding/x.png"},
 		{name: "POST", method: http.MethodPost, path: "/wiki/page"},
-		{name: "HEAD", method: http.MethodHead, path: "/wiki/page"},
+		{name: "HEAD api", method: http.MethodHead, path: "/wiki/api/unknown"},
+		{name: "HEAD outside base path", method: http.MethodHead, path: "/other/page"},
 		{name: "OPTIONS", method: http.MethodOptions, path: "/wiki/page"},
 		{name: "outside base path", method: http.MethodGet, path: "/other/page"},
 		{name: "base path as prefix of another segment", method: http.MethodGet, path: "/wikix/page"},
@@ -493,12 +499,14 @@ func TestShellResponders_Metrics_SeeResponderStatus(t *testing.T) {
 	for _, path := range []string{"/teapot", "/declined"} {
 		router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, path, nil))
 	}
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodHead, "/teapot", nil))
 
 	rec := httptest.NewRecorder()
 	m.HTTPHandler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
 	for _, want := range []string{
 		`leafwiki_http_requests_total{method="GET",route="unmatched",status="418"} 1`,
 		`leafwiki_http_requests_total{method="GET",route="unmatched",status="404"} 1`,
+		`leafwiki_http_requests_total{method="HEAD",route="unmatched",status="418"} 1`,
 	} {
 		if !strings.Contains(rec.Body.String(), want) {
 			t.Fatalf("metrics missing %s", want)
@@ -528,6 +536,207 @@ func TestServeShell_NoCacheRequested_SetsCacheControl(t *testing.T) {
 			}
 			if got := rec.Header().Get("Cache-Control"); got != tt.want {
 				t.Fatalf("Cache-Control = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// redirectRoot redirects the route root like the seo root redirect does.
+var redirectRoot = wikihttp.ShellResponderFunc(func(w http.ResponseWriter, req wikihttp.ShellRequest) bool {
+	if req.RoutePath != "/" {
+		return false
+	}
+	http.Redirect(w, req.Request, req.BasePath+"/start", http.StatusFound)
+	return true
+})
+
+// HEAD on an SPA route answers like GET without a body: same status and
+// headers, so link checkers and uptime monitors see what a browser gets.
+func TestServeShell_Head_MatchesGetWithoutBody(t *testing.T) {
+	tests := []struct {
+		name       string
+		cfg        func() wikihttp.FrontendConfig
+		path       string
+		wantStatus int
+		wantHeader map[string]string
+		shell      bool
+	}{
+		{
+			name:       "shell",
+			cfg:        func() wikihttp.FrontendConfig { return wikihttp.FrontendConfig{} },
+			path:       "/wiki/deep/page",
+			wantStatus: http.StatusOK,
+			wantHeader: map[string]string{"Content-Type": "text/html; charset=utf-8"},
+			shell:      true,
+		},
+		{
+			name: "shell with page content runs contributors",
+			cfg: func() wikihttp.FrontendConfig {
+				return wikihttp.FrontendConfig{ShellContributors: []wikihttp.ShellContributor{parts(wikihttp.ShellParts{Title: "Page", NoCache: true})}}
+			},
+			path:       "/wiki/deep/page",
+			wantStatus: http.StatusOK,
+			wantHeader: map[string]string{"Cache-Control": "no-cache"},
+			shell:      true,
+		},
+		{
+			name: "declining responder's headers are kept",
+			cfg: func() wikihttp.FrontendConfig {
+				return wikihttp.FrontendConfig{ShellResponders: []wikihttp.ShellResponder{&recordingResponder{header: "Accept"}}}
+			},
+			path:       "/wiki/deep/page",
+			wantStatus: http.StatusOK,
+			wantHeader: map[string]string{"Vary": "Accept"},
+			shell:      true,
+		},
+		{
+			name: "responder redirect",
+			cfg: func() wikihttp.FrontendConfig {
+				return wikihttp.FrontendConfig{ShellResponders: []wikihttp.ShellResponder{redirectRoot}}
+			},
+			path:       "/wiki/",
+			wantStatus: http.StatusFound,
+			wantHeader: map[string]string{"Location": "/wiki/start"},
+		},
+		{
+			name: "responder writing a body",
+			cfg: func() wikihttp.FrontendConfig {
+				return wikihttp.FrontendConfig{ShellResponders: []wikihttp.ShellResponder{&recordingResponder{handle: true, header: "X"}}}
+			},
+			path:       "/wiki/deep/page",
+			wantStatus: http.StatusTeapot,
+			wantHeader: map[string]string{"Content-Type": "text/plain", "Vary": "X"},
+		},
+		{
+			name: "responder writing a string",
+			cfg: func() wikihttp.FrontendConfig {
+				return wikihttp.FrontendConfig{ShellResponders: []wikihttp.ShellResponder{wikihttp.ShellResponderFunc(func(w http.ResponseWriter, _ wikihttp.ShellRequest) bool {
+					w.Header().Set("Content-Type", "text/markdown")
+					_, _ = io.WriteString(w, "# Page")
+					return true
+				})}}
+			},
+			path:       "/wiki/deep/page",
+			wantStatus: http.StatusOK,
+			wantHeader: map[string]string{"Content-Type": "text/markdown"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			engine := wikihttp.ShellEngine(seamTestTemplate, tt.cfg(), wikihttp.RouterOptions{BasePath: "/wiki"})
+			get, head := httptest.NewRecorder(), httptest.NewRecorder()
+			engine.ServeHTTP(get, httptest.NewRequest(http.MethodGet, tt.path, nil))
+			engine.ServeHTTP(head, httptest.NewRequest(http.MethodHead, tt.path, nil))
+
+			if get.Code != tt.wantStatus || head.Code != tt.wantStatus {
+				t.Fatalf("status GET=%d HEAD=%d, want %d", get.Code, head.Code, tt.wantStatus)
+			}
+			if !reflect.DeepEqual(head.Header(), get.Header()) {
+				t.Fatalf("headers differ\n GET: %v\nHEAD: %v", get.Header(), head.Header())
+			}
+			for k, want := range tt.wantHeader {
+				if got := head.Header().Get(k); got != want {
+					t.Errorf("%s = %q, want %q", k, got, want)
+				}
+			}
+			if head.Body.Len() != 0 || get.Body.Len() == 0 {
+				t.Fatalf("body length GET=%d HEAD=%d, want HEAD empty", get.Body.Len(), head.Body.Len())
+			}
+			if tt.shell {
+				if got := head.Header().Get("Content-Length"); got != strconv.Itoa(get.Body.Len()) {
+					t.Fatalf("Content-Length = %q, want GET body length %d", got, get.Body.Len())
+				}
+			}
+		})
+	}
+}
+
+// The HEAD writer forwards the status to gin's writer, so request logging,
+// metrics and rate limiting see what the client gets.
+func TestServeShell_Head_StatusVisibleToMiddleware(t *testing.T) {
+	cfg := wikihttp.FrontendConfig{ShellResponders: []wikihttp.ShellResponder{redirectRoot}}
+	engine := wikihttp.ShellEngine(seamTestTemplate, cfg, wikihttp.RouterOptions{})
+	var seen []int
+	engine.Use(func(c *gin.Context) {
+		c.Next()
+		seen = append(seen, c.Writer.Status())
+	})
+	for _, path := range []string{"/", "/page", "/api/x"} {
+		engine.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodHead, path, nil))
+	}
+	if want := []int{http.StatusFound, http.StatusOK, http.StatusNotFound}; !reflect.DeepEqual(seen, want) {
+		t.Fatalf("statuses = %v, want %v", seen, want)
+	}
+}
+
+// Through a real server: net/http drops HEAD bodies itself and only sends a
+// Content-Length the handler set, so this pins what clients actually receive.
+func TestServeShell_HeadOverHTTP_MatchesGet(t *testing.T) {
+	cfg := wikihttp.FrontendConfig{ShellResponders: []wikihttp.ShellResponder{redirectRoot}}
+	srv := httptest.NewServer(wikihttp.ShellEngine(seamTestTemplate, cfg, wikihttp.RouterOptions{BasePath: "/wiki"}))
+	t.Cleanup(srv.Close)
+	client := srv.Client()
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	do := func(method, path string) (*http.Response, string) {
+		t.Helper()
+		req, err := http.NewRequest(method, srv.URL+path, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("%s %s: %v", method, path, err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp, string(body)
+	}
+
+	get, getBody := do(http.MethodGet, "/wiki/deep/page")
+	head, headBody := do(http.MethodHead, "/wiki/deep/page")
+	if get.StatusCode != http.StatusOK || head.StatusCode != http.StatusOK || headBody != "" {
+		t.Fatalf("GET=%d HEAD=%d HEAD body=%q", get.StatusCode, head.StatusCode, headBody)
+	}
+	if head.ContentLength != int64(len(getBody)) || head.Header.Get("Content-Type") != get.Header.Get("Content-Type") {
+		t.Fatalf("HEAD Content-Length=%d Content-Type=%q, want %d %q", head.ContentLength, head.Header.Get("Content-Type"), len(getBody), get.Header.Get("Content-Type"))
+	}
+
+	redirect, _ := do(http.MethodHead, "/wiki/")
+	if redirect.StatusCode != http.StatusFound || redirect.Header.Get("Location") != "/wiki/start" {
+		t.Fatalf("HEAD /wiki/: status=%d Location=%q", redirect.StatusCode, redirect.Header.Get("Location"))
+	}
+}
+
+// Routes next to the fallback answer HEAD themselves; otherwise HEAD would
+// fall through to the shell and report text/html for a stylesheet or icon.
+func TestRouter_HeadOnStaticFrontendRoutes_MatchesGet(t *testing.T) {
+	dir := t.TempDir()
+	css := filepath.Join(dir, "custom.css")
+	if err := os.WriteFile(css, []byte("body{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := wikihttp.EmbedFrontend
+	wikihttp.EmbedFrontend = "true"
+	t.Cleanup(func() { wikihttp.EmbedFrontend = old })
+	router := wikihttp.NewRouter(nil, wikihttp.FrontendConfig{StorageDir: dir},
+		wikihttp.RouterOptions{BasePath: "/wiki", CustomStylesheet: css, DisableRequestLog: true})
+
+	tests := []struct {
+		path            string
+		wantContentType string
+	}{
+		{path: "/wiki/favicon.svg", wantContentType: "image/svg+xml"},
+		{path: "/wiki/custom.css", wantContentType: "text/css; charset=utf-8"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, httptest.NewRequest(http.MethodHead, tt.path, nil))
+			if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != tt.wantContentType {
+				t.Fatalf("status=%d Content-Type=%q, want 200 %q", rec.Code, rec.Header().Get("Content-Type"), tt.wantContentType)
 			}
 		})
 	}

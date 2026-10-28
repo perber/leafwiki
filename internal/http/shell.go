@@ -5,13 +5,14 @@ import (
 	"html"
 	"html/template"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
-// The SPA shell is the HTML document served for every GET that no route
-// matched (deep links into the SPA). Features shape it through two seams
+// The SPA shell is the HTML document served for every GET or HEAD that no
+// route matched (deep links into the SPA). Features shape it through two seams
 // registered on FrontendConfig, see ADR-0017:
 //
 //   - ShellResponder answers the request itself (e.g. a redirect or another
@@ -24,7 +25,9 @@ import (
 //     resolved. Expose only publicly readable content and decline cheaply when
 //     public access is off. Read pages through the same read use cases as the
 //     API, never from core/tree directly.
-//   - They run on every SPA GET, so keep them cheap.
+//   - They run on every SPA GET and HEAD, so keep them cheap. HEAD is GET
+//     without a body: the router discards what they write and keeps status
+//     and headers, so they never check the method.
 //   - Never panic. Handle and log your own errors; on error return empty
 //     parts (contributor) or false (responder).
 //   - A responder whose decision depends on a request header adds the matching
@@ -158,6 +161,13 @@ func (h *shellHandler) serve(c *gin.Context) {
 		return
 	}
 	req := ShellRequest{Request: c.Request, RoutePath: routePath, BasePath: h.basePath}
+	if c.Request.Method == http.MethodHead {
+		// Responders and the shell write as for GET; only the body is dropped.
+		// gin's writer stays underneath, so logging and metrics see the status.
+		w := c.Writer
+		c.Writer = headWriter{w}
+		defer func() { c.Writer = w }()
+	}
 
 	// gin presets 404 on the fallback route; give responders stdlib semantics
 	// (Write without WriteHeader means 200) and restore it when all decline.
@@ -180,6 +190,10 @@ func (h *shellHandler) serve(c *gin.Context) {
 	if noCache {
 		c.Writer.Header().Set("Cache-Control", "no-cache")
 	}
+	// Set explicitly so HEAD reports the length GET sends; net/http computes
+	// it only for small bodies and never for HEAD. Correct only while nothing
+	// in the process compresses the response; a Go gzip middleware must drop it.
+	c.Writer.Header().Set("Content-Length", strconv.Itoa(len(doc)))
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(doc))
 }
 
@@ -257,8 +271,24 @@ func shellRoutePath(urlPath, basePath string) (routePath string, ok bool) {
 	return routePath, true
 }
 
+// headWriter answers HEAD like GET: headers and status go to the wrapped
+// writer, the body is counted as written and dropped.
+type headWriter struct {
+	gin.ResponseWriter
+}
+
+func (w headWriter) Write(b []byte) (int, error) {
+	w.WriteHeaderNow()
+	return len(b), nil
+}
+
+func (w headWriter) WriteString(s string) (int, error) {
+	w.WriteHeaderNow()
+	return len(s), nil
+}
+
 func isShellRequest(method, routePath string) bool {
-	return method == http.MethodGet &&
+	return (method == http.MethodGet || method == http.MethodHead) &&
 		!strings.HasPrefix(routePath, "/api") &&
 		!strings.HasPrefix(routePath, "/assets") &&
 		!strings.HasPrefix(routePath, "/static") &&
