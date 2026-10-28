@@ -429,16 +429,11 @@ func TestPersistAndScanAssetHelperBranches(t *testing.T) {
 		t.Fatalf("expected size mismatch")
 	}
 
-	badPageID := "bad-assets"
-	badDir := filepath.Join(storageDir, "assets", badPageID)
-	if err := os.MkdirAll(filepath.Dir(badDir), 0o755); err != nil {
-		t.Fatalf("MkdirAll bad parent failed: %v", err)
-	}
-	if err := os.WriteFile(badDir, []byte("not a dir"), 0o644); err != nil {
-		t.Fatalf("WriteFile bad asset dir failed: %v", err)
-	}
-	if _, err := service.scanLiveAssets(badPageID); err == nil {
-		t.Fatalf("expected scanLiveAssets to fail when path is a file")
+	// A path under a regular file reports not-exist on Windows, which
+	// scanLiveAssets treats as "no assets" by design. A NUL byte makes
+	// ReadDir fail with an invalid-argument error on every OS (#1698).
+	if _, err := service.scanLiveAssets("bad\x00assets"); err == nil {
+		t.Fatalf("expected scanLiveAssets to fail when the asset dir can't be read")
 	}
 }
 
