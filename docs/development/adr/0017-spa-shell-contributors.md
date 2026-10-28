@@ -133,3 +133,10 @@ Contract for responders and contributors:
   body that opens with a long code fence or has no line breaks is cut late or not at all and
   costs about as much as rendering it whole (15–45 ms at 100 KB). Rerun it when the description
   source changes.
+- **2026-10 (#1292, HEAD):** HEAD counts as a shell request and is answered like GET without a
+  body (step 1 above said GET only; HEAD got the 404). Responders and contributors run
+  unchanged and never check the method: the router hands them a writer that forwards headers
+  and status to gin's writer (request log, metrics and rate limiting see the real status) and
+  drops the body. The shell sets `Content-Length`, so HEAD reports the length GET sends. HEAD
+  costs a full render like GET. `/custom.css` and `/favicon.svg` now register HEAD themselves,
+  so it no longer falls through to the shell (text/html); `/api` keeps its 404.

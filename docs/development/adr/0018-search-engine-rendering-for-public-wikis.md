@@ -132,3 +132,7 @@ fixing that is a separate change.
     is ignored with a warning, and stays fatal with `--smtp-host`.
   - Shells with page meta are served with `Cache-Control: no-cache` (`ShellParts.NoCache`,
     ADR-0017). Non-page routes, unknown pages and a tree that is not loaded get the plain shell.
+- **2026-11 (#1292, HEAD):** the shell now answers HEAD like GET without a body (see
+  [ADR-0017](./0017-spa-shell-contributors.md), "Later changes"), so the root redirect and the
+  page meta apply to HEAD too. The sentence above that HEAD is outside this decision is
+  superseded.

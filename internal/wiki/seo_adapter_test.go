@@ -156,6 +156,27 @@ func TestWiki_RootRedirect_FollowsPublicAccessAtRuntime(t *testing.T) {
 	assertNoRedirect(t, serveGET(router, "/wiki/", nil))
 }
 
+// HEAD / answers like GET without a body, so crawlers and monitors that
+// probe with HEAD see the same redirect.
+func TestWiki_RootRedirect_Head_SameAsGet(t *testing.T) {
+	_, public, router := newSEOTestRouter(t, "/wiki")
+	setPublicAccess(t, public, true)
+
+	get := serveGET(router, "/wiki/", nil)
+	head := httptest.NewRecorder()
+	router.ServeHTTP(head, httptest.NewRequest(http.MethodHead, "/wiki/", nil))
+
+	if head.Code != http.StatusFound || head.Code != get.Code {
+		t.Fatalf("status HEAD=%d GET=%d, want 302", head.Code, get.Code)
+	}
+	if got, want := head.Header().Get("Location"), get.Header().Get("Location"); got != want || got == "" {
+		t.Fatalf("Location HEAD=%q GET=%q", got, want)
+	}
+	if head.Body.Len() != 0 {
+		t.Fatalf("HEAD body = %q, want empty", head.Body.String())
+	}
+}
+
 func TestWiki_RootRedirect_NoRedirect(t *testing.T) {
 	tests := []struct {
 		name    string

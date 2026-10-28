@@ -22,15 +22,20 @@ func RenderShell(indexTemplate string, cfg FrontendConfig, opts RouterOptions, c
 	return doc
 }
 
-// ServeShell serves a GET request to path through the SPA fallback route with
-// indexTemplate as the embedded index, so tests see status and headers
-// without a built dist/.
-func ServeShell(indexTemplate string, cfg FrontendConfig, opts RouterOptions, path string) *httptest.ResponseRecorder {
+// ShellEngine returns an engine whose only route is the SPA fallback with
+// indexTemplate as the embedded index, so tests see status, headers and
+// middleware without a built dist/.
+func ShellEngine(indexTemplate string, cfg FrontendConfig, opts RouterOptions) *gin.Engine {
 	h := newShellHandler(cfg, opts, "")
 	h.setIndex([]byte(indexTemplate), nil)
 	engine := gin.New()
 	engine.NoRoute(h.serve)
+	return engine
+}
+
+// ServeShell serves a GET request to path through ShellEngine.
+func ServeShell(indexTemplate string, cfg FrontendConfig, opts RouterOptions, path string) *httptest.ResponseRecorder {
 	rec := httptest.NewRecorder()
-	engine.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+	ShellEngine(indexTemplate, cfg, opts).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 	return rec
 }
