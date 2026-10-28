@@ -271,6 +271,30 @@ func TestRootCommand_TrimsStringFlagValue(t *testing.T) {
 	})
 }
 
+// --public-url is a server option: email links use it today, canonical links
+// will later (GitHub #1292).
+func TestRootCommand_PublicURLResolvesIntoServerOptions(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		env  string
+		args []string
+	}{
+		{name: "flag", args: []string{"--public-url= https://wiki.example.com "}},
+		{name: "environment variable", env: " https://wiki.example.com "},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.env != "" {
+				t.Setenv("LEAFWIKI_PUBLIC_URL", tc.env)
+			}
+			runRootCommand(t, tc.args, func(cfg *serverConfig) {
+				if got, want := cfg.server.publicURL, "https://wiki.example.com"; got != want {
+					t.Fatalf("public-url = %q, want %q", got, want)
+				}
+			})
+		})
+	}
+}
+
 func TestRootCommand_ResolutionPrecedence(t *testing.T) {
 	t.Run("environment variable overrides the default", func(t *testing.T) {
 		t.Setenv("LEAFWIKI_HOST", "0.0.0.0")
