@@ -1347,7 +1347,14 @@ func TestDockerfileBuilder_GoBuildStage_DeclaresAppVersionArg(t *testing.T) {
 func TestResolveVersionScript_AppVersionEnvOverride_ReturnsEnvValue(t *testing.T) {
 	scriptPath := filepath.Join("..", "..", "scripts", "resolve-version.sh")
 
-	cmd := exec.Command(scriptPath)
+	// Windows can't execute a shell script directly, so run it through sh
+	// (Git for Windows ships one).
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh not on PATH; resolve-version.sh is a POSIX shell script")
+	}
+
+	cmd := exec.Command(sh, scriptPath)
 	cmd.Env = append(os.Environ(), "APP_VERSION=v9.9.9-test")
 
 	out, err := cmd.Output()
