@@ -505,3 +505,30 @@ func TestShellResponders_Metrics_SeeResponderStatus(t *testing.T) {
 		}
 	}
 }
+
+// A shell with page-specific content must not be served stale from a cache;
+// without a request for it the shell keeps its previous (absent) header.
+func TestServeShell_NoCacheRequested_SetsCacheControl(t *testing.T) {
+	tests := []struct {
+		name         string
+		contributors []wikihttp.ShellContributor
+		want         string
+	}{
+		{name: "no contributors", want: ""},
+		{name: "nobody asks", contributors: []wikihttp.ShellContributor{parts(wikihttp.ShellParts{Title: "T", Head: `<meta name="a">`})}, want: ""},
+		{name: "one contributor asks", contributors: []wikihttp.ShellContributor{parts(wikihttp.ShellParts{Title: "T"}), parts(wikihttp.ShellParts{NoCache: true})}, want: "no-cache"},
+		{name: "an empty-part contributor asks", contributors: []wikihttp.ShellContributor{parts(wikihttp.ShellParts{NoCache: true})}, want: "no-cache"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := wikihttp.FrontendConfig{ShellContributors: tt.contributors}
+			rec := wikihttp.ServeShell(seamTestTemplate, cfg, wikihttp.RouterOptions{}, "/deep/page")
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200", rec.Code)
+			}
+			if got := rec.Header().Get("Cache-Control"); got != tt.want {
+				t.Fatalf("Cache-Control = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
