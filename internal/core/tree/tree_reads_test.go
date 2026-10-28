@@ -66,3 +66,31 @@ func TestTreeService_FirstRootChildPath_WithoutNodes_ReturnsError(t *testing.T) 
 		})
 	}
 }
+
+// Run with -race: the read must hold the tree lock while SortPages and
+// CreateNode rewrite the root's children.
+func TestTreeService_FirstRootChildPath_ConcurrentWithMutations(t *testing.T) {
+	svc, ids := subtreeFixture(t)
+	orders := [][]string{{ids["other"], ids["docs"]}, {ids["docs"], ids["other"]}}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 50; i++ {
+			if err := svc.SortPages("root", orders[i%2]); err != nil {
+				t.Errorf("SortPages failed: %v", err)
+				return
+			}
+		}
+	}()
+	for i := 0; i < 200; i++ {
+		got, err := svc.FirstRootChildPath()
+		if err != nil {
+			t.Fatalf("FirstRootChildPath failed: %v", err)
+		}
+		if got != "docs" && got != "other" {
+			t.Fatalf("FirstRootChildPath() = %q, want docs or other", got)
+		}
+	}
+	<-done
+}

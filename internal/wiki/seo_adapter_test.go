@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/perber/wiki/internal/core/tree"
 	httpinternal "github.com/perber/wiki/internal/http"
 	"github.com/perber/wiki/internal/publicaccess"
 )
@@ -71,9 +72,34 @@ func TestWiki_RootRedirect_PublicWiki_RedirectsToFirstPage(t *testing.T) {
 		basePath string
 		path     string
 		headers  map[string]string
+		prepare  func(t *testing.T, w *Wiki)
 		want     string
 	}{
 		{name: "root without base path", path: "/", want: "/welcome-to-leafwiki"},
+		{name: "query string on root is dropped like the SPA does", basePath: "/wiki", path: "/wiki/?utm_source=x", want: "/wiki/welcome-to-leafwiki"},
+		{
+			name: "first page renamed after boot",
+			path: "/",
+			prepare: func(t *testing.T, w *Wiki) {
+				first := w.tree.GetTree().Children[0]
+				updatePageForTest(t, w, SYSTEM_USER_ID, first.ID, "Start", "start", nil, nil)
+			},
+			want: "/start",
+		},
+		{
+			name: "pages reordered after boot, section first",
+			path: "/",
+			prepare: func(t *testing.T, w *Wiki) {
+				welcome := w.tree.GetTree().Children[0]
+				sectionKind := tree.NodeKindSection
+				section := createPageForTest(t, w, SYSTEM_USER_ID, nil, "Docs", "docs", &sectionKind)
+				createPageForTest(t, w, SYSTEM_USER_ID, &section.ID, "Setup", "setup", pageNodeKind())
+				if err := w.tree.SortPages("root", []string{section.ID, welcome.ID}); err != nil {
+					t.Fatalf("SortPages: %v", err)
+				}
+			},
+			want: "/docs",
+		},
 		{name: "base path with trailing slash", basePath: "/wiki", path: "/wiki/", want: "/wiki/welcome-to-leafwiki"},
 		{name: "base path without trailing slash", basePath: "/wiki", path: "/wiki", want: "/wiki/welcome-to-leafwiki"},
 		{
@@ -86,8 +112,11 @@ func TestWiki_RootRedirect_PublicWiki_RedirectsToFirstPage(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, public, router := newSEOTestRouter(t, tc.basePath)
+			w, public, router := newSEOTestRouter(t, tc.basePath)
 			setPublicAccess(t, public, true)
+			if tc.prepare != nil {
+				tc.prepare(t, w)
+			}
 
 			rec := serveGET(router, tc.path, tc.headers)
 
@@ -122,6 +151,7 @@ func TestWiki_RootRedirect_NoRedirect(t *testing.T) {
 		prepare func(t *testing.T, w *Wiki)
 	}{
 		{name: "page route", path: "/wiki/welcome-to-leafwiki"},
+		{name: "index.html is not the root", path: "/wiki/index.html"},
 		{
 			name: "empty tree",
 			path: "/wiki/",
