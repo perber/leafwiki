@@ -112,9 +112,32 @@ func TestRenderHTML_XSSCorpus_IsNeutralized(t *testing.T) {
 		{name: "html comment", content: "<!-- <script>alert(1)</script> -->x", wantNot: []string{"<!--", "<script"}},
 		{name: "textarea breakout", content: "<textarea></textarea><script>alert(1)</script>", wantNot: []string{"<textarea", "<script"}},
 		{name: "noscript breakout", content: `<noscript><p title="</noscript><img src=x onerror=alert(1)>">`, wantNot: []string{"onerror", "<noscript"}},
+		{name: "javascript autolink", content: "<javascript:alert(1)>", wantNot: []string{"href"}},
+		{name: "javascript angle-bracket destination", content: "[x](<javascript:alert(1)>)", wantNot: []string{"href"}},
+		{name: "javascript reference link", content: "[x][r]\n\n[r]: javascript:alert(1) \"t\"", wantNot: []string{"href", "javascript"}},
+		{name: "percent-encoded scheme", content: "[p](%6Aavascript:alert(1)) <a href=\"%6Aavascript:alert(1)\">q</a>", wantNot: []string{"href"}},
+		{name: "NUL inside scheme", content: "[n](java\x00script:alert(1)) <a href=\"java\x00script:alert(1)\">m</a>", wantNot: []string{"href"}},
+		{name: "control char before scheme", content: "<a href=\"\x01javascript:alert(1)\">c</a>", wantNot: []string{"href"}},
+		{name: "entity colon decimal", content: `<a href="javascript&#58;alert(1)">e</a>`, wantNot: []string{"href"}},
+		{name: "image title with quotes", content: `![a](x.png "t\" onerror=alert(1) x=\"")`, want: []string{`title="t&#34; onerror=alert(1) x=&#34;"`}},
+		{name: "link title with single quote", content: `[a](/x "t' onmouseover=alert(1) ")`, want: []string{`title="t&#39; onmouseover=alert(1) "`}},
+		{name: "header attribute syntax", content: "# h {#root .c onclick=alert(1)}", want: []string{"<h1>h {#root .c onclick=alert(1)}</h1>"}},
+		{name: "srcset dropped", content: `<img src="x.png" srcset="javascript:alert(1) 1x">`, wantNot: []string{"srcset", "javascript"}},
+		{name: "cite dropped", content: `<q cite="javascript:alert(1)">q</q><blockquote cite="javascript:x">b</blockquote>`, wantNot: []string{"cite", "javascript"}},
+		{name: "svg animate href", content: `<svg><animate attributeName=href values=javascript:alert(1) /><a><text>x</text></a></svg>`, wantNot: []string{"<svg", "<animate", "javascript"}},
+		{name: "template script", content: "<template><script>alert(1)</script></template>", wantNot: []string{"<template", "alert"}},
+		{name: "xmp raw text", content: "<xmp><img src=x onerror=alert(1)></xmp>", wantNot: []string{"<xmp", "<img"}},
+		{name: "cdata section", content: "<![CDATA[<script>alert(1)</script>]]>", wantNot: []string{"<script", "CDATA"}},
+		{name: "a ping and download dropped", content: `<a href="https://e.example" ping="https://e.example" download rel="opener">d</a>`, wantNot: []string{"ping", "download", "rel="}},
+		{name: "checkbox with form attributes", content: `<input type=checkbox formaction=x form=f autofocus onfocus=alert(1)>`, want: []string{`<input type="checkbox">`}},
+		{name: "wikilink resolving to a scheme stays a path", content: "[[JS]]", want: []string{`href="/wiki/javascript:alert%281%29"`}},
+		{name: "wikilink resolving protocol-relative stays local", content: "[[Proto]]", want: []string{`href="/wiki/evil.example"`}},
+		{name: "dot segments cannot build protocol-relative", content: "[x](/..//evil.example) [y](.//evil.example) [z](../../..//evil.example)", wantNot: []string{`href="//`}},
 		{name: "wikilink alias with markup", content: `[[Foo|<img src=x onerror=alert(1)>]]`, want: []string{"&lt;img src=x onerror=alert(1)&gt;"}, wantNot: []string{"<img"}},
 	}
-	runRenderCases(t, cases, testOptions(map[string]string{"Foo": "/foo"}))
+	runRenderCases(t, cases, testOptions(map[string]string{
+		"Foo": "/foo", "JS": "javascript:alert(1)", "Proto": "/../..//evil.example",
+	}))
 }
 
 // previewSanitizeSchemaSHA256 pins the frontend sanitizer schema the crawler
