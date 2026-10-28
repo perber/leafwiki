@@ -353,19 +353,13 @@
         }
     },
     "definitions": {
-        "auth.UserLabel": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
-        },
         "dto.ErrorDetail": {
             "type": "object",
+            "required": [
+                "code",
+                "message",
+                "template"
+            ],
             "properties": {
                 "args": {
                     "description": "Args are the values substituted into Template; omitted when empty.",
@@ -390,6 +384,9 @@
         },
         "dto.ErrorResponse": {
             "type": "object",
+            "required": [
+                "error"
+            ],
             "properties": {
                 "error": {
                     "description": "Error carries the localizable error details.",
@@ -403,6 +400,9 @@
         },
         "dto.LegacyError": {
             "type": "object",
+            "required": [
+                "error"
+            ],
             "properties": {
                 "error": {
                     "description": "Error is the human-readable error message.",
@@ -412,6 +412,10 @@
         },
         "dto.PropertyEntry": {
             "type": "object",
+            "required": [
+                "type",
+                "value"
+            ],
             "properties": {
                 "type": {
                     "description": "currently always \"text\"",
@@ -424,6 +428,10 @@
         },
         "dto.PropertyKeyCount": {
             "type": "object",
+            "required": [
+                "count",
+                "key"
+            ],
             "properties": {
                 "count": {
                     "type": "integer"
@@ -435,6 +443,12 @@
         },
         "dto.PropertyPage": {
             "type": "object",
+            "required": [
+                "id",
+                "path",
+                "properties",
+                "title"
+            ],
             "properties": {
                 "createdAt": {
                     "type": "string"
@@ -446,7 +460,7 @@
                     "type": "string"
                 },
                 "lastAuthor": {
-                    "$ref": "#/definitions/auth.UserLabel"
+                    "$ref": "#/definitions/dto.UserLabel"
                 },
                 "lastAuthorId": {
                     "type": "string"
@@ -470,6 +484,10 @@
         },
         "dto.TagCount": {
             "type": "object",
+            "required": [
+                "count",
+                "tag"
+            ],
             "properties": {
                 "count": {
                     "type": "integer"
@@ -481,6 +499,12 @@
         },
         "dto.TaggedPage": {
             "type": "object",
+            "required": [
+                "id",
+                "path",
+                "tags",
+                "title"
+            ],
             "properties": {
                 "createdAt": {
                     "type": "string"
@@ -495,7 +519,7 @@
                     "type": "string"
                 },
                 "lastAuthor": {
-                    "$ref": "#/definitions/auth.UserLabel"
+                    "$ref": "#/definitions/dto.UserLabel"
                 },
                 "lastAuthorId": {
                     "type": "string"
@@ -517,8 +541,27 @@
                 }
             }
         },
+        "dto.UserLabel": {
+            "type": "object",
+            "required": [
+                "id",
+                "username"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
         "health.HealthResponse": {
             "type": "object",
+            "required": [
+                "checks",
+                "status"
+            ],
             "properties": {
                 "checks": {
                     "description": "Checks maps each check name (sqlite, data_dir, search) to its result:\n\"ok\" or \"failed\" for sqlite and data_dir; \"ok\", \"indexing\" or \"failed\" for search.",

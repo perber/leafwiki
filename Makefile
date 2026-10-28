@@ -69,7 +69,7 @@ run:
 
 # Regenerate the experimental Swagger 2.0 spec in docs/api (pinned swag, not a go.mod dependency).
 api-docs:
-	go run github.com/swaggo/swag/cmd/swag@v1.16.6 init --generalInfo api_docs.go --dir ./cmd/leafwiki,./internal --parseInternal --output ./docs/api --outputTypes json,yaml
+	go run github.com/swaggo/swag/cmd/swag@v1.16.6 init --generalInfo api_docs.go --dir ./cmd/leafwiki,./internal --parseInternal --requiredByDefault --output ./docs/api --outputTypes json,yaml
 
 clean:
 	rm -f $(BINARY_NAME)
