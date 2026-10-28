@@ -247,6 +247,10 @@ func TestFromBodyStart_ReadsOnlyTheStart(t *testing.T) {
 		// Cut inside the fence, the unclosed code would become excerpt text.
 		{name: "fence crossing the limit does not leak code", body: "Intro.\n```\n" + strings.Repeat("secret code\n", 2000) + "```\nAfter the code.", want: "Intro."},
 		{name: "text after the limit is not read", body: strings.Repeat("\n", startBytes+1) + "Late text.", want: ""},
+		// Fences that bodyStart's line scan doesn't see as fences (inside a
+		// block quote, or indented in a list item) must not leak code either.
+		{name: "block-quoted fence crossing the limit does not leak code", body: "Intro.\n\n> ```\n" + strings.Repeat("> secret code\n", 2000) + "> ```\n\nAfter the code.", want: "Intro."},
+		{name: "list-indented fence crossing the limit does not leak code", body: "- Intro.\n\n    ```\n" + strings.Repeat("    secret code\n", 2000) + "    ```\n\nAfter the code.", want: "Intro."},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
