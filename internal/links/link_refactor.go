@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
@@ -81,8 +82,8 @@ func CompileWikiLinkRewrites(rules []RewriteRule) CompiledWikiLinkRewrites {
 				newTarget: rule.NewTitle,
 			})
 		}
-		oldHint := strings.TrimPrefix(normalizeWikiPath(rule.OldPath), "/")
-		newHint := strings.TrimPrefix(normalizeWikiPath(rule.NewPath), "/")
+		oldHint := strings.TrimPrefix(markdown.NormalizeRoutePath(rule.OldPath), "/")
+		newHint := strings.TrimPrefix(markdown.NormalizeRoutePath(rule.NewPath), "/")
 		if oldHint != "" && oldHint != newHint {
 			rw = append(rw, wikiRewrite{
 				re:        regexp.MustCompile(`\[\[\s*` + regexp.QuoteMeta(oldHint) + `\s*(\|[^\]\n]*)?\]\]`),
@@ -168,7 +169,7 @@ type wikiFindPattern struct {
 
 func CompileWikiLinkFinder(oldPath, pageTitle string) CompiledWikiLinkFinder {
 	finder := CompiledWikiLinkFinder{}
-	oldHint := strings.TrimPrefix(normalizeWikiPath(oldPath), "/")
+	oldHint := strings.TrimPrefix(markdown.NormalizeRoutePath(oldPath), "/")
 	if oldHint != "" {
 		finder.patterns = append(finder.patterns, wikiFindPattern{
 			re: regexp.MustCompile(`\[\[\s*` + regexp.QuoteMeta(oldHint) + `\s*(?:\|[^\]\n]*)?\]\]`), syntax: "[[" + oldHint + "]]",
@@ -560,7 +561,7 @@ func rewriteLinkDestination(currentPath string, destination string, rules []Rewr
 		return destination, false, nil
 	}
 
-	resolvedPath, err := resolveURLPath(currentPath, baseDest)
+	resolvedPath, err := markdown.ResolveFolderRelative(currentPath, baseDest)
 	if err != nil || resolvedPath == "" {
 		return destination, false, &RewriteWarning{
 			Message: fmt.Sprintf("Skipped unresolved link destination %q", destination),
@@ -577,7 +578,7 @@ func rewriteLinkDestination(currentPath string, destination string, rules []Rewr
 		rewrittenBase = newResolvedPath
 	} else {
 		currentPathForRelative := currentPath
-		if nextCurrentPath, rewrittenCurrentPath := applyRewriteRules(normalizeWikiPath(currentPath), rules); rewrittenCurrentPath {
+		if nextCurrentPath, rewrittenCurrentPath := applyRewriteRules(markdown.NormalizeRoutePath(currentPath), rules); rewrittenCurrentPath {
 			currentPathForRelative = nextCurrentPath
 		}
 		rewrittenBase = relativeWikiLinkPath(currentPathForRelative, newResolvedPath)
@@ -598,7 +599,7 @@ func rewriteRelativeLinkForPathChange(oldCurrentPath string, newCurrentPath stri
 		return destination, false, nil
 	}
 
-	resolvedPath, err := resolveURLPath(oldCurrentPath, baseDest)
+	resolvedPath, err := markdown.ResolveFolderRelative(oldCurrentPath, baseDest)
 	if err != nil || resolvedPath == "" {
 		return destination, false, &RewriteWarning{
 			Message: fmt.Sprintf("Skipped unresolved link destination %q", destination),
@@ -703,8 +704,8 @@ func applyRewriteRules(resolvedPath string, rules []RewriteRule) (string, bool) 
 }
 
 func relativeWikiLinkPath(currentPath string, targetPath string) string {
-	base := normalizeWikiPath(currentPath)
-	target := normalizeWikiPath(targetPath)
+	base := markdown.NormalizeRoutePath(currentPath)
+	target := markdown.NormalizeRoutePath(targetPath)
 	if target == "" {
 		return ""
 	}
@@ -731,7 +732,7 @@ func relativeWikiLinkPath(currentPath string, targetPath string) string {
 }
 
 func splitWikiPathSegments(value string) []string {
-	normalized := strings.Trim(normalizeWikiPath(value), "/")
+	normalized := strings.Trim(markdown.NormalizeRoutePath(value), "/")
 	if normalized == "" {
 		return nil
 	}
