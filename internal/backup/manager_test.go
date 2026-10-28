@@ -10,6 +10,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 // managerFixture returns a settings-mode manager over a fresh data dir plus the
@@ -62,7 +64,7 @@ func managerFixtureNoBox(t *testing.T) (*Manager, string) {
 
 func fileRemoteConfig(bare string) Config {
 	return Config{
-		RemoteURL: "file://" + bare,
+		RemoteURL: test_utils.FileURL(bare),
 		Branch:    "main",
 		SSHKey:    testSSHKeyPEM,
 		Interval:  2 * time.Minute,
@@ -103,7 +105,7 @@ func TestManager_Reconfigure_BringsBackupUpAndPersists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("store.Load: %v", err)
 	}
-	if !enabled || cfg.RemoteURL != "file://"+bare {
+	if !enabled || cfg.RemoteURL != test_utils.FileURL(bare) {
 		t.Fatalf("config not persisted correctly: %+v enabled=%v", cfg, enabled)
 	}
 }
@@ -214,7 +216,7 @@ func TestManager_Reconfigure_SwapsSchedulerWithoutLeaking(t *testing.T) {
 		t.Fatal("expected Enabled after second Reconfigure")
 	}
 	cfg, _, _ := m.store.Load()
-	if cfg.RemoteURL != "file://"+bare2 {
+	if cfg.RemoteURL != test_utils.FileURL(bare2) {
 		t.Fatalf("expected remote to be bare2, got %q", cfg.RemoteURL)
 	}
 }
@@ -240,7 +242,7 @@ func TestManager_Disable_StopsBackupButKeepsRemote(t *testing.T) {
 	if enabled {
 		t.Fatal("expected enabled=false on disk after Disable")
 	}
-	if cfg.RemoteURL != "file://"+bare {
+	if cfg.RemoteURL != test_utils.FileURL(bare) {
 		t.Fatalf("Disable should keep the remote, got %q", cfg.RemoteURL)
 	}
 }

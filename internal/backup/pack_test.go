@@ -14,6 +14,8 @@ import (
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/format/packfile"
+
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 func packWindow(t *testing.T, r *Repository) uint {
@@ -88,7 +90,7 @@ func TestInit_AdoptedRemoteHistory_DisablesPackDeltaCompression(t *testing.T) {
 	pushFirstCommitToRemote(t, bareDir, "main", "root/remote.md", "# Remote\n")
 
 	cfg, _ := newLocalConfig(t)
-	cfg.RemoteURL = "file://" + bareDir
+	cfg.RemoteURL = test_utils.FileURL(bareDir)
 	cfg.SSHKey = testSSHKeyPEM
 	repo, err := Init(cfg)
 	if err != nil {

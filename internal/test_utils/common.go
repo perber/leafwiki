@@ -6,6 +6,7 @@ import (
 	"mime/multipart"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -77,4 +78,15 @@ func WrapCloseWithErrorCheck(closer func() error, t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to close resource: %v", err)
 	}
+}
+
+// FileURL returns a file:// URL for the absolute directory dir that go-git
+// accepts on every OS. A Windows path has no leading slash ("C:\x" becomes
+// "C:/x"), so it needs a third slash to keep the authority empty (#1698).
+func FileURL(dir string) string {
+	p := filepath.ToSlash(dir)
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	return "file://" + p
 }

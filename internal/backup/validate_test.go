@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 func TestTestRemote_ReachableRemote_Succeeds(t *testing.T) {
@@ -13,7 +15,7 @@ func TestTestRemote_ReachableRemote_Succeeds(t *testing.T) {
 	_, _ = newRepoWithRemote(t, bare)
 
 	err := TestRemote(context.Background(), Config{
-		RemoteURL: "file://" + bare,
+		RemoteURL: test_utils.FileURL(bare),
 		SSHKey:    testSSHKeyPEM,
 	})
 	if err != nil {
@@ -25,7 +27,7 @@ func TestTestRemote_EmptyRemote_TreatedAsSuccess(t *testing.T) {
 	bare := initBareRemote(t) // freshly init'd, no commits
 
 	err := TestRemote(context.Background(), Config{
-		RemoteURL: "file://" + bare,
+		RemoteURL: test_utils.FileURL(bare),
 		SSHKey:    testSSHKeyPEM,
 	})
 	if err != nil {
@@ -37,7 +39,7 @@ func TestTestRemote_NonexistentRemote_Fails(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "does-not-exist.git")
 
 	err := TestRemote(context.Background(), Config{
-		RemoteURL: "file://" + missing,
+		RemoteURL: test_utils.FileURL(missing),
 		SSHKey:    testSSHKeyPEM,
 	})
 	if err == nil {
@@ -67,7 +69,7 @@ func TestTestRemote_CancelledContext_Fails(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
 	defer cancel()
 
-	if err := TestRemote(ctx, Config{RemoteURL: "file://" + bare, SSHKey: testSSHKeyPEM}); err == nil {
+	if err := TestRemote(ctx, Config{RemoteURL: test_utils.FileURL(bare), SSHKey: testSSHKeyPEM}); err == nil {
 		t.Fatal("TestRemote should fail when the context is already expired")
 	}
 }

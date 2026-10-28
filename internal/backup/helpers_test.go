@@ -17,6 +17,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	gossh "golang.org/x/crypto/ssh"
+
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 // testSSHKeyPEM holds a throwaway Ed25519 key generated at test startup.
@@ -70,7 +72,7 @@ func newRepoWithRemote(t *testing.T, bareDir string) (*Repository, string) {
 		AuthorName:  "Test Author",
 		AuthorEmail: "test@example.com",
 		Branch:      "main",
-		RemoteURL:   "file://" + bareDir,
+		RemoteURL:   test_utils.FileURL(bareDir),
 		SSHKey:      testSSHKeyPEM,
 	}
 	repo, err := Init(cfg)
@@ -104,7 +106,7 @@ func commitChangesToRemote(t *testing.T, bareDir string, files map[string]string
 	t.Helper()
 	cloneDir := t.TempDir()
 	cloned, err := gogit.PlainClone(cloneDir, false, &gogit.CloneOptions{
-		URL:           "file://" + bareDir,
+		URL:           test_utils.FileURL(bareDir),
 		ReferenceName: plumbing.NewBranchReferenceName("main"),
 		Auth:          nil,
 	})
@@ -205,7 +207,7 @@ func pushNewHistoryToRemote(t *testing.T, bareDir, branch, filename, content, co
 	}
 	if _, err := repo.CreateRemote(&config.RemoteConfig{
 		Name: "origin",
-		URLs: []string{"file://" + bareDir},
+		URLs: []string{test_utils.FileURL(bareDir)},
 	}); err != nil {
 		t.Fatalf("pushNewHistoryToRemote: CreateRemote: %v", err)
 	}
@@ -245,7 +247,7 @@ func deleteFromRemote(t *testing.T, bareDir, filename string) {
 	t.Helper()
 	cloneDir := t.TempDir()
 	cloned, err := gogit.PlainClone(cloneDir, false, &gogit.CloneOptions{
-		URL:           "file://" + bareDir,
+		URL:           test_utils.FileURL(bareDir),
 		ReferenceName: plumbing.NewBranchReferenceName("main"),
 	})
 	if err != nil {

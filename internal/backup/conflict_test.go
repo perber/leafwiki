@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 // TestConflict_DivergedHistory tests that RunBackup sets NeedsIntervention when
@@ -143,7 +145,7 @@ func TestConflict_FirstPush_NoError(t *testing.T) {
 		AuthorName:  "Test",
 		AuthorEmail: "t@t.com",
 		Branch:      "main",
-		RemoteURL:   "file://" + bareDir,
+		RemoteURL:   test_utils.FileURL(bareDir),
 		SSHKey:      testSSHKeyPEM,
 	}
 	repo, err := Init(cfg)

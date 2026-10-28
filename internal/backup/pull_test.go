@@ -12,6 +12,8 @@ import (
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/filemode"
+
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 // TestPull_FastForward tests that Pull merges new remote commits into the
@@ -129,7 +131,7 @@ func TestPull_UnbornLocalHead_RemoteAdvanced(t *testing.T) {
 		AuthorName:  "Test",
 		AuthorEmail: "t@t.com",
 		Branch:      "main",
-		RemoteURL:   "file://" + bareDir,
+		RemoteURL:   test_utils.FileURL(bareDir),
 		SSHKey:      testSSHKeyPEM,
 	})
 	if err != nil {
@@ -522,7 +524,7 @@ func TestPull_UnbornLocalHead_WritesMissingFilesAndConverges(t *testing.T) {
 	repo, err := Init(Config{
 		RootDir: rootDir, AssetsDir: assetsDir,
 		AuthorName: "Test", AuthorEmail: "t@t.com",
-		Branch: "main", RemoteURL: "file://" + bareDir, SSHKey: testSSHKeyPEM,
+		Branch: "main", RemoteURL: test_utils.FileURL(bareDir), SSHKey: testSSHKeyPEM,
 	})
 	if err != nil {
 		t.Fatalf("Init: %v", err)
@@ -697,7 +699,7 @@ func TestInit_FirstContactInvalidRemoteTreeEntry_FailsWithoutWriting(t *testing.
 	_, err := Init(Config{
 		RootDir: rootDir, AssetsDir: assetsDir,
 		AuthorName: "Test", AuthorEmail: "t@t.com",
-		Branch: "main", RemoteURL: "file://" + bareDir, SSHKey: testSSHKeyPEM,
+		Branch: "main", RemoteURL: test_utils.FileURL(bareDir), SSHKey: testSSHKeyPEM,
 	})
 	if err == nil {
 		t.Fatal("expected Init to fail on an invalid remote tree entry")

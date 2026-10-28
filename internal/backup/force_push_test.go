@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 // TestForcePush_RefusesWhenLocalBehind covers the data-loss path of the
@@ -89,7 +91,7 @@ func TestForcePush_RemoteBranchMissing_Pushes(t *testing.T) {
 	repo, err := Init(Config{
 		RootDir: rootDir, AssetsDir: assetsDir,
 		AuthorName: "T", AuthorEmail: "t@t.com", Branch: "main",
-		RemoteURL: "file://" + bareDir, SSHKey: testSSHKeyPEM,
+		RemoteURL: test_utils.FileURL(bareDir), SSHKey: testSSHKeyPEM,
 	})
 	if err != nil {
 		t.Fatalf("Init: %v", err)
@@ -124,7 +126,7 @@ func TestForcePush_UnbornLocal_RemoteExists_Refused(t *testing.T) {
 	repo, err := Init(Config{
 		RootDir: rootDir, AssetsDir: assetsDir,
 		AuthorName: "T", AuthorEmail: "t@t.com", Branch: "main",
-		RemoteURL: "file://" + bareDir, SSHKey: testSSHKeyPEM,
+		RemoteURL: test_utils.FileURL(bareDir), SSHKey: testSSHKeyPEM,
 	})
 	if err != nil {
 		t.Fatalf("Init: %v", err)
