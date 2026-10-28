@@ -142,14 +142,10 @@ func TestAPIDocs_Metadata_DescribesExperimentalAPI(t *testing.T) {
 	}
 }
 
-func TestAPIDocs_Health_IsTheOnlyDocumentedOperation(t *testing.T) {
+func TestAPIDocs_Health_DocumentsPublicProbe(t *testing.T) {
 	doc := readAPIDocument(t, "swagger.json")
 
-	paths := docObject(t, doc, "paths")
-	if len(paths) != 1 {
-		t.Fatalf("documented paths = %v, want only /health", reflect.ValueOf(paths).MapKeys())
-	}
-	item := docObject(t, paths, "/health")
+	item := docObject(t, doc, "paths", "/health")
 	if len(item) != 1 {
 		t.Fatalf("/health operations = %v, want only get", reflect.ValueOf(item).MapKeys())
 	}
@@ -213,7 +209,8 @@ func TestAPIDocs_Health_IsTheOnlyDocumentedOperation(t *testing.T) {
 
 // assertProperties requires the model to have exactly the wanted properties
 // (name -> type): an extra field is a wire-format change that the annotation
-// must not hide.
+// must not hide. An empty wanted type accepts any type, for properties that
+// reference another model.
 func assertProperties(t *testing.T, model map[string]any, want map[string]string) {
 	t.Helper()
 	props := docObject(t, model, "properties")
@@ -224,9 +221,174 @@ func assertProperties(t *testing.T, model map[string]any, want map[string]string
 	}
 	for name, wantType := range want {
 		prop := docObject(t, props, name)
-		if got := docString(prop, "type"); got != wantType {
+		if got := docString(prop, "type"); wantType != "" && got != wantType {
 			t.Errorf("property %q type = %q, want %q", name, got, wantType)
 		}
+	}
+}
+
+// queryParam is the documented type and requiredness of a query parameter.
+type queryParam struct {
+	typ      string
+	required bool
+}
+
+// opSpec is what one documented operation must say. Every expectation is
+// explicit, so route kinds with other guards or bodies build their own spec;
+// apiReadGroupGET fills in the read-group defaults.
+type opSpec struct {
+	method, path string
+	// onlyOperation requires method to be the only operation on path.
+	onlyOperation bool
+	tag           string
+	// bearer requires @Security BearerAuth (the route accepts API keys).
+	bearer bool
+	// descriptionMentions are lower-case phrases the description must contain.
+	descriptionMentions []string
+	// query lists every parameter; all must be in the query string.
+	query map[string]queryParam
+	// arrayOf is the model suffix of the 200 array items, with its properties.
+	arrayOf      string
+	arrayOfProps map[string]string
+	// refs maps a status to the model suffix its schema references.
+	refs map[string]string
+	// broad maps a status with several real shapes to the model names its
+	// description must name; its schema must be a plain object.
+	broad map[string][]string
+	// absent lists statuses that must not be documented.
+	absent []string
+}
+
+// apiReadGroupGET is the spec of a GET behind RouterContext.APIReadGroup:
+// API keys and cookies accepted, anonymous reads with public access on,
+// localized 400s from the handler, flat 401/429/503 from the auth and API-key
+// middleware, a 500 that is localized from the handler or flat from the
+// middleware, and no 403 (CSRF does nothing on GET and there is no role guard).
+func apiReadGroupGET(path, tag string) opSpec {
+	return opSpec{
+		method:              "get",
+		path:                path,
+		onlyOperation:       true,
+		tag:                 tag,
+		bearer:              true,
+		descriptionMentions: []string{"public access", "cookie"},
+		refs:                map[string]string{"400": "ErrorResponse", "401": "LegacyError", "429": "LegacyError", "503": "LegacyError"},
+		broad:               map[string][]string{"500": {"ErrorResponse", "LegacyError"}},
+		absent:              []string{"403"},
+	}
+}
+
+// assertOperation checks one documented operation against its spec.
+func assertOperation(t *testing.T, doc map[string]any, spec opSpec) {
+	t.Helper()
+	item := docObject(t, doc, "paths", spec.path)
+	if spec.onlyOperation && len(item) != 1 {
+		t.Errorf("%s operations = %v, want only %s", spec.path, reflect.ValueOf(item).MapKeys(), spec.method)
+	}
+	op := docObject(t, item, spec.method)
+
+	if tags, _ := op["tags"].([]any); len(tags) != 1 || tags[0] != spec.tag {
+		t.Errorf("tags = %v, want [%s]", op["tags"], spec.tag)
+	}
+	security, hasSecurity := op["security"].([]any)
+	switch {
+	case spec.bearer && (len(security) != 1 || docObject(t, security[0].(map[string]any))["BearerAuth"] == nil):
+		t.Errorf("security = %v, want BearerAuth", op["security"])
+	case !spec.bearer && hasSecurity:
+		t.Errorf("security = %v, want none", op["security"])
+	}
+	desc := strings.ToLower(docString(op, "description"))
+	for _, want := range spec.descriptionMentions {
+		if !strings.Contains(desc, want) {
+			t.Errorf("description should mention %q: %q", want, desc)
+		}
+	}
+
+	got := map[string]queryParam{}
+	params, _ := op["parameters"].([]any)
+	for _, raw := range params {
+		p := raw.(map[string]any)
+		if docString(p, "in") != "query" {
+			t.Errorf("parameter %v is not a query parameter", p)
+		}
+		required, _ := p["required"].(bool)
+		got[docString(p, "name")] = queryParam{docString(p, "type"), required}
+	}
+	if !reflect.DeepEqual(got, spec.query) {
+		t.Errorf("query parameters = %v, want %v", got, spec.query)
+	}
+
+	responses := docObject(t, op, "responses")
+	ok := docObject(t, responses, "200", "schema")
+	if docString(ok, "type") != "array" {
+		t.Fatalf("200 schema = %v, want an array", ok)
+	}
+	name, model := resolveDefinition(t, doc, docObject(t, ok, "items"))
+	if !strings.HasSuffix(name, spec.arrayOf) {
+		t.Errorf("200 items reference %q, want %s", name, spec.arrayOf)
+	}
+	assertProperties(t, model, spec.arrayOfProps)
+
+	for status, want := range spec.refs {
+		if name, _ := resolveDefinition(t, doc, docObject(t, responses, status, "schema")); !strings.HasSuffix(name, want) {
+			t.Errorf("%s references %q, want %s", status, name, want)
+		}
+	}
+	for status, names := range spec.broad {
+		resp := docObject(t, responses, status)
+		if schema := docObject(t, resp, "schema"); docString(schema, "type") != "object" || schema["$ref"] != nil {
+			t.Errorf("%s schema = %v, want a broad object", status, schema)
+		}
+		for _, want := range names {
+			if !strings.Contains(docString(resp, "description"), want) {
+				t.Errorf("%s description should name %s: %q", status, want, docString(resp, "description"))
+			}
+		}
+	}
+	for _, status := range spec.absent {
+		if _, ok := responses[status]; ok {
+			t.Errorf("%s must not be documented", status)
+		}
+	}
+}
+
+func TestAPIDocs_Tags_DescribeReadOperations(t *testing.T) {
+	list := apiReadGroupGET("/tags", "tags")
+	list.query = map[string]queryParam{"q": {"string", false}, "limit": {"integer", false}, "selected": {"array", false}}
+	list.arrayOf = "TagCount"
+	list.arrayOfProps = map[string]string{"tag": "string", "count": "integer"}
+
+	pages := apiReadGroupGET("/tags/pages", "tags")
+	pages.query = map[string]queryParam{"tags": {"array", true}}
+	pages.arrayOf = "TaggedPage"
+	pages.arrayOfProps = map[string]string{
+		"id": "string", "title": "string", "path": "string", "excerpt": "string", "tags": "array",
+		"createdAt": "string", "updatedAt": "string", "creatorId": "string", "lastAuthorId": "string", "lastAuthor": "",
+	}
+
+	doc := readAPIDocument(t, "swagger.json")
+	for _, spec := range []opSpec{list, pages} {
+		t.Run(spec.path, func(t *testing.T) { assertOperation(t, doc, spec) })
+	}
+}
+
+func TestAPIDocs_Properties_DescribeReadOperations(t *testing.T) {
+	list := apiReadGroupGET("/properties", "properties")
+	list.query = map[string]queryParam{"q": {"string", false}, "limit": {"integer", false}}
+	list.arrayOf = "PropertyKeyCount"
+	list.arrayOfProps = map[string]string{"key": "string", "count": "integer"}
+
+	pages := apiReadGroupGET("/properties/pages", "properties")
+	pages.query = map[string]queryParam{"key": {"string", true}, "value": {"string", true}}
+	pages.arrayOf = "PropertyPage"
+	pages.arrayOfProps = map[string]string{
+		"id": "string", "title": "string", "path": "string", "properties": "object",
+		"createdAt": "string", "updatedAt": "string", "creatorId": "string", "lastAuthorId": "string", "lastAuthor": "",
+	}
+
+	doc := readAPIDocument(t, "swagger.json")
+	for _, spec := range []opSpec{list, pages} {
+		t.Run(spec.path, func(t *testing.T) { assertOperation(t, doc, spec) })
 	}
 }
 

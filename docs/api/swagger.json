@@ -49,14 +49,470 @@
                     }
                 }
             }
+        },
+        "/properties": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists the frontmatter property keys with the number of pages carrying each, ordered by count (descending), then by key. Nested properties use dot-joined keys such as `a.b`.\nAccess: a signed-in user (session cookie, API key or reverse-proxy identity); anonymous callers only when public access is on. With public access on, a missing or invalid session cookie is treated as anonymous instead of 401.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "properties"
+                ],
+                "summary": "List property keys",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Prefix filter on the key; trimmed and lowercased before matching",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Maximum number of keys; values below 1 mean 50, values above 200 mean 200",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Keys with page counts; empty array when nothing matches",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.PropertyKeyCount"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "limit is not an integer (code properties_invalid_limit)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "No valid session while public access is off, an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    },
+                    "429": {
+                        "description": "API-key attempts throttled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    },
+                    "500": {
+                        "description": "Index lookup failed: the body is an ErrorResponse (code properties_internal_error). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object.",
+                        "schema": {
+                            "type": "object"
+                        }
+                    },
+                    "503": {
+                        "description": "API-key store unavailable during a live restore (when API-key management is enabled)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    }
+                }
+            }
+        },
+        "/properties/pages": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists the pages whose property `key` has exactly the value `value`. Key and value are matched as given (not trimmed or lowercased); each must contain a non-space character.\nAccess: a signed-in user (session cookie, API key or reverse-proxy identity); anonymous callers only when public access is on. With public access on, a missing or invalid session cookie is treated as anonymous instead of 401.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "properties"
+                ],
+                "summary": "List pages by property",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Property key, for example `status` or a dot-joined nested key",
+                        "name": "key",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Exact property value",
+                        "name": "value",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Matching pages with all their properties; empty array when none match",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.PropertyPage"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "key or value is missing or blank (code properties_missing_key or properties_missing_value)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "No valid session while public access is off, an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    },
+                    "429": {
+                        "description": "API-key attempts throttled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    },
+                    "500": {
+                        "description": "Index lookup failed: the body is an ErrorResponse (code properties_internal_error). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object.",
+                        "schema": {
+                            "type": "object"
+                        }
+                    },
+                    "503": {
+                        "description": "API-key store unavailable during a live restore (when API-key management is enabled)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    }
+                }
+            }
+        },
+        "/tags": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists tags with the number of pages carrying each, ordered by count (descending), then by tag. With `selected`, only pages carrying every selected tag are counted and the selected tags themselves are left out, so the result is the tags that can narrow the selection further.\nAccess: a signed-in user (session cookie, API key or reverse-proxy identity); anonymous callers only when public access is on. With public access on, a missing or invalid session cookie is treated as anonymous instead of 401.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tags"
+                ],
+                "summary": "List tags",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Prefix filter on the tag name; trimmed and lowercased before matching",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Maximum number of tags; values below 1 mean 50, values above 200 mean 200",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Already selected tags; repeat the parameter or separate tags with commas",
+                        "name": "selected",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tags with page counts; empty array when nothing matches",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.TagCount"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "limit is not an integer (code tags_invalid_limit)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "No valid session while public access is off, an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    },
+                    "429": {
+                        "description": "API-key attempts throttled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    },
+                    "500": {
+                        "description": "Index lookup failed: the body is an ErrorResponse (code tags_internal_error). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object.",
+                        "schema": {
+                            "type": "object"
+                        }
+                    },
+                    "503": {
+                        "description": "API-key store unavailable during a live restore (when API-key management is enabled)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    }
+                }
+            }
+        },
+        "/tags/pages": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists the pages that carry every given tag. Tags are trimmed and lowercased before matching.\nAccess: a signed-in user (session cookie, API key or reverse-proxy identity); anonymous callers only when public access is on. With public access on, a missing or invalid session cookie is treated as anonymous instead of 401.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tags"
+                ],
+                "summary": "List pages by tags",
+                "parameters": [
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Tags a page must all carry; repeat the parameter or separate tags with commas",
+                        "name": "tags",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Matching pages; empty array when none match",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.TaggedPage"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "No non-empty tag given (code tags_missing_param)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "No valid session while public access is off, an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    },
+                    "429": {
+                        "description": "API-key attempts throttled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    },
+                    "500": {
+                        "description": "Index lookup failed: the body is an ErrorResponse (code tags_internal_error). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object.",
+                        "schema": {
+                            "type": "object"
+                        }
+                    },
+                    "503": {
+                        "description": "API-key store unavailable during a live restore (when API-key management is enabled)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
+        "auth.UserLabel": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.ErrorDetail": {
+            "type": "object",
+            "properties": {
+                "args": {
+                    "description": "Args are the values substituted into Template; omitted when empty.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "code": {
+                    "description": "Code is the stable machine-readable error code, e.g. \"page_not_found\".",
+                    "type": "string"
+                },
+                "message": {
+                    "description": "Message is the English human-readable message.",
+                    "type": "string"
+                },
+                "template": {
+                    "description": "Template is the localization key the client translates; it doubles as\nthe fallback message when no translation exists.",
+                    "type": "string"
+                }
+            }
+        },
+        "dto.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "description": "Error carries the localizable error details.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/dto.ErrorDetail"
+                        }
+                    ]
+                }
+            }
+        },
         "dto.LegacyError": {
             "type": "object",
             "properties": {
                 "error": {
                     "description": "Error is the human-readable error message.",
+                    "type": "string"
+                }
+            }
+        },
+        "dto.PropertyEntry": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "description": "currently always \"text\"",
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.PropertyKeyCount": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "key": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.PropertyPage": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "creatorId": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "lastAuthor": {
+                    "$ref": "#/definitions/auth.UserLabel"
+                },
+                "lastAuthorId": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "properties": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/dto.PropertyEntry"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.TagCount": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "tag": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.TaggedPage": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "creatorId": {
+                    "type": "string"
+                },
+                "excerpt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "lastAuthor": {
+                    "$ref": "#/definitions/auth.UserLabel"
+                },
+                "lastAuthorId": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updatedAt": {
                     "type": "string"
                 }
             }
