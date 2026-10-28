@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/go-git/go-git/v5/plumbing/object"
+
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 // TestNormalizeBackupPath_Prefixes_CleansOrRejects tests how a user-supplied
@@ -65,7 +67,7 @@ func newRepoWithRemotePath(t *testing.T, bareDir, prefix string) (*Repository, s
 		AuthorName:  "Test Author",
 		AuthorEmail: "test@example.com",
 		Branch:      "main",
-		RemoteURL:   "file://" + bareDir,
+		RemoteURL:   test_utils.FileURL(bareDir),
 		SSHKey:      testSSHKeyPEM,
 	}
 	repo, err := Init(cfg)
@@ -323,7 +325,7 @@ func TestRunBackup_PathCollidesWithExistingFile(t *testing.T) {
 				AuthorName:  "Test Author",
 				AuthorEmail: "test@example.com",
 				Branch:      "main",
-				RemoteURL:   "file://" + bareDir,
+				RemoteURL:   test_utils.FileURL(bareDir),
 				SSHKey:      testSSHKeyPEM,
 			})
 			if err != nil {

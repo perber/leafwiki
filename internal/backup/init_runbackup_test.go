@@ -13,6 +13,8 @@ import (
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
+
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 // --- Init edge cases ---
@@ -134,7 +136,7 @@ func TestInit_ReconcileRemote_UpdatesURL(t *testing.T) {
 
 	// Re-init pointing at a different remote — reconcileRemote should update origin.
 	cfg := repo.cfg
-	cfg.RemoteURL = "file://" + bareDir2
+	cfg.RemoteURL = test_utils.FileURL(bareDir2)
 	if _, err := Init(cfg); err != nil {
 		t.Fatalf("second Init failed: %v", err)
 	}
@@ -144,8 +146,8 @@ func TestInit_ReconcileRemote_UpdatesURL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("remote 'origin' not found: %v", err)
 	}
-	if urls := remote.Config().URLs; len(urls) == 0 || urls[0] != "file://"+bareDir2 {
-		t.Errorf("expected remote URL %q, got %v", "file://"+bareDir2, urls)
+	if urls := remote.Config().URLs; len(urls) == 0 || urls[0] != test_utils.FileURL(bareDir2) {
+		t.Errorf("expected remote URL %q, got %v", test_utils.FileURL(bareDir2), urls)
 	}
 }
 

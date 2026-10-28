@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 // TestScenario_FreshInstanceSyncsInsteadOfWiping_WithPath is the prefix
@@ -36,7 +38,7 @@ func TestScenario_FreshInstanceSyncsInsteadOfWiping_WithPath(t *testing.T) {
 		AuthorName:  "Test Author",
 		AuthorEmail: "test@example.com",
 		Branch:      "main",
-		RemoteURL:   "file://" + bareDir,
+		RemoteURL:   test_utils.FileURL(bareDir),
 		SSHKey:      testSSHKeyPEM,
 	})
 	if err != nil {
@@ -96,7 +98,7 @@ func TestScenario_FreshInstanceSyncsInsteadOfWiping(t *testing.T) {
 		AuthorName:  "Test Author",
 		AuthorEmail: "test@example.com",
 		Branch:      "main",
-		RemoteURL:   "file://" + bareDir,
+		RemoteURL:   test_utils.FileURL(bareDir),
 		SSHKey:      testSSHKeyPEM,
 	})
 	if err != nil {
@@ -157,7 +159,7 @@ func TestScenario_FailedFirstContactSyncRetriesOnRestart(t *testing.T) {
 		AuthorName:  "Test Author",
 		AuthorEmail: "test@example.com",
 		Branch:      "main",
-		RemoteURL:   "file://" + bareDir,
+		RemoteURL:   test_utils.FileURL(bareDir),
 		SSHKey:      testSSHKeyPEM,
 	}
 	if _, err := Init(cfg); err == nil || !strings.Contains(err.Error(), "failed to sync content from remote") {

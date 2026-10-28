@@ -23,6 +23,8 @@ import (
 	backupSvc "github.com/perber/wiki/internal/backup"
 	sharedcrypto "github.com/perber/wiki/internal/core/shared/crypto"
 	gossh "golang.org/x/crypto/ssh"
+
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 func newTestGinContext() (*gin.Context, *httptest.ResponseRecorder) {
@@ -153,7 +155,7 @@ func newFileConflictRoutes(t *testing.T) *Routes {
 		AuthorName:  "Test",
 		AuthorEmail: "t@t.com",
 		Branch:      "main",
-		RemoteURL:   "file://" + bareDir,
+		RemoteURL:   test_utils.FileURL(bareDir),
 		SSHKey:      testSSHKeyPEM(t),
 	})
 	if err != nil {
@@ -165,7 +167,7 @@ func newFileConflictRoutes(t *testing.T) *Routes {
 
 	cloneDir := t.TempDir()
 	cloned, err := gogit.PlainClone(cloneDir, false, &gogit.CloneOptions{
-		URL:           "file://" + bareDir,
+		URL:           test_utils.FileURL(bareDir),
 		ReferenceName: plumbing.NewBranchReferenceName("main"),
 	})
 	if err != nil {
@@ -496,7 +498,7 @@ func TestHandleGetBackupConfig_ReturnsPath(t *testing.T) {
 	// Reconfigure skips the URL-scheme validation (see
 	// TestHandleGetBackupConfig_RedactsSecrets), so a local file:// remote works.
 	if err := routes.mgr.Reconfigure(backupSvc.Config{
-		RemoteURL: "file://" + bareDir,
+		RemoteURL: test_utils.FileURL(bareDir),
 		Path:      "docs/wiki",
 		Branch:    "main",
 		SSHKey:    testEd25519PEM(t),
@@ -543,7 +545,7 @@ func TestHandleGetBackupConfig_RedactsSecrets(t *testing.T) {
 		t.Fatalf("PlainInit: %v", err)
 	}
 	if err := routes.mgr.Reconfigure(backupSvc.Config{
-		RemoteURL: "file://" + bareDir,
+		RemoteURL: test_utils.FileURL(bareDir),
 		Branch:    "main",
 		SSHKey:    testEd25519PEM(t),
 		Interval:  30 * time.Minute,
