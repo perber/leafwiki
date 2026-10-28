@@ -310,5 +310,7 @@ func (w *Wiki) FrontendConfig() httpinternal.FrontendConfig {
 			}
 			return cfg.FaviconFile
 		},
+		FindPageByRoutePath: w.tree.FindPageByRoutePath,
+		GetTree:             w.tree.GetTree,
 	}
 }
