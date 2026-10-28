@@ -1621,6 +1621,61 @@ Body text.`;
     test.expect(styles.position).not.toBe('absolute');
   });
 
+  // Regression for #1743: inline code kept a fixed 0.75rem inside every
+  // heading, so it stayed 12px next to 36px heading text.
+  test('inline code scales with the heading level', async ({ page }) => {
+    const timestamp = Date.now();
+    const slug = `heading-inline-code-scale-${timestamp}`;
+    const title = `Heading Inline Code Scale ${timestamp}`;
+    const content = [
+      '# `h1 hello` world',
+      '',
+      '## `h2 hello` world',
+      '',
+      '### `h3 hello` world',
+      '',
+      'Body `inline code` text.',
+    ].join('\n');
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    const measureCode = async (selector: string) => {
+      const container = page
+        .locator(selector)
+        .filter({ has: page.locator('code.inline-code') })
+        .first();
+      await container.waitFor({ state: 'visible' });
+      return container.evaluate((element) => {
+        const code = element.querySelector('code.inline-code') as HTMLElement;
+        return {
+          container: parseFloat(window.getComputedStyle(element).fontSize),
+          code: parseFloat(window.getComputedStyle(code).fontSize),
+        };
+      });
+    };
+
+    const h1 = await measureCode('article h1');
+    const h2 = await measureCode('article h2');
+    const h3 = await measureCode('article h3');
+    const body = await measureCode('article p');
+
+    // The code follows the heading level instead of staying at the body size.
+    test.expect(h1.code).toBeGreaterThan(body.code);
+    test.expect(h1.code).toBeGreaterThan(h2.code);
+    test.expect(h2.code).toBeGreaterThan(h3.code);
+
+    // The same share of the surrounding text at every level, and never bigger.
+    const ratio = (sizes: { container: number; code: number }) => sizes.code / sizes.container;
+    test.expect(ratio(h1)).toBeCloseTo(ratio(h2), 1);
+    test.expect(ratio(h1)).toBeCloseTo(ratio(h3), 1);
+    test.expect(ratio(body)).toBeCloseTo(ratio(h1), 1);
+    test.expect(ratio(h1)).toBeGreaterThanOrEqual(0.7);
+    test.expect(ratio(h1)).toBeLessThan(1);
+  });
+
   test('headline hash navigation keeps target below sticky toc', async ({ page }) => {
     const timestamp = Date.now();
     const slug = `headline-anchor-sticky-${timestamp}`;
