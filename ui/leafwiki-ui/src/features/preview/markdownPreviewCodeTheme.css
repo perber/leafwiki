@@ -6,7 +6,10 @@
 .markdown-editor__preview .inline-code {
   border-radius: 0.25rem;
   padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
+  /* `em`, not `rem`: inline code must track the size of its surroundings, so
+     it grows with the heading it sits in (#1743) while keeping the same share
+     of the surrounding text as in body copy. */
+  font-size: 0.75em;
   font-weight: 500;
 }
 
