@@ -42,9 +42,20 @@ errors), which the documentation must show instead of hiding.
 - **Shared error models, no migration.** `internal/http/dto` gets `ErrorResponse`,
   `ErrorDetail` and `LegacyError`. Existing package helpers migrate in their own documentation
   PRs; incompatible variants are reported on #1661.
+- **Required means always present.** swag runs with `--requiredByDefault`, so a field without
+  `omitempty` is listed as `required` and a field with `omitempty` is optional. That is the
+  same rule `encoding/json` uses to decide whether a key is written, so the `required` lists
+  follow from the struct tags and cannot drift; `api_docs_test.go` checks each definition
+  against its Go type. Required means the key is present, not that the value is non-null
+  (Swagger 2.0 has no `nullable`), so mappers normalize nil slices and maps in required
+  fields to empty ones.
+- **No core types in documented responses.** Documented response types use `dto` types such
+  as `dto.UserLabel` instead of `internal/core` types, so core types stay out of the public
+  contract. `api_docs_test.go` rejects any definition whose Go type lives in
+  `internal/core`.
 - **Deferred.** Serving the specification or a viewer from the running server, swag v2/OpenAPI
-  3, an API stability promise (`info.version` is `0.x`), and documenting packages beyond
-  health.
+  3, an API stability promise (`info.version` is `0.x`), and documenting the packages beyond
+  health, tags and properties.
 
 Contributor rules are in [docs/api/README.md](../../api/README.md).
 
@@ -62,6 +73,9 @@ Contributor rules are in [docs/api/README.md](../../api/README.md).
 - **Serve the spec (gin-swagger, embedded file)**: adds a runtime surface, dependencies and an
   exposure/auth question for a documentation set that is mostly empty. Deferred until coverage
   is meaningful.
+- **Per-field `binding:"required"` or `validate:"required"` tags** for the required lists:
+  `binding` turns on gin validation, which changes request behaviour; `validate` on every
+  field works but is noisy and easy to forget. swag has no field-level comment for it.
 - **Prefix or per-package coverage exceptions**: would silently excuse new routes. Exact
   entries force a conscious reviewed decision.
 - **Normalize error responses first**: changes the wire format that the frontend and existing
@@ -77,5 +91,14 @@ Contributor rules are in [docs/api/README.md](../../api/README.md).
   behaviour; per-package shape tests close that gap.
 - Swagger 2.0 cannot describe some real behaviour exactly (alternatives of one status, cookie
   auth); descriptions carry that, and the approximations are not authorization.
+- Request and query structs document every field without `omitempty` as required. An
+  optional request field needs `omitempty` or `validate:"optional"`; never
+  `binding:"optional"`, which makes gin panic.
+- A field without `omitempty` that can be `null` is documented as required although clients
+  may see `null`: `dto.Node.Children` is `null` for leaf nodes and must be normalized (or
+  noted) when pages are documented.
+- Undocumented responses still expose core types, to be replaced when their packages are
+  documented: `dto.Node.Kind` and `pages.WikiLinkMatch.Kind` (`tree.NodeKind`), and
+  `links.GetBrokenLinksOutput.Links` (`[]corelinks.BrokenLink`).
 - Revisit when Swagger 2.0's limits block accurate documentation, when most routes are documented (serving the spec), or when
   the API gets a stability guarantee.

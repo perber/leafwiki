@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -18,12 +19,14 @@ import (
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	httpinternal "github.com/perber/wiki/internal/http"
+	"github.com/perber/wiki/internal/http/dto"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/tocdisplay"
 	"github.com/perber/wiki/internal/wiki"
 	wikibackup "github.com/perber/wiki/internal/wiki/backup"
+	"github.com/perber/wiki/internal/wiki/health"
 	wikiinstancesettings "github.com/perber/wiki/internal/wiki/instancesettings"
 	wikirestore "github.com/perber/wiki/internal/wiki/restore"
 	wikisnapshot "github.com/perber/wiki/internal/wiki/snapshot"
@@ -389,6 +392,136 @@ func TestAPIDocs_Properties_DescribeReadOperations(t *testing.T) {
 	doc := readAPIDocument(t, "swagger.json")
 	for _, spec := range []opSpec{list, pages} {
 		t.Run(spec.path, func(t *testing.T) { assertOperation(t, doc, spec) })
+	}
+}
+
+// documentedModels maps every definition in the spec to the Go type swag
+// generated it from. A new documented model must be added here, so its
+// required list is checked against the code.
+var documentedModels = map[string]reflect.Type{
+	"dto.ErrorDetail":       reflect.TypeFor[dto.ErrorDetail](),
+	"dto.ErrorResponse":     reflect.TypeFor[dto.ErrorResponse](),
+	"dto.LegacyError":       reflect.TypeFor[dto.LegacyError](),
+	"dto.PropertyEntry":     reflect.TypeFor[dto.PropertyEntry](),
+	"dto.PropertyKeyCount":  reflect.TypeFor[dto.PropertyKeyCount](),
+	"dto.PropertyPage":      reflect.TypeFor[dto.PropertyPage](),
+	"dto.TagCount":          reflect.TypeFor[dto.TagCount](),
+	"dto.TaggedPage":        reflect.TypeFor[dto.TaggedPage](),
+	"dto.UserLabel":         reflect.TypeFor[dto.UserLabel](),
+	"health.HealthResponse": reflect.TypeFor[health.HealthResponse](),
+}
+
+// alwaysPresentJSONFields lists the JSON keys of a struct's fields without
+// omitempty, selecting fields the way encoding/json does: "-" and unexported
+// fields are skipped, untagged embedded structs are flattened. (encoding/json
+// also drops a nil embedded pointer at runtime; no documented model has one.)
+func alwaysPresentJSONFields(typ reflect.Type) []string {
+	var keys []string
+	for i := range typ.NumField() {
+		f := typ.Field(i)
+		tag := f.Tag.Get("json")
+		if tag == "-" {
+			continue
+		}
+		name, opts, _ := strings.Cut(tag, ",")
+		ft := f.Type
+		if ft.Kind() == reflect.Pointer {
+			ft = ft.Elem()
+		}
+		if !f.IsExported() && (!f.Anonymous || ft.Kind() != reflect.Struct) {
+			continue
+		}
+		if f.Anonymous && name == "" && ft.Kind() == reflect.Struct {
+			keys = append(keys, alwaysPresentJSONFields(ft)...)
+			continue
+		}
+		if name == "" {
+			name = f.Name
+		}
+		if !slices.Contains(strings.Split(opts, ","), "omitempty") {
+			keys = append(keys, name)
+		}
+	}
+	return keys
+}
+
+// The current models have no embedded or skipped fields, so the helper's
+// handling of them is pinned on a sample type.
+func TestAPIDocs_AlwaysPresentJSONFields_FollowsEncodingJSON(t *testing.T) {
+	type inner struct {
+		A string `json:"a"`
+		B string `json:"b,omitempty"`
+	}
+	type named struct {
+		C string `json:"c"`
+	}
+	type sample struct {
+		*inner
+		named    `json:"named"`
+		Plain    string
+		Skipped  string `json:"-"`
+		Optional string `json:"optional,omitempty"`
+		hidden   string
+	}
+	_ = sample{}.hidden
+
+	want := []string{"a", "named", "Plain"}
+	if got := alwaysPresentJSONFields(reflect.TypeFor[sample]()); !slices.Equal(got, want) {
+		t.Errorf("alwaysPresentJSONFields = %v, want %v", got, want)
+	}
+}
+
+// Required means "always present in the JSON": exactly the fields without
+// omitempty (swag --requiredByDefault). Required does not mean non-null;
+// Swagger 2.0 cannot say nullable.
+func TestAPIDocs_Definitions_RequireAlwaysPresentFields(t *testing.T) {
+	doc := readAPIDocument(t, "swagger.json")
+	definitions := docObject(t, doc, "definitions")
+
+	for name := range definitions {
+		if _, ok := documentedModels[name]; !ok {
+			t.Errorf("definition %q has no entry in documentedModels", name)
+		}
+	}
+	for name, typ := range documentedModels {
+		t.Run(name, func(t *testing.T) {
+			def, ok := definitions[name].(map[string]any)
+			if !ok {
+				t.Fatalf("documentedModels lists %q, but the spec has no such definition", name)
+			}
+			var got []string
+			raw, _ := def["required"].([]any)
+			for _, r := range raw {
+				got = append(got, r.(string))
+			}
+			want := alwaysPresentJSONFields(typ)
+			slices.Sort(got)
+			slices.Sort(want)
+			if !slices.Equal(got, want) {
+				t.Errorf("required = %v, want %v (the %s fields without omitempty)", got, want, typ)
+			}
+		})
+	}
+}
+
+// Core types are not part of the public contract: documented responses use
+// dto types such as dto.UserLabel. The check goes by the Go package path, not
+// the definition name, because slices share names with core packages (auth,
+// links); TestAPIDocs_Definitions_RequireAlwaysPresentFields makes sure every
+// definition is in documentedModels.
+func TestAPIDocs_Definitions_ExposeNoCoreTypes(t *testing.T) {
+	for name, typ := range documentedModels {
+		if strings.Contains(typ.PkgPath(), "/internal/core/") {
+			t.Errorf("definition %q is the core type %s.%s", name, typ.PkgPath(), typ.Name())
+		}
+	}
+
+	doc := readAPIDocument(t, "swagger.json")
+	for _, model := range []string{"dto.TaggedPage", "dto.PropertyPage"} {
+		lastAuthor := docObject(t, doc, "definitions", model, "properties", "lastAuthor")
+		if got := docString(lastAuthor, "$ref"); got != "#/definitions/dto.UserLabel" {
+			t.Errorf("%s.lastAuthor references %q, want #/definitions/dto.UserLabel", model, got)
+		}
 	}
 }
 

@@ -1,12 +1,5 @@
 basePath: /api
 definitions:
-  auth.UserLabel:
-    properties:
-      id:
-        type: string
-      username:
-        type: string
-    type: object
   dto.ErrorDetail:
     properties:
       args:
@@ -25,6 +18,10 @@ definitions:
           Template is the localization key the client translates; it doubles as
           the fallback message when no translation exists.
         type: string
+    required:
+    - code
+    - message
+    - template
     type: object
   dto.ErrorResponse:
     properties:
@@ -32,12 +29,16 @@ definitions:
         allOf:
         - $ref: '#/definitions/dto.ErrorDetail'
         description: Error carries the localizable error details.
+    required:
+    - error
     type: object
   dto.LegacyError:
     properties:
       error:
         description: Error is the human-readable error message.
         type: string
+    required:
+    - error
     type: object
   dto.PropertyEntry:
     properties:
@@ -46,6 +47,9 @@ definitions:
         type: string
       value:
         type: string
+    required:
+    - type
+    - value
     type: object
   dto.PropertyKeyCount:
     properties:
@@ -53,6 +57,9 @@ definitions:
         type: integer
       key:
         type: string
+    required:
+    - count
+    - key
     type: object
   dto.PropertyPage:
     properties:
@@ -63,7 +70,7 @@ definitions:
       id:
         type: string
       lastAuthor:
-        $ref: '#/definitions/auth.UserLabel'
+        $ref: '#/definitions/dto.UserLabel'
       lastAuthorId:
         type: string
       path:
@@ -76,6 +83,11 @@ definitions:
         type: string
       updatedAt:
         type: string
+    required:
+    - id
+    - path
+    - properties
+    - title
     type: object
   dto.TagCount:
     properties:
@@ -83,6 +95,9 @@ definitions:
         type: integer
       tag:
         type: string
+    required:
+    - count
+    - tag
     type: object
   dto.TaggedPage:
     properties:
@@ -95,7 +110,7 @@ definitions:
       id:
         type: string
       lastAuthor:
-        $ref: '#/definitions/auth.UserLabel'
+        $ref: '#/definitions/dto.UserLabel'
       lastAuthorId:
         type: string
       path:
@@ -108,6 +123,21 @@ definitions:
         type: string
       updatedAt:
         type: string
+    required:
+    - id
+    - path
+    - tags
+    - title
+    type: object
+  dto.UserLabel:
+    properties:
+      id:
+        type: string
+      username:
+        type: string
+    required:
+    - id
+    - username
     type: object
   health.HealthResponse:
     properties:
@@ -121,6 +151,9 @@ definitions:
       status:
         description: Status is "ok" when every check passes, otherwise "degraded".
         type: string
+    required:
+    - checks
+    - status
     type: object
 info:
   contact: {}

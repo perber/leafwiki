@@ -21,7 +21,7 @@ make api-docs
 or, without Make (Windows, for example), the same command directly:
 
 ```text
-go run github.com/swaggo/swag/cmd/swag@v1.16.6 init --generalInfo api_docs.go --dir ./cmd/leafwiki,./internal --parseInternal --output ./docs/api --outputTypes json,yaml
+go run github.com/swaggo/swag/cmd/swag@v1.16.6 init --generalInfo api_docs.go --dir ./cmd/leafwiki,./internal --parseInternal --requiredByDefault --output ./docs/api --outputTypes json,yaml
 ```
 
 The generator is pinned to swag v1.16.6 (Swagger 2.0; swag v2 would produce OpenAPI 3.x) and
@@ -46,6 +46,18 @@ above their handlers, for example `handleHealth` in
   to the slice (see `internal/wiki/health/api_types.go`). Reuse shared types from
   `internal/http/dto` where they exist. Do not use `gin.H` or anonymous structs for documented
   bodies. Replacing `gin.H` with a named type must not change the wire format; add a test.
+- **Required fields**: the generator runs with `--requiredByDefault`, so a field without
+  `omitempty` is always written and listed as `required`; a field with `omitempty` is
+  optional. Required means the key is present, not that the value is non-null (Swagger 2.0
+  has no `nullable`): normalize nil slices and maps in required fields to empty ones. For
+  optional request or query fields use `omitempty` or `validate:"optional"`, never
+  `binding:"optional"` (gin panics on it). `api_docs_test.go` checks every definition's
+  `required` list against its Go type; add a new model to `documentedModels` there.
+- **No core types**: documented response types use `dto` types such as `dto.UserLabel`, not
+  `internal/core` types; the test rejects any definition whose Go type is in
+  `internal/core`. Some undocumented responses still carry core types (`tree.NodeKind` in
+  `dto.Node` and `pages.WikiLinkMatch`, `corelinks.BrokenLink` in the broken-links output);
+  replace them when documenting those packages.
 - **Errors**: see below. Document a failure status only if a middleware or handler on that
   route can actually emit it.
 - Keep summaries short and say what is true for the route today, including configuration-
