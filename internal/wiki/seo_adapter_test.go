@@ -1,8 +1,10 @@
 package wiki
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,11 +13,25 @@ import (
 	"github.com/perber/wiki/internal/core/tree"
 	httpinternal "github.com/perber/wiki/internal/http"
 	"github.com/perber/wiki/internal/publicaccess"
+	wikipages "github.com/perber/wiki/internal/wiki/pages"
 )
 
 // newSEOTestRouter builds a real wiki (with its welcome page) and the router
 // on top of it; public access is settings-managed so tests can toggle it.
 func newSEOTestRouter(t *testing.T, basePath string) (*Wiki, *publicaccess.Service, *gin.Engine) {
+	t.Helper()
+	w, public := newSEOTestWiki(t, "")
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+		BasePath:          basePath,
+		PublicAccess:      public,
+		DisableRequestLog: true,
+	})
+	return w, public, router
+}
+
+// newSEOTestWiki builds a real wiki (with its welcome page) with public access
+// off and settings-managed, so tests can toggle it.
+func newSEOTestWiki(t *testing.T, publicURL string) (*Wiki, *publicaccess.Service) {
 	t.Helper()
 	dir := t.TempDir()
 	public, err := publicaccess.NewSettingsManaged(dir)
@@ -29,17 +45,13 @@ func newSEOTestRouter(t *testing.T, basePath string) (*Wiki, *publicaccess.Servi
 		AccessTokenTimeout:  15 * time.Minute,
 		RefreshTokenTimeout: 7 * 24 * time.Hour,
 		PublicAccess:        public,
+		PublicURL:           publicURL,
 	})
 	if err != nil {
 		t.Fatalf("NewWiki: %v", err)
 	}
 	t.Cleanup(func() { _ = w.Close() })
-	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
-		BasePath:          basePath,
-		PublicAccess:      public,
-		DisableRequestLog: true,
-	})
-	return w, public, router
+	return w, public
 }
 
 func setPublicAccess(t *testing.T, public *publicaccess.Service, enabled bool) {
@@ -170,5 +182,165 @@ func TestWiki_RootRedirect_NoRedirect(t *testing.T) {
 
 			assertNoRedirect(t, serveGET(router, tc.path, nil))
 		})
+	}
+}
+
+// contributeShell runs the wiki's registered shell contributors the way the
+// router does for a GET of basePath+routePath and merges their parts.
+func contributeShell(t *testing.T, w *Wiki, basePath, routePath string, headers map[string]string) httpinternal.ShellParts {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, basePath+routePath, nil)
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	var merged httpinternal.ShellParts
+	for _, c := range w.FrontendConfig().ShellContributors {
+		parts := c.ContributeShell(req.Context(), httpinternal.ShellRequest{Request: req, RoutePath: routePath, BasePath: basePath})
+		if merged.Title == "" {
+			merged.Title = parts.Title
+		}
+		merged.Head += parts.Head
+		merged.Body += parts.Body
+		merged.NoCache = merged.NoCache || parts.NoCache
+	}
+	return merged
+}
+
+func createDescribedPage(t *testing.T, w *Wiki, title, slug, body, description string) {
+	t.Helper()
+	page := createPageForTest(t, w, SYSTEM_USER_ID, nil, title, slug, pageNodeKind())
+	_, err := wikipages.NewUpdatePageUseCase(w.tree, w.slug, w.newPageOrchestrator(), w.log, nil).Execute(
+		context.Background(),
+		wikipages.UpdatePageInput{
+			UserID: SYSTEM_USER_ID, ID: page.ID, Version: page.Version(), Title: title, Slug: slug,
+			Content: &body, Kind: pageNodeKind(), Properties: map[string]string{"description": description},
+		},
+	)
+	if err != nil {
+		t.Fatalf("UpdatePage: %v", err)
+	}
+}
+
+func TestWiki_PageMeta_PublicWiki_AddsMetaTags(t *testing.T) {
+	tests := []struct {
+		name      string
+		publicURL string
+		basePath  string
+		siteName  string
+		headers   map[string]string
+		wantTitle string
+		wantHead  string
+	}{
+		{
+			name:      "without public url: no canonical link",
+			wantTitle: "Setup - LeafWiki",
+			wantHead: `<meta name="description" content="How to set it up.">` +
+				`<meta property="og:type" content="website">` +
+				`<meta property="og:title" content="Setup">` +
+				`<meta property="og:description" content="How to set it up.">` +
+				`<meta property="og:site_name" content="LeafWiki">`,
+		},
+		{
+			name:      "with public url, base path and branding site name",
+			publicURL: "https://wiki.example.com/wiki",
+			basePath:  "/wiki",
+			siteName:  "Team Wiki",
+			headers:   map[string]string{"X-Forwarded-Host": "evil.example", "X-Forwarded-Proto": "http"},
+			wantTitle: "Setup - Team Wiki",
+			wantHead: `<meta name="description" content="How to set it up.">` +
+				`<link rel="canonical" href="https://wiki.example.com/wiki/setup">` +
+				`<meta property="og:type" content="website">` +
+				`<meta property="og:title" content="Setup">` +
+				`<meta property="og:description" content="How to set it up.">` +
+				`<meta property="og:site_name" content="Team Wiki">` +
+				`<meta property="og:url" content="https://wiki.example.com/wiki/setup">`,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w, public := newSEOTestWiki(t, tc.publicURL)
+			setPublicAccess(t, public, true)
+			if tc.siteName != "" {
+				if err := w.branding.UpdateBranding(tc.siteName); err != nil {
+					t.Fatalf("UpdateBranding: %v", err)
+				}
+			}
+			createDescribedPage(t, w, "Setup", "setup", "# Setup\n\nInstall it.", "How to set it up.")
+
+			got := contributeShell(t, w, tc.basePath, "/setup", tc.headers)
+
+			if got.Title != tc.wantTitle {
+				t.Errorf("Title = %q, want %q", got.Title, tc.wantTitle)
+			}
+			if string(got.Head) != tc.wantHead {
+				t.Errorf("Head =\n%s\nwant\n%s", got.Head, tc.wantHead)
+			}
+			if !got.NoCache {
+				t.Error("NoCache = false, want true")
+			}
+		})
+	}
+}
+
+func TestWiki_PageMeta_ExcerptFallback_UsesPageBody(t *testing.T) {
+	w, public := newSEOTestWiki(t, "")
+	setPublicAccess(t, public, true)
+	body := "# Setup\n\nInstall it."
+	page := createPageForTest(t, w, SYSTEM_USER_ID, nil, "Setup", "setup", pageNodeKind())
+	updatePageForTest(t, w, SYSTEM_USER_ID, page.ID, "Setup", "setup", &body, pageNodeKind())
+
+	got := contributeShell(t, w, "", "/setup", nil)
+
+	if want := `<meta name="description" content="Setup Install it.">`; !strings.Contains(string(got.Head), want) {
+		t.Fatalf("Head = %s, want it to contain %s", got.Head, want)
+	}
+}
+
+func TestWiki_PageMeta_FollowsPublicAccessAtRuntime(t *testing.T) {
+	w, public := newSEOTestWiki(t, "https://wiki.example.com")
+
+	if got := contributeShell(t, w, "", "/welcome-to-leafwiki", nil); got != (httpinternal.ShellParts{}) {
+		t.Fatalf("public access off: parts = %+v, want none", got)
+	}
+
+	setPublicAccess(t, public, true)
+	if got := contributeShell(t, w, "", "/welcome-to-leafwiki", nil); got.Title != "Welcome to LeafWiki - LeafWiki" {
+		t.Fatalf("after enabling public access: Title = %q", got.Title)
+	}
+
+	setPublicAccess(t, public, false)
+	if got := contributeShell(t, w, "", "/welcome-to-leafwiki", nil); got != (httpinternal.ShellParts{}) {
+		t.Fatalf("after disabling public access: parts = %+v, want none", got)
+	}
+}
+
+func TestWiki_PageMeta_NotAPage_ContributesNothing(t *testing.T) {
+	tests := []struct {
+		name      string
+		routePath string
+	}{
+		{name: "root", routePath: "/"},
+		{name: "unknown page", routePath: "/missing"},
+		{name: "unknown child of a page", routePath: "/welcome-to-leafwiki/missing"},
+		{name: "trailing slash", routePath: "/welcome-to-leafwiki/"},
+		{name: "SPA route", routePath: "/settings/branding"},
+	}
+	w, public := newSEOTestWiki(t, "https://wiki.example.com")
+	setPublicAccess(t, public, true)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := contributeShell(t, w, "", tc.routePath, nil); got != (httpinternal.ShellParts{}) {
+				t.Fatalf("parts = %+v, want none", got)
+			}
+		})
+	}
+}
+
+func TestSEOPageReader_TreeNotLoaded_ReturnsNoPage(t *testing.T) {
+	reader := seoPageReader{uc: wikipages.NewGetPageViewByPathUseCase(tree.NewTreeService(t.TempDir()))}
+
+	page, err := reader.PageByRoutePath(context.Background(), "docs")
+	if page != nil || err != nil {
+		t.Fatalf("PageByRoutePath = %+v, %v; want nil, nil", page, err)
 	}
 }

@@ -295,14 +295,8 @@ func (w *Wiki) SetInstanceSettingsRoutes(r *wikiinstancesettings.Routes) {
 // FrontendConfig returns the minimal runtime data required by the router to serve the SPA.
 func (w *Wiki) FrontendConfig() httpinternal.FrontendConfig {
 	return httpinternal.FrontendConfig{
-		StorageDir: w.storageDir,
-		GetSiteName: func() string {
-			cfg, err := w.branding.GetBranding()
-			if err != nil || cfg == nil {
-				return ""
-			}
-			return cfg.SiteName
-		},
+		StorageDir:  w.storageDir,
+		GetSiteName: w.siteName,
 		GetFaviconFile: func() string {
 			cfg, err := w.branding.GetBranding()
 			if err != nil || cfg == nil {
@@ -313,6 +307,15 @@ func (w *Wiki) FrontendConfig() httpinternal.FrontendConfig {
 		// SPA shell seam (ADR-0017): features register here, in the order
 		// they should run. Requests reaching them are always anonymous.
 		ShellResponders:   w.seoShellResponders(),
-		ShellContributors: nil,
+		ShellContributors: w.seoShellContributors(),
 	}
+}
+
+// siteName returns the branding site name, "" when none is configured.
+func (w *Wiki) siteName() string {
+	cfg, err := w.branding.GetBranding()
+	if err != nil || cfg == nil {
+		return ""
+	}
+	return cfg.SiteName
 }

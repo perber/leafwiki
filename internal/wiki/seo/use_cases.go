@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	errInvalidRoutePath   = errors.New("seo: first page has an invalid route path")
-	errUnsafeRootLocation = errors.New("seo: root redirect location would leave the wiki")
+	errInvalidRoutePath = errors.New("seo: page has an invalid route path")
+	errUnsafeWikiPath   = errors.New("seo: path would leave the wiki")
 )
 
 // FirstPage is the page a public wiki opens at its root.
@@ -61,17 +61,18 @@ func (uc *GetRootTargetUseCase) Execute(ctx context.Context, in GetRootTargetInp
 	if page == nil {
 		return &GetRootTargetOutput{}, nil
 	}
-	location, err := rootLocation(in.BasePath, page.RoutePath)
+	location, err := wikiPath(in.BasePath, page.RoutePath)
 	if err != nil {
 		return nil, err
 	}
 	return &GetRootTargetOutput{Location: location}, nil
 }
 
-// rootLocation escapes the base path and every route path segment. Escaping
-// turns CR, LF, "?", "#" and "\" into percent escapes; a location starting
-// with "//" (a protocol-relative URL to another host) is refused.
-func rootLocation(basePath, routePath string) (string, error) {
+// wikiPath returns the escaped, server-relative path of a page: the base path
+// and every route path segment escaped. Escaping turns CR, LF, "?", "#" and
+// "\" into percent escapes; a path starting with "//" (a protocol-relative
+// URL to another host) is refused.
+func wikiPath(basePath, routePath string) (string, error) {
 	var b strings.Builder
 	b.WriteString((&url.URL{Path: strings.TrimRight(basePath, "/")}).EscapedPath())
 	for _, segment := range strings.Split(routePath, "/") {
@@ -83,7 +84,7 @@ func rootLocation(basePath, routePath string) (string, error) {
 	}
 	location := b.String()
 	if !strings.HasPrefix(location, "/") || strings.HasPrefix(location, "//") {
-		return "", errUnsafeRootLocation
+		return "", errUnsafeWikiPath
 	}
 	return location, nil
 }

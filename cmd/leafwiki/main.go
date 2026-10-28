@@ -277,6 +277,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		},
 		Metrics:      metrics,
 		PublicAccess: publicAccessService,
+		PublicURL:    cfg.server.publicURL,
 	})
 	if err != nil {
 		if msg, ok := corruptDatabaseMessage(err); ok {

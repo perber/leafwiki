@@ -1,5 +1,6 @@
 import { useBrandingStore } from '@/stores/branding'
 import { useEffect } from 'react'
+import { documentTitle } from './documentTitle'
 
 export interface UseSetTitleOptions {
   title: string
@@ -10,8 +11,6 @@ export function useSetTitle({ title }: UseSetTitleOptions) {
   const siteNameFromStore = useBrandingStore((s) => s.siteName)
 
   useEffect(() => {
-    document.title = title
-      ? `${title} - ${siteNameFromStore}`
-      : siteNameFromStore
+    document.title = documentTitle(title, siteNameFromStore)
   }, [title, siteNameFromStore])
 }

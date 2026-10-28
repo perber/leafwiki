@@ -69,7 +69,7 @@ func (o *serverOptions) Flags() []cli.Flag {
 			Name:        "public-url",
 			Destination: &o.publicURL,
 			Category:    catServer,
-			Usage:       "public base URL of this wiki, e.g. https://wiki.example.com; used for links in outgoing email, required with --smtp-host",
+			Usage:       "public base URL of this wiki including --base-path, e.g. https://wiki.example.com/wiki; used for links in outgoing email (required with --smtp-host) and canonical links in public wikis",
 			Sources:     envVars("LEAFWIKI_PUBLIC_URL"),
 			Config:      trimmed,
 		},

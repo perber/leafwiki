@@ -39,6 +39,9 @@ import (
 //   - Status codes other than 200 for the shell (404/410) belong in ShellParts
 //     once needed, not in a responder that re-renders the shell.
 
+// DefaultSiteName is the shell's site name when branding has none configured.
+const DefaultSiteName = "LeafWiki"
+
 // ShellRequest describes the request the shell is rendered for.
 type ShellRequest struct {
 	Request *http.Request
@@ -199,7 +202,7 @@ func (h *shellHandler) render(req ShellRequest) (doc string, noCache bool) {
 		}
 	}
 
-	siteName := "LeafWiki"
+	siteName := DefaultSiteName
 	if h.getSiteName != nil {
 		if name := h.getSiteName(); name != "" {
 			siteName = name
