@@ -83,6 +83,102 @@ func TestWriteStreamAtomic_WritesToTargetFile(t *testing.T) {
 	}
 }
 
+func TestWriteFileAtomic_ReplacesExistingFile(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "page.md")
+	if err := os.WriteFile(target, []byte("old"), 0o644); err != nil {
+		t.Fatalf("WriteFile err: %v", err)
+	}
+
+	if err := WriteFileAtomic(target, []byte("new"), 0o644); err != nil {
+		t.Fatalf("WriteFileAtomic err: %v", err)
+	}
+
+	raw, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("ReadFile err: %v", err)
+	}
+	if string(raw) != "new" {
+		t.Fatalf("content = %q, want %q", string(raw), "new")
+	}
+}
+
+// The target is an empty directory, so the rename must fail. Removing the
+// target before renaming (as a Windows workaround once did) deleted the empty
+// directory first, which made the write succeed and replaced a directory with
+// a file (#1698).
+func TestWriteFileAtomic_TargetIsEmptyDirectory_FailsAndKeepsDirectory(t *testing.T) {
+	parent := t.TempDir()
+	target := filepath.Join(parent, "page.md")
+	if err := os.Mkdir(target, 0o755); err != nil {
+		t.Fatalf("Mkdir err: %v", err)
+	}
+
+	if err := WriteFileAtomic(target, []byte("x"), 0o644); err == nil {
+		t.Fatal("expected an error when the target is a directory")
+	}
+
+	assertDirectoryWithoutTempFiles(t, parent, target)
+}
+
+func TestWriteStreamAtomic_TargetIsEmptyDirectory_FailsAndKeepsDirectory(t *testing.T) {
+	parent := t.TempDir()
+	target := filepath.Join(parent, "asset.bin")
+	if err := os.Mkdir(target, 0o755); err != nil {
+		t.Fatalf("Mkdir err: %v", err)
+	}
+
+	if err := WriteStreamAtomic(target, strings.NewReader("x"), 1<<20, 0o644); err == nil {
+		t.Fatal("expected an error when the target is a directory")
+	}
+
+	assertDirectoryWithoutTempFiles(t, parent, target)
+}
+
+// Whether replacing a file that a reader holds open succeeds depends on the
+// OS, but the target must never end up missing: either the old or the new
+// content has to be readable afterwards.
+func TestWriteFileAtomic_TargetOpenForReading_NeverLeavesTargetMissing(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "asset.bin")
+	if err := os.WriteFile(target, []byte("old"), 0o644); err != nil {
+		t.Fatalf("WriteFile err: %v", err)
+	}
+	reader, err := os.Open(target)
+	if err != nil {
+		t.Fatalf("Open err: %v", err)
+	}
+	t.Cleanup(func() { _ = reader.Close() })
+
+	err = WriteFileAtomic(target, []byte("new"), 0o644)
+	t.Logf("replace while open: err=%v", err)
+
+	raw, readErr := os.ReadFile(target)
+	if readErr != nil {
+		t.Fatalf("target missing after replace while open: %v", readErr)
+	}
+	if got := string(raw); got != "old" && got != "new" {
+		t.Fatalf("content = %q, want %q or %q", got, "old", "new")
+	}
+}
+
+func assertDirectoryWithoutTempFiles(t *testing.T, parent, target string) {
+	t.Helper()
+
+	info, err := os.Stat(target)
+	if err != nil {
+		t.Fatalf("Stat err: %v", err)
+	}
+	if !info.IsDir() {
+		t.Fatalf("%s is no longer a directory", target)
+	}
+	leftovers, err := filepath.Glob(filepath.Join(parent, ".tmp-*"))
+	if err != nil {
+		t.Fatalf("Glob err: %v", err)
+	}
+	if len(leftovers) != 0 {
+		t.Fatalf("temp files left behind: %v", leftovers)
+	}
+}
+
 // Regression tests for the zip-bomb unbounded-decompression DoS (CWE-409)
 // fix's CopyWithBudget primitive: which cap trips must be attributed
 // correctly, and an attacker-controlled declared compressed size that
