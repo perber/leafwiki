@@ -56,11 +56,9 @@ jobs:
         run: make test
 
   # Windows is a release target; build-go-cross only compiles for it, which
-  # can't catch filesystem differences. Non-blocking until the suite is
-  # green on Windows (#1698).
+  # can't catch filesystem differences (#1698).
   test-go-windows:
     runs-on: windows-latest
-    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
