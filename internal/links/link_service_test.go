@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/perber/wiki/internal/core/tree"
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 func pageNodeKind() *tree.NodeKind {
@@ -245,6 +246,7 @@ func setupLinkService(t *testing.T) (*LinkService, *tree.TreeService, *LinksStor
 	if err != nil {
 		t.Fatalf("NewLinksStore failed: %v", err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
 
 	svc := NewLinkService(dataDir, ts, store)
 	return svc, ts, store
