@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -287,19 +288,24 @@ func TestCreateSnapshot_ContainsStateDBWhenPresent(t *testing.T) {
 
 // TestCreateSnapshot_StateDBStatErrorOtherThanNotExist_FailsSnapshot is the
 // regression test for a real bug found in review: an os.Stat error other
-// than "file doesn't exist" (e.g. permission denied, or here a path component
-// that isn't a directory) used to be silently treated the same as "the
-// database just doesn't exist on this data dir yet", producing a snapshot
-// that quietly omits its data instead of failing loudly.
+// than "file doesn't exist" (e.g. permission denied, or here a path with a NUL
+// byte, which every OS rejects as invalid instead of reporting it missing;
+// a file used as a directory reports not-exist on Windows) used to be
+// silently treated the same as "the database just doesn't exist on this data
+// dir yet", producing a snapshot that quietly omits its data instead of
+// failing loudly.
 func TestCreateSnapshot_StateDBStatErrorOtherThanNotExist_FailsSnapshot(t *testing.T) {
 	for _, tc := range stateDBCases {
 		t.Run(tc.file, func(t *testing.T) {
 			cfg := newTestConfig(t)
-			blocker := test_utils.WriteFile(t, t.TempDir(), "not-a-directory", "x")
-			cfg.StateDBPaths = []string{filepath.Join(blocker, tc.file)}
+			cfg.StateDBPaths = []string{filepath.Join(t.TempDir(), "bad\x00"+tc.file)}
 
-			if _, err := createSnapshot(context.Background(), cfg); err == nil {
+			_, err := createSnapshot(context.Background(), cfg)
+			if err == nil {
 				t.Fatalf("expected createSnapshot to fail on a %s stat error other than not-exist", tc.file)
+			}
+			if !strings.Contains(err.Error(), "failed to stat") {
+				t.Fatalf("expected the stat error to fail the snapshot, got: %v", err)
 			}
 		})
 	}
