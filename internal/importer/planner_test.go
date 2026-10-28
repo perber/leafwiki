@@ -359,19 +359,15 @@ func TestPlanner_CreatePlan_Error_ExistingZeroSegments_IsCollected(t *testing.T)
 
 // ---- Title extraction -------------------------------------------------------
 
+// malformedFrontmatterMarkdown makes markdown.LoadMarkdownFile fail while the
+// file itself stays readable.
+const malformedFrontmatterMarkdown = "---\ntitle: [unclosed\n---\n# Title"
+
 func TestPlanner_CreatePlan_TitleExtractionError_AddsNote(t *testing.T) {
 	tmp := t.TempDir()
-	abs := test_utils.WriteFile(t, tmp, "unreadable.md", "# Title")
-
-	// Make file unreadable to trigger extraction error
-	if err := os.Chmod(abs, 0o000); err != nil {
-		t.Fatalf("chmod: %v", err)
-	}
-	defer func() {
-		if err := os.Chmod(abs, 0o644); err != nil { // restore for cleanup
-			t.Fatalf("chmod restore: %v", err)
-		}
-	}()
+	// Malformed frontmatter makes the markdown load fail on every OS; chmod
+	// would only work on Unix and not as root (#1698).
+	test_utils.WriteFile(t, tmp, "unreadable.md", malformedFrontmatterMarkdown)
 
 	wiki := &fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}}
 	p := newPlannerWithFake(wiki)
@@ -484,17 +480,8 @@ func TestPlanner_CreatePlan_RootIndexMd_EmptyWikiPath_UsesFallbackTitle(t *testi
 	// When wikiPath is empty, path.Base("") returns ".", which is not meaningful.
 	// The fix should use filename without extension as fallback.
 	tmp := t.TempDir()
-	abs := test_utils.WriteFile(t, tmp, "index.md", "# Title")
-
-	// Make file unreadable to trigger markdown loading failure
-	if err := os.Chmod(abs, 0o000); err != nil {
-		t.Fatalf("chmod: %v", err)
-	}
-	defer func() {
-		if err := os.Chmod(abs, 0o644); err != nil { // restore for cleanup
-			t.Fatalf("chmod restore: %v", err)
-		}
-	}()
+	// Malformed frontmatter triggers the markdown loading failure on every OS.
+	test_utils.WriteFile(t, tmp, "index.md", malformedFrontmatterMarkdown)
 
 	wiki := &fakeWiki{treeHash: "h", lookups: map[string]*tree.PathLookup{}}
 	p := newPlannerWithFake(wiki)
