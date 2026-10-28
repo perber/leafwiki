@@ -5,45 +5,56 @@ import (
 	"testing"
 )
 
-func TestFromContent_PlainText(t *testing.T) {
-	raw := "---\ntitle: Hello\n---\n\nThis is the page body."
-	got := FromContent(raw)
-	if got != "This is the page body." {
-		t.Errorf("got %q", got)
+func TestFromContent_ReturnsBodyText(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{name: "frontmatter is skipped", raw: "---\ntitle: Hello\n---\n\nThis is the page body.", want: "This is the page body."},
+		{name: "content without frontmatter", raw: "Just plain content here.", want: "Just plain content here."},
+		{name: "empty body", raw: "---\ntitle: Hello\n---\n\n", want: ""},
+		{name: "empty content", raw: "", want: ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := FromContent(tc.raw); got != tc.want {
+				t.Errorf("FromContent(%q) = %q, want %q", tc.raw, got, tc.want)
+			}
+		})
 	}
 }
 
-func TestFromContent_NoFrontmatter(t *testing.T) {
-	raw := "Just plain content here."
-	got := FromContent(raw)
-	if got != "Just plain content here." {
-		t.Errorf("got %q", got)
+func TestFromContent_StripsMarkup(t *testing.T) {
+	tests := []struct {
+		name        string
+		body        string
+		contains    []string
+		notContains []string
+	}{
+		{name: "fenced code", body: "Before.\n\n```go\nfunc main() {}\n```\n\nAfter.", contains: []string{"Before.", "After."}, notContains: []string{"func main"}},
+		{name: "heading markers", body: "# Heading One\n\nSome body text.", contains: []string{"Heading One"}, notContains: []string{"#"}},
+		{name: "image syntax keeps alt text", body: "![alt text](image.png) Some text.", contains: []string{"alt text"}, notContains: []string{"![", "image.png"}},
+		{name: "link syntax keeps link text", body: "[Click here](https://example.com) for more.", contains: []string{"Click here"}, notContains: []string{"https://example.com", "]("}},
+		{name: "HTML tags", body: "<strong>Bold</strong> text.", notContains: []string{"<strong>", "</strong>"}},
+		{name: "emphasis markers", body: "LeafWiki **fett** und _kursiv_.", contains: []string{"LeafWiki fett und kursiv."}, notContains: []string{"**", "_"}},
+		{name: "whitespace is collapsed", body: "Line one.\n\nLine two.\n\nLine three.", notContains: []string{"\n", "  "}},
+		{name: "short content is not truncated", body: "Short body.", notContains: []string{"..."}},
 	}
-}
-
-func TestFromContent_EmptyBody(t *testing.T) {
-	raw := "---\ntitle: Hello\n---\n\n"
-	got := FromContent(raw)
-	if got != "" {
-		t.Errorf("expected empty, got %q", got)
-	}
-}
-
-func TestFromContent_EmptyContent(t *testing.T) {
-	got := FromContent("")
-	if got != "" {
-		t.Errorf("expected empty, got %q", got)
-	}
-}
-
-func TestFromContent_StripsFencedCode(t *testing.T) {
-	raw := "---\ntitle: T\n---\n\nBefore.\n\n```go\nfunc main() {}\n```\n\nAfter."
-	got := FromContent(raw)
-	if strings.Contains(got, "func main") {
-		t.Errorf("excerpt should not contain fenced code, got %q", got)
-	}
-	if !strings.Contains(got, "Before.") || !strings.Contains(got, "After.") {
-		t.Errorf("excerpt should contain surrounding text, got %q", got)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := FromContent("---\ntitle: T\n---\n\n" + tc.body)
+			for _, want := range tc.contains {
+				if !strings.Contains(got, want) {
+					t.Errorf("excerpt %q should contain %q", got, want)
+				}
+			}
+			for _, unwanted := range tc.notContains {
+				if strings.Contains(got, unwanted) {
+					t.Errorf("excerpt %q should not contain %q", got, unwanted)
+				}
+			}
+		})
 	}
 }
 
@@ -58,39 +69,6 @@ func TestPlainTextForSearch_IncludesCodeBlockContent(t *testing.T) {
 	}
 }
 
-func TestFromContent_StripsMarkdownHeadings(t *testing.T) {
-	raw := "---\ntitle: T\n---\n\n# Heading One\n\nSome body text."
-	got := FromContent(raw)
-	if strings.Contains(got, "#") {
-		t.Errorf("excerpt should not contain # heading markers, got %q", got)
-	}
-	if !strings.Contains(got, "Heading One") {
-		t.Errorf("heading text should be preserved, got %q", got)
-	}
-}
-
-func TestFromContent_StripsImageSyntax(t *testing.T) {
-	raw := "---\ntitle: T\n---\n\n![alt text](image.png) Some text."
-	got := FromContent(raw)
-	if strings.Contains(got, "![") || strings.Contains(got, "image.png") {
-		t.Errorf("image syntax should be stripped, got %q", got)
-	}
-	if !strings.Contains(got, "alt text") {
-		t.Errorf("alt text should be preserved, got %q", got)
-	}
-}
-
-func TestFromContent_StripsLinkSyntax(t *testing.T) {
-	raw := "---\ntitle: T\n---\n\n[Click here](https://example.com) for more."
-	got := FromContent(raw)
-	if strings.Contains(got, "https://example.com") || strings.Contains(got, "](") {
-		t.Errorf("link URL should be stripped, got %q", got)
-	}
-	if !strings.Contains(got, "Click here") {
-		t.Errorf("link text should be preserved, got %q", got)
-	}
-}
-
 func TestFromContent_TruncatesLongContent(t *testing.T) {
 	body := strings.Repeat("word ", 200)
 	raw := "---\ntitle: T\n---\n\n" + body
@@ -101,44 +79,6 @@ func TestFromContent_TruncatesLongContent(t *testing.T) {
 	runes := []rune(got)
 	if len(runes) > MaxRunes+10 {
 		t.Errorf("excerpt too long: %d runes", len(runes))
-	}
-}
-
-func TestFromContent_ShortContentNotTruncated(t *testing.T) {
-	raw := "---\ntitle: T\n---\n\nShort body."
-	got := FromContent(raw)
-	if strings.HasSuffix(got, "...") {
-		t.Errorf("short content should not be truncated, got %q", got)
-	}
-}
-
-func TestFromContent_CollapsesWhitespace(t *testing.T) {
-	raw := "---\ntitle: T\n---\n\nLine one.\n\nLine two.\n\nLine three."
-	got := FromContent(raw)
-	if strings.Contains(got, "\n") {
-		t.Errorf("excerpt should have no newlines, got %q", got)
-	}
-	if strings.Contains(got, "  ") {
-		t.Errorf("excerpt should have no double spaces, got %q", got)
-	}
-}
-
-func TestFromContent_StripsHTMLTags(t *testing.T) {
-	raw := "---\ntitle: T\n---\n\n<strong>Bold</strong> text."
-	got := FromContent(raw)
-	if strings.Contains(got, "<strong>") || strings.Contains(got, "</strong>") {
-		t.Errorf("HTML tags should be stripped, got %q", got)
-	}
-}
-
-func TestFromContent_StripsMarkdownEmphasisMarkers(t *testing.T) {
-	raw := "---\ntitle: T\n---\n\nLeafWiki **fett** und _kursiv_."
-	got := FromContent(raw)
-	if strings.Contains(got, "**") || strings.Contains(got, "_") {
-		t.Errorf("markdown emphasis markers should be stripped, got %q", got)
-	}
-	if !strings.Contains(got, "LeafWiki fett und kursiv.") {
-		t.Errorf("expected plain text excerpt, got %q", got)
 	}
 }
 
@@ -293,4 +233,58 @@ func TestFromBody_StripsHTMLAndMarkdown(t *testing.T) {
 	if got != "Bold link" {
 		t.Errorf("got %q", got)
 	}
+}
+
+func TestFromBodyStart_ReadsOnlyTheStart(t *testing.T) {
+	prose := strings.Repeat("Some prose sentence here.\n", 2000) // ~52 KB
+	tests := []struct {
+		name string
+		body string
+		want string
+	}{
+		{name: "short body equals FromBody", body: "# Title\n\nShort *body*.", want: FromBody("# Title\n\nShort *body*.")},
+		{name: "long prose equals FromBody", body: prose, want: FromBody(prose)},
+		// Cut inside the fence, the unclosed code would become excerpt text.
+		{name: "fence crossing the limit does not leak code", body: "Intro.\n```\n" + strings.Repeat("secret code\n", 2000) + "```\nAfter the code.", want: "Intro."},
+		{name: "text after the limit is not read", body: strings.Repeat("\n", startBytes+1) + "Late text.", want: ""},
+		// Fences that bodyStart's line scan doesn't see as fences (inside a
+		// block quote, or indented in a list item) must not leak code either.
+		{name: "block-quoted fence crossing the limit does not leak code", body: "Intro.\n\n> ```\n" + strings.Repeat("> secret code\n", 2000) + "> ```\n\nAfter the code.", want: "Intro."},
+		{name: "list-indented fence crossing the limit does not leak code", body: "- Intro.\n\n    ```\n" + strings.Repeat("    secret code\n", 2000) + "    ```\n\nAfter the code.", want: "Intro."},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := FromBodyStart(tc.body); got != tc.want {
+				t.Errorf("FromBodyStart = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestBodyStart_CutsAtLineEndOutsideFences(t *testing.T) {
+	fenced := strings.Repeat("a\n", startBytes/2-1) + "```\ncode\n```\nrest"
+	tests := []struct {
+		name string
+		body string
+		want string
+	}{
+		{name: "within the limit", body: "a\nb", want: "a\nb"},
+		{name: "cut at the first line end past the limit", body: strings.Repeat("a\n", startBytes) + "tail", want: strings.Repeat("a\n", startBytes/2)},
+		{name: "fence open at the limit is kept until it closes", body: fenced, want: strings.Repeat("a\n", startBytes/2-1) + "```\ncode\n```\n"},
+		{name: "fence never closes", body: strings.Repeat("a\n", startBytes/2-1) + "```\n" + strings.Repeat("c\n", startBytes), want: strings.Repeat("a\n", startBytes/2-1) + "```\n" + strings.Repeat("c\n", startBytes)},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := bodyStart(tc.body); got != tc.want {
+				t.Errorf("bodyStart = %d bytes %q…, want %d bytes", len(got), firstBytes(got, 40), len(tc.want))
+			}
+		})
+	}
+}
+
+func firstBytes(s string, n int) string {
+	if len(s) < n {
+		return s
+	}
+	return s[:n]
 }
