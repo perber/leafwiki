@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	httpinternal "github.com/perber/wiki/internal/http"
+	"github.com/perber/wiki/internal/http/dto"
 )
 
 // Routes is the RouteRegistrar for the properties domain.
@@ -59,7 +60,7 @@ func (r *Routes) handleGetPropertyKeys(c *gin.Context) {
 		respondWithPropertiesError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, out.Keys)
+	c.JSON(http.StatusOK, dto.ToPropertyKeyCounts(out.Keys))
 }
 
 // handleGetPagesByProperty handles GET /api/properties/pages?key=status&value=draft

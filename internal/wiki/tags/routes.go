@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	httpinternal "github.com/perber/wiki/internal/http"
+	"github.com/perber/wiki/internal/http/dto"
 )
 
 // Routes is the RouteRegistrar for the tags domain.
@@ -64,7 +65,7 @@ func (r *Routes) handleGetTags(c *gin.Context) {
 		respondWithTagsError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, out.Tags)
+	c.JSON(http.StatusOK, dto.ToTagCounts(out.Tags))
 }
 
 // handleGetPagesByTags handles GET /api/tags/pages?tags=react,typescript

@@ -5,12 +5,23 @@ import (
 
 	"github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/core/tree"
+	coretags "github.com/perber/wiki/internal/tags"
 )
 
 // TagCount is returned by the tag listing endpoint.
 type TagCount struct {
 	Tag   string `json:"tag"`
 	Count int    `json:"count"`
+}
+
+// ToTagCounts converts tag counts from the tag index; nil becomes an empty
+// slice so the response is [] rather than null.
+func ToTagCounts(in []coretags.TagCount) []TagCount {
+	out := make([]TagCount, len(in))
+	for i, tc := range in {
+		out[i] = TagCount{Tag: tc.Tag, Count: tc.Count}
+	}
+	return out
 }
 
 // TaggedPage is the reduced page DTO returned by the tag filter endpoint.
