@@ -12,6 +12,7 @@ import (
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/links"
 	"github.com/perber/wiki/internal/search"
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 func TestNewLinkIndexSideEffect_DefaultsLogger(t *testing.T) {
@@ -20,6 +21,7 @@ func TestNewLinkIndexSideEffect_DefaultsLogger(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewLinksStore failed: %v", err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
 	effect := NewLinkIndexSideEffect(links.NewLinkService(t.TempDir(), treeService, store), nil, nil)
 	if effect.log == nil {
 		t.Fatal("expected default logger to be set")
