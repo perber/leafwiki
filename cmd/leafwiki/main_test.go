@@ -173,6 +173,44 @@ func TestValidateHTTPRemoteUserAutoCreateConfig(t *testing.T) {
 	}
 }
 
+// The messages are pinned: operators grep logs for them.
+func TestValidateSMTPConfig_FlagCombinations_ReturnPinnedErrors(t *testing.T) {
+	tests := []struct {
+		name      string
+		host      string
+		from      string
+		publicURL string
+		security  string
+		wantErr   string
+	}{
+		{name: "smtp off ignores everything else", publicURL: "not a url", security: "bogus"},
+		{name: "smtp off with a valid public url", publicURL: "https://wiki.example.com"},
+		{name: "complete https config", host: "smtp.example.com", from: "wiki@example.com", publicURL: "https://wiki.example.com", security: "starttls"},
+		{name: "http public url with path", host: "smtp.example.com", from: "wiki@example.com", publicURL: "http://wiki.example.com/wiki", security: "none"},
+		{name: "tls security", host: "smtp.example.com", from: "wiki@example.com", publicURL: "https://wiki.example.com", security: "tls"},
+		{name: "missing from", host: "smtp.example.com", publicURL: "https://wiki.example.com", security: "starttls", wantErr: "--smtp-from is required when --smtp-host is set"},
+		{name: "missing public url", host: "smtp.example.com", from: "wiki@example.com", security: "starttls", wantErr: "--public-url is required when --smtp-host is set"},
+		{name: "relative public url", host: "smtp.example.com", from: "wiki@example.com", publicURL: "/wiki", security: "starttls", wantErr: `--public-url must be an absolute http(s):// URL, got "/wiki"`},
+		{name: "ftp public url", host: "smtp.example.com", from: "wiki@example.com", publicURL: "ftp://wiki.example.com", security: "starttls", wantErr: `--public-url must be an absolute http(s):// URL, got "ftp://wiki.example.com"`},
+		{name: "public url without host", host: "smtp.example.com", from: "wiki@example.com", publicURL: "https://", security: "starttls", wantErr: `--public-url must be an absolute http(s):// URL, got "https://"`},
+		{name: "unparseable public url", host: "smtp.example.com", from: "wiki@example.com", publicURL: "https://wiki.example.com/%zz", security: "starttls", wantErr: `--public-url must be an absolute http(s):// URL, got "https://wiki.example.com/%zz"`},
+		{name: "unknown security", host: "smtp.example.com", from: "wiki@example.com", publicURL: "https://wiki.example.com", security: "ssl", wantErr: `--smtp-security must be one of none, starttls, tls, got "ssl"`},
+		{name: "from is checked before public url", host: "smtp.example.com", security: "bogus", wantErr: "--smtp-from is required when --smtp-host is set"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateSMTPConfig(tc.host, tc.from, tc.publicURL, tc.security)
+			got := ""
+			if err != nil {
+				got = err.Error()
+			}
+			if got != tc.wantErr {
+				t.Fatalf("validateSMTPConfig(%q, %q, %q, %q) error = %q, want %q", tc.host, tc.from, tc.publicURL, tc.security, got, tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestValidateRedirectURL(t *testing.T) {
 	tests := []struct {
 		name    string
