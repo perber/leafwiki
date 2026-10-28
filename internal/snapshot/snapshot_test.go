@@ -298,14 +298,16 @@ func TestCreateSnapshot_StateDBStatErrorOtherThanNotExist_FailsSnapshot(t *testi
 	for _, tc := range stateDBCases {
 		t.Run(tc.file, func(t *testing.T) {
 			cfg := newTestConfig(t)
-			cfg.StateDBPaths = []string{filepath.Join(t.TempDir(), "bad\x00"+tc.file)}
+			badName := "bad\x00" + tc.file
+			cfg.StateDBPaths = []string{filepath.Join(t.TempDir(), badName)}
 
 			_, err := createSnapshot(context.Background(), cfg)
 			if err == nil {
 				t.Fatalf("expected createSnapshot to fail on a %s stat error other than not-exist", tc.file)
 			}
-			if !strings.Contains(err.Error(), "failed to stat") {
-				t.Fatalf("expected the stat error to fail the snapshot, got: %v", err)
+			// Name the file so "failed to stat snapshot zip" can't satisfy this.
+			if !strings.Contains(err.Error(), "failed to stat "+badName) {
+				t.Fatalf("expected the stat error of %s to fail the snapshot, got: %v", tc.file, err)
 			}
 		})
 	}
