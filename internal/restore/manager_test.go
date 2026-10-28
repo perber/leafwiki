@@ -649,7 +649,10 @@ func TestManager_Restore_WALCleanupFailure_RecoversWithoutTouchingLiveFiles(t *t
 	// MkdirTemp extractAndValidateWithLimits does inside dataDir). The real
 	// UserSettingsStore opened by newFullManagerFixtureWithBranding already
 	// left a genuine (harmless) usersettings.db-wal file behind, so it's
-	// removed first before a blocking directory takes its place.
+	// removed first before a blocking directory takes its place. The store is
+	// closed first because Windows can't remove a file that is still open
+	// (#1698); the fixture's own cleanup tolerates the second Close.
+	test_utils.WrapCloseWithErrorCheck(f.userSettings.Close, t)
 	walPath := filepath.Join(f.dataDir, "usersettings.db-wal")
 	if err := os.RemoveAll(walPath); err != nil {
 		t.Fatalf("failed to remove existing usersettings.db-wal: %v", err)
