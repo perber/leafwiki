@@ -41,6 +41,12 @@ func newPageRootOperationError(operation string) *sharederrors.LocalizedError {
 	)
 }
 
+// newPageMissingPathError keeps the message and template the handler
+// returned before the check moved into the use case.
+func newPageMissingPathError() *sharederrors.LocalizedError {
+	return sharederrors.NewLocalizedError(ErrCodePageMissingPath, "Missing path", "missing path", nil)
+}
+
 // PageErrorResponse is the structured JSON error body returned by page endpoints.
 type PageErrorResponse struct {
 	Error PageErrorDetail `json:"error"`

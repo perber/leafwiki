@@ -17,16 +17,6 @@ func NewPageQueries(t *tree.TreeService) *PageQueries {
 	return &PageQueries{tree: t}
 }
 
-// GetPage fetches the page by ID.
-func (q *PageQueries) GetPage(id string) (*tree.Page, error) {
-	return q.tree.GetPage(id)
-}
-
-// FindByPath finds the page matching a URL route path (e.g. "docs/api/intro").
-func (q *PageQueries) FindByPath(routePath string) (*tree.Page, error) {
-	return q.tree.FindPageByRoutePath(routePath)
-}
-
 // LookupPath resolves a path to its tree segments, including non-existing ones.
 func (q *PageQueries) LookupPath(path string) (*tree.PathLookup, error) {
 	return q.tree.LookupPagePath(path)
