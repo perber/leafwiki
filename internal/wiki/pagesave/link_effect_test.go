@@ -5,6 +5,7 @@ import (
 
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/links"
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 func pageKindPtr() *tree.NodeKind {
@@ -23,6 +24,7 @@ func setupLinkEffect(t *testing.T) (*LinkIndexSideEffect, *links.LinkService, *t
 	if err != nil {
 		t.Fatalf("NewLinksStore: %v", err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
 	svc := links.NewLinkService(dataDir, ts, store)
 	return NewLinkIndexSideEffect(svc, nil, nil), svc, ts
 }
