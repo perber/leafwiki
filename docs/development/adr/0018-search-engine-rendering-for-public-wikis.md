@@ -128,5 +128,7 @@ fixing that is a separate change.
     and the escaped route path. The path of `--public-url` is only checked against
     `--base-path` at startup (warning on mismatch), because email links use `--public-url` as
     given.
+  - `--public-url` is checked without SMTP: unset in a public wiki logs a hint; an invalid value
+    is ignored with a warning, and stays fatal with `--smtp-host`.
   - Shells with page meta are served with `Cache-Control: no-cache` (`ShellParts.NoCache`,
     ADR-0017). Non-page routes, unknown pages and a tree that is not loaded get the plain shell.
