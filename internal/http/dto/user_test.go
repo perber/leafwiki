@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -92,6 +93,15 @@ func TestPageDTOs_Marshal_AuthorLabelWireShape(t *testing.T) {
 			want:  metadata("ghost", ""),
 		},
 		{
+			name: "child node metadata resolves its own author",
+			value: func() any {
+				parent := node("ghost")
+				parent.Children = []*tree.PageNode{node(aliceID)}
+				return ToAPINode(parent, "", resolver).Children[0].Metadata
+			},
+			want: metadata("$ALICE", `,"creator":`+alice+`,"lastAuthor":`+alice),
+		},
+		{
 			name:  "node metadata without an author omits the labels",
 			value: func() any { return ToAPINode(node(""), "", resolver).Metadata },
 			want:  metadata("", ""),
@@ -109,6 +119,46 @@ func TestPageDTOs_Marshal_AuthorLabelWireShape(t *testing.T) {
 func TestUserLabel_Marshal_MatchesCoreType(t *testing.T) {
 	assertMarshalsTo(t, UserLabel{ID: "u1", Username: "alice"}, `{"id":"u1","username":"alice"}`)
 	assertMarshalsTo(t, auth.UserLabel{ID: "u1", Username: "alice"}, `{"id":"u1","username":"alice"}`)
+
+	// Escaping must not differ between the two types either: encoding/json
+	// escapes HTML characters and U+2028/U+2029 specially.
+	usernames := []struct{ name, username string }{
+		{name: "html characters", username: `<script>alert("x")</script> & co`},
+		{name: "non-ASCII and line separators", username: "Jürgen   "},
+	}
+	for _, tt := range usernames {
+		t.Run(tt.name, func(t *testing.T) {
+			want, err := json.Marshal(auth.UserLabel{ID: "u/1", Username: tt.username})
+			if err != nil {
+				t.Fatalf("Marshal core label: %v", err)
+			}
+			assertMarshalsTo(t, UserLabel{ID: "u/1", Username: tt.username}, string(want))
+		})
+	}
+}
+
+// ResolveUserLabel copies the cached core label; a caller changing the
+// returned label must not change what later responses show for that user.
+func TestResolveUserLabel_ReturnsCopyOfCachedLabel(t *testing.T) {
+	resolver, aliceID := newTestUserResolver(t)
+
+	first := ResolveUserLabel(resolver, aliceID)
+	if first == nil {
+		t.Fatal("ResolveUserLabel(alice) = nil")
+	}
+	first.Username = "mallory"
+
+	second := ResolveUserLabel(resolver, aliceID)
+	if second == first {
+		t.Error("ResolveUserLabel returned the same pointer twice")
+	}
+	if second == nil || second.Username != "alice" {
+		t.Errorf("second ResolveUserLabel = %+v, want username alice", second)
+	}
+	core, _ := resolver.ResolveUserLabel(aliceID)
+	if core == nil || core.Username != "alice" {
+		t.Errorf("resolver cache = %+v, want username alice", core)
+	}
 }
 
 func TestResolveUserLabel_ReturnsLabelOnlyForKnownUsers(t *testing.T) {
