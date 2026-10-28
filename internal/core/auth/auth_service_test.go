@@ -8,6 +8,7 @@ import (
 	"github.com/pquerna/otp/totp"
 
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 func setupTestAuthService(t *testing.T) *AuthService {
@@ -16,6 +17,7 @@ func setupTestAuthService(t *testing.T) *AuthService {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
 	userService := NewUserService(store)
 
 	// Create test user
@@ -29,6 +31,7 @@ func setupTestAuthService(t *testing.T) *AuthService {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(sessionStore.Close, t) })
 
 	sessions := NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", 1*time.Hour, 24*time.Hour*7)
 	authService := NewAuthService(userService, sessions, nil)
@@ -52,6 +55,7 @@ func setupTOTPTestFixture(t *testing.T) *totpTestFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
 	userService := NewUserService(store)
 
 	user, err := userService.CreateUser("testuser", "test@example.com", "securepass", "admin")
@@ -63,6 +67,7 @@ func setupTOTPTestFixture(t *testing.T) *totpTestFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(sessionStore.Close, t) })
 
 	totpService, err := NewTOTPService(testEncryptionKey())
 	if err != nil {
@@ -373,6 +378,7 @@ func mustNewSessionStore(t *testing.T) *SessionStore {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(s.Close, t) })
 	return s
 }
 
@@ -393,6 +399,7 @@ func setupTOTPSetupFixture(t *testing.T) *totpSetupFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
 	userService := NewUserService(store)
 
 	user, err := userService.CreateUser("testuser", "test@example.com", "securepass", "admin")
@@ -404,6 +411,7 @@ func setupTOTPSetupFixture(t *testing.T) *totpSetupFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(sessionStore.Close, t) })
 
 	totpService, err := NewTOTPService(testEncryptionKey())
 	if err != nil {

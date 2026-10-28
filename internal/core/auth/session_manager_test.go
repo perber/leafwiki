@@ -112,6 +112,7 @@ func TestSessionManager_ValidateToken_ResolveUserNotWired_ReturnsErrorInsteadOfP
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = store.Close() })
 	sm := NewSessionManager(store, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
 
 	user := &User{ID: "u1", Username: "alice", Role: RoleAdmin}
@@ -134,6 +135,7 @@ func TestSessionManager_RefreshToken_ResolveUserNotWired_ReturnsErrorInsteadOfPa
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = store.Close() })
 	sm := NewSessionManager(store, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
 
 	user := &User{ID: "u1", Username: "alice", Role: RoleAdmin}
@@ -344,6 +346,7 @@ func TestSessionManager_IssueSession_SessionExpiryMatchesRefreshTokenExp(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = store.Close() })
 	sm := NewSessionManager(store, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
 	sm.resolveUser = func(id string) (*User, error) { return user, nil }
 	sm.now = fakeAdvancingClock(3 * time.Second)
@@ -379,6 +382,7 @@ func TestSessionManager_RefreshToken_SessionExpiryMatchesNewRefreshTokenExp(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = store.Close() })
 	sm := NewSessionManager(store, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
 	sm.resolveUser = func(id string) (*User, error) { return user, nil }
 	sm.now = fakeAdvancingClock(3 * time.Second)
@@ -417,6 +421,7 @@ func TestSessionManager_Close_ClosesSessionStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = store.Close() })
 	sm := NewSessionManager(store, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
 
 	if err := sm.Close(); err != nil {

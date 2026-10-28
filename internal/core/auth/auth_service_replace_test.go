@@ -4,6 +4,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 func TestAuthService_ReplaceUserStore_SwapsToNewUsers(t *testing.T) {
@@ -12,6 +14,7 @@ func TestAuthService_ReplaceUserStore_SwapsToNewUsers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(oldStore.Close, t) })
 	if _, err := NewUserService(oldStore).CreateUser("old-user", "old@example.com", "old-password", "admin"); err != nil {
 		t.Fatal(err)
 	}
@@ -19,6 +22,7 @@ func TestAuthService_ReplaceUserStore_SwapsToNewUsers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(sessionStore.Close, t) })
 	oldUserService := NewUserService(oldStore)
 	sessions := NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
 	authService := NewAuthService(oldUserService, sessions, nil)
@@ -33,6 +37,7 @@ func TestAuthService_ReplaceUserStore_SwapsToNewUsers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(newStore.Close, t) })
 	if _, err := NewUserService(newStore).CreateUser("new-user", "new@example.com", "new-password", "admin"); err != nil {
 		t.Fatal(err)
 	}
@@ -76,6 +81,7 @@ func TestAuthService_PauseUserStoreForSwap_ThenReplaceUserStore_Recovers(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(newStore.Close, t) })
 	if _, err := NewUserService(newStore).CreateUser("restored-user", "restored@example.com", "restored-password", "admin"); err != nil {
 		t.Fatal(err)
 	}
@@ -101,6 +107,7 @@ func TestAuthService_ReplaceUserStore_ClosesPreviousStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(newStore.Close, t) })
 	if _, err := NewUserService(newStore).CreateUser("new-user", "new@example.com", "new-password", "admin"); err != nil {
 		t.Fatal(err)
 	}
@@ -125,6 +132,7 @@ func TestAuthService_ReplaceUserStore_ConcurrentLoginsDuringSwap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(oldStore.Close, t) })
 	if _, err := NewUserService(oldStore).CreateUser("shared-user", "shared@example.com", "shared-password", "admin"); err != nil {
 		t.Fatal(err)
 	}
@@ -132,6 +140,7 @@ func TestAuthService_ReplaceUserStore_ConcurrentLoginsDuringSwap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(sessionStore.Close, t) })
 	sharedUserService := NewUserService(oldStore)
 	sharedSessions := NewSessionManager(sessionStore, "test-secret-key-for-unit-tests-1", time.Hour, 24*time.Hour)
 	authService := NewAuthService(sharedUserService, sharedSessions, nil)
@@ -142,6 +151,7 @@ func TestAuthService_ReplaceUserStore_ConcurrentLoginsDuringSwap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(newStore.Close, t) })
 	if _, err := NewUserService(newStore).CreateUser("shared-user", "shared@example.com", "shared-password", "admin"); err != nil {
 		t.Fatal(err)
 	}

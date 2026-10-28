@@ -97,6 +97,7 @@ func newTestEmailTokenService(t *testing.T, smtpAddr string) (*EmailTokenService
 	if err != nil {
 		t.Fatalf("NewUserStore returned error: %v", err)
 	}
+	t.Cleanup(func() { _ = userStore.Close() })
 	users := NewUserService(userStore)
 
 	sessionStore, err := NewSessionStore(storageDir)
