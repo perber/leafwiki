@@ -15,6 +15,7 @@ func setupTestUserService(t *testing.T) *UserService {
 	if err != nil {
 		t.Fatalf("Failed to setup user store: %v", err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
 	return NewUserService(store)
 }
 
@@ -153,6 +154,7 @@ func TestUserService_DeleteUser(t *testing.T) {
 
 func TestUserService_InitDefaultAdmin(t *testing.T) {
 	store, _ := NewUserStore(t.TempDir())
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
 	service := NewUserService(store)
 
 	err := service.InitDefaultAdmin("", "", "password123")
@@ -168,6 +170,7 @@ func TestUserService_InitDefaultAdmin(t *testing.T) {
 
 func TestUserService_InitDefaultAdmin_UsesGivenUsernameAndEmail(t *testing.T) {
 	store, _ := NewUserStore(t.TempDir())
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
 	service := NewUserService(store)
 
 	err := service.InitDefaultAdmin("root", "root@example.com", "password123")
@@ -183,6 +186,7 @@ func TestUserService_InitDefaultAdmin_UsesGivenUsernameAndEmail(t *testing.T) {
 
 func TestUserService_InitDefaultAdmin_PasswordTooShort_ReturnsError(t *testing.T) {
 	store, _ := NewUserStore(t.TempDir())
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
 	service := NewUserService(store)
 
 	err := service.InitDefaultAdmin("root", "root@example.com", "short")
@@ -198,6 +202,7 @@ func TestUserService_InitDefaultAdmin_PasswordTooShort_ReturnsError(t *testing.T
 
 func TestUserService_InitDefaultAdmin_SkipsWhenAdminAlreadyExists(t *testing.T) {
 	store, _ := NewUserStore(t.TempDir())
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
 	service := NewUserService(store)
 
 	if _, err := service.CreateUser("admin", "admin@localhost", "existing", "admin"); err != nil {
@@ -632,6 +637,7 @@ func setupTestUserServiceWithEditorLimit(t *testing.T, limit int) *UserService {
 	if err != nil {
 		t.Fatalf("Failed to setup user store: %v", err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
 	service := NewUserService(store)
 	service.SetEditorLimit(limit)
 	return service

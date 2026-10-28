@@ -3,6 +3,8 @@ package auth
 import (
 	"testing"
 	"time"
+
+	"github.com/perber/wiki/internal/test_utils"
 )
 
 func setupTestUserResolver(t *testing.T) (*UserResolver, *UserService) {
@@ -136,6 +138,7 @@ func TestUserResolver_ResolveUserLabel_ReflectsLiveRestore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewUserStore(pre): %v", err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(preStore.Close, t) })
 	preSvc := NewUserService(preStore)
 
 	sessionStore, err := NewSessionStore(t.TempDir())
@@ -161,6 +164,7 @@ func TestUserResolver_ResolveUserLabel_ReflectsLiveRestore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewUserStore(post): %v", err)
 	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(postStore.Close, t) })
 	postSvc := NewUserService(postStore)
 	postUser, err := postSvc.CreateUser("post-restore-admin", "post-restore-admin@example.com", "password123", RoleAdmin)
 	if err != nil {
