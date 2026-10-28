@@ -365,3 +365,70 @@ func TestSEOPageReader_TreeNotLoaded_ReturnsNoPage(t *testing.T) {
 		t.Fatalf("PageByRoutePath = %+v, %v; want nil, nil", page, err)
 	}
 }
+
+// HEAD on the real router answers like GET without a body. Routes that
+// registrars add for GET only must not let HEAD fall through to the SPA
+// shell: a link checker would see 200 text/html for an icon or a missing
+// avatar.
+func TestWiki_Head_MatchesGetOnRealRouter(t *testing.T) {
+	old := httpinternal.EmbedFrontend
+	httpinternal.EmbedFrontend = "true"
+	t.Cleanup(func() { httpinternal.EmbedFrontend = old })
+	_, public, router := newSEOTestRouter(t, "/wiki")
+	setPublicAccess(t, public, true)
+	if rec := serveGET(router, "/wiki/welcome-to-leafwiki", nil); !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/html") {
+		t.Skip("requires built frontend (make ui)")
+	}
+
+	tests := []struct {
+		name   string
+		public bool
+		path   string
+		// sameAsGet: status and headers match GET. Otherwise HEAD only has
+		// to stay out of the shell (GET-only routes answer HEAD with 404).
+		sameAsGet bool
+	}{
+		{name: "root, public", public: true, path: "/wiki/", sameAsGet: true},
+		{name: "root, private", public: false, path: "/wiki/", sameAsGet: true},
+		{name: "page, public", public: true, path: "/wiki/welcome-to-leafwiki", sameAsGet: true},
+		{name: "page, private", public: false, path: "/wiki/welcome-to-leafwiki", sameAsGet: true},
+		{name: "SPA route", public: true, path: "/wiki/settings/branding", sameAsGet: true},
+		{name: "favicon.svg", public: true, path: "/wiki/favicon.svg", sameAsGet: true},
+		{name: "favicon.ico", public: true, path: "/wiki/favicon.ico"},
+		{name: "avatar of unknown user", public: true, path: "/wiki/avatars/nobody"},
+		{name: "branding asset", public: true, path: "/wiki/branding/missing.png"},
+		{name: "api health", public: true, path: "/wiki/api/health"},
+		{name: "unknown api", public: true, path: "/wiki/api/unknown", sameAsGet: true},
+		{name: "unknown static", public: true, path: "/wiki/static/missing.js", sameAsGet: true},
+		{name: "unknown asset", public: true, path: "/wiki/assets/missing.png", sameAsGet: true},
+		{name: "outside base path", public: true, path: "/other/page", sameAsGet: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			setPublicAccess(t, public, tc.public)
+			get := serveGET(router, tc.path, nil)
+			head := httptest.NewRecorder()
+			router.ServeHTTP(head, httptest.NewRequest(http.MethodHead, tc.path, nil))
+			headCT, getCT := head.Header().Get("Content-Type"), get.Header().Get("Content-Type")
+			// The recorder keeps bodies that net/http drops for HEAD; only the
+			// shell's own writer has to drop it.
+			if strings.HasPrefix(headCT, "text/html") && head.Body.Len() != 0 {
+				t.Fatalf("HEAD shell body = %q, want empty", head.Body.String())
+			}
+			if !tc.sameAsGet {
+				if strings.HasPrefix(headCT, "text/html") && !strings.HasPrefix(getCT, "text/html") {
+					t.Fatalf("HEAD got the SPA shell (%d %q), GET %d %q", head.Code, headCT, get.Code, getCT)
+				}
+				return
+			}
+			if head.Code != get.Code || headCT != getCT {
+				t.Fatalf("HEAD %d %q, GET %d %q", head.Code, headCT, get.Code, getCT)
+			}
+			for _, h := range []string{"Location", "Cache-Control", "Vary", "Content-Length"} {
+				if got, want := head.Header().Get(h), get.Header().Get(h); got != want {
+					t.Errorf("%s: HEAD %q, GET %q", h, got, want)
+				}
+			}
+		})
+	}
+}
