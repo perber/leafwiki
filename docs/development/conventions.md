@@ -24,6 +24,7 @@ cmd/leafwiki → internal/wiki (composition root) → internal/wiki/<slice> → 
 |---|---|---|
 | `internal/core/*` | Storage and domain primitives: tree, auth, revision, markdown, assets, settings, … | other `internal/core/*`, stdlib, third-party. **No** gin, no `internal/wiki`, no `internal/http`, no top-level `internal/*` packages |
 | `internal/<package>` (links, search, tags, properties, favorites, usersettings, backup, snapshot, restore, …) | Derived indexes and optional feature services built on core | `internal/core/*`, other top-level packages. **No** `internal/wiki`, no `internal/http` |
+| `internal/render` | Markdown → sanitized HTML for clients without the SPA (crawlers); pure, wikilinks resolved through a caller callback ([ADR-0020](./adr/0020-server-rendered-page-html-for-crawlers.md)) | `internal/core/markdown`, stdlib, goldmark, bluemonday. **No** `core/tree`, no HTTP, no `internal/wiki` |
 | `internal/http/**` | Router infrastructure, middleware, DTOs | everything below. **No** `internal/wiki` |
 | `internal/wiki/<slice>` | One capability's use cases + HTTP routes | layers below, plus `internal/wiki/pagesave`. **No** other slice |
 | `internal/wiki` (`wiki.go`, `wiki_boot.go`, `wiki_routes.go`, `wiki_resync.go`) | Composition root: builds and wires everything | everything |
