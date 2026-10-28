@@ -168,14 +168,14 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		fail("Invalid HTTP remote user auto-create configuration", "error", err)
 	}
 
-	if err := validateSMTPConfig(cfg.email.smtpHost, cfg.email.smtpFrom, cfg.email.publicURL, cfg.email.smtpSecurity); err != nil {
+	if err := validateSMTPConfig(cfg.email.smtpHost, cfg.email.smtpFrom, cfg.server.publicURL, cfg.email.smtpSecurity); err != nil {
 		fail("Invalid SMTP configuration", "error", err)
 	}
 	if smtpEnabled {
 		// A misconfigured public URL produces broken links in emails that
 		// have already gone out — irreversible — so log the resolved value
 		// once at boot rather than only on first use.
-		slog.Default().Info("SMTP email enabled", "host", cfg.email.smtpHost, "port", cfg.email.smtpPort, "security", cfg.email.smtpSecurity, "publicUrl", cfg.email.publicURL)
+		slog.Default().Info("SMTP email enabled", "host", cfg.email.smtpHost, "port", cfg.email.smtpPort, "security", cfg.email.smtpSecurity, "publicUrl", cfg.server.publicURL)
 	}
 
 	if cfg.proxy.enableHTTPRemoteUser {
@@ -273,7 +273,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 			Security:           email.Security(cfg.email.smtpSecurity),
 			InsecureSkipVerify: cfg.email.smtpInsecureSkipVerify,
 			Timeout:            cfg.email.smtpTimeout,
-			PublicURL:          cfg.email.publicURL,
+			PublicURL:          cfg.server.publicURL,
 		},
 		Metrics: metrics,
 	})
