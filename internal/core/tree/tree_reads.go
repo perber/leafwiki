@@ -28,6 +28,25 @@ func (t *TreeService) HasPages() bool {
 	return t.tree != nil && len(t.tree.Children) > 0
 }
 
+// FirstRootChildPath returns the route path of the first top-level node, page
+// or section, in the order the navigation shows (the order SortPages sets).
+// It returns ErrTreeNotLoaded before the tree is loaded and ErrPageNotFound
+// when the tree has no nodes.
+func (t *TreeService) FirstRootChildPath() (string, error) {
+	var routePath string
+	err := t.withRLockedTree(func() error {
+		if t.tree == nil {
+			return ErrTreeNotLoaded
+		}
+		if len(t.tree.Children) == 0 {
+			return ErrPageNotFound
+		}
+		routePath = t.tree.Children[0].Slug // a root child's route path is its slug
+		return nil
+	})
+	return routePath, err
+}
+
 // NodeCounts returns how many page and section nodes the tree currently holds,
 // excluding the synthetic root. It reads the in-memory id index under the read
 // lock and allocates nothing, so it is cheap enough to call on every metrics

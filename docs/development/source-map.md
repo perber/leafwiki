@@ -16,8 +16,8 @@ derived-index packages (`internal/links`, `internal/tags`, `internal/properties`
 `internal/branding`, `internal/importer`), then into the `internal/wiki/<domain>` slices (`pages`,
 `pagesave`, `auth`, `resync`, `revisions`, `search`, `links`, `tags`, `properties`, `apikeys`,
 `assets`, `avatar`, `backup`, `branding`, `health`, `importer`, `instancesettings`, `restore`,
-`snapshot`, `usersettings`) that each expose HTTP routes via
-`internal/http`. See [ADR-0001: Filesystem as Source of Truth](./adr/0001-filesystem-source-of-truth.md) for why the split between
+`seo`, `snapshot`, `usersettings`) that each expose HTTP routes (or, for `seo`, SPA shell
+responders) via `internal/http`. See [ADR-0001: Filesystem as Source of Truth](./adr/0001-filesystem-source-of-truth.md) for why the split between
 filesystem-canonical (`tree`, `revision`) and SQLite-derived (`links`, `tags`, `properties`,
 `search`) packages exists.
 
@@ -260,7 +260,7 @@ shape for that domain.
 
 - **`internal/wiki/pages`** — the largest domain slice: CRUD + tree operations exposed over HTTP.
   One file per use case — `create_page.go`, `update_page.go`, `move_page.go`, `copy_page.go`,
-  `delete_page.go`, `convert_page.go` (page↔section), `get_page_view.go` (`GetPageViewByIDUseCase`/`GetPageViewByPathUseCase` — the single-page view shared by API and SEO: page plus frontmatter tags and properties via `page_metadata.go`; not a visibility layer), `get_page.go` (`PageQueries` — the remaining read-only lookups: path lookup, title, permalink), `pin_page.go` (global editorial pin, see
+  `delete_page.go`, `convert_page.go` (page↔section), `get_page_view.go` (`GetPageViewByIDUseCase`/`GetPageViewByPathUseCase` — the single-page view shared by API and SEO: page plus frontmatter tags and properties via `page_metadata.go`; not a visibility layer), `get_first_page_path.go` (`GetFirstPagePathUseCase` — the first top-level page or section in navigation order, the target of the root redirect), `get_page.go` (`PageQueries` — the remaining read-only lookups: path lookup, title, permalink), `pin_page.go` (global editorial pin, see
   distinction from favorites below), `ensure_path.go`, `refactor.go` (link-refactor
   trigger), `add_favorite.go`/`remove_favorite.go`/`list_favorites.go` (per-user favorites, note the explicit distinction: pin is global/editorial via
   `tree.SetPinned` in page frontmatter, favorites is per-user via `internal/favorites`, deliberately
@@ -301,6 +301,12 @@ shape for that domain.
   `internal/avatar` and `internal/usersettings` (own avatar, own preferences).
 - **`internal/wiki/instancesettings`** — admin-only instance settings changeable at runtime
   instead of via flag + restart; today the public-access toggle.
+- **`internal/wiki/seo`** — search-engine rendering for public wikis
+  ([ADR-0018](./adr/0018-search-engine-rendering-for-public-wikis.md)); no routes, it registers
+  SPA shell responders. `shell.go`: `PublicOnly` (every registration of the slice runs only
+  while public access is on) and the root redirect (`GET /` → 302 to the first page);
+  `use_cases.go`: `GetRootTargetUseCase` behind the narrow `FirstPageReader`, implemented in
+  `internal/wiki/seo_adapter.go` with the pages slice's read use case.
 
 ## Frontend — `ui/leafwiki-ui/src/`
 
