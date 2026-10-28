@@ -55,6 +55,29 @@ jobs:
           GOARCH: '386'
         run: make test
 
+  # Windows is a release target; build-go-cross only compiles for it, which
+  # can't catch filesystem differences. Non-blocking until the suite is
+  # green on Windows (#1698).
+  test-go-windows:
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run tests on windows/amd64
+        run: go test ./...
+
   # windows/amd64 and darwin/arm64 are release targets, but the release
   # workflow is the only other place that builds them; without this a
   # platform-specific compile error would first show up at the release tag.
