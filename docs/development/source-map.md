@@ -87,7 +87,8 @@ filesystem-canonical (`tree`, `revision`) and SQLite-derived (`links`, `tags`, `
   size.
 - **`internal/core/excerpt`** — `excerpt.go` renders a short plain-text excerpt (`MaxRunes = 180`)
   from a page's markdown via `goldmark` + `bluemonday` HTML sanitization, used by search results
-  and tag listings.
+  and tag listings. `FromBodyStart` does the same over the start of the body, for excerpts built
+  per request (page meta tags).
 - **`internal/core/ignore`** — `.leafwikiignore` support (`gitignore`-syntax matcher via
   `sabhiram/go-gitignore`), consulted by tree reconstruction/resync/backup to skip paths.
 - **`internal/core/shared`** — cross-cutting helpers with no business logic of their own:
@@ -306,10 +307,12 @@ shape for that domain.
   instead of via flag + restart; today the public-access toggle.
 - **`internal/wiki/seo`** — search-engine rendering for public wikis
   ([ADR-0018](./adr/0018-search-engine-rendering-for-public-wikis.md)); no routes, it registers
-  SPA shell responders. `shell.go`: `PublicOnly` (every registration of the slice runs only
-  while public access is on) and the root redirect (`GET /` → 302 to the first page);
-  `use_cases.go`: `GetRootTargetUseCase` behind the narrow `FirstPageReader`, implemented in
-  `internal/wiki/seo_adapter.go` with the pages slice's read use case.
+  SPA shell responders and contributors. `shell.go`: `PublicOnly` (every registration of the
+  slice runs only while public access is on), the root redirect (`GET /` → 302 to the first
+  page) and the page meta contributor; `use_cases.go`: `GetRootTargetUseCase` behind the narrow
+  `FirstPageReader`; `page_meta.go`: `GetPageMetaUseCase` (title, description, canonical URL)
+  behind `PageReader`. Both readers are implemented in `internal/wiki/seo_adapter.go` with the
+  pages slice's read use cases.
 
 ## Frontend — `ui/leafwiki-ui/src/`
 
