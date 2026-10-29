@@ -50,24 +50,36 @@ func (sew *slogErrorWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func slogRequestLogger() gin.HandlerFunc {
+func slogRequestLogger(capabilities *capabilityPrefixes) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-		path := c.Request.URL.Path
-		if raw := c.Request.URL.RawQuery; raw != "" {
-			path += "?" + raw
-		}
-
 		c.Next()
 
 		slog.Default().Info("http request",
 			"method", c.Request.Method,
-			"path", path,
+			"path", loggedPath(c, capabilities),
 			"status", c.Writer.Status(),
 			"latency", time.Since(start),
 			"ip", c.ClientIP(),
 		)
 	}
+}
+
+// loggedPath is the path written to the access log. A capability URL carries
+// its secret in the path, so it is logged as its route template, or as its
+// prefix when no route matched; its query string is dropped.
+func loggedPath(c *gin.Context, capabilities *capabilityPrefixes) string {
+	if c.GetBool(capabilityRequestKey) && c.FullPath() != "" {
+		return c.FullPath()
+	}
+	if prefix := capabilities.match(c.Request.URL.Path); prefix != "" {
+		return prefix + "/…"
+	}
+	path := c.Request.URL.Path
+	if raw := c.Request.URL.RawQuery; raw != "" {
+		path += "?" + raw
+	}
+	return path
 }
 
 func disableClientCache(c *gin.Context) {
@@ -176,9 +188,10 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 	authCookies := auth_middleware.NewAuthCookies(opts.AllowInsecure, opts.AccessTokenTimeout, opts.RefreshTokenTimeout)
 	csrfCookie := security.NewCSRFCookie(opts.AllowInsecure, 3*24*time.Hour)
 
+	capabilities := &capabilityPrefixes{}
 	engine := gin.New()
 	if !opts.DisableRequestLog {
-		engine.Use(slogRequestLogger())
+		engine.Use(slogRequestLogger(capabilities))
 	}
 	if opts.Metrics != nil {
 		engine.Use(opts.Metrics.Middleware())
@@ -222,11 +235,12 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 	}
 
 	ctx := RouterContext{
-		Engine:      engine,
-		Base:        base,
-		AuthCookies: authCookies,
-		CSRFCookie:  csrfCookie,
-		Opts:        opts,
+		Engine:       engine,
+		Base:         base,
+		AuthCookies:  authCookies,
+		CSRFCookie:   csrfCookie,
+		Opts:         opts,
+		capabilities: capabilities,
 	}
 
 	for _, r := range registrars {
