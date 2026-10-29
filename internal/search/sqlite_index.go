@@ -783,7 +783,8 @@ func (s *SQLiteIndex) Search(query string, pageIDs []string, offset, limit int) 
 			}
 		}()
 
-		var results []SearchResultItem
+		// Non-nil so a query without a match serializes as [] and not null.
+		results := []SearchResultItem{}
 		for rows.Next() {
 			var r SearchResultItem
 			var bm25Score float64
