@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
+	"github.com/perber/wiki/internal/http/dto"
 )
 
 const (
@@ -13,21 +14,9 @@ const (
 	ErrCodeLinkInternalError = "link_internal_error"
 )
 
-// LinkErrorResponse is the structured JSON error body returned by link endpoints.
-type LinkErrorResponse struct {
-	Error LinkErrorDetail `json:"error"`
-}
-
-// LinkErrorDetail carries the localization-ready error data.
-type LinkErrorDetail struct {
-	Code     string `json:"code"`
-	Message  string `json:"message"`
-	Template string `json:"template"`
-}
-
 func respondWithLinkStatusError(c *gin.Context, status int, code, message, template string) {
-	c.JSON(status, LinkErrorResponse{
-		Error: LinkErrorDetail{
+	c.JSON(status, dto.ErrorResponse{
+		Error: dto.ErrorDetail{
 			Code:     code,
 			Message:  message,
 			Template: template,
