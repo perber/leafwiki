@@ -5,6 +5,7 @@ import (
 
 	httpinternal "github.com/perber/wiki/internal/http"
 	coreimporter "github.com/perber/wiki/internal/importer"
+	"github.com/perber/wiki/internal/scopedread"
 	wikiapikeys "github.com/perber/wiki/internal/wiki/apikeys"
 	wikiassets "github.com/perber/wiki/internal/wiki/assets"
 	wikiauth "github.com/perber/wiki/internal/wiki/auth"
@@ -22,6 +23,7 @@ import (
 	wikiresync "github.com/perber/wiki/internal/wiki/resync"
 	wikirevisions "github.com/perber/wiki/internal/wiki/revisions"
 	wikisearch "github.com/perber/wiki/internal/wiki/search"
+	wikishares "github.com/perber/wiki/internal/wiki/shares"
 	wikisnapshot "github.com/perber/wiki/internal/wiki/snapshot"
 	wikitags "github.com/perber/wiki/internal/wiki/tags"
 	wikiusersettings "github.com/perber/wiki/internal/wiki/usersettings"
@@ -40,6 +42,12 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 	w.avatarRoutes = w.buildAvatarRoutes()
 	w.userSettingsRoutes = w.buildUserSettingsRoutes()
 	w.apiKeysRoutes = w.buildAPIKeysRoutes()
+	if w.shareLinks != nil {
+		w.sharesRoutes = wikishares.NewRoutes(wikishares.RoutesConfig{
+			GetPage: wikishares.NewGetSharedPageUseCase(w.shareLinks, scopedread.NewPageReader(w.tree)),
+			Log:     w.log,
+		})
+	}
 	w.importerRoutes = w.buildImporterRoutes(options)
 	w.healthRoutes = wikihealth.NewRoutes(wikihealth.RoutesConfig{
 		Index:      w.searchIndex,
@@ -265,6 +273,9 @@ func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
 	}
 	if w.restoreRoutes != nil {
 		registrars = append(registrars, w.restoreRoutes)
+	}
+	if w.sharesRoutes != nil {
+		registrars = append(registrars, w.sharesRoutes)
 	}
 	if w.instanceSettingsRoutes != nil {
 		registrars = append(registrars, w.instanceSettingsRoutes)
