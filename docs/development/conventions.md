@@ -214,6 +214,7 @@ Accept a `ctx`, check `ctx.Err()` between phases and return it (see `runReloadPh
   | `_not_found` | 404 | `page_not_found` |
   | `_already_exists`, `_conflict`, `_already_running`, `_version_conflict` | 409 | `page_version_conflict` |
   | `_too_large` | 413 | `asset_file_too_large` |
+  | `_too_many_<what>` | 429 | `share_link_too_many_attempts` |
   | `_unavailable` (temporary, e.g. a store suspended during restore) | 503 | `auth_user_store_unavailable` |
   | `_internal_error`, `_failed` | 500 | `asset_upload_failed` |
 

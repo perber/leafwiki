@@ -155,6 +155,28 @@ definitions:
     - checks
     - status
     type: object
+  scopedread.PageView:
+    properties:
+      content:
+        type: string
+      id:
+        type: string
+      kind:
+        description: |-
+          Kind is "page" or "section". A plain string, so the shape seen by
+          scoped callers doesn't change with the core NodeKind type.
+        type: string
+      title:
+        type: string
+      updatedAt:
+        type: string
+    required:
+    - content
+    - id
+    - kind
+    - title
+    - updatedAt
+    type: object
 info:
   contact: {}
   description: |-
@@ -316,6 +338,87 @@ paths:
       summary: List pages by property
       tags:
       - properties
+  /shared/{token}/page:
+    get:
+      description: |-
+        Returns the page a share link points to. The token in the path is the only authorization: no session, reverse-proxy identity or API key is used, and none is needed. Unknown, expired and revoked links get the same 404 as a page outside the link. Requires --enable-share-links.
+        Responses carry Referrer-Policy: no-referrer, X-Robots-Tag: noindex, nofollow and Cache-Control: no-store.
+      parameters:
+      - description: Share link token
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: The shared page
+          schema:
+            $ref: '#/definitions/scopedread.PageView'
+        "404":
+          description: Unknown, malformed, expired or revoked link, or the page no
+            longer exists (code share_link_not_found)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "429":
+          description: Too many failed link lookups from this client (code share_link_too_many_attempts)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Reading the page failed (code share_link_internal_error)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "503":
+          description: Share link store unavailable during a live restore (code share_link_store_unavailable)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Read the shared page
+      tags:
+      - shared
+  /shared/{token}/pages/{id}:
+    get:
+      description: |-
+        Returns a page inside the share link's scope: the shared page itself, or, for a link that includes subpages, any page below it as the tree is now. The token in the path is the only authorization. A page outside the scope gets the same 404 as an unknown link. Requires --enable-share-links.
+        Responses carry Referrer-Policy: no-referrer, X-Robots-Tag: noindex, nofollow and Cache-Control: no-store.
+      parameters:
+      - description: Share link token
+        in: path
+        name: token
+        required: true
+        type: string
+      - description: Page ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: The page
+          schema:
+            $ref: '#/definitions/scopedread.PageView'
+        "404":
+          description: Unknown, malformed, expired or revoked link, or a page outside
+            the link, unknown or deleted (code share_link_not_found)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "429":
+          description: Too many failed link lookups from this client (code share_link_too_many_attempts)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Reading the page failed (code share_link_internal_error)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "503":
+          description: Share link store unavailable during a live restore (code share_link_store_unavailable)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Read a page inside a share link
+      tags:
+      - shared
   /tags:
     get:
       description: |-
