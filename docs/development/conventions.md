@@ -76,6 +76,7 @@ Rules:
    | Seam | Where | Used for |
    |---|---|---|
    | `RouteRegistrar` | `internal/http/registrar.go` | each slice registers its own routes |
+   | `RouterContext.CapabilityGroup` | `internal/http/registrar.go` | read-only routes whose URL secret is the authorization (share links); no identity, hardened, never logged ([ADR-0018](./adr/0018-capability-routes-without-identity.md)) |
    | `PageSideEffect` | `internal/wiki/pagesave` | reactions to page create/update/move/delete/restore |
    | `ShellResponder` / `ShellContributor` on `FrontendConfig` | `internal/http/shell.go` | the HTML document served for SPA routes: title, head and `#root` markup, or another response ([ADR-0017](./adr/0017-spa-shell-contributors.md)) |
    | `Provider` interfaces + `settings.Value` (`Managed`/`Fixed`) | `internal/publicaccess`, `internal/tocdisplay`, `internal/core/settings` | instance settings changeable at runtime or pinned by a flag |

@@ -205,7 +205,9 @@ resync-derived state.
   the custom stylesheet and `InjectCodeInHeader` last), see
   [ADR-0017](./adr/0017-spa-shell-contributors.md). `registrar.go` defines
   the `RouteRegistrar` interface and `RouterContext` (engine, auth cookie manager, CSRF cookie
-  manager, options) that every `internal/wiki/<domain>` package's `Routes` implements/receives —
+  manager, options; `APIAuthGroup`, `APIReadGroup`, and `CapabilityGroup` for identity-free
+  capability URLs, [ADR-0018](./adr/0018-capability-routes-without-identity.md)) that every
+  `internal/wiki/<domain>` package's `Routes` implements/receives —
   this is the seam that lets each domain slice register its own routes/middleware without the
   central router knowing about it. `dto/` holds shared HTTP response types
   (`dto/page.go`, `dto/tag.go`, `dto/property.go` — explicitly forbidden from importing
