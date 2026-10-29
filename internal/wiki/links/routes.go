@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	httpinternal "github.com/perber/wiki/internal/http"
+	"github.com/perber/wiki/internal/http/dto"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 )
 
@@ -55,7 +56,7 @@ func (r *Routes) handleGetLinkStatus(c *gin.Context) {
 		respondWithLinkError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, out.Status)
+	c.JSON(http.StatusOK, dto.ToLinkStatus(out.Status))
 }
 
 func (r *Routes) handleGetBrokenLinks(c *gin.Context) {
@@ -65,5 +66,5 @@ func (r *Routes) handleGetBrokenLinks(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, out)
+	c.JSON(http.StatusOK, dto.ToBrokenLinks(out.Links))
 }

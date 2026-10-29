@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	httpinternal "github.com/perber/wiki/internal/http"
+	"github.com/perber/wiki/internal/http/dto"
 )
 
 // Routes is the RouteRegistrar for the search domain.
@@ -71,12 +72,12 @@ func (r *Routes) handleSearch(c *gin.Context) {
 		respondWithSearchError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, out.Result)
+	c.JSON(http.StatusOK, dto.ToSearchResult(out.Result))
 }
 
 func (r *Routes) handleGetIndexingStatus(c *gin.Context) {
 	out := r.getIndexingStatus.Execute(c.Request.Context())
-	c.JSON(http.StatusOK, out.Status)
+	c.JSON(http.StatusOK, dto.ToIndexingStatus(out.Status))
 }
 
 func splitTags(raw string) []string {
