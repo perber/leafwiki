@@ -49,6 +49,22 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 // ─── Handlers ───────────────────────────────────────────────────────────────
 
+// handleGetLinkStatus handles GET /api/pages/{id}/links
+//
+//	@Summary		Get link status of a page
+//	@Description	Lists the links pointing at the given page (backlinks) and, separately, the links from other pages to this page's path that are broken (broken incoming links). The links starting on the page are split the same way into outgoing and broken outgoing links. The counters hold the length of each of the four lists.
+//	@Description	Access: a signed-in user (session cookie, API key or reverse-proxy identity); anonymous callers only when public access is on. With public access on, a missing or invalid session cookie is treated as anonymous instead of 401.
+//	@Tags			links
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		string				true	"Page ID"
+//	@Success		200	{object}	dto.LinkStatus		"Link status of the page; empty lists for a page without links"
+//	@Failure		401	{object}	dto.LegacyError		"No valid session while public access is off, an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)"
+//	@Failure		404	{object}	dto.ErrorResponse	"No page with this ID (code link_page_not_found)"
+//	@Failure		429	{object}	dto.LegacyError		"API-key attempts throttled"
+//	@Failure		500	{object}	object				"Link lookup failed: the body is an ErrorResponse (code link_internal_error). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object."
+//	@Failure		503	{object}	dto.LegacyError		"API-key store unavailable during a live restore (when API-key management is enabled)"
+//	@Router			/pages/{id}/links [get]
 func (r *Routes) handleGetLinkStatus(c *gin.Context) {
 	pageID := c.Param("id")
 	out, err := r.getLinkStatus.Execute(c.Request.Context(), GetLinkStatusInput{PageID: pageID})
@@ -59,6 +75,21 @@ func (r *Routes) handleGetLinkStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.ToLinkStatus(out.Status))
 }
 
+// handleGetBrokenLinks handles GET /api/links/broken
+//
+//	@Summary		List broken links
+//	@Description	Lists every link in the wiki whose target page does not exist, with the page it appears on.
+//	@Description	Access: admin only, also when public access is on. API keys act with the lesser of the owner's role and the key's role. With authentication disabled the route answers 403.
+//	@Tags			links
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	dto.BrokenLinks	"Broken links; an empty list when there are none"
+//	@Failure		401	{object}	dto.LegacyError	"No valid session, an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)"
+//	@Failure		403	{object}	dto.LegacyError	"The caller is not an admin, or authentication is disabled"
+//	@Failure		429	{object}	dto.LegacyError	"API-key attempts throttled"
+//	@Failure		500	{object}	object			"Link lookup failed: the body is an ErrorResponse (code link_internal_error). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object."
+//	@Failure		503	{object}	dto.LegacyError	"API-key store unavailable during a live restore (when API-key management is enabled)"
+//	@Router			/links/broken [get]
 func (r *Routes) handleGetBrokenLinks(c *gin.Context) {
 	out, err := r.getBrokenLinks.Execute(c.Request.Context())
 	if err != nil {
