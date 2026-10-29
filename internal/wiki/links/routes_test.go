@@ -178,8 +178,8 @@ func assertListKeys(t *testing.T, body map[string]json.RawMessage, want map[stri
 }
 
 // TestLinksRoutes_LinkStatus_PreservesWireShape pins the body of
-// GET /api/pages/{id}/links: the five keys, the item keys, and which empty
-// lists are [] and which are null.
+// GET /api/pages/{id}/links: the five keys, the item keys, and that an empty
+// list is [] and never null.
 func TestLinksRoutes_LinkStatus_PreservesWireShape(t *testing.T) {
 	f := newLinksRouter(t, signedIn)
 	counts := map[string]string{"backlinks": "number", "broken_incoming": "number", "outgoings": "number", "broken_outgoings": "number"}
@@ -188,16 +188,16 @@ func TestLinksRoutes_LinkStatus_PreservesWireShape(t *testing.T) {
 		"outgoings": outgoingItem, "broken_outgoings": outgoingItem,
 	}
 
-	// backlinks and broken_incoming are null while empty: toBacklinkResult
-	// builds them with `var items`. Outgoings are built with make and are [].
+	// Every list is an array, also when it is empty.
+	allArrays := map[string]string{"backlinks": "array", "broken_incoming": "array", "outgoings": "array", "broken_outgoings": "array"}
 	tests := []struct {
 		name string
 		page string
 		want map[string]string
 	}{
-		{"page with a backlink", f.pageB, map[string]string{"backlinks": "array", "broken_incoming": "null", "outgoings": "array", "broken_outgoings": "array"}},
-		{"page with a valid and a broken outgoing link", f.pageA, map[string]string{"backlinks": "null", "broken_incoming": "null", "outgoings": "array", "broken_outgoings": "array"}},
-		{"page without links", f.pageC, map[string]string{"backlinks": "null", "broken_incoming": "null", "outgoings": "array", "broken_outgoings": "array"}},
+		{"page with a backlink", f.pageB, allArrays},
+		{"page with a valid and a broken outgoing link", f.pageA, allArrays},
+		{"page without links", f.pageC, allArrays},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
