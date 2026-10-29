@@ -59,7 +59,7 @@ func (uc *GetLinkStatusUseCase) Execute(_ context.Context, in GetLinkStatusInput
 }
 
 type GetBrokenLinksOutput struct {
-	Links []corelinks.BrokenLink `json:"links"`
+	Links []corelinks.BrokenLink
 }
 
 type GetBrokenLinksUseCase struct {
