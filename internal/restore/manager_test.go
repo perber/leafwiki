@@ -963,6 +963,8 @@ func TestManager_RestoreFromUpload_CleansUpTempFileAfterCompletion(t *testing.T)
 			t.Fatalf("TriggerRestoreFromUpload failed: %v", err)
 		}
 		waitForRestoreDone(t, f.manager)
+		// The job reports Done before the deferred cleanup of the temp file runs.
+		f.manager.Wait()
 
 		if matches := tempGlob(f.dataDir); len(matches) != 0 {
 			t.Errorf("expected upload temp file to be cleaned up, found: %v", matches)
@@ -997,6 +999,8 @@ func TestManager_RestoreFromUpload_CleansUpTempFileAfterCompletion(t *testing.T)
 		if status.Error == "" {
 			t.Fatal("expected the invalid zip to fail validation")
 		}
+		// The job reports Done before the deferred cleanup of the temp file runs.
+		f.manager.Wait()
 
 		if matches := tempGlob(f.dataDir); len(matches) != 0 {
 			t.Errorf("expected upload temp file to be cleaned up even on failure, found: %v", matches)
