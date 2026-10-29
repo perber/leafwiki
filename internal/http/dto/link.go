@@ -39,8 +39,8 @@ type OutgoingLink struct {
 	FromPageID  string `json:"from_page_id"`
 }
 
-// ToLinkStatus converts a link status; nil stays nil. Backlinks and
-// BrokenIncoming stay nil when the input is nil, which marshals as null.
+// ToLinkStatus converts a link status; nil stays nil. Every list becomes an
+// empty slice so the response is [] rather than null.
 func ToLinkStatus(in *corelinks.LinkStatusResult) *LinkStatus {
 	if in == nil {
 		return nil
@@ -60,9 +60,6 @@ func ToLinkStatus(in *corelinks.LinkStatusResult) *LinkStatus {
 }
 
 func toBacklinks(in []corelinks.BacklinkResultItem) []Backlink {
-	if in == nil {
-		return nil
-	}
 	out := make([]Backlink, len(in))
 	for i, b := range in {
 		out[i] = Backlink{

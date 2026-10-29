@@ -20,23 +20,26 @@ func TestToLinkStatus_Marshal_MatchesCoreType(t *testing.T) {
 	assertMarshalsTo(t, ToLinkStatus(in), marshalString(t, in))
 }
 
-func TestToLinkStatus_EmptyLists(t *testing.T) {
-	in := &corelinks.LinkStatusResult{
-		Outgoings:       []corelinks.OutgoingResultItem{},
-		BrokenOutgoings: []corelinks.OutgoingResultItem{},
+// The core type sends null for empty backlinks and broken_incoming; the dto
+// sends [] for every list.
+func TestToLinkStatus_EmptyLists_AreArrays(t *testing.T) {
+	const want = `{"backlinks":[],"broken_incoming":[],"outgoings":[],"broken_outgoings":[],"counts":{"backlinks":0,"broken_incoming":0,"outgoings":0,"broken_outgoings":0}}`
+	tests := []struct {
+		name string
+		in   *corelinks.LinkStatusResult
+	}{
+		{"nil slices", &corelinks.LinkStatusResult{}},
+		{"empty slices", &corelinks.LinkStatusResult{
+			Backlinks:       []corelinks.BacklinkResultItem{},
+			BrokenIncoming:  []corelinks.BacklinkResultItem{},
+			Outgoings:       []corelinks.OutgoingResultItem{},
+			BrokenOutgoings: []corelinks.OutgoingResultItem{},
+		}},
 	}
-
-	// backlinks and broken_incoming stay null until the next commit flips them.
-	assertMarshalsTo(t, ToLinkStatus(in),
-		`{"backlinks":null,"broken_incoming":null,"outgoings":[],"broken_outgoings":[],"counts":{"backlinks":0,"broken_incoming":0,"outgoings":0,"broken_outgoings":0}}`)
-	assertMarshalsTo(t, in, marshalString(t, ToLinkStatus(in)))
-}
-
-func TestToLinkStatus_NilOutgoings_AreArrays(t *testing.T) {
-	got := marshalString(t, ToLinkStatus(&corelinks.LinkStatusResult{}))
-	want := `{"backlinks":null,"broken_incoming":null,"outgoings":[],"broken_outgoings":[],"counts":{"backlinks":0,"broken_incoming":0,"outgoings":0,"broken_outgoings":0}}`
-	if got != want {
-		t.Errorf("got %s, want %s", got, want)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertMarshalsTo(t, ToLinkStatus(tt.in), want)
+		})
 	}
 }
 
