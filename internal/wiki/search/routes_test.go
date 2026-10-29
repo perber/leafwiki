@@ -191,6 +191,24 @@ func TestSearchRoutes_Search_TagFacetsListTagsOfTheMatches(t *testing.T) {
 	}
 }
 
+// TestSearchRoutes_Search_TextQueryWithoutMatch pins that a text query that
+// matches nothing sends empty lists, not null.
+func TestSearchRoutes_Search_TextQueryWithoutMatch(t *testing.T) {
+	router, _ := newSearchRouter(t, signedIn, searchPages...)
+
+	rec := get(router, "/api/search?q=zebra")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+
+	test_utils.AssertJSONObjectShape(t, rec.Body.Bytes(), map[string]string{
+		"limit": "number", "offset": "number", "count": "number", "items": "array", "tag_facets": "array",
+	})
+	if body := rec.Body.String(); !strings.Contains(body, `"items":[]`) || !strings.Contains(body, `"count":0`) {
+		t.Errorf(`body = %s, want "items":[] and "count":0`, body)
+	}
+}
+
 // TestSearchRoutes_Search_ErrorBodies pins the exact error bodies so the
 // localized envelope stays wire-compatible (args omitted when empty).
 func TestSearchRoutes_Search_ErrorBodies(t *testing.T) {
