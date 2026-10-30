@@ -120,6 +120,7 @@
     "menuSortChildren": "{{item}}-Unterelemente sortieren",
     "menuMove": "{{item}} verschieben",
     "menuConvertToPage": "In Seite umwandeln",
+    "menuConvertToSection": "In Bereich umwandeln",
     "menuDelete": "{{item}} löschen",
     "emptySectionToast": "„{{title}}“ ist jetzt ein leerer Bereich",
     "convertBackAction": "Zurück in Seite umwandeln",

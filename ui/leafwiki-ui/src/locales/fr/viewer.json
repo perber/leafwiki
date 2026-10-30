@@ -120,6 +120,7 @@
     "menuSortChildren": "Trier les enfants de {{item}}",
     "menuMove": "Déplacer {{item}}",
     "menuConvertToPage": "Convertir en page",
+    "menuConvertToSection": "Convertir en section",
     "menuDelete": "Supprimer {{item}}",
     "emptySectionToast": "\"{{title}}\" est maintenant une section vide",
     "convertBackAction": "Reconvertir en page",

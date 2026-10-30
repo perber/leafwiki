@@ -120,6 +120,7 @@
     "menuSortChildren": "Ordenar elementos secundarios de {{item}}",
     "menuMove": "Mover {{item}}",
     "menuConvertToPage": "Convertir en página",
+    "menuConvertToSection": "Convertir en sección",
     "menuDelete": "Eliminar {{item}}",
     "emptySectionToast": "\"{{title}}\" ahora es una sección vacía",
     "convertBackAction": "Volver a convertir en página",
