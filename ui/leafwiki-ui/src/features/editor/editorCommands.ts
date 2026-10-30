@@ -1,17 +1,35 @@
-import { indentLess, insertTab } from '@codemirror/commands'
+import { indentLess, indentMore, insertTab } from '@codemirror/commands'
 import { indentUnit } from '@codemirror/language'
-import { Extension } from '@codemirror/state'
+import { Extension, StateCommand } from '@codemirror/state'
 import { EditorView, KeyBinding } from '@codemirror/view'
 
-// Tab inserts a single indentation character at the cursor, and only falls back
-// to indenting whole lines when the selection actually spans them (that's what
-// `insertTab` does). This replaces CodeMirror's `indentWithTab`, which always
-// ran `indentMore` — indenting the entire current line even for a collapsed
-// cursor, so pressing Tab mid-line shifted the whole line instead of inserting
-// at the caret. Shift-Tab still dedents via `indentLess`.
+// Matches leading whitespace + list marker + checkbox (optional)
+// e.g. "" || " " && "-" || "*" || "+" || "<#>. " || "<#>) " && "" || "[ ] " || "[x] " || "[X] "
+const LIST_PREFIX_RE = /^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?$/
+
+//Changes indentation rules if operating in a list
+//If the line matches, use the "insertMore" function to move entire line,
+//otherwise default back to "insertTab".
+//Without the check, one would have to move the caret before the bullet,
+//which makes list making quite tedious.
+export const smartTab: StateCommand = ({ state, dispatch }) => {
+  if (
+    state.selection.ranges.every((range) => {
+      if (!range.empty) return false
+      const line = state.doc.lineAt(range.from)
+      const textBeforeCursor = line.text.slice(0, range.from - line.from)
+      return LIST_PREFIX_RE.test(textBeforeCursor)
+    })
+  ) {
+    return indentMore({ state, dispatch })
+  }
+
+  return insertTab({ state, dispatch })
+}
+
 export const tabIndentKeyBinding: KeyBinding = {
   key: 'Tab',
-  run: insertTab,
+  run: smartTab,
   shift: indentLess,
 }
 
