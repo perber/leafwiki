@@ -120,6 +120,7 @@
     "menuSortChildren": "排序{{item}}子项",
     "menuMove": "移动{{item}}",
     "menuConvertToPage": "转换为页面",
+    "menuConvertToSection": "转换为章节",
     "menuDelete": "删除{{item}}",
     "emptySectionToast": "“{{title}}”现在是空章节",
     "convertBackAction": "转回页面",

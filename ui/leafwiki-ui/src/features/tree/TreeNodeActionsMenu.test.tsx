@@ -4,6 +4,7 @@ import { usePageEditorStore } from '@/features/editor/pageEditorStore'
 import { DIALOG_EDIT_PAGE_METADATA } from '@/lib/registries'
 import {
   applyPageRefactor,
+  convertPage,
   getPageByPath,
   previewPageRefactor,
   updatePage,
@@ -160,5 +161,61 @@ describe('TreeNodeActionsMenu', () => {
     })
     expect(previewPageRefactor).not.toHaveBeenCalled()
     expect(applyPageRefactor).not.toHaveBeenCalled()
+  })
+
+  it('offers "convert to section" for a page, and converts it on click', async () => {
+    vi.mocked(convertPage).mockResolvedValue(undefined)
+
+    render(
+      <MemoryRouter>
+        <TreeNodeActionsMenu node={node} />
+      </MemoryRouter>,
+    )
+
+    expect(
+      screen.queryByText('treeActions.menuConvertToPage'),
+    ).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('treeActions.menuConvertToSection'))
+
+    await waitFor(() => {
+      expect(convertPage).toHaveBeenCalledWith(node.id, 'section', node.version)
+    })
+  })
+
+  it('offers "convert to page" for an empty section, not for one with children', () => {
+    const emptySection: PageNode = {
+      ...node,
+      id: 'section-empty',
+      kind: 'section',
+      children: null,
+    }
+    const { rerender } = render(
+      <MemoryRouter>
+        <TreeNodeActionsMenu node={emptySection} />
+      </MemoryRouter>,
+    )
+    expect(
+      screen.getByText('treeActions.menuConvertToPage'),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText('treeActions.menuConvertToSection'),
+    ).not.toBeInTheDocument()
+
+    const sectionWithChildren: PageNode = {
+      ...emptySection,
+      id: 'section-with-children',
+      children: [{ ...node, id: 'child-1' }],
+    }
+    useTreeNodeActionsMenusStore.setState({
+      openMenuNodeId: sectionWithChildren.id,
+    })
+    rerender(
+      <MemoryRouter>
+        <TreeNodeActionsMenu node={sectionWithChildren} />
+      </MemoryRouter>,
+    )
+    expect(
+      screen.queryByText('treeActions.menuConvertToPage'),
+    ).not.toBeInTheDocument()
   })
 })

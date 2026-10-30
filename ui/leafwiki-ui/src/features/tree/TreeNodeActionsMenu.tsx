@@ -367,6 +367,15 @@ export default function TreeNodeActionsMenu({
                 {t('treeActions.menuConvertToPage')}
               </DropdownMenuItem>
             )}
+            {nodeKind === NODE_KIND_PAGE && (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={handleConvertPage}
+              >
+                <Repeat2 size={18} className="tree-node__action-icon" />{' '}
+                {t('treeActions.menuConvertToSection')}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
           </>
         )}
