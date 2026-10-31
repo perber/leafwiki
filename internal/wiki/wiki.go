@@ -20,6 +20,7 @@ import (
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/links"
 	"github.com/perber/wiki/internal/properties"
+	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/restore"
 	"github.com/perber/wiki/internal/search"
 	"github.com/perber/wiki/internal/sharing"
@@ -63,6 +64,7 @@ type Wiki struct {
 	searchIndex       *search.SQLiteIndex
 	status            *search.IndexingStatus
 	storageDir        string
+	publicAccess      publicaccess.ReadGate
 
 	// Domain route registrars (populated by NewWiki).
 	pagesRoutes            *wikipages.Routes
@@ -121,6 +123,10 @@ type WikiOptions struct {
 	TOTPEncryptionKey       string        // Key used to encrypt per-user TOTP secrets at rest; empty disables TOTP self-service
 	SMTP                    email.Config  // SMTP config for password-reset/invite email; SMTP.Enabled()==false disables the feature entirely
 	Metrics                 *httpmetrics.HTTPMetrics
+	// PublicAccess is the runtime public-access setting, read per request by
+	// features that serve anonymous visitors (search engine rendering). nil
+	// means public access is off.
+	PublicAccess publicaccess.ReadGate
 }
 
 func NewWiki(options *WikiOptions) (*Wiki, error) {
@@ -132,6 +138,7 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 		shutdownCtx:    shutdownCtx,
 		shutdownCancel: shutdownCancel,
 		metrics:        options.Metrics,
+		publicAccess:   options.PublicAccess,
 	}
 	if err := w.boot(options); err != nil {
 		// Close what the steps before the failing one opened: a leaked
