@@ -8,7 +8,7 @@ import {
 } from './editorCommands'
 
 // Runs the Tab / Shift-Tab binding against a real EditorState and returns the
-// resulting document. `head`/`anchor` default to a collapsed cursor.
+// resulting document and cursor head. `head`/`anchor` default to a collapsed cursor.
 function runTab(
   doc: string,
   {
@@ -30,7 +30,11 @@ function runTab(
       next = tr.state
     },
   } as unknown as EditorView)
-  return { handled, doc: next.doc.toString() }
+  return {
+    handled,
+    doc: next.doc.toString(),
+    head: next.selection.main.head,
+  }
 }
 
 describe('tabIndentKeyBinding', () => {
@@ -41,6 +45,40 @@ describe('tabIndentKeyBinding', () => {
     expect(doc).toBe('## Hea\tding')
     // Regression: the old `indentWithTab` produced "\t## Heading".
     expect(doc.startsWith('\t')).toBe(false)
+  })
+
+  it('indents the whole bullet line when the cursor is right after the list marker', () => {
+    // Simulates pressing Enter on a list item ("- item 1\n- ") and then pressing Tab
+    const initial = '- item 1\n- '
+    const { handled, doc, head } = runTab(initial, { anchor: initial.length })
+    expect(handled).toBe(true)
+    expect(doc).toBe('- item 1\n\t- ')
+    expect(head).toBe('- item 1\n\t- '.length)
+    // Regression: the old "insertTab" usage produced "- item 1\n- \t"
+    expect(doc).not.toBe('- item 1\n- \t')
+  })
+
+  it.each([
+    { label: 'dash bullet', input: '- ', expected: '\t- ' },
+    { label: 'asterisk bullet', input: '* ', expected: '\t* ' },
+    { label: 'plus bullet', input: '+ ', expected: '\t+ ' },
+    { label: 'already indented bullet', input: '\t- ', expected: '\t\t- ' },
+    { label: 'numbered dot list', input: '1. ', expected: '\t1. ' },
+    { label: 'numbered paren list', input: '1) ', expected: '\t1) ' },
+    { label: 'unchecked task list', input: '- [ ] ', expected: '\t- [ ] ' },
+    { label: 'checked task list', input: '- [x] ', expected: '\t- [x] ' },
+  ])('indents the whole line when cursor follows $label ($input)', ({ input, expected }) => {
+    const { handled, doc } = runTab(input, { anchor: input.length })
+    expect(handled).toBe(true)
+    expect(doc).toBe(expected)
+  })
+
+  it('inserts a literal tab at the cursor when inside list item text', () => {
+    // Cursor sits mid-text inside a list item: "- hello| world"
+    const initial = '- hello world'
+    const { handled, doc } = runTab(initial, { anchor: '- hello'.length })
+    expect(handled).toBe(true)
+    expect(doc).toBe('- hello\t world')
   })
 
   it('indents every line when the selection spans multiple lines', () => {
