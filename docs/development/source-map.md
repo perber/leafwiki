@@ -14,7 +14,7 @@ derived-index packages (`internal/links`, `internal/tags`, `internal/properties`
 `internal/favorites`, `internal/usersettings`, `internal/avatar`, `internal/publicaccess`,
 `internal/tocdisplay`, `internal/snapshot`, `internal/restore`, `internal/backup`,
 `internal/branding`, `internal/importer`), then into the `internal/wiki/<domain>` slices (`pages`,
-`pagesave`, `auth`, `resync`, `revisions`, `search`, `links`, `tags`, `properties`, `apikeys`,
+`pagesave`, `auth`, `resync`, `revisions`, `search`, `links`, `tags`, `properties`, `apikeys`, `shares`,
 `assets`, `avatar`, `backup`, `branding`, `health`, `importer`, `instancesettings`, `restore`,
 `snapshot`, `usersettings`) that each expose HTTP routes via
 `internal/http`. See [ADR-0001: Filesystem as Source of Truth](./adr/0001-filesystem-source-of-truth.md) for why the split between
@@ -205,7 +205,9 @@ resync-derived state.
   the custom stylesheet and `InjectCodeInHeader` last), see
   [ADR-0017](./adr/0017-spa-shell-contributors.md). `registrar.go` defines
   the `RouteRegistrar` interface and `RouterContext` (engine, auth cookie manager, CSRF cookie
-  manager, options) that every `internal/wiki/<domain>` package's `Routes` implements/receives —
+  manager, options; `APIAuthGroup`, `APIReadGroup`, and `CapabilityGroup` for identity-free
+  capability URLs, [ADR-0018](./adr/0018-capability-routes-without-identity.md)) that every
+  `internal/wiki/<domain>` package's `Routes` implements/receives —
   this is the seam that lets each domain slice register its own routes/middleware without the
   central router knowing about it. `dto/` holds shared HTTP response types
   (`dto/page.go`, `dto/tag.go`, `dto/property.go` — explicitly forbidden from importing
@@ -284,6 +286,13 @@ shape for that domain.
   **`internal/wiki/links`** — thin HTTP slices over the matching top-level `internal/<name>`
   package (search query endpoint, tag listing/filter, property listing/filter, backlink/link-status
   endpoints respectively).
+- **`internal/wiki/shares`** — the public read surface of share links (#1252, `--enable-share-links`):
+  `GET /api/shared/{token}/page` and `/pages/{id}` in a capability group
+  ([ADR-0018](./adr/0018-capability-routes-without-identity.md)). The use case resolves the token to a
+  `sharing.Grant`, turns it into a `scopedread.ReadScope` and reads through `scopedread.PageReader`
+  ([ADR-0015](./adr/0015-scoped-read-boundary.md)); every "no such link or page" is the same 404, and
+  failed lookups are rate limited per client. The slice is registered at boot only when share links
+  are enabled; a runtime admin switch would move that decision into a provider checked per request.
 - **`internal/wiki/apikeys`** — API key CRUD HTTP surface over `core/auth`'s `APIKeyService`.
 - **`internal/wiki/assets`** — per-page asset upload/list/delete HTTP surface over
   `core/assets`.
