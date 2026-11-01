@@ -8,7 +8,7 @@ COPY ./ui/leafwiki-ui/ ./
 RUN VITE_API_URL=/ APP_VERSION=${APP_VERSION} npm run build
 
 # Step 2: Backend + Build binary
-FROM golang:1.27.3-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd AS backend-build
+FROM golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS backend-build
 WORKDIR /app
 ARG APP_VERSION
 ARG DISABLE_REFRESH_TOKEN_RATE_LIMIT=false
