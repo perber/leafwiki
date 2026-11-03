@@ -76,6 +76,22 @@ type UpdatePageInput struct {
 	Content *string // nil keeps the current content
 }
 
+// PatchRange is one line-range operation of a patch_page patch. The line
+// numbers are 1-based and inclusive, matching the line numbers get_page
+// renders, so an agent can point straight at the lines it read.
+type PatchRange struct {
+	Start   int    // first line of the range
+	End     int    // last line of the range
+	Replace string // replacement text; empty deletes the range's lines
+}
+
+// PatchPageInput is the input of the patch_page tool.
+type PatchPageInput struct {
+	Actor  Actor
+	ID     string
+	Ranges []PatchRange
+}
+
 // PageOps is the narrow consumer interface the page tools delegate to. The
 // slice never talks to the wiki's services directly: tool handlers bind their
 // arguments, gate the caller's role, call one of these, format the result, and
@@ -95,4 +111,6 @@ type PageOps interface {
 	CreatePage(ctx context.Context, in CreatePageInput) (*Page, error)
 	// UpdatePage fully replaces a page's title and/or content and returns it.
 	UpdatePage(ctx context.Context, in UpdatePageInput) (*Page, error)
+	// PatchPage applies a line-range patch to a page's content and returns it.
+	PatchPage(ctx context.Context, in PatchPageInput) (*Page, error)
 }

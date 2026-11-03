@@ -210,6 +210,42 @@ func (a *WikiMCPAdapter) UpdatePage(ctx context.Context, in wikimcp.UpdatePageIn
 	return mcpPageFromView(fresh), nil
 }
 
+// PatchPage applies a line-range patch to a page's body: it reads the live
+// page, applies the patch, and writes the result through the update-page
+// use case under the read version, so a concurrent edit is a clean
+// page_version_conflict instead of a silent overwrite.
+func (a *WikiMCPAdapter) PatchPage(ctx context.Context, in wikimcp.PatchPageInput) (*wikimcp.Page, error) {
+	view, err := a.pageViewByID(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	patched, err := wikimcp.ApplyPatch(view.Page.Content, in.Ranges)
+	if err != nil {
+		return nil, patchFieldError(err)
+	}
+	content := patched
+	if _, err := a.updatePageChange(ctx, in.Actor.ID, view.Page, "", view.Page.Slug, &content); err != nil {
+		return nil, err
+	}
+	// The patch rewrites the page's body, so the result's tags and properties
+	// come from a fresh view (as UpdatePage does; the REST update route
+	// re-reads them for its response the same way).
+	fresh, err := a.pageViewByID(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	return mcpPageFromView(fresh), nil
+}
+
+// patchFieldError reports an invalid patch (a range out of line bounds or
+// overlapping another) as a validation error on the patch field, which the
+// tool error mapper renders as mcp_invalid_input.
+func patchFieldError(err error) error {
+	ve := sharederrors.NewValidationErrors()
+	ve.Add("patch", err.Error())
+	return ve
+}
+
 // pageViewByID runs the get-page-view-by-ID use case and maps its errors like
 // the read ops do.
 func (a *WikiMCPAdapter) pageViewByID(ctx context.Context, id string) (*wikipages.PageView, error) {

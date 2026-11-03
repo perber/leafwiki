@@ -157,9 +157,9 @@ func TestMCP_DisabledByDefault(t *testing.T) {
 
 // TestMCP_SessionInitializeAndListsTools is the contract a cookie-authenticated
 // session sees: a valid MCP initialize (serverInfo named leafwiki) and a
-// tools/list carrying the six page tools (four reads, create_page and
-// update_page; the remaining write tools land in the follow-up PRs of the
-// series).
+// tools/list carrying the seven page tools (four reads, create_page,
+// update_page and patch_page; the remaining write tools land in the
+// follow-up PRs of the series).
 func TestMCP_SessionInitializeAndListsTools(t *testing.T) {
 	_, router := newMCPRouterTest(t, false)
 	sess := loginSession(t, router, "admin", "adminpassword")
@@ -195,7 +195,7 @@ func TestMCP_SessionInitializeAndListsTools(t *testing.T) {
 	for _, tool := range listResp.Result.Tools {
 		got[tool.Name] = true
 	}
-	for _, want := range []string{"get_page", "get_page_by_path", "search", "list_tree", "create_page", "update_page"} {
+	for _, want := range []string{"get_page", "get_page_by_path", "search", "list_tree", "create_page", "update_page", "patch_page"} {
 		if !got[want] {
 			t.Fatalf("expected tool %q in tools/list, got %v", want, listResp.Result.Tools)
 		}

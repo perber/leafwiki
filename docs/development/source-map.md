@@ -300,11 +300,12 @@ shape for that domain.
   registers the page tools, and holds the context helpers `userFromContext`/`keyAuthFromContext`,
   the `Actor` extractor `actorFromContext`, and the role gate `requireRole` the tool handlers read.
   The tools are thin (one file each: the reads `get_page.go`, `get_page_by_path.go`, `search.go`,
-  `list_tree.go` gated at `viewer`; the writes `create_page.go`, `update_page.go` gated at `editor`,
-  the role the equivalent REST mutation requires): each binds its arguments, gates the caller's
-  role (failing closed on a nil caller), delegates to the `PageOps` interface (`ops.go`, the
-  read-only DTOs plus the write input structs with their `Actor`), formats the result
-  (`format.go`), and maps errors onto a `ToolError`. `errors.go` maps use-case errors onto MCP tool
+  `list_tree.go` gated at `viewer`; the writes `create_page.go`, `update_page.go`, `patch_page.go`
+  gated at `editor`, the role the equivalent REST mutation requires): each binds its arguments,
+  gates the caller's role (failing closed on a nil caller), delegates to the `PageOps` interface
+  (`ops.go`, the read-only DTOs plus the write input structs with their `Actor`), formats the
+  result (`format.go`, which also holds the `patch_page` line-range format:
+  `parsePatch`/`ApplyPatch`), and maps errors onto a `ToolError`. `errors.go` maps use-case errors onto MCP tool
   errors — a `LocalizedError` passes through with its code and message, validation failures become
   `mcp_invalid_input`, a denied role becomes `mcp_forbidden`, anything else becomes
   `mcp_internal_error` (500-equivalent codes — `mcp_internal_error` and a slice's own

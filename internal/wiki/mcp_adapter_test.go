@@ -496,3 +496,95 @@ func TestWikiMCPAdapter_UpdatePage_MetadataReflectsThePageAfterTheWrite(t *testi
 		t.Fatalf("updated Tags = %v, want the fresh read's %v", updated.Tags, fresh.Tags)
 	}
 }
+
+// TestWikiMCPAdapter_PatchPage_Effects applies a line-range patch to the live
+// page: the returned and the re-read page carry the patched body.
+func TestWikiMCPAdapter_PatchPage_Effects(t *testing.T) {
+	_, adapter := newMCPWriteTestWiki(t)
+
+	created, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor:   mcpActor(),
+		Title:   "MCP Patchable",
+		Content: "alpha\nbeta\ngamma",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage error: %v", err)
+	}
+
+	patched, err := adapter.PatchPage(context.Background(), wikimcp.PatchPageInput{
+		Actor:  mcpActor(),
+		ID:     created.ID,
+		Ranges: []wikimcp.PatchRange{{Start: 2, End: 2, Replace: "BETA"}},
+	})
+	if err != nil {
+		t.Fatalf("PatchPage error: %v", err)
+	}
+	if want := "alpha\nBETA\ngamma"; patched.Content != want {
+		t.Fatalf("patched Content = %q, want %q", patched.Content, want)
+	}
+	got, err := adapter.GetPage(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("GetPage after patch error: %v", err)
+	}
+	if want := "alpha\nBETA\ngamma"; got.Content != want {
+		t.Fatalf("live Content = %q, want %q", got.Content, want)
+	}
+}
+
+// TestWikiMCPAdapter_PatchPage_OutOfRange reports a range past the end of the
+// page as a validation error on the patch field, which the tool error mapper
+// renders as mcp_invalid_input (a clean error, not a 500-equivalent).
+func TestWikiMCPAdapter_PatchPage_OutOfRange(t *testing.T) {
+	_, adapter := newMCPWriteTestWiki(t)
+
+	created, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(),
+		Title: "MCP Short",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage error: %v", err)
+	}
+
+	_, err = adapter.PatchPage(context.Background(), wikimcp.PatchPageInput{
+		Actor:  mcpActor(),
+		ID:     created.ID,
+		Ranges: []wikimcp.PatchRange{{Start: 1, End: 99, Replace: "x"}},
+	})
+	var vErr *sharederrors.ValidationErrors
+	if !errors.As(err, &vErr) {
+		t.Fatalf("expected a *sharederrors.ValidationErrors, got %T (%v)", err, err)
+	}
+}
+
+// TestWikiMCPAdapter_PatchPage_MetadataReflectsThePageAfterTheWrite proves the
+// patch result is re-read after the write (as UpdatePage is), so its tags and
+// properties are the page's own after the patch, per a fresh read.
+func TestWikiMCPAdapter_PatchPage_MetadataReflectsThePageAfterTheWrite(t *testing.T) {
+	w, adapter := newMCPWriteTestWiki(t)
+
+	created, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor:   mcpActor(),
+		Title:   "MCP Patch Metadata",
+		Content: "alpha\nbeta\ngamma",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage error: %v", err)
+	}
+	updatePageMetadataForTest(t, w, "u-1", created.ID, []string{"kept"})
+
+	patched, err := adapter.PatchPage(context.Background(), wikimcp.PatchPageInput{
+		Actor:  mcpActor(),
+		ID:     created.ID,
+		Ranges: []wikimcp.PatchRange{{Start: 2, End: 2, Replace: "BETA"}},
+	})
+	if err != nil {
+		t.Fatalf("PatchPage error: %v", err)
+	}
+	fresh, err := adapter.GetPage(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("GetPage after patch error: %v", err)
+	}
+	if len(patched.Tags) != len(fresh.Tags) || (len(fresh.Tags) > 0 && patched.Tags[0] != fresh.Tags[0]) {
+		t.Fatalf("patched Tags = %v, want the fresh read's %v", patched.Tags, fresh.Tags)
+	}
+}
