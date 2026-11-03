@@ -588,3 +588,353 @@ func TestWikiMCPAdapter_PatchPage_MetadataReflectsThePageAfterTheWrite(t *testin
 		t.Fatalf("patched Tags = %v, want the fresh read's %v", patched.Tags, fresh.Tags)
 	}
 }
+
+// TestWikiMCPAdapter_DeletePage_Effects deletes the page from the tree and the
+// search index, and cleans up the per-user favorites and the revision data —
+// the same cleanup the REST delete route performs through the delete use case.
+func TestWikiMCPAdapter_DeletePage_Effects(t *testing.T) {
+	w, adapter := newMCPWriteTestWiki(t)
+
+	created, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor:   mcpActor(),
+		Title:   "MCP Deletable",
+		Content: "doomed body",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage error: %v", err)
+	}
+	// A content change records a revision; the delete must clear it.
+	body := "a second body"
+	if _, err := adapter.UpdatePage(context.Background(), wikimcp.UpdatePageInput{
+		Actor:   mcpActor(),
+		ID:      created.ID,
+		Content: &body,
+	}); err != nil {
+		t.Fatalf("UpdatePage error: %v", err)
+	}
+	revsBefore, err := w.revision.ListRevisions(created.ID)
+	if err != nil {
+		t.Fatalf("ListRevisions before delete error: %v", err)
+	}
+	if len(revsBefore) == 0 {
+		t.Fatal("expected the content change to have recorded a revision")
+	}
+	if err := w.favorites.Add("u-1", created.ID); err != nil {
+		t.Fatalf("favorites.Add error: %v", err)
+	}
+
+	if err := adapter.DeletePage(context.Background(), wikimcp.DeletePageInput{Actor: mcpActor(), ID: created.ID}); err != nil {
+		t.Fatalf("DeletePage error: %v", err)
+	}
+
+	// Gone from the tree…
+	if _, err := adapter.GetPage(context.Background(), created.ID); err == nil {
+		t.Fatal("GetPage after delete succeeded, want page_not_found")
+	}
+	// …and from the search index.
+	res, err := adapter.Search(context.Background(), "doomed", 10)
+	if err != nil {
+		t.Fatalf("Search error: %v", err)
+	}
+	for _, item := range res.Items {
+		if item.ID == created.ID {
+			t.Fatal("deleted page is still in the search index")
+		}
+	}
+	// Favorites and revision data are cleaned up.
+	favIDs, err := w.favorites.ListPageIDsForUser("u-1")
+	if err != nil {
+		t.Fatalf("ListPageIDsForUser error: %v", err)
+	}
+	for _, id := range favIDs {
+		if id == created.ID {
+			t.Fatal("deleted page is still in the user's favorites")
+		}
+	}
+	revs, err := w.revision.ListRevisions(created.ID)
+	if err != nil {
+		t.Fatalf("ListRevisions after delete error: %v", err)
+	}
+	if len(revs) != 0 {
+		t.Fatalf("revision data survived the delete: %+v", revs)
+	}
+}
+
+// TestWikiMCPAdapter_DeletePage_HasChildren reports a non-recursive delete of a
+// page with children with the REST-parity code page_has_children.
+func TestWikiMCPAdapter_DeletePage_HasChildren(t *testing.T) {
+	_, adapter := newMCPWriteTestWiki(t)
+
+	section, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(),
+		Title: "MCP Section",
+		Slug:  "mcp-section",
+		Kind:  "section",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage (section) error: %v", err)
+	}
+	if _, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor:    mcpActor(),
+		Title:    "MCP Child",
+		ParentID: &section.ID,
+	}); err != nil {
+		t.Fatalf("CreatePage (child) error: %v", err)
+	}
+
+	err = adapter.DeletePage(context.Background(), wikimcp.DeletePageInput{Actor: mcpActor(), ID: section.ID})
+	assertPageError(t, err, wikipages.ErrCodePageHasChildren, "Page has children, use recursive delete")
+}
+
+// TestWikiMCPAdapter_MovePage_Effects moves the page to a new route path: the
+// old path no longer resolves and the new one does.
+func TestWikiMCPAdapter_MovePage_Effects(t *testing.T) {
+	_, adapter := newMCPWriteTestWiki(t)
+
+	created, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor:   mcpActor(),
+		Title:   "MCP Movable",
+		Content: "moving body",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage error: %v", err)
+	}
+	if _, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(),
+		Title: "MCP Destination",
+		Slug:  "mcp-dest",
+		Kind:  "section",
+	}); err != nil {
+		t.Fatalf("CreatePage (section) error: %v", err)
+	}
+
+	if err := adapter.MovePage(context.Background(), wikimcp.MovePageInput{
+		Actor: mcpActor(),
+		ID:    created.ID,
+		Path:  "mcp-dest/renamed-movable",
+	}); err != nil {
+		t.Fatalf("MovePage error: %v", err)
+	}
+
+	// The new path resolves to the moved page…
+	moved, err := adapter.GetPageByPath(context.Background(), "mcp-dest/renamed-movable")
+	if err != nil {
+		t.Fatalf("GetPageByPath (new path) error: %v", err)
+	}
+	if moved.ID != created.ID || moved.Content != "moving body" {
+		t.Fatalf("new path resolved to the wrong page: %+v", moved)
+	}
+	// …and the old one is gone.
+	if _, err := adapter.GetPageByPath(context.Background(), "mcp-movable"); err == nil {
+		t.Fatal("old path still resolves after the move")
+	}
+}
+
+// TestWikiMCPAdapter_MovePage_ToRoot moves a nested page to the wiki root
+// through the empty path (the tool's documented root-move path): the old path
+// no longer resolves and the root path does.
+func TestWikiMCPAdapter_MovePage_ToRoot(t *testing.T) {
+	_, adapter := newMCPWriteTestWiki(t)
+
+	nest, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(),
+		Title: "MCP Nest",
+		Slug:  "mcp-nest",
+		Kind:  "section",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage (section) error: %v", err)
+	}
+	nested, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor:    mcpActor(),
+		Title:    "MCP Nested",
+		Slug:     "mcp-nested",
+		ParentID: &nest.ID,
+	})
+	if err != nil {
+		t.Fatalf("CreatePage (nested) error: %v", err)
+	}
+	// Pin the nested path down before the move.
+	if _, err := adapter.GetPageByPath(context.Background(), "mcp-nest/mcp-nested"); err != nil {
+		t.Fatalf("the nested page should resolve before the move: %v", err)
+	}
+
+	if err := adapter.MovePage(context.Background(), wikimcp.MovePageInput{
+		Actor: mcpActor(),
+		ID:    nested.ID,
+		Path:  "",
+	}); err != nil {
+		t.Fatalf("MovePage (to root) error: %v", err)
+	}
+
+	// The root path resolves to the moved page…
+	moved, err := adapter.GetPageByPath(context.Background(), "mcp-nested")
+	if err != nil {
+		t.Fatalf("GetPageByPath (root path) error: %v", err)
+	}
+	if moved.ID != nested.ID {
+		t.Fatalf("root path resolved to the wrong page: %+v", moved)
+	}
+	// …and the nested one is gone.
+	if _, err := adapter.GetPageByPath(context.Background(), "mcp-nest/mcp-nested"); err == nil {
+		t.Fatal("the nested path still resolves after the move to root")
+	}
+}
+
+// TestWikiMCPAdapter_MovePage_RootPageUnchanged is the no-op move: a page
+// already at the root, moved to the root with an unchanged slug, is refused
+// with the REST-identical page_slug_conflict (the on-disk move onto itself
+// fails) and the page must stay reachable at its root path, unchanged.
+func TestWikiMCPAdapter_MovePage_RootPageUnchanged(t *testing.T) {
+	_, adapter := newMCPWriteTestWiki(t)
+
+	created, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(),
+		Title: "MCP Rooted",
+		Slug:  "mcp-rooted",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage error: %v", err)
+	}
+
+	err = adapter.MovePage(context.Background(), wikimcp.MovePageInput{
+		Actor: mcpActor(),
+		ID:    created.ID,
+		Path:  "",
+	})
+	assertPageError(t, err, wikipages.ErrCodePageSlugConflict, "Page already exists")
+
+	// The refused no-op leaves the page exactly where it was.
+	got, err := adapter.GetPageByPath(context.Background(), "mcp-rooted")
+	if err != nil {
+		t.Fatalf("GetPageByPath after the no-op move error: %v", err)
+	}
+	if got.ID != created.ID {
+		t.Fatalf("the page did not stay reachable at its root path: %+v", got)
+	}
+}
+
+// TestWikiMCPAdapter_MovePage_CircularMove reports a move into the page's own
+// subtree with the REST-parity code page_circular_move — and, because the
+// destination is validated before any mutation, the page is left exactly
+// where it was: the old path still resolves and the slug is unchanged.
+func TestWikiMCPAdapter_MovePage_CircularMove(t *testing.T) {
+	_, adapter := newMCPWriteTestWiki(t)
+
+	section, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(),
+		Title: "MCP Cycle Section",
+		Slug:  "mcp-cycle",
+		Kind:  "section",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage (section) error: %v", err)
+	}
+	if _, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor:    mcpActor(),
+		Title:    "MCP Cycle Child",
+		Slug:     "mcp-cycle-child",
+		ParentID: &section.ID,
+	}); err != nil {
+		t.Fatalf("CreatePage (child) error: %v", err)
+	}
+
+	err = adapter.MovePage(context.Background(), wikimcp.MovePageInput{
+		Actor: mcpActor(),
+		ID:    section.ID,
+		Path:  "mcp-cycle/mcp-cycle-child/x",
+	})
+	assertPageError(t, err, wikipages.ErrCodePageCircularMove, "Move would create a circular reference")
+
+	// The refused move must be a no-op: the section keeps its path (and so its
+	// slug) and a renamed slug would have left the tree.
+	got, err := adapter.GetPageByPath(context.Background(), "mcp-cycle")
+	if err != nil {
+		t.Fatalf("the section's path must survive a circular move: %v", err)
+	}
+	if got.ID != section.ID || got.Path != "mcp-cycle" {
+		t.Fatalf("the circular move changed the page: %+v", got)
+	}
+}
+
+// TestWikiMCPAdapter_MovePage_ParentNotFound reports a destination whose parent
+// path does not exist with the REST-parity code page_parent_not_found (the
+// REST move route answers the same code for an unknown parent).
+func TestWikiMCPAdapter_MovePage_ParentNotFound(t *testing.T) {
+	_, adapter := newMCPWriteTestWiki(t)
+
+	created, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(),
+		Title: "MCP Stranded",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage error: %v", err)
+	}
+
+	err = adapter.MovePage(context.Background(), wikimcp.MovePageInput{
+		Actor: mcpActor(),
+		ID:    created.ID,
+		Path:  "no-such-section/stranded",
+	})
+	assertPageError(t, err, wikipages.ErrCodePageParentNotFound, "Parent page not found")
+}
+
+// TestWikiMCPAdapter_MovePage_FailedCollisionLeavesSlugBehind pins the residual
+// property stated in the move tool's description: a destination slug collision
+// is only discovered by the move itself (after the rename is committed), so a
+// failed move may leave the new slug in place — here the page ends up at its
+// old location under the new slug.
+func TestWikiMCPAdapter_MovePage_FailedCollisionLeavesSlugBehind(t *testing.T) {
+	_, adapter := newMCPWriteTestWiki(t)
+
+	if _, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(),
+		Title: "MCP Clash",
+		Slug:  "mcp-clash",
+		Kind:  "section",
+	}); err != nil {
+		t.Fatalf("CreatePage (section) error: %v", err)
+	}
+	mover, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(),
+		Title: "MCP Mover",
+		Slug:  "mover",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage (mover) error: %v", err)
+	}
+	// The destination section already has a child with the target slug, so the
+	// move will collide even though the rename to "dup" succeeds at root.
+	dest, err := adapter.GetPageByPath(context.Background(), "mcp-clash")
+	if err != nil {
+		t.Fatalf("GetPageByPath (mcp-clash) error: %v", err)
+	}
+	if _, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor:    mcpActor(),
+		Title:    "MCP Occupant",
+		Slug:     "dup",
+		ParentID: &dest.ID,
+	}); err != nil {
+		t.Fatalf("CreatePage (occupant) error: %v", err)
+	}
+
+	err = adapter.MovePage(context.Background(), wikimcp.MovePageInput{
+		Actor: mcpActor(),
+		ID:    mover.ID,
+		Path:  "mcp-clash/dup",
+	})
+	assertPageError(t, err, wikipages.ErrCodePageSlugConflict, "Page already exists")
+
+	// The move failed, but the rename is committed: the page is at its old
+	// location (root) under the new slug.
+	got, err := adapter.GetPageByPath(context.Background(), "dup")
+	if err != nil {
+		t.Fatalf("the renamed slug must resolve at the old location: %v", err)
+	}
+	if got.ID != mover.ID {
+		t.Fatalf("the new slug resolved to the wrong page: %+v", got)
+	}
+	if _, err := adapter.GetPageByPath(context.Background(), "mover"); err == nil {
+		t.Fatal("the old slug still resolves after the rename")
+	}
+}

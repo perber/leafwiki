@@ -36,6 +36,8 @@ type recordingOps struct {
 	lastCreate CreatePageInput
 	lastUpdate UpdatePageInput
 	lastPatch  PatchPageInput
+	lastDelete DeletePageInput
+	lastMove   MovePageInput
 
 	created   *Page
 	createErr error
@@ -43,6 +45,8 @@ type recordingOps struct {
 	updateErr error
 	patched   *Page
 	patchErr  error
+	deleteErr error
+	moveErr   error
 }
 
 func (f *recordingOps) GetPage(_ context.Context, id string) (*Page, error) {
@@ -124,6 +128,18 @@ func (f *recordingOps) PatchPage(_ context.Context, in PatchPageInput) (*Page, e
 		return f.patched, nil
 	}
 	return defaultPage(), nil
+}
+
+func (f *recordingOps) DeletePage(_ context.Context, in DeletePageInput) error {
+	f.calls = append(f.calls, "DeletePage:"+in.ID)
+	f.lastDelete = in
+	return f.deleteErr
+}
+
+func (f *recordingOps) MovePage(_ context.Context, in MovePageInput) error {
+	f.calls = append(f.calls, "MovePage:"+in.ID)
+	f.lastMove = in
+	return f.moveErr
 }
 
 func defaultPage() *Page {

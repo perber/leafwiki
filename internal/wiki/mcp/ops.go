@@ -92,6 +92,23 @@ type PatchPageInput struct {
 	Ranges []PatchRange
 }
 
+// DeletePageInput is the input of the delete_page tool; Recursive carries the
+// REST delete's ?recursive= flag.
+type DeletePageInput struct {
+	Actor     Actor
+	ID        string
+	Recursive bool
+}
+
+// MovePageInput is the input of the move_page tool: the page's new route path
+// (the last segment is the new slug, the remaining segments name the
+// destination parent; an empty path moves the page to the wiki root).
+type MovePageInput struct {
+	Actor Actor
+	ID    string
+	Path  string
+}
+
 // PageOps is the narrow consumer interface the page tools delegate to. The
 // slice never talks to the wiki's services directly: tool handlers bind their
 // arguments, gate the caller's role, call one of these, format the result, and
@@ -113,4 +130,8 @@ type PageOps interface {
 	UpdatePage(ctx context.Context, in UpdatePageInput) (*Page, error)
 	// PatchPage applies a line-range patch to a page's content and returns it.
 	PatchPage(ctx context.Context, in PatchPageInput) (*Page, error)
+	// DeletePage deletes a page (optionally its subtree), like the REST delete.
+	DeletePage(ctx context.Context, in DeletePageInput) error
+	// MovePage moves a page to a new route path.
+	MovePage(ctx context.Context, in MovePageInput) error
 }

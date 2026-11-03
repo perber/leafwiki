@@ -4,6 +4,7 @@ import (
 	"context"
 	stderrors "errors"
 	"log/slog"
+	"strings"
 
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/revision"
@@ -275,6 +276,85 @@ func mapWriteError(err error) error {
 		return vErr
 	}
 	return wikipages.MapPageError(err)
+}
+
+// DeletePage deletes a page (optionally its whole subtree) through the
+// delete-page use case the REST delete route uses: assets, favorites and
+// revision data are cleaned up exactly as through HTTP. The delete is checked
+// against the page's current version, like a REST client's save.
+func (a *WikiMCPAdapter) DeletePage(ctx context.Context, in wikimcp.DeletePageInput) error {
+	view, err := a.pageViewByID(ctx, in.ID)
+	if err != nil {
+		return err
+	}
+	err = wikipages.NewDeletePageUseCase(a.tree, a.revision, a.assets, a.favorites, a.orchestrator, a.log, a.metrics).Execute(ctx, wikipages.DeletePageInput{
+		UserID: in.Actor.ID, ID: in.ID, Version: view.Page.Version(), Recursive: in.Recursive,
+	})
+	return mapWriteError(err)
+}
+
+// MovePage moves a page to a new route path. The last path segment is the
+// new slug and the remaining segments name the destination parent, resolved
+// by route path like the REST lookup; an empty path moves the page to the
+// wiki root without touching its slug. A changed slug goes through the
+// update-page use case and the parent change through the move-page use case,
+// so the link/search side effects for the affected subtree fire as for
+// manual edits. Self and circular destinations are rejected before any
+// mutation, so those failures leave the page exactly where it was; a
+// destination slug collision is only discovered by the move itself, so that
+// failure may leave the new slug in place (stated in the tool description).
+func (a *WikiMCPAdapter) MovePage(ctx context.Context, in wikimcp.MovePageInput) error {
+	view, err := a.pageViewByID(ctx, in.ID)
+	if err != nil {
+		return err
+	}
+	page := view.Page
+
+	newSlug := ""
+	parentPath := ""
+	if in.Path != "" {
+		newSlug = in.Path
+		if i := strings.LastIndex(in.Path, "/"); i >= 0 {
+			newSlug, parentPath = in.Path[i+1:], in.Path[:i]
+		}
+	}
+
+	parentID := ""
+	if parentPath != "" {
+		dest, err := wikipages.NewGetPageViewByPathUseCase(a.tree).Execute(ctx, wikipages.GetPageViewByPathInput{RoutePath: parentPath})
+		if err != nil {
+			// The REST move route reports an unknown parent with
+			// page_parent_not_found; keep that code.
+			if stderrors.Is(err, tree.ErrPageNotFound) {
+				return sharederrors.NewLocalizedError(wikipages.ErrCodePageParentNotFound, "Parent page not found", "parent page not found", err)
+			}
+			return mapReadError(err)
+		}
+		// Pre-validate before any mutation: moving into the page itself
+		// or its own subtree would otherwise leave the already-committed
+		// slug change behind (the move use case rejects both, but only
+		// after the update ran).
+		if dest.Page.ID == page.ID {
+			return sharederrors.NewLocalizedError(wikipages.ErrCodePageCannotMoveToSelf, "Page cannot be moved to itself", "page cannot be moved to itself", tree.ErrPageCannotBeMovedToItself)
+		}
+		if page.IsChildOf(dest.Page.ID, true) {
+			return sharederrors.NewLocalizedError(wikipages.ErrCodePageCircularMove, "Move would create a circular reference", "circular reference detected", tree.ErrMovePageCircularReference)
+		}
+		parentID = dest.Page.ID
+	}
+
+	if newSlug != "" && newSlug != page.Slug {
+		out, err := a.updatePageChange(ctx, in.Actor.ID, page, "", newSlug, nil)
+		if err != nil {
+			return err
+		}
+		page = out
+	}
+
+	err = wikipages.NewMovePageUseCase(a.tree, a.orchestrator, a.log, a.metrics).Execute(ctx, wikipages.MovePageInput{
+		UserID: in.Actor.ID, ID: in.ID, Version: page.Version(), ParentID: parentID,
+	})
+	return mapWriteError(err)
 }
 
 // Search runs a full-text search, delegating to the existing search use case.
