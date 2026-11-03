@@ -15,6 +15,7 @@ import (
 	wikiimporter "github.com/perber/wiki/internal/wiki/importer"
 	wikiinstancesettings "github.com/perber/wiki/internal/wiki/instancesettings"
 	wikilinks "github.com/perber/wiki/internal/wiki/links"
+	wikimcp "github.com/perber/wiki/internal/wiki/mcp"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
 	"github.com/perber/wiki/internal/wiki/pagesave"
 	wikiproperties "github.com/perber/wiki/internal/wiki/properties"
@@ -40,6 +41,7 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 	w.avatarRoutes = w.buildAvatarRoutes()
 	w.userSettingsRoutes = w.buildUserSettingsRoutes()
 	w.apiKeysRoutes = w.buildAPIKeysRoutes()
+	w.mcpRoutes = w.buildMCPRoutes(options)
 	w.importerRoutes = w.buildImporterRoutes(options)
 	w.healthRoutes = wikihealth.NewRoutes(wikihealth.RoutesConfig{
 		Index:      w.searchIndex,
@@ -217,6 +219,20 @@ func (w *Wiki) buildAPIKeysRoutes() *wikiapikeys.Routes {
 	})
 }
 
+// buildMCPRoutes builds the experimental MCP server routes (ADR-0018); nil
+// when --enable-mcp is off, so Registrars registers nothing.
+func (w *Wiki) buildMCPRoutes(options *WikiOptions) *wikimcp.Routes {
+	if !options.EnableMCP {
+		return nil
+	}
+	return wikimcp.NewRoutes(wikimcp.RoutesConfig{
+		Name:        "leafwiki",
+		Version:     options.Version,
+		Log:         w.log,
+		AuthService: w.auth,
+	})
+}
+
 func (w *Wiki) buildImporterRoutes(options *WikiOptions) *wikiimporter.Routes {
 	importerDir := filepath.Join(options.StorageDir, ".importer")
 	adapter := NewWikiImportAdapter(w)
@@ -268,6 +284,9 @@ func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
 	}
 	if w.instanceSettingsRoutes != nil {
 		registrars = append(registrars, w.instanceSettingsRoutes)
+	}
+	if w.mcpRoutes != nil {
+		registrars = append(registrars, w.mcpRoutes)
 	}
 	return registrars
 }

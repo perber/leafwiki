@@ -15,9 +15,9 @@ derived-index packages (`internal/links`, `internal/tags`, `internal/properties`
 `internal/tocdisplay`, `internal/snapshot`, `internal/restore`, `internal/backup`,
 `internal/branding`, `internal/importer`), then into the `internal/wiki/<domain>` slices (`pages`,
 `pagesave`, `auth`, `resync`, `revisions`, `search`, `links`, `tags`, `properties`, `apikeys`,
-`assets`, `avatar`, `backup`, `branding`, `health`, `importer`, `instancesettings`, `restore`,
-`seo`, `snapshot`, `usersettings`) that each expose HTTP routes (or, for `seo`, SPA shell
-responders) via `internal/http`. See [ADR-0001: Filesystem as Source of Truth](./adr/0001-filesystem-source-of-truth.md) for why the split between
+`mcp`, `assets`, `avatar`, `backup`, `branding`, `health`, `importer`, `instancesettings`,
+`restore`, `seo`, `snapshot`, `usersettings`) that each expose HTTP routes (or, for
+`seo`, SPA shell responders) via `internal/http`. See [ADR-0001: Filesystem as Source of Truth](./adr/0001-filesystem-source-of-truth.md) for why the split between
 filesystem-canonical (`tree`, `revision`) and SQLite-derived (`links`, `tags`, `properties`,
 `search`) packages exists.
 
@@ -289,6 +289,17 @@ shape for that domain.
   package (search query endpoint, tag listing/filter, property listing/filter, backlink/link-status
   endpoints respectively).
 - **`internal/wiki/apikeys`** — API key CRUD HTTP surface over `core/auth`'s `APIKeyService`.
+- **`internal/wiki/mcp`** — the experimental MCP (Model Context Protocol) server
+  (`--enable-mcp`, [ADR-0018](./adr/0018-mcp-server-dependency.md)): one endpoint `/api/mcp` on the
+  streamable-HTTP transport of `github.com/mark3labs/mcp-go`, registered through the `RouteRegistrar`
+  seam behind `APIAuthGroup`'s existing session/API-key auth chain. `routes.go` lifts the resolved
+  user and the key-auth marker into the mcp-go request context; `server.go` builds the MCP server
+  (`MCPServer` + `StreamableHTTPServer` as an `http.Handler`; zero tools in the initial PR — a
+  client gets a valid `initialize` and an empty `tools/list`) plus the context helpers
+  `userFromContext`/`keyAuthFromContext` the future tool handlers read; `errors.go` maps use-case
+  errors onto MCP tool errors — a `LocalizedError` passes through with its code and message,
+  validation failures become `mcp_invalid_input`, anything else becomes `mcp_internal_error`,
+  and the internal detail never reaches the client.
 - **`internal/wiki/assets`** — per-page asset upload/list/delete HTTP surface over
   `core/assets`.
 - **`internal/wiki/auth`** — login/logout/refresh/TOTP-setup HTTP surface over `core/auth`'s

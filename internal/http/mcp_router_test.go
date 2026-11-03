@@ -1,0 +1,434 @@
+package http_test
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	httpinternal "github.com/perber/wiki/internal/http"
+	"github.com/perber/wiki/internal/test_utils"
+	"github.com/perber/wiki/internal/wiki"
+)
+
+const (
+	// mcpInitializeBody is a spec-conformant initialize request; the
+	// response is a plain JSON JSON-RPC reply (no SSE) because the client
+	// does not opt into streaming.
+	mcpInitializeBody = `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"leafwiki-test","version":"0"}}}`
+	mcpToolsListBody  = `{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}`
+)
+
+// mcpJSONRPC is the JSON-RPC envelope of a /api/mcp response.
+type mcpJSONRPC struct {
+	Result struct {
+		ProtocolVersion string `json:"protocolVersion"`
+		ServerInfo      struct {
+			Name    string `json:"name"`
+			Version string `json:"version"`
+		} `json:"serverInfo"`
+		Tools []struct {
+			Name string `json:"name"`
+		} `json:"tools"`
+	} `json:"result"`
+	Error *struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+// newMCPRouterTest builds a Wiki+router pair with the experimental MCP
+// server enabled, mirroring newAPIKeyRouterTest but without the snapshot/
+// restore/backup routes (the MCP endpoint does not need them). With apiKeys,
+// API-key management is on and Bearer auth is wired, so a key created through
+// the admin session authenticates against /api/mcp.
+func newMCPRouterTest(t *testing.T, apiKeys bool) (*wiki.Wiki, http.Handler) {
+	t.Helper()
+	w, err := wiki.NewWiki(&wiki.WikiOptions{
+		StorageDir:             t.TempDir(),
+		AdminPassword:          "adminpassword",
+		JWTSecret:              "secretkey",
+		AccessTokenTimeout:     15 * time.Minute,
+		RefreshTokenTimeout:    7 * 24 * time.Hour,
+		EnableMCP:              true,
+		EnableAPIKeyManagement: apiKeys,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance: %v", err)
+	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(w.Close, t) })
+
+	router := newTestRouter(w, func(o *httpinternal.RouterOptions) {
+		if apiKeys {
+			o.APIKeyService = w.APIKeyService()
+			o.EnableAPIKeyManagement = true
+		}
+	})
+	return w, router
+}
+
+// mcpPost sends a JSON-RPC body to the MCP endpoint with the session cookies
+// (and CSRF token for a state-changing method), like authenticatedRequest but
+// without re-logging in. sess nil = unauthenticated.
+func mcpPost(t *testing.T, router http.Handler, body, sessionID string, sess *testSession) *httptest.ResponseRecorder {
+	t.Helper()
+	req := mcpPostRequest(body, sessionID, sess)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	return rec
+}
+
+func mcpPostRequest(body, sessionID string, sess *testSession) *http.Request {
+	req := httptest.NewRequest(http.MethodPost, "/api/mcp", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	if sessionID != "" {
+		req.Header.Set("Mcp-Session-Id", sessionID)
+	}
+	if sess != nil {
+		for _, c := range sess.cookies {
+			req.AddCookie(c)
+		}
+		req.Header.Set("X-CSRF-Token", sess.csrf)
+	}
+	return req
+}
+
+// mcpPostBearer sends a JSON-RPC body authenticated with a Bearer API key.
+// A resolved key skips CSRF in the middleware chain, so only the
+// Authorization header is needed.
+// mcpDelete terminates an MCP session via the transport's DELETE verb.
+// Session auth is state-changing, so the CSRF token is required like for
+// mcpPost.
+func mcpDelete(t *testing.T, router http.Handler, sessionID string, sess *testSession) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodDelete, "/api/mcp", nil)
+	req.Header.Set("Mcp-Session-Id", sessionID)
+	if sess != nil {
+		for _, c := range sess.cookies {
+			req.AddCookie(c)
+		}
+		req.Header.Set("X-CSRF-Token", sess.csrf)
+	}
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	return rec
+}
+
+func mcpPostBearer(t *testing.T, router http.Handler, body, secret, sessionID string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/mcp", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+secret)
+	if sessionID != "" {
+		req.Header.Set("Mcp-Session-Id", sessionID)
+	}
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	return rec
+}
+
+func decodeMCP(t *testing.T, rec *httptest.ResponseRecorder) mcpJSONRPC {
+	t.Helper()
+	var resp mcpJSONRPC
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode MCP response %q: %v", rec.Body.String(), err)
+	}
+	return resp
+}
+
+// TestMCP_DisabledByDefault proves the endpoint does not exist at all when
+// --enable-mcp is off: the request never reaches the MCP handler and the SPA
+// fallback answers 404 for the unknown /api path.
+func TestMCP_DisabledByDefault(t *testing.T) {
+	w := createWikiTestInstance(t)
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(w.Close, t) })
+	router := createRouterTestInstance(w, t)
+
+	rec := mcpPost(t, router, mcpInitializeBody, "", nil)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for /api/mcp with the flag off, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestMCP_SessionInitializeAndEmptyToolList is the PR 1 contract: a
+// cookie-authenticated session gets a valid MCP initialize (serverInfo named
+// leafwiki) and an empty tools/list.
+func TestMCP_SessionInitializeAndEmptyToolList(t *testing.T) {
+	_, router := newMCPRouterTest(t, false)
+	sess := loginSession(t, router, "admin", "adminpassword")
+
+	initRec := mcpPost(t, router, mcpInitializeBody, "", &sess)
+	if initRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for initialize, got %d: %s", initRec.Code, initRec.Body.String())
+	}
+	initResp := decodeMCP(t, initRec)
+	if initResp.Error != nil {
+		t.Fatalf("initialize returned a JSON-RPC error: %+v", initResp.Error)
+	}
+	if initResp.Result.ServerInfo.Name != "leafwiki" {
+		t.Fatalf("expected serverInfo.name leafwiki, got %q", initResp.Result.ServerInfo.Name)
+	}
+	if initResp.Result.ProtocolVersion == "" {
+		t.Fatalf("expected a protocolVersion in the initialize result")
+	}
+	sessionID := initRec.Header().Get("Mcp-Session-Id")
+	if sessionID == "" {
+		t.Fatal("expected the initialize response to carry a Mcp-Session-Id header")
+	}
+
+	listRec := mcpPost(t, router, mcpToolsListBody, sessionID, &sess)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for tools/list, got %d: %s", listRec.Code, listRec.Body.String())
+	}
+	listResp := decodeMCP(t, listRec)
+	if listResp.Error != nil {
+		t.Fatalf("tools/list returned a JSON-RPC error: %+v", listResp.Error)
+	}
+	if len(listResp.Result.Tools) != 0 {
+		t.Fatalf("expected no tools in PR 1, got %d: %+v", len(listResp.Result.Tools), listResp.Result.Tools)
+	}
+}
+
+// TestMCP_ReportsBuildVersion pins the version half of serverInfo: the
+// initialize response must report the build version passed to the wiki
+// (WikiOptions.Version, main.go passes the binary's version), not an empty
+// string.
+func TestMCP_ReportsBuildVersion(t *testing.T) {
+	const version = "1.2.3-mcp-test"
+	w, err := wiki.NewWiki(&wiki.WikiOptions{
+		StorageDir:          t.TempDir(),
+		AdminPassword:       "adminpassword",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+		EnableMCP:           true,
+		Version:             version,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance: %v", err)
+	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(w.Close, t) })
+	router := newTestRouter(w, nil)
+	sess := loginSession(t, router, "admin", "adminpassword")
+
+	initRec := mcpPost(t, router, mcpInitializeBody, "", &sess)
+	if initRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for initialize, got %d: %s", initRec.Code, initRec.Body.String())
+	}
+	initResp := decodeMCP(t, initRec)
+	if initResp.Error != nil {
+		t.Fatalf("initialize returned a JSON-RPC error: %+v", initResp.Error)
+	}
+	if got := initResp.Result.ServerInfo.Version; got != version {
+		t.Fatalf("expected serverInfo.version %q, got %q", version, got)
+	}
+}
+
+// TestMCP_DeleteTerminatesSession covers the transport's third verb:
+// DELETE /api/mcp ends the session (200), and any request carrying the
+// terminated session ID is refused afterwards.
+func TestMCP_DeleteTerminatesSession(t *testing.T) {
+	_, router := newMCPRouterTest(t, false)
+	sess := loginSession(t, router, "admin", "adminpassword")
+
+	initRec := mcpPost(t, router, mcpInitializeBody, "", &sess)
+	if initRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for initialize, got %d: %s", initRec.Code, initRec.Body.String())
+	}
+	sessionID := initRec.Header().Get("Mcp-Session-Id")
+	if sessionID == "" {
+		t.Fatal("expected the initialize response to carry a Mcp-Session-Id header")
+	}
+
+	delRec := mcpDelete(t, router, sessionID, &sess)
+	if delRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 terminating the session, got %d: %.200s", delRec.Code, delRec.Body.String())
+	}
+
+	rec := mcpPost(t, router, mcpToolsListBody, sessionID, &sess)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected the terminated session to be rejected with 404, got %d: %.200s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestMCP_GetOpensSSEStreamAndReturnsOnDisconnect proves the GET verb opens
+// the SSE notification stream (200, text/event-stream) and — because the
+// stream blocks by design — that the handler returns when the client
+// disconnects (net/http cancels the request context), instead of leaking a
+// goroutine per connection.
+func TestMCP_GetOpensSSEStreamAndReturnsOnDisconnect(t *testing.T) {
+	_, router := newMCPRouterTest(t, false)
+	sess := loginSession(t, router, "admin", "adminpassword")
+
+	initRec := mcpPost(t, router, mcpInitializeBody, "", &sess)
+	if initRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for initialize, got %d: %s", initRec.Code, initRec.Body.String())
+	}
+	sessionID := initRec.Header().Get("Mcp-Session-Id")
+	if sessionID == "" {
+		t.Fatal("expected the initialize response to carry a Mcp-Session-Id header")
+	}
+
+	// Serve the router over a real connection: the client sees the stream
+	// headers when the handler writes them, and done closes when the
+	// handler goroutine returns.
+	done := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer close(done)
+		router.ServeHTTP(w, r)
+	}))
+	t.Cleanup(srv.Close)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/api/mcp", nil)
+	if err != nil {
+		t.Fatalf("build GET request: %v", err)
+	}
+	req.Header.Set("Mcp-Session-Id", sessionID)
+	for _, c := range sess.cookies {
+		req.AddCookie(c)
+	}
+
+	resp, err := srv.Client().Do(req)
+	if err != nil {
+		t.Fatalf("GET /api/mcp: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(resp.Body.Close, t)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 opening the SSE stream, got %d", resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/event-stream") {
+		t.Fatalf("expected content-type text/event-stream, got %q", ct)
+	}
+
+	// Disconnect the client; the handler must give up the stream.
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("GET handler did not return when the client disconnected")
+	}
+}
+
+// TestMCP_RejectsOversizedRequestBody proves the body cap in routes.go
+// bounds mcp-go's unbounded io.ReadAll: a POST body above the cap is not
+// slurped in full but answered with a JSON-RPC PARSE_ERROR (not a 500, not
+// a hang).
+func TestMCP_RejectsOversizedRequestBody(t *testing.T) {
+	_, router := newMCPRouterTest(t, false)
+	sess := loginSession(t, router, "admin", "adminpassword")
+
+	// A valid JSON-RPC initialize request padded just over the 1 MiB cap.
+	body := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"leafwiki-test","version":"0","note":"` +
+		strings.Repeat("x", 1<<21) + `"}}}`
+
+	rec := mcpPost(t, router, body, "", &sess)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for an oversized body, got %d: %.200s", rec.Code, rec.Body.String())
+	}
+	resp := decodeMCP(t, rec)
+	if resp.Error == nil {
+		t.Fatalf("expected a JSON-RPC error for an oversized body, got result %+v", resp.Result)
+	}
+	if resp.Error.Code != -32700 {
+		t.Fatalf("expected PARSE_ERROR (-32700), got %d: %s", resp.Error.Code, resp.Error.Message)
+	}
+}
+
+// TestMCP_APIKeyAuthenticates proves the endpoint uses the existing API-key
+// auth: a valid Bearer key passes the chain (CSRF skipped for resolved keys)
+// and gets a session, while a revoked key is rejected with 401 on the very
+// next request.
+func TestMCP_APIKeyAuthenticates(t *testing.T) {
+	_, router := newMCPRouterTest(t, true)
+
+	adminID := getAdminUserIDViaAPI(t, router)
+	createBody := `{"name":"mcp key","userId":"` + adminID + `","role":"admin"}`
+	createRec := authenticatedRequest(t, router, http.MethodPost, "/api/api-keys", strings.NewReader(createBody))
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("expected 201 creating key, got %d: %s", createRec.Code, createRec.Body.String())
+	}
+	var created struct {
+		Key struct {
+			ID string `json:"id"`
+		} `json:"key"`
+		Secret string `json:"secret"`
+	}
+	if err := json.Unmarshal(createRec.Body.Bytes(), &created); err != nil {
+		t.Fatalf("unmarshal create response: %v", err)
+	}
+
+	initRec := mcpPostBearer(t, router, mcpInitializeBody, created.Secret, "")
+	if initRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for initialize with a Bearer key, got %d: %s", initRec.Code, initRec.Body.String())
+	}
+	initResp := decodeMCP(t, initRec)
+	if initResp.Error != nil {
+		t.Fatalf("initialize returned a JSON-RPC error: %+v", initResp.Error)
+	}
+	if initResp.Result.ServerInfo.Name != "leafwiki" {
+		t.Fatalf("expected serverInfo.name leafwiki, got %q", initResp.Result.ServerInfo.Name)
+	}
+	sessionID := initRec.Header().Get("Mcp-Session-Id")
+	if sessionID == "" {
+		t.Fatal("expected the initialize response to carry a Mcp-Session-Id header")
+	}
+
+	listRec := mcpPostBearer(t, router, mcpToolsListBody, created.Secret, sessionID)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for tools/list with a Bearer key, got %d: %s", listRec.Code, listRec.Body.String())
+	}
+	if got := decodeMCP(t, listRec); got.Error != nil {
+		t.Fatalf("tools/list returned a JSON-RPC error: %+v", got.Error)
+	}
+
+	// A revoked key must stop working on the very next request.
+	revokeRec := authenticatedRequest(t, router, http.MethodDelete, "/api/api-keys/"+created.Key.ID, nil)
+	if revokeRec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 revoking key, got %d: %s", revokeRec.Code, revokeRec.Body.String())
+	}
+	revokedRec := mcpPostBearer(t, router, mcpInitializeBody, created.Secret, "")
+	if revokedRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for a revoked key, got %d: %s", revokedRec.Code, revokedRec.Body.String())
+	}
+}
+
+// TestMCP_RegisteredUnderBasePath proves the endpoint lands under the
+// configured base path like every other API route: under the prefix the
+// request reaches the auth chain (401 for an unauthenticated caller), without
+// it there is no route at all (404).
+func TestMCP_RegisteredUnderBasePath(t *testing.T) {
+	w, err := wiki.NewWiki(&wiki.WikiOptions{
+		StorageDir:          t.TempDir(),
+		AdminPassword:       "adminpassword",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+		EnableMCP:           true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance: %v", err)
+	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(w.Close, t) })
+	router := newTestRouter(w, func(o *httpinternal.RouterOptions) {
+		o.BasePath = "/wiki"
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/wiki/api/mcp", strings.NewReader(mcpInitializeBody))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 from the auth chain under the base path, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/mcp", strings.NewReader(mcpInitializeBody)))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 without the base path, got %d: %s", rec.Code, rec.Body.String())
+	}
+}

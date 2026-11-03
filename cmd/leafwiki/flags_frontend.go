@@ -17,6 +17,7 @@ type frontendOptions struct {
 	enableLinkRefactor      bool
 	enableAPIKeyManagement  bool
 	enableShareLinks        bool
+	enableMCP               bool
 	maxRevisionHistory      int
 	revisionCoalesceWindow  time.Duration
 }
@@ -95,6 +96,13 @@ func (o *frontendOptions) Flags() []cli.Flag {
 			Category:    catFeatures,
 			Usage:       "enable the experimental share links feature (read-only links to a page for people without an account; not usable yet)",
 			Sources:     envBoolVars("LEAFWIKI_ENABLE_SHARE_LINKS"),
+		},
+		&cli.BoolFlag{
+			Name:        "enable-mcp",
+			Destination: &o.enableMCP,
+			Category:    catFeatures,
+			Usage:       "enable the experimental MCP (Model Context Protocol) server at /api/mcp (experimental)",
+			Sources:     envBoolVars("LEAFWIKI_ENABLE_MCP"),
 		},
 		&cli.IntFlag{
 			Name:        "max-revision-history",

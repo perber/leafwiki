@@ -36,6 +36,7 @@ import (
 	wikiimporter "github.com/perber/wiki/internal/wiki/importer"
 	wikiinstancesettings "github.com/perber/wiki/internal/wiki/instancesettings"
 	wikilinks "github.com/perber/wiki/internal/wiki/links"
+	wikimcp "github.com/perber/wiki/internal/wiki/mcp"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
 	wikiproperties "github.com/perber/wiki/internal/wiki/properties"
 	wikirestore "github.com/perber/wiki/internal/wiki/restore"
@@ -79,6 +80,7 @@ type Wiki struct {
 	brandingRoutes         *wikibranding.Routes
 	avatarRoutes           *wikiavatar.Routes
 	apiKeysRoutes          *wikiapikeys.Routes
+	mcpRoutes              *wikimcp.Routes
 	importerRoutes         *wikiimporter.Routes
 	healthRoutes           *wikihealth.Routes
 	revision               *revision.Service
@@ -117,6 +119,7 @@ type WikiOptions struct {
 	EnableRevision          bool          // Whether revision recording/storage is enabled
 	EnableAPIKeyManagement  bool          // Whether the experimental API key management feature is enabled
 	EnableShareLinks        bool          // Whether the experimental share links feature (#1252) is enabled
+	EnableMCP               bool          // Whether the experimental MCP server (--enable-mcp) is enabled
 	MaxRevisionHistory      int           // Max revisions kept per page; 0 = unlimited
 	EditorLimit             int           // Max admin+editor users allowed; 0 = unlimited
 	MaxAssetUploadSizeBytes int64         // Maximum allowed size in bytes for asset/import uploads; 0 = default
@@ -131,6 +134,7 @@ type WikiOptions struct {
 	// PublicURL is --public-url, already validated: the only source for
 	// absolute URLs such as canonical links (ADR-0018). "" means none.
 	PublicURL string
+	Version   string // Build version, reported as serverInfo.version by the MCP server
 }
 
 func NewWiki(options *WikiOptions) (*Wiki, error) {
