@@ -75,9 +75,46 @@ func respondWithPageStatusError(c *gin.Context, status int, code, message, templ
 	})
 }
 
+// MapPageError maps an error a page use case passes through onto the
+// LocalizedError the page routes would respond with for it: each tree sentinel
+// the routes handle gets its domain code, message and template, and anything
+// else falls into the internal-error arm (the same fallback the REST endpoints
+// use, with the raw detail kept as the client-facing message). It is the
+// non-HTTP core of respondWithPageError: consumers outside the HTTP layer map
+// errors onto the same table instead of keeping a copy (ADR-0018).
+func MapPageError(err error) *sharederrors.LocalizedError {
+	switch {
+	case errors.Is(err, tree.ErrPageNotFound):
+		return sharederrors.NewLocalizedError(ErrCodePageNotFound, "Page not found", "page not found", err)
+	case errors.Is(err, tree.ErrParentNotFound):
+		return sharederrors.NewLocalizedError(ErrCodePageParentNotFound, "Parent page not found", "parent page not found", err)
+	case errors.Is(err, tree.ErrPageHasChildren):
+		return sharederrors.NewLocalizedError(ErrCodePageHasChildren, "Page has children, use recursive delete", "page has children", err)
+	case errors.Is(err, tree.ErrPageAlreadyExists):
+		return sharederrors.NewLocalizedError(ErrCodePageSlugConflict, "Page already exists", "page already exists", err)
+	case errors.Is(err, tree.ErrMovePageCircularReference):
+		return sharederrors.NewLocalizedError(ErrCodePageCircularMove, "Move would create a circular reference", "circular reference detected", err)
+	case errors.Is(err, tree.ErrPageCannotBeMovedToItself):
+		return sharederrors.NewLocalizedError(ErrCodePageCannotMoveToSelf, "Page cannot be moved to itself", "page cannot be moved to itself", err)
+	case errors.Is(err, tree.ErrConvertNotAllowed):
+		return sharederrors.NewLocalizedError(ErrCodePageConvertNotAllowed, "Convert operation not allowed", "convert not allowed", err)
+	case errors.Is(err, tree.ErrInvalidOperation):
+		return sharederrors.NewLocalizedError(ErrCodePageInvalidRequest, err.Error(), "invalid operation", err)
+	case errors.Is(err, tree.ErrVersionConflict):
+		return sharederrors.NewLocalizedError(ErrCodePageVersionConflict, "Page was changed by another request", "page was changed by another request", err)
+	case errors.Is(err, tree.ErrVersionRequired):
+		return sharederrors.NewLocalizedError(ErrCodePageVersionRequired, "Page version is required", "page version is required", err)
+	case errors.Is(err, tree.ErrTreeNotLoaded):
+		return sharederrors.NewLocalizedError(ErrCodePageInternalError, "Tree not loaded", "tree not loaded", err)
+	default:
+		return sharederrors.NewLocalizedError(ErrCodePageInternalError, err.Error(), "internal error", err)
+	}
+}
+
 // respondWithPageError is the central error handler for all page endpoints.
-// It checks for LocalizedError first (rich, template-ready), then falls back to
-// sentinel error mapping so that lower-level service errors produce correct HTTP statuses.
+// It checks for LocalizedError first (rich, template-ready), then
+// ValidationErrors, and falls back to MapPageError's sentinel table so that
+// lower-level service errors produce correct HTTP statuses.
 func respondWithPageError(c *gin.Context, err error) {
 	if loc, ok := sharederrors.AsLocalizedError(err); ok {
 		respondWithPageStatusError(c, pageErrorStatus(loc.Code), loc.Code, loc.Message, loc.Template, loc.Args...)
@@ -93,32 +130,8 @@ func respondWithPageError(c *gin.Context, err error) {
 		return
 	}
 
-	switch {
-	case errors.Is(err, tree.ErrPageNotFound):
-		respondWithPageStatusError(c, http.StatusNotFound, ErrCodePageNotFound, "Page not found", "page not found")
-	case errors.Is(err, tree.ErrParentNotFound):
-		respondWithPageStatusError(c, http.StatusNotFound, ErrCodePageParentNotFound, "Parent page not found", "parent page not found")
-	case errors.Is(err, tree.ErrPageHasChildren):
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageHasChildren, "Page has children, use recursive delete", "page has children")
-	case errors.Is(err, tree.ErrPageAlreadyExists):
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageSlugConflict, "Page already exists", "page already exists")
-	case errors.Is(err, tree.ErrMovePageCircularReference):
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageCircularMove, "Move would create a circular reference", "circular reference detected")
-	case errors.Is(err, tree.ErrPageCannotBeMovedToItself):
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageCannotMoveToSelf, "Page cannot be moved to itself", "page cannot be moved to itself")
-	case errors.Is(err, tree.ErrConvertNotAllowed):
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageConvertNotAllowed, "Convert operation not allowed", "convert not allowed")
-	case errors.Is(err, tree.ErrInvalidOperation):
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageInvalidRequest, err.Error(), "invalid operation")
-	case errors.Is(err, tree.ErrVersionConflict):
-		respondWithPageStatusError(c, http.StatusConflict, ErrCodePageVersionConflict, "Page was changed by another request", "page was changed by another request")
-	case errors.Is(err, tree.ErrVersionRequired):
-		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageVersionRequired, "Page version is required", "page version is required")
-	case errors.Is(err, tree.ErrTreeNotLoaded):
-		respondWithPageStatusError(c, http.StatusInternalServerError, ErrCodePageInternalError, "Tree not loaded", "tree not loaded")
-	default:
-		respondWithPageStatusError(c, http.StatusInternalServerError, ErrCodePageInternalError, err.Error(), "internal error")
-	}
+	loc := MapPageError(err)
+	respondWithPageStatusError(c, pageErrorStatus(loc.Code), loc.Code, loc.Message, loc.Template, loc.Args...)
 }
 
 func pageErrorStatus(code string) int {
