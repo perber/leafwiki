@@ -230,6 +230,7 @@ func (w *Wiki) buildMCPRoutes(options *WikiOptions) *wikimcp.Routes {
 		Version:     options.Version,
 		Log:         w.log,
 		AuthService: w.auth,
+		Ops:         NewWikiMCPAdapter(w),
 	})
 }
 

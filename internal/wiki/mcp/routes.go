@@ -16,10 +16,11 @@ import (
 // streamable-HTTP transport, behind the same API auth chain as the REST API:
 // a session cookie or, when API-key management is enabled, a Bearer API key.
 //
-// PR 1 registers the endpoint with zero tools — a client gets a valid
-// initialize and an empty tools/list. Tool handlers arrive in follow-up PRs
-// through the composition root's WikiMCPAdapter, which delegates to the
-// existing pages/revisions/search use cases.
+// The registered tools (page reads today, revisions/writes/admin in follow-up
+// PRs) are thin: they bind arguments, gate the caller's role, delegate to the
+// PageOps the composition root supplies (WikiMCPAdapter), format the result,
+// and map errors onto a ToolError. The adapter delegates to the existing
+// pages/revisions/search use cases; the slice never talks to them directly.
 type Routes struct {
 	handler     http.Handler
 	authService *coreauth.AuthService
@@ -31,12 +32,15 @@ type RoutesConfig struct {
 	Version     string // serverInfo.version
 	Log         *slog.Logger
 	AuthService *coreauth.AuthService
+	// Ops is the PageOps the tool handlers delegate to. The composition root
+	// provides the WikiMCPAdapter; it is always non-nil when the server is on.
+	Ops PageOps
 }
 
 // NewRoutes constructs the mcp RouteRegistrar.
 func NewRoutes(cfg RoutesConfig) *Routes {
 	return &Routes{
-		handler:     newStreamableHandler(cfg.Name, cfg.Version, cfg.Log),
+		handler:     newStreamableHandler(cfg.Name, cfg.Version, cfg.Log, cfg.Ops),
 		authService: cfg.AuthService,
 	}
 }

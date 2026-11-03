@@ -3,8 +3,10 @@ package mcp
 import (
 	stderrors "errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
+	mcpgo "github.com/mark3labs/mcp-go/mcp"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 )
 
@@ -15,6 +17,9 @@ const (
 	// ErrCodeMCPInvalidInput: the tool's input failed validation (the 400
 	// equivalent).
 	ErrCodeMCPInvalidInput = "mcp_invalid_input"
+	// ErrCodeMCPForbidden: the caller's role is below the tool's minimum role
+	// (the 403 equivalent). A nil caller is denied the same way.
+	ErrCodeMCPForbidden = "mcp_forbidden"
 	// ErrCodeMCPInternalError: an unexpected failure inside the tool (the 500
 	// equivalent).
 	ErrCodeMCPInternalError = "mcp_internal_error"
@@ -63,4 +68,21 @@ func toolErrorFrom(err error) *ToolError {
 		}
 	}
 	return &ToolError{Code: ErrCodeMCPInternalError, Message: "tool failed", Cause: err}
+}
+
+// toolResult converts a ToolError into the failed tool result a handler
+// returns. MCP has no structured error-code field on a tool result, so the
+// code travels in the text ("code: message"); the internal Cause never leaves
+// the process. IsError is set so clients branch on a failed call.
+//
+// A failed tool answer is HTTP 200 and mcp-go never logs it, so this is the
+// point where the internal detail stops propagating: an mcp_internal_error is
+// logged exactly once here (ADR-0008). Domain codes (page_not_found,
+// search_unavailable, …) are expected client errors and stay out of the logs,
+// matching the REST slices.
+func toolResult(log *slog.Logger, toolName string, toolErr *ToolError) *mcpgo.CallToolResult {
+	if toolErr.Code == ErrCodeMCPInternalError {
+		log.Error("mcp tool failed", "tool", toolName, "code", toolErr.Code, "error", toolErr)
+	}
+	return mcpgo.NewToolResultError(toolErr.Code + ": " + toolErr.Message)
 }

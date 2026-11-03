@@ -3,6 +3,7 @@ package http_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -153,10 +154,10 @@ func TestMCP_DisabledByDefault(t *testing.T) {
 	}
 }
 
-// TestMCP_SessionInitializeAndEmptyToolList is the PR 1 contract: a
-// cookie-authenticated session gets a valid MCP initialize (serverInfo named
-// leafwiki) and an empty tools/list.
-func TestMCP_SessionInitializeAndEmptyToolList(t *testing.T) {
+// TestMCP_SessionInitializeAndListsTools is the contract a cookie-authenticated
+// session sees: a valid MCP initialize (serverInfo named leafwiki) and a
+// tools/list carrying the four page-read tools.
+func TestMCP_SessionInitializeAndListsTools(t *testing.T) {
 	_, router := newMCPRouterTest(t, false)
 	sess := loginSession(t, router, "admin", "adminpassword")
 
@@ -187,8 +188,14 @@ func TestMCP_SessionInitializeAndEmptyToolList(t *testing.T) {
 	if listResp.Error != nil {
 		t.Fatalf("tools/list returned a JSON-RPC error: %+v", listResp.Error)
 	}
-	if len(listResp.Result.Tools) != 0 {
-		t.Fatalf("expected no tools in PR 1, got %d: %+v", len(listResp.Result.Tools), listResp.Result.Tools)
+	got := map[string]bool{}
+	for _, tool := range listResp.Result.Tools {
+		got[tool.Name] = true
+	}
+	for _, want := range []string{"get_page", "get_page_by_path", "search", "list_tree"} {
+		if !got[want] {
+			t.Fatalf("expected tool %q in tools/list, got %v", want, listResp.Result.Tools)
+		}
 	}
 }
 
@@ -430,5 +437,167 @@ func TestMCP_RegisteredUnderBasePath(t *testing.T) {
 	router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/mcp", strings.NewReader(mcpInitializeBody)))
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404 without the base path, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// mcpToolCallResponse is the JSON-RPC envelope of a tools/call response: the
+// tool's text content lives in result.content, and a failed call sets
+// result.isError (a JSON-RPC error only covers transport-level failures).
+type mcpToolCallResponse struct {
+	Result struct {
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+		IsError bool `json:"isError"`
+	} `json:"result"`
+	Error *struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+// mcpToolCallText posts a tools/call body and returns the tool's text result,
+// failing the test on a non-200, a JSON-RPC error, or an errored tool result.
+func mcpToolCallText(t *testing.T, router http.Handler, body, sessionID string, sess *testSession) string {
+	t.Helper()
+	rec := mcpPost(t, router, body, sessionID, sess)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for tools/call, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp mcpToolCallResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode tools/call response %q: %v", rec.Body.String(), err)
+	}
+	if resp.Error != nil {
+		t.Fatalf("tools/call returned a JSON-RPC error: %+v", resp.Error)
+	}
+	if resp.Result.IsError {
+		for _, c := range resp.Result.Content {
+			t.Fatalf("tools/call returned an error result: %s", c.Text)
+		}
+	}
+	for _, c := range resp.Result.Content {
+		if c.Type == "text" {
+			return c.Text
+		}
+	}
+	t.Fatal("tools/call result carried no text content")
+	return ""
+}
+
+// mcpPageID extracts the stable page ID from a rendered page result (the "ID: "
+// line the page tools emit).
+func mcpPageID(text string) string {
+	for _, line := range strings.Split(text, "\n") {
+		if rest, ok := strings.CutPrefix(line, "ID: "); ok {
+			return strings.TrimSpace(rest)
+		}
+	}
+	return ""
+}
+
+// TestMCP_ToolCallReadsPages is the end-to-end round trip: a cookie-authenticated
+// session initializes, lists the tools, then drives the page-read tools against
+// the live wiki. get_page_by_path discovers the welcome page (and its stable ID);
+// get_page reads that page by ID; search proves a second, non-trivial delegation.
+func TestMCP_ToolCallReadsPages(t *testing.T) {
+	_, router := newMCPRouterTest(t, false)
+	sess := loginSession(t, router, "admin", "adminpassword")
+
+	initRec := mcpPost(t, router, mcpInitializeBody, "", &sess)
+	if initRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for initialize, got %d: %s", initRec.Code, initRec.Body.String())
+	}
+	sessionID := initRec.Header().Get("Mcp-Session-Id")
+	if sessionID == "" {
+		t.Fatal("expected the initialize response to carry a Mcp-Session-Id header")
+	}
+
+	const welcomePath = "welcome-to-leafwiki"
+
+	byPathBody := fmt.Sprintf(
+		`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_page_by_path","arguments":{"path":%q}}}`,
+		welcomePath)
+	byPathText := mcpToolCallText(t, router, byPathBody, sessionID, &sess)
+	if !strings.Contains(byPathText, "Welcome to LeafWiki") {
+		t.Fatalf("get_page_by_path did not return the welcome page:\n%s", byPathText)
+	}
+	pageID := mcpPageID(byPathText)
+	if pageID == "" {
+		t.Fatalf("could not extract a page ID from:\n%s", byPathText)
+	}
+
+	getPageBody := fmt.Sprintf(
+		`{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_page","arguments":{"id":%q}}}`,
+		pageID)
+	getPageText := mcpToolCallText(t, router, getPageBody, sessionID, &sess)
+	if !strings.Contains(getPageText, "Welcome to LeafWiki") {
+		t.Fatalf("get_page did not return the page content:\n%s", getPageText)
+	}
+
+	searchBody := `{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"search","arguments":{"query":"Welcome"}}}`
+	searchText := mcpToolCallText(t, router, searchBody, sessionID, &sess)
+	// The title is FTS-highlighted, so assert on the stable route path.
+	if !strings.Contains(searchText, "Path: "+welcomePath) {
+		t.Fatalf("search did not find the welcome page:\n%s", searchText)
+	}
+}
+
+// TestMCP_ToolCallMissingPageReportsPageNotFound proves the not-found error
+// mapping end to end: a get_page_by_path call for a nonexistent route path
+// answers HTTP 200 with an errored tool result (isError) carrying the stable
+// page_not_found code, not the generic mcp_internal_error.
+func TestMCP_ToolCallMissingPageReportsPageNotFound(t *testing.T) {
+	_, router := newMCPRouterTest(t, false)
+	sess := loginSession(t, router, "admin", "adminpassword")
+
+	initRec := mcpPost(t, router, mcpInitializeBody, "", &sess)
+	if initRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for initialize, got %d: %s", initRec.Code, initRec.Body.String())
+	}
+	sessionID := initRec.Header().Get("Mcp-Session-Id")
+	if sessionID == "" {
+		t.Fatal("expected the initialize response to carry a Mcp-Session-Id header")
+	}
+
+	body := `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_page_by_path","arguments":{"path":"no/such/page"}}}`
+	rec := mcpPost(t, router, body, sessionID, &sess)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for tools/call, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp mcpToolCallResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode tools/call response %q: %v", rec.Body.String(), err)
+	}
+	if resp.Error != nil {
+		t.Fatalf("tools/call returned a JSON-RPC error: %+v", resp.Error)
+	}
+	if !resp.Result.IsError {
+		for _, c := range resp.Result.Content {
+			t.Fatalf("expected an errored tool result for a missing page, got success: %s", c.Text)
+		}
+	}
+	var text string
+	for _, c := range resp.Result.Content {
+		if c.Type == "text" {
+			text = c.Text
+		}
+	}
+	if !strings.Contains(text, "page_not_found") {
+		t.Fatalf("expected the page_not_found code in the error result, got %q", text)
+	}
+}
+
+// TestMCP_ToolCallRefusesUnauthenticated proves the auth chain sits in front of
+// the tools: a tools/call from a caller with no session is refused with 401 before
+// any tool runs (no tool result is produced).
+func TestMCP_ToolCallRefusesUnauthenticated(t *testing.T) {
+	_, router := newMCPRouterTest(t, false)
+
+	body := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_page","arguments":{"id":"nope"}}}`
+	rec := mcpPost(t, router, body, "", nil)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for an unauthenticated tools/call, got %d: %s", rec.Code, rec.Body.String())
 	}
 }

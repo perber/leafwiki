@@ -37,15 +37,35 @@ func keyAuthFromContext(ctx context.Context) bool {
 	return keyAuth
 }
 
-// newStreamableHandler builds the MCP server (zero tools in PR 1: a client
-// gets a valid initialize and an empty tools/list) and serves it on the
-// streamable-HTTP transport as a plain http.Handler (ADR-0018).
-// WithToolCapabilities keeps the tools capability advertised with zero tools
-// registered — without it mcp-go answers tools/list with "tools not
-// supported" until the first tool lands, which would make the endpoint's
-// shape change mid-way through the PR series.
-func newStreamableHandler(name, version string, log *slog.Logger) http.Handler {
+// requireRole enforces a tool's minimum role. It fails closed: a nil caller
+// (no authenticated user lifted into the request context) is denied, not
+// treated as the minimum role. It returns nil to proceed, or a ToolError
+// (mcp_forbidden) when the caller must not run the tool.
+func requireRole(ctx context.Context, minRole string) *ToolError {
+	if coreauth.HasAtLeastRole(userFromContext(ctx), minRole) {
+		return nil
+	}
+	return &ToolError{
+		Code:    ErrCodeMCPForbidden,
+		Message: "caller lacks the required role for this tool",
+	}
+}
+
+// newStreamableHandler builds the MCP server and serves it on the
+// streamable-HTTP transport as a plain http.Handler (ADR-0018). The page-read
+// tools register here, each capturing the PageOps the composition root hands
+// in. WithToolCapabilities keeps the tools capability advertised from the
+// first PR — without it mcp-go answers tools/list with "tools not supported"
+// until the first tool lands, which would make the endpoint's shape change
+// mid-way through the PR series.
+func newStreamableHandler(name, version string, log *slog.Logger, ops PageOps) http.Handler {
 	server := mcpserver.NewMCPServer(name, version, mcpserver.WithToolCapabilities(false))
+	server.AddTools(
+		newGetPageTool(log, ops),
+		newGetPageByPathTool(log, ops),
+		newSearchTool(log, ops),
+		newListTreeTool(log, ops),
+	)
 	return mcpserver.NewStreamableHTTPServer(server,
 		mcpserver.WithStreamableHTTPLogger(log),
 		mcpserver.WithHTTPContextFunc(httpContextFromRequest),

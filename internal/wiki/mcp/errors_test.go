@@ -1,11 +1,14 @@
 package mcp
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"testing"
 
+	mcpgo "github.com/mark3labs/mcp-go/mcp"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 )
 
@@ -95,5 +98,68 @@ func TestToolError_Error_KeepsInternalDetailForLogs(t *testing.T) {
 	}
 	if !strings.Contains(got, "secret detail xyz") {
 		t.Errorf("Error() = %q, want it to carry the cause for logs", got)
+	}
+}
+
+// TestToolResult_LogsInternalErrorOnce pins the ADR-0008 swallow point: a
+// failed tool answer is HTTP 200 and mcp-go never logs it, so the point
+// where the internal detail stops propagating is toolResult. An
+// mcp_internal_error is logged exactly once there with the tool name, the
+// code and the error itself; domain codes (page_not_found, …) are expected
+// client errors and stay out of the logs, matching the REST slices.
+func TestToolResult_LogsInternalErrorOnce(t *testing.T) {
+	tests := []struct {
+		name       string
+		toolErr    *ToolError
+		wantLogged bool
+	}{
+		{
+			name:       "mcp_internal_error is logged with tool, code and error fields",
+			toolErr:    &ToolError{Code: ErrCodeMCPInternalError, Message: "tool failed", Cause: errors.New("secret detail xyz")},
+			wantLogged: true,
+		},
+		{
+			name:    "a domain code is not logged",
+			toolErr: &ToolError{Code: "page_not_found", Message: "Page not found"},
+		},
+		{
+			name:    "mcp_forbidden is not logged",
+			toolErr: &ToolError{Code: ErrCodeMCPForbidden, Message: "caller lacks the required role for this tool"},
+		},
+		{
+			name:    "mcp_invalid_input is not logged",
+			toolErr: &ToolError{Code: ErrCodeMCPInvalidInput, Message: "id is required"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			log := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+			res := toolResult(log, "get_page", tc.toolErr)
+
+			if !res.IsError {
+				t.Fatalf("toolResult must set IsError")
+			}
+			wantText := tc.toolErr.Code + ": " + tc.toolErr.Message
+			for _, c := range res.Content {
+				if tc2, ok := c.(mcpgo.TextContent); ok && tc2.Text != wantText {
+					t.Fatalf("result text = %q, want %q", tc2.Text, wantText)
+				}
+			}
+			logged := buf.String()
+			if gotLogged := strings.Contains(logged, "mcp tool failed"); gotLogged != tc.wantLogged {
+				t.Fatalf("logged = %v, want %v (log output: %s)", gotLogged, tc.wantLogged, logged)
+			}
+			if tc.wantLogged {
+				for _, want := range []string{"tool=get_page", "code=" + ErrCodeMCPInternalError, "error="} {
+					if !strings.Contains(logged, want) {
+						t.Errorf("log output missing %q: %s", want, logged)
+					}
+				}
+				if !strings.Contains(logged, "secret detail xyz") {
+					t.Errorf("log output must carry the internal cause: %s", logged)
+				}
+			}
+		})
 	}
 }

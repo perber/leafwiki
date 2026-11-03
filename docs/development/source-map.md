@@ -294,12 +294,22 @@ shape for that domain.
   streamable-HTTP transport of `github.com/mark3labs/mcp-go`, registered through the `RouteRegistrar`
   seam behind `APIAuthGroup`'s existing session/API-key auth chain. `routes.go` lifts the resolved
   user and the key-auth marker into the mcp-go request context; `server.go` builds the MCP server
-  (`MCPServer` + `StreamableHTTPServer` as an `http.Handler`; zero tools in the initial PR — a
-  client gets a valid `initialize` and an empty `tools/list`) plus the context helpers
-  `userFromContext`/`keyAuthFromContext` the future tool handlers read; `errors.go` maps use-case
-  errors onto MCP tool errors — a `LocalizedError` passes through with its code and message,
-  validation failures become `mcp_invalid_input`, anything else becomes `mcp_internal_error`,
-  and the internal detail never reaches the client.
+  (`MCPServer` + `StreamableHTTPServer` as an `http.Handler`), registers the page-read tools, and
+  holds the context helpers `userFromContext`/`keyAuthFromContext` and the role gate `requireRole`
+  the tool handlers read. The tools are thin (`get_page.go`, `get_page_by_path.go`, `search.go`,
+  `list_tree.go`): each binds its arguments, gates the caller's role (minimum `viewer`, failing
+  closed on a nil caller), delegates to the `PageOps` interface (`ops.go`, read-only DTOs), formats
+  the result (`format.go`), and maps errors onto a `ToolError`. `errors.go` maps use-case errors onto
+  MCP tool errors — a `LocalizedError` passes through with its code and message, validation failures
+  become `mcp_invalid_input`, a denied role becomes `mcp_forbidden`, anything else becomes
+  `mcp_internal_error` (logged once at that point; domain codes are expected client errors and stay
+  out of the logs), and the internal detail never reaches the client. The composition root's
+  `WikiMCPAdapter` (`internal/wiki/mcp_adapter.go`) implements `PageOps` by delegating the page
+  reads and the search to the existing pages/search use cases; `ListTree` has no use case — the
+  adapter reads `tree.GetTree()` and strips the synthetic root, mirroring the REST tree route — and
+  the adapter maps the tree's `ErrPageNotFound`/`ErrTreeNotLoaded` sentinels onto the `page_*`
+  `LocalizedError`s the REST route would return, so the slice never talks to `internal/core`
+  directly.
 - **`internal/wiki/assets`** — per-page asset upload/list/delete HTTP surface over
   `core/assets`.
 - **`internal/wiki/auth`** — login/logout/refresh/TOTP-setup HTTP surface over `core/auth`'s
