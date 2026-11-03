@@ -2,10 +2,13 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
+	mcpgo "github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
 	coreauth "github.com/perber/wiki/internal/core/auth"
 )
@@ -37,6 +40,27 @@ func keyAuthFromContext(ctx context.Context) bool {
 	return keyAuth
 }
 
+// actorFromContext builds the Actor the write tools hand to PageOps. Only
+// call it after requireRole has passed: the role gate fails closed on a nil
+// caller, so a user is always present here.
+func actorFromContext(ctx context.Context) Actor {
+	return Actor{ID: userFromContext(ctx).ID}
+}
+
+// pageIDArg trims the write tools' id argument and validates it (required,
+// bounded by maxPageIDArgLength), returning the id and a client-facing
+// message ("" when the argument is usable).
+func pageIDArg(req mcpgo.CallToolRequest) (string, string) {
+	id := strings.TrimSpace(req.GetString("id", ""))
+	switch {
+	case id == "":
+		return "", "id is required"
+	case len(id) > maxPageIDArgLength:
+		return "", fmt.Sprintf("id is too long (maximum %d characters)", maxPageIDArgLength)
+	}
+	return id, ""
+}
+
 // requireRole enforces a tool's minimum role. It fails closed: a nil caller
 // (no authenticated user lifted into the request context) is denied, not
 // treated as the minimum role. It returns nil to proceed, or a ToolError
@@ -52,12 +76,12 @@ func requireRole(ctx context.Context, minRole string) *ToolError {
 }
 
 // newStreamableHandler builds the MCP server and serves it on the
-// streamable-HTTP transport as a plain http.Handler (ADR-0018). The page-read
-// tools register here, each capturing the PageOps the composition root hands
-// in. WithToolCapabilities keeps the tools capability advertised from the
-// first PR — without it mcp-go answers tools/list with "tools not supported"
-// until the first tool lands, which would make the endpoint's shape change
-// mid-way through the PR series.
+// streamable-HTTP transport as a plain http.Handler (ADR-0018). The page tools
+// register here, each capturing the PageOps the composition root hands in.
+// WithToolCapabilities keeps the tools capability advertised from the first
+// PR — without it mcp-go answers tools/list with "tools not supported" until
+// the first tool lands, which would make the endpoint's shape change mid-way
+// through the PR series.
 func newStreamableHandler(name, version string, log *slog.Logger, ops PageOps) http.Handler {
 	server := mcpserver.NewMCPServer(name, version, mcpserver.WithToolCapabilities(false))
 	server.AddTools(
@@ -65,6 +89,8 @@ func newStreamableHandler(name, version string, log *slog.Logger, ops PageOps) h
 		newGetPageByPathTool(log, ops),
 		newSearchTool(log, ops),
 		newListTreeTool(log, ops),
+		newCreatePageTool(log, ops),
+		newUpdatePageTool(log, ops),
 	)
 	return mcpserver.NewStreamableHTTPServer(server,
 		mcpserver.WithStreamableHTTPLogger(log),

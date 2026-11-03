@@ -103,20 +103,35 @@ func TestToolError_Error_KeepsInternalDetailForLogs(t *testing.T) {
 
 // TestToolResult_LogsInternalErrorOnce pins the ADR-0008 swallow point: a
 // failed tool answer is HTTP 200 and mcp-go never logs it, so the point
-// where the internal detail stops propagating is toolResult. An
-// mcp_internal_error is logged exactly once there with the tool name, the
-// code and the error itself; domain codes (page_not_found, …) are expected
-// client errors and stay out of the logs, matching the REST slices.
+// where the internal detail stops propagating is toolResult. 500-equivalent
+// codes — mcp_internal_error and a slice's own <domain>_internal_error
+// (the page write path's page_internal_error, the 500-equivalent
+// LocalizedError its error mapper returns for a failure below its sentinel
+// table) — are logged exactly once there with the tool name, the code and
+// the error itself; expected client errors (page_not_found, …) stay out of
+// the logs, matching the REST slices.
 func TestToolResult_LogsInternalErrorOnce(t *testing.T) {
 	tests := []struct {
 		name       string
 		toolErr    *ToolError
 		wantLogged bool
+		wantCause  string // the internal detail the log line must carry, when logged
 	}{
 		{
 			name:       "mcp_internal_error is logged with tool, code and error fields",
 			toolErr:    &ToolError{Code: ErrCodeMCPInternalError, Message: "tool failed", Cause: errors.New("secret detail xyz")},
 			wantLogged: true,
+			wantCause:  "secret detail xyz",
+		},
+		{
+			// The page write path reports wrapped storage failures under the
+			// page slice's 500-equivalent code; a failed MCP tool answer is
+			// HTTP 200, so this code must leave a log line the way the REST
+			// 500 it mirrors would.
+			name:       "a slice's 500-equivalent code (page_internal_error) is logged",
+			toolErr:    &ToolError{Code: "page_internal_error", Message: "could not write page content", Cause: errors.New("disk detail abc")},
+			wantLogged: true,
+			wantCause:  "disk detail abc",
 		},
 		{
 			name:    "a domain code is not logged",
@@ -151,13 +166,13 @@ func TestToolResult_LogsInternalErrorOnce(t *testing.T) {
 				t.Fatalf("logged = %v, want %v (log output: %s)", gotLogged, tc.wantLogged, logged)
 			}
 			if tc.wantLogged {
-				for _, want := range []string{"tool=get_page", "code=" + ErrCodeMCPInternalError, "error="} {
+				for _, want := range []string{"tool=get_page", "code=" + tc.toolErr.Code, "error="} {
 					if !strings.Contains(logged, want) {
 						t.Errorf("log output missing %q: %s", want, logged)
 					}
 				}
-				if !strings.Contains(logged, "secret detail xyz") {
-					t.Errorf("log output must carry the internal cause: %s", logged)
+				if tc.wantCause != "" && !strings.Contains(logged, tc.wantCause) {
+					t.Errorf("log output must carry the internal cause %q: %s", tc.wantCause, logged)
 				}
 			}
 		})

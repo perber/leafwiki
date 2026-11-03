@@ -76,12 +76,16 @@ func toolErrorFrom(err error) *ToolError {
 // the process. IsError is set so clients branch on a failed call.
 //
 // A failed tool answer is HTTP 200 and mcp-go never logs it, so this is the
-// point where the internal detail stops propagating: an mcp_internal_error is
-// logged exactly once here (ADR-0008). Domain codes (page_not_found,
-// search_unavailable, …) are expected client errors and stay out of the logs,
-// matching the REST slices.
+// point where the internal detail stops propagating: 500-equivalent codes are
+// logged exactly once here (ADR-0008) — mcp_internal_error and the page
+// domain's page_internal_error, which the write-path error mapper returns for
+// failures below its sentinel table (a wrapped storage error and the like).
+// The match is on the suffix every slice's 500-equivalent code carries by the
+// <domain>_<reason> convention, so a later PR exposing more slices' tools
+// needs no change here. Expected client errors (page_not_found,
+// search_unavailable, …) stay out of the logs, matching the REST slices.
 func toolResult(log *slog.Logger, toolName string, toolErr *ToolError) *mcpgo.CallToolResult {
-	if toolErr.Code == ErrCodeMCPInternalError {
+	if strings.HasSuffix(toolErr.Code, "_internal_error") {
 		log.Error("mcp tool failed", "tool", toolName, "code", toolErr.Code, "error", toolErr)
 	}
 	return mcpgo.NewToolResultError(toolErr.Code + ": " + toolErr.Message)

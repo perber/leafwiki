@@ -70,6 +70,45 @@ session or a Bearer API key?
 6. **First PR scope:** endpoint skeleton only — a client gets a valid
    `initialize` and an empty `tools/list`. Zero tools registered.
 
+### The page tools (PRs 2–3 of the staged rollout)
+
+The second PR registered the four page-read tools (`get_page`,
+`get_page_by_path`, `search`, `list_tree`, gated at `viewer`). The third is a
+three-part series — `create_page` and `update_page` first, then `patch_page`,
+then `delete_page` and `move_page` — each gated at `editor`, the role the
+equivalent REST mutation requires, each delegating through the same use case
+constructors the REST routes use (so `pagesave` events, `AffectedPages`, and
+the asset/favorite/revision cleanup fire exactly as through HTTP) and mapping
+the write-path tree sentinels onto the same `page_*` codes
+`respondWithPageError` returns — through the non-HTTP mapper the route handler
+now shares with every consumer (`pages.MapPageError`), so the two tables can't
+diverge. One parity detail: an unknown create parent surfaces with
+`page_not_found`, not `page_parent_not_found` — the REST create route answers
+`page_not_found` because the create use case's parent check passes the raw
+tree error through, and the write tools mirror that. Two consequences of the
+write tools:
+
+- **Body cap:** the transport's body cap grew from 1 MiB to
+  `maxRequestBodyBytes` (500 MiB, a named constant in `routes.go`). The
+  write tools carry full page content, so the cap has to accept the largest
+  page payload the platform accepts anywhere — its own bulk-content uploads:
+  the importer's ZIP upload cap (`importMaxUploadSize` in
+  `internal/wiki/importer`) and the backup-restore upload default
+  (`--restore-upload-max-size`, 500 MiB). The adjacent REST page-update route
+  sets no cap at all, so the MCP cap is strictly tighter; looser would only
+  widen an authenticated-DoS lever (mcp-go buffers and JSON-decodes the whole
+  body per request).
+- **Error logging:** a write failure that is neither a known domain error nor
+  validation arrives at the `toolResult` choke point as `page_internal_error`
+  — the 500-equivalent `LocalizedError` the REST route would return (a wrapped
+  storage failure lands in the shared mapper's default arm). The choke point
+  logs it exactly once, the way it logs `mcp_internal_error`: a failed tool
+  answer is HTTP 200 and mcp-go never logs it, so without the line the
+  storage failure would leave no trace at all — unlike the REST API, where
+  the same failure is a visible 500. The match is on the `_internal_error`
+  suffix every slice's 500-equivalent code carries by the `<domain>_<reason>`
+  convention, so exposing more slices' tools later needs no change there.
+
 ## Alternatives considered
 
 - **Hand-rolled JSON-RPC/MCP layer:** ~50 lines gets you a request/response

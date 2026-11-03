@@ -16,7 +16,7 @@ import (
 // streamable-HTTP transport, behind the same API auth chain as the REST API:
 // a session cookie or, when API-key management is enabled, a Bearer API key.
 //
-// The registered tools (page reads today, revisions/writes/admin in follow-up
+// The registered page tools (reads and writes; revisions/admin in follow-up
 // PRs) are thin: they bind arguments, gate the caller's role, delegate to the
 // PageOps the composition root supplies (WikiMCPAdapter), format the result,
 // and map errors onto a ToolError. The adapter delegates to the existing
@@ -57,17 +57,26 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	authGroup.DELETE("/mcp", r.handleMCP)
 }
 
+// maxRequestBodyBytes caps the MCP POST body. mcp-go reads it with an
+// unbounded io.ReadAll, and the write tools carry full page content, so the
+// cap has to accept the largest page payload the platform accepts anywhere:
+// the importer's ZIP upload cap (internal/wiki/importer's importMaxUploadSize)
+// and the backup-restore upload default (--restore-upload-max-size, 500 MiB)
+// — both 500 MiB, the bulk-content ceiling the platform already serves. The
+// adjacent REST page-update route sets no cap at all, so this is strictly
+// tighter; looser would only widen an authenticated-DoS lever (the body is
+// fully buffered and JSON-decoded per request). See ADR-0018.
+const maxRequestBodyBytes = 500 << 20
+
 // handleMCP lifts the caller resolved by the auth chain into the request
 // context and hands the request to the mcp-go streamable handler. The lift
 // (gin context → request context) happens here; WithHTTPContextFunc
 // (httpContextFromRequest) moves it from the request context into the MCP
 // request context.
 func (r *Routes) handleMCP(c *gin.Context) {
-	// mcp-go reads POST bodies with an unbounded io.ReadAll; without a cap
-	// any authenticated caller could OOM the process. With the cap an
-	// oversized read fails and mcp-go answers a JSON-RPC PARSE_ERROR,
-	// never a raw HTTP failure.
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20)
+	// With the cap an oversized read fails and mcp-go answers a JSON-RPC
+	// PARSE_ERROR, never a raw HTTP failure.
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxRequestBodyBytes)
 	ctx := c.Request.Context()
 	if user := authmw.TryGetUser(c); user != nil {
 		ctx = context.WithValue(ctx, mcpUserKey, user)

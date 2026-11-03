@@ -32,6 +32,14 @@ type recordingOps struct {
 	searchErr error
 	tree      []TreeNode
 	treeErr   error
+
+	lastCreate CreatePageInput
+	lastUpdate UpdatePageInput
+
+	created   *Page
+	createErr error
+	updated   *Page
+	updateErr error
 }
 
 func (f *recordingOps) GetPage(_ context.Context, id string) (*Page, error) {
@@ -77,6 +85,30 @@ func (f *recordingOps) ListTree(context.Context) ([]TreeNode, error) {
 		return f.tree, nil
 	}
 	return nil, nil
+}
+
+func (f *recordingOps) CreatePage(_ context.Context, in CreatePageInput) (*Page, error) {
+	f.calls = append(f.calls, "CreatePage:"+in.Title)
+	f.lastCreate = in
+	if f.createErr != nil {
+		return nil, f.createErr
+	}
+	if f.created != nil {
+		return f.created, nil
+	}
+	return defaultPage(), nil
+}
+
+func (f *recordingOps) UpdatePage(_ context.Context, in UpdatePageInput) (*Page, error) {
+	f.calls = append(f.calls, "UpdatePage:"+in.ID)
+	f.lastUpdate = in
+	if f.updateErr != nil {
+		return nil, f.updateErr
+	}
+	if f.updated != nil {
+		return f.updated, nil
+	}
+	return defaultPage(), nil
 }
 
 func defaultPage() *Page {
@@ -161,6 +193,41 @@ func assertRoleGate(t *testing.T, ctor func(*slog.Logger, PageOps) mcpserver.Ser
 	}
 }
 
+// assertEditorRoleGate runs the role matrix against an editor-gated tool: a
+// nil caller, an empty role and a viewer are denied with mcp_forbidden and
+// never reach the delegate, while editor (the minimum) and admin proceed.
+func assertEditorRoleGate(t *testing.T, ctor func(*slog.Logger, PageOps) mcpserver.ServerTool, args map[string]any) {
+	t.Helper()
+	cases := []struct {
+		name   string
+		user   *coreauth.User
+		denied bool
+	}{
+		{"nil user is denied (fail closed)", nil, true},
+		{"empty role is denied", mkUser(""), true},
+		{"viewer is denied", mkUser(coreauth.RoleViewer), true},
+		{"editor is allowed", mkUser(coreauth.RoleEditor), false},
+		{"admin is allowed", mkUser(coreauth.RoleAdmin), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ops := &recordingOps{}
+			tool := ctor(discardLog, ops)
+			text, _ := callTool(t, tool, toolCtx(tc.user), args)
+			if tc.denied {
+				if !strings.Contains(text, ErrCodeMCPForbidden) {
+					t.Fatalf("expected %s in %q", ErrCodeMCPForbidden, text)
+				}
+				if len(ops.calls) != 0 {
+					t.Fatalf("denied call must not delegate, got %v", ops.calls)
+				}
+			} else if len(ops.calls) == 0 {
+				t.Fatalf("allowed role did not reach the delegate; result %q", text)
+			}
+		})
+	}
+}
+
 // assertInvalidInput confirms a tool answers mcp_invalid_input (and delegates
 // nothing) when a required argument is missing.
 func assertInvalidInput(t *testing.T, ctor func(*slog.Logger, PageOps) mcpserver.ServerTool, arg string) {
@@ -186,6 +253,20 @@ func assertCodePassthrough(t *testing.T, ctor func(*slog.Logger, PageOps) mcpser
 	setErr(ops)
 	tool := ctor(discardLog, ops)
 	text, _ := callTool(t, tool, toolCtx(mkUser(coreauth.RoleViewer)), args)
+	if !strings.Contains(text, code) {
+		t.Fatalf("expected the use-case code %q in the result, got %q", code, text)
+	}
+}
+
+// assertWriteCodePassthrough is the write-tool version of
+// assertCodePassthrough: it runs the tool as an editor, the minimum role the
+// write tools require, so the delegate runs and the scripted error surfaces.
+func assertWriteCodePassthrough(t *testing.T, ctor func(*slog.Logger, PageOps) mcpserver.ServerTool, args map[string]any, code string, setErr func(*recordingOps)) {
+	t.Helper()
+	ops := &recordingOps{}
+	setErr(ops)
+	tool := ctor(discardLog, ops)
+	text, _ := callTool(t, tool, toolCtx(mkUser(coreauth.RoleEditor)), args)
 	if !strings.Contains(text, code) {
 		t.Fatalf("expected the use-case code %q in the result, got %q", code, text)
 	}

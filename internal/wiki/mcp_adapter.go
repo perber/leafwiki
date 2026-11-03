@@ -3,14 +3,20 @@ package wiki
 import (
 	"context"
 	stderrors "errors"
+	"log/slog"
 
+	"github.com/perber/wiki/internal/core/assets"
+	"github.com/perber/wiki/internal/core/revision"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
+	"github.com/perber/wiki/internal/favorites"
 	"github.com/perber/wiki/internal/http/dto"
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/search"
 	"github.com/perber/wiki/internal/tags"
 	wikimcp "github.com/perber/wiki/internal/wiki/mcp"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
+	"github.com/perber/wiki/internal/wiki/pagesave"
 	wikisearch "github.com/perber/wiki/internal/wiki/search"
 )
 
@@ -18,19 +24,36 @@ import (
 // pages/search use cases (ADR-0018). It is the only place the MCP slice meets
 // the wiki's services: the slice never talks to internal/core or the
 // top-level index packages directly, it calls PageOps, and this adapter fills
-// in the slice's read-only DTOs.
+// in the slice's DTOs. The write ops use the same use case constructors as
+// the REST routes (buildPagesRoutes), so pagesave events, Before/After
+// capture, AffectedPages and the asset/favorite/revision cleanup fire
+// exactly as through HTTP.
 type WikiMCPAdapter struct {
-	tree        *tree.TreeService
-	searchIndex *search.SQLiteIndex
-	tags        *tags.TagsService
+	tree         *tree.TreeService
+	searchIndex  *search.SQLiteIndex
+	tags         *tags.TagsService
+	slug         *tree.SlugService
+	orchestrator *pagesave.PageSaveOrchestrator
+	revision     *revision.Service
+	assets       *assets.AssetService
+	favorites    *favorites.FavoritesStore
+	log          *slog.Logger
+	metrics      *httpmetrics.HTTPMetrics
 }
 
 // NewWikiMCPAdapter constructs a WikiMCPAdapter over the wiki's services.
 func NewWikiMCPAdapter(w *Wiki) *WikiMCPAdapter {
 	return &WikiMCPAdapter{
-		tree:        w.tree,
-		searchIndex: w.searchIndex,
-		tags:        w.tags,
+		tree:         w.tree,
+		searchIndex:  w.searchIndex,
+		tags:         w.tags,
+		slug:         w.slug,
+		orchestrator: w.newPageOrchestrator(),
+		revision:     w.revision,
+		assets:       w.asset,
+		favorites:    w.favorites,
+		log:          w.log,
+		metrics:      w.metrics,
 	}
 }
 
@@ -75,6 +98,149 @@ func mapReadError(err error) error {
 	}
 }
 
+// CreatePage creates a page or section through the create-page use case the
+// REST create route uses, and (when content is supplied) sets the body with
+// the update-page use case — the same two steps the editor performs through
+// the UI, so the pagesave events fire the same way. An omitted slug is
+// suggested by the same SuggestSlugUseCase the REST slug-suggestion route
+// uses, so an unknown parent surfaces with the code the REST create route
+// answers for one (page_not_found, via the use case's raw tree error) and an
+// omitted one deduplicates among the siblings exactly like the UI.
+func (a *WikiMCPAdapter) CreatePage(ctx context.Context, in wikimcp.CreatePageInput) (*wikimcp.Page, error) {
+	kind := tree.NodeKindPage
+	if in.Kind == "section" {
+		kind = tree.NodeKindSection
+	}
+	slug := in.Slug
+	if slug == "" {
+		parentID := ""
+		if in.ParentID != nil {
+			parentID = *in.ParentID
+		}
+		out, err := wikipages.NewSuggestSlugUseCase(a.tree, a.slug).Execute(ctx, wikipages.SuggestSlugInput{
+			ParentID: parentID,
+			Title:    in.Title,
+		})
+		if err != nil {
+			return nil, mapWriteError(err)
+		}
+		slug = out.Slug
+	}
+
+	out, err := wikipages.NewCreatePageUseCase(a.tree, a.slug, a.orchestrator, a.log, a.metrics).Execute(ctx, wikipages.CreatePageInput{
+		UserID: in.Actor.ID, ParentID: in.ParentID, Title: in.Title, Slug: slug, Kind: &kind,
+	})
+	if err != nil {
+		return nil, mapWriteError(err)
+	}
+	page := out.Page
+	if in.Content != "" {
+		content := in.Content
+		updated, err := a.updatePageChange(ctx, in.Actor.ID, page, "", page.Slug, &content)
+		if err != nil {
+			a.removeHalfCreated(ctx, in.Actor.ID, page, err)
+			return nil, err
+		}
+		page = updated
+	}
+	return mcpPageFromPage(page), nil
+}
+
+// updatePageChange runs the update-page use case the REST update route uses
+// for a known page: the kind comes from the page; an empty title or slug
+// keeps the page's current value, content is the new body or nil to keep the
+// current one, and the change is checked against the page's current version
+// (optimistic locking, the way the UI's saves go). The returned page is the
+// live node after the change.
+func (a *WikiMCPAdapter) updatePageChange(ctx context.Context, actorID string, page *tree.Page, title, slug string, content *string) (*tree.Page, error) {
+	if title == "" {
+		title = page.Title
+	}
+	out, err := wikipages.NewUpdatePageUseCase(a.tree, a.slug, a.orchestrator, a.log, a.metrics).Execute(ctx, wikipages.UpdatePageInput{
+		UserID: actorID, ID: page.ID, Version: page.Version(),
+		Title: title, Slug: slug, Content: content, Kind: &page.Kind,
+	})
+	if err != nil {
+		return nil, mapWriteError(err)
+	}
+	return out.Page, nil
+}
+
+// removeHalfCreated deletes a page that was created but could not be finished
+// (a failed content set), so a failed create leaves no orphan page behind.
+// A version conflict is the one failure that must not trigger cleanup: it
+// means a concurrent writer already saved to the page, and deleting it would
+// destroy that save. Otherwise best effort: a failing cleanup is logged, the
+// original error is the one reported.
+func (a *WikiMCPAdapter) removeHalfCreated(ctx context.Context, actorID string, page *tree.Page, writeErr error) {
+	if loc, ok := sharederrors.AsLocalizedError(writeErr); ok && loc.Code == wikipages.ErrCodePageVersionConflict {
+		return
+	}
+	err := wikipages.NewDeletePageUseCase(a.tree, a.revision, a.assets, a.favorites, a.orchestrator, a.log, a.metrics).Execute(ctx, wikipages.DeletePageInput{
+		UserID: actorID, ID: page.ID, Version: page.Version(), Recursive: false,
+	})
+	if err != nil {
+		a.log.Warn("failed to remove half-created page", "pageID", page.ID, "error", err)
+	}
+}
+
+// UpdatePage fully replaces a page's title and/or content through the
+// update-page use case the REST update route uses. The REST contract is a
+// full replace (title, slug, content all supplied); the tool's omitted fields
+// are filled from the live page first, so an omitted title or content keeps
+// the current value.
+func (a *WikiMCPAdapter) UpdatePage(ctx context.Context, in wikimcp.UpdatePageInput) (*wikimcp.Page, error) {
+	view, err := a.pageViewByID(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	// An empty title keeps the current one; nil content keeps the current
+	// body (the update-page use case's full-replace contract, with the
+	// tool's omitted fields filled from the live page).
+	if _, err := a.updatePageChange(ctx, in.Actor.ID, view.Page, in.Title, view.Page.Slug, in.Content); err != nil {
+		return nil, err
+	}
+	// A content replacement rewrites the page's frontmatter, so the result's
+	// tags and properties come from a fresh view (the REST update route
+	// re-reads them for exactly this reason).
+	fresh, err := a.pageViewByID(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	return mcpPageFromView(fresh), nil
+}
+
+// pageViewByID runs the get-page-view-by-ID use case and maps its errors like
+// the read ops do.
+func (a *WikiMCPAdapter) pageViewByID(ctx context.Context, id string) (*wikipages.PageView, error) {
+	view, err := wikipages.NewGetPageViewByIDUseCase(a.tree).Execute(ctx, wikipages.GetPageViewByIDInput{ID: id})
+	if err != nil {
+		return nil, mapReadError(err)
+	}
+	return view, nil
+}
+
+// mapWriteError converts a page-write use case error onto the LocalizedError
+// the REST route would return for it (respondWithPageError), so the tools
+// report the same client-facing codes and the tool error mapper does not fall
+// back to mcp_internal_error. LocalizedErrors and validation errors pass
+// through unchanged; everything else goes through the pages slice's shared
+// sentinel table (MapPageError), which also covers the internal-error arm a
+// wrapped storage failure lands in.
+func mapWriteError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if _, ok := sharederrors.AsLocalizedError(err); ok {
+		return err
+	}
+	var vErr *sharederrors.ValidationErrors
+	if stderrors.As(err, &vErr) {
+		return vErr
+	}
+	return wikipages.MapPageError(err)
+}
+
 // Search runs a full-text search, delegating to the existing search use case.
 func (a *WikiMCPAdapter) Search(ctx context.Context, query string, limit int) (*wikimcp.SearchResult, error) {
 	out, err := wikisearch.NewSearchUseCase(a.searchIndex, a.tags, a.tree).Execute(
@@ -97,22 +263,31 @@ func (a *WikiMCPAdapter) ListTree(_ context.Context) ([]wikimcp.TreeNode, error)
 }
 
 // mcpPageFromView maps an existing page view (node + content + metadata) onto
-// the slice's read-only Page DTO.
+// the slice's Page DTO.
 func mcpPageFromView(view *wikipages.PageView) *wikimcp.Page {
-	page := view.Page
+	page := mcpPageFromPage(view.Page)
+	if page == nil {
+		return nil
+	}
+	page.Tags = view.Tags
+	page.Properties = view.Properties
+	return page
+}
+
+// mcpPageFromPage maps a tree page onto the slice's Page DTO without the
+// frontmatter metadata, which the write ops' use case outputs do not carry.
+func mcpPageFromPage(page *tree.Page) *wikimcp.Page {
 	if page == nil || page.PageNode == nil {
 		return nil
 	}
 	return &wikimcp.Page{
-		ID:         page.ID,
-		Title:      page.Title,
-		Path:       dto.BuildPathFromNode(page.PageNode),
-		Kind:       string(page.Kind),
-		Content:    page.Content,
-		Tags:       view.Tags,
-		Properties: view.Properties,
-		CreatedAt:  page.Metadata.CreatedAt,
-		UpdatedAt:  page.Metadata.UpdatedAt,
+		ID:        page.ID,
+		Title:     page.Title,
+		Path:      dto.BuildPathFromNode(page.PageNode),
+		Kind:      string(page.Kind),
+		Content:   page.Content,
+		CreatedAt: page.Metadata.CreatedAt,
+		UpdatedAt: page.Metadata.UpdatedAt,
 	}
 }
 
