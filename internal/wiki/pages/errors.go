@@ -79,9 +79,12 @@ func respondWithPageStatusError(c *gin.Context, status int, code, message, templ
 // LocalizedError the page routes would respond with for it: each tree sentinel
 // the routes handle gets its domain code, message and template, and anything
 // else falls into the internal-error arm (the same fallback the REST endpoints
-// use, with the raw detail kept as the client-facing message). It is the
-// non-HTTP core of respondWithPageError: consumers outside the HTTP layer map
-// errors onto the same table instead of keeping a copy (ADR-0018).
+// use, with the raw detail kept as the client-facing message). A drift error
+// is the exception: its Error() text embeds the absolute storage path, so it
+// gets a fixed message and keeps the DriftError as the cause — the path stays
+// in the log and the cause, never in the client response. It is the non-HTTP
+// core of respondWithPageError: consumers outside the HTTP layer map errors
+// onto the same table instead of keeping a copy (ADR-0018).
 func MapPageError(err error) *sharederrors.LocalizedError {
 	switch {
 	case errors.Is(err, tree.ErrPageNotFound):
@@ -106,6 +109,10 @@ func MapPageError(err error) *sharederrors.LocalizedError {
 		return sharederrors.NewLocalizedError(ErrCodePageVersionRequired, "Page version is required", "page version is required", err)
 	case errors.Is(err, tree.ErrTreeNotLoaded):
 		return sharederrors.NewLocalizedError(ErrCodePageInternalError, "Tree not loaded", "tree not loaded", err)
+	case errors.Is(err, tree.ErrDrift):
+		// Fixed message: DriftError.Error() embeds the absolute storage
+		// path, which must stay server-side (logs and cause only).
+		return sharederrors.NewLocalizedError(ErrCodePageInternalError, "Storage drift detected", "storage drift detected", err)
 	default:
 		return sharederrors.NewLocalizedError(ErrCodePageInternalError, err.Error(), "internal error", err)
 	}

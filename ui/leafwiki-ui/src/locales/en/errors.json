@@ -99,6 +99,7 @@
   "a sync is already in progress": "A sync is already in progress",
   "resync request failed": "Resync request failed",
   "search is currently unavailable": "Search is currently unavailable",
+  "storage drift detected": "Storage drift detected",
   "title query param is required": "Title query parameter is required",
   "TOTP is already enabled for this account": "Two-factor authentication is already enabled",
   "TOTP is not enabled for this account": "Two-factor authentication is not enabled",

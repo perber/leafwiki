@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -50,6 +51,9 @@ func TestMapPageError(t *testing.T) {
 		err         error
 		wantCode    string
 		wantMessage string
+		// wantNotIn is the substring the message must not contain (the
+		// drift row: the absolute storage path stays server-side).
+		wantNotIn string
 	}{
 		{name: "page not found", err: tree.ErrPageNotFound, wantCode: ErrCodePageNotFound, wantMessage: "Page not found"},
 		{name: "parent not found", err: tree.ErrParentNotFound, wantCode: ErrCodePageParentNotFound, wantMessage: "Parent page not found"},
@@ -61,6 +65,13 @@ func TestMapPageError(t *testing.T) {
 		{name: "version conflict", err: tree.ErrVersionConflict, wantCode: ErrCodePageVersionConflict, wantMessage: "Page was changed by another request"},
 		{name: "version required", err: tree.ErrVersionRequired, wantCode: ErrCodePageVersionRequired, wantMessage: "Page version is required"},
 		{name: "tree not loaded", err: tree.ErrTreeNotLoaded, wantCode: ErrCodePageInternalError, wantMessage: "Tree not loaded"},
+		{
+			name:        "drift error keeps the storage path off the client",
+			err:         &tree.DriftError{NodeID: "n-1", Kind: tree.NodeKindPage, Path: "/abs/storage/wiki/docs/intro.md", Reason: "expected file missing"},
+			wantCode:    ErrCodePageInternalError,
+			wantMessage: "Storage drift detected",
+			wantNotIn:   "/abs/storage/wiki/docs/intro.md",
+		},
 		{name: "wrapped sentinel keeps its code", err: errors.Join(fmt.Errorf("creating page: %w", tree.ErrPageNotFound)), wantCode: ErrCodePageNotFound, wantMessage: "Page not found"},
 		{name: "unknown error is the internal-error arm", err: unknown, wantCode: ErrCodePageInternalError, wantMessage: "disk on fire"},
 	}
@@ -72,6 +83,9 @@ func TestMapPageError(t *testing.T) {
 			}
 			if loc.Message != tc.wantMessage {
 				t.Fatalf("message = %q, want %q", loc.Message, tc.wantMessage)
+			}
+			if tc.wantNotIn != "" && strings.Contains(loc.Message, tc.wantNotIn) {
+				t.Fatalf("message %q must not contain %q", loc.Message, tc.wantNotIn)
 			}
 		})
 	}

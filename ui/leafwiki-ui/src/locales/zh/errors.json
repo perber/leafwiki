@@ -99,6 +99,7 @@
   "a sync is already in progress": "同步已在进行中",
   "resync request failed": "重新同步请求失败",
   "search is currently unavailable": "搜索当前不可用",
+  "storage drift detected": "检测到存储漂移",
   "title query param is required": "需要 title 查询参数",
   "TOTP is already enabled for this account": "两步验证已启用",
   "TOTP is not enabled for this account": "两步验证未启用",
