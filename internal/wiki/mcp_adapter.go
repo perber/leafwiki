@@ -357,6 +357,59 @@ func (a *WikiMCPAdapter) MovePage(ctx context.Context, in wikimcp.MovePageInput)
 	return mapWriteError(err)
 }
 
+// EnsurePath ensures a route path exists — the missing segments become
+// sections and the last segment takes the given kind — through the
+// ensure-path use case the REST ensure route uses (the same constructor the
+// import adapter already delegates through). A path that already exists is
+// returned unchanged, so a repeated call creates nothing and never clobbers
+// an existing node's title.
+func (a *WikiMCPAdapter) EnsurePath(ctx context.Context, in wikimcp.EnsurePathInput) (*wikimcp.Page, error) {
+	kind := tree.NodeKindPage
+	if in.Kind == "section" {
+		kind = tree.NodeKindSection
+	}
+	out, err := wikipages.NewEnsurePathUseCase(a.tree, a.slug, a.orchestrator, a.log).Execute(ctx, wikipages.EnsurePathInput{
+		UserID: in.Actor.ID, TargetPath: in.Path, TargetTitle: in.Title, Kind: &kind,
+	})
+	if err != nil {
+		return nil, mapWriteError(err)
+	}
+	return mcpPageFromPage(out.Page), nil
+}
+
+// ConvertNode converts a page to a section, or a section to a page, through
+// the convert-page use case the REST convert route uses. The version is taken
+// from the live page (a tool caller does not track versions), and a
+// conversion the tree refuses — a section with children to a page — surfaces
+// with the REST-parity code page_has_children (the mapper's
+// page_convert_not_allowed arm covers the node store's not-empty-folder
+// refusal, reachable only from an on-disk drift state).
+func (a *WikiMCPAdapter) ConvertNode(ctx context.Context, in wikimcp.ConvertNodeInput) error {
+	view, err := a.pageViewByID(ctx, in.ID)
+	if err != nil {
+		return err
+	}
+	err = wikipages.NewConvertPageUseCase(a.tree, a.revision, a.log).Execute(ctx, wikipages.ConvertPageInput{
+		UserID: in.Actor.ID, ID: in.ID, Version: view.Page.Version(), TargetKind: tree.NodeKind(in.Kind),
+	})
+	return mapWriteError(err)
+}
+
+// CopyPage copies a page and its assets under a new title and slug through
+// the copy-page use case the REST copy route uses — the single-page semantics
+// (the children stay with the source). A destination slug already taken under
+// the same parent surfaces with the REST-parity code page_slug_conflict.
+func (a *WikiMCPAdapter) CopyPage(ctx context.Context, in wikimcp.CopyPageInput) (*wikimcp.Page, error) {
+	out, err := wikipages.NewCopyPageUseCase(a.tree, a.slug, a.orchestrator, a.assets, a.log).Execute(ctx, wikipages.CopyPageInput{
+		UserID: in.Actor.ID, SourcePageID: in.SourceID, TargetParentID: in.ParentID,
+		Title: in.Title, Slug: in.Slug,
+	})
+	if err != nil {
+		return nil, mapWriteError(err)
+	}
+	return mcpPageFromPage(out.Page), nil
+}
+
 // Search runs a full-text search, delegating to the existing search use case.
 func (a *WikiMCPAdapter) Search(ctx context.Context, query string, limit int) (*wikimcp.SearchResult, error) {
 	out, err := wikisearch.NewSearchUseCase(a.searchIndex, a.tags, a.tree).Execute(

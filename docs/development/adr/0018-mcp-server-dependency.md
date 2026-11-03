@@ -109,6 +109,20 @@ write tools:
   suffix every slice's 500-equivalent code carries by the `<domain>_<reason>`
   convention, so exposing more slices' tools later needs no change there.
 
+### The tree tools (PR 4 of the staged rollout)
+
+The fourth PR adds the three tree tools — `ensure_path`, `convert_node`,
+`copy_page` — each gated at `editor`, the role the equivalent REST mutation
+requires, and each a thin delegation to the existing use case the REST route
+uses: `EnsurePathUseCase` (missing segments become sections, existing nodes are
+reused — a repeated call creates nothing and never clobbers a title),
+`ConvertPageUseCase` (the version comes from the live page; a section with
+children cannot become a page, the REST-parity `page_has_children` — the
+mapper's `page_convert_not_allowed` arm covers the node store's not-empty-folder
+refusal, reachable only from an on-disk drift state), and `CopyPageUseCase`
+(the REST single-page copy: the page and its assets, the children stay with
+the source; a destination slug collision answers `page_slug_conflict`).
+
 ## Alternatives considered
 
 - **Hand-rolled JSON-RPC/MCP layer:** ~50 lines gets you a request/response

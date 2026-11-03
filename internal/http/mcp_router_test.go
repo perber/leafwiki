@@ -157,7 +157,9 @@ func TestMCP_DisabledByDefault(t *testing.T) {
 
 // TestMCP_SessionInitializeAndListsTools is the contract a cookie-authenticated
 // session sees: a valid MCP initialize (serverInfo named leafwiki) and a
-// tools/list carrying all nine page tools (four reads, five writes).
+// tools/list carrying exactly the twelve page tools (four reads, eight
+// writes) — the count and the set are both pinned, so a thirteenth tool fails
+// this test until the expected list is extended.
 func TestMCP_SessionInitializeAndListsTools(t *testing.T) {
 	_, router := newMCPRouterTest(t, false)
 	sess := loginSession(t, router, "admin", "adminpassword")
@@ -189,12 +191,17 @@ func TestMCP_SessionInitializeAndListsTools(t *testing.T) {
 	if listResp.Error != nil {
 		t.Fatalf("tools/list returned a JSON-RPC error: %+v", listResp.Error)
 	}
+	wantTools := []string{"get_page", "get_page_by_path", "search", "list_tree",
+		"create_page", "update_page", "patch_page", "delete_page", "move_page",
+		"ensure_path", "convert_node", "copy_page"}
+	if len(listResp.Result.Tools) != len(wantTools) {
+		t.Fatalf("expected exactly %d tools in tools/list, got %d: %+v", len(wantTools), len(listResp.Result.Tools), listResp.Result.Tools)
+	}
 	got := map[string]bool{}
 	for _, tool := range listResp.Result.Tools {
 		got[tool.Name] = true
 	}
-	for _, want := range []string{"get_page", "get_page_by_path", "search", "list_tree",
-		"create_page", "update_page", "patch_page", "delete_page", "move_page"} {
+	for _, want := range wantTools {
 		if !got[want] {
 			t.Fatalf("expected tool %q in tools/list, got %v", want, listResp.Result.Tools)
 		}
@@ -696,6 +703,95 @@ func TestMCP_ToolCallWritesPages(t *testing.T) {
 		rec := mcpPost(t, router, createBody, "", nil)
 		if rec.Code != http.StatusUnauthorized {
 			t.Fatalf("expected 401 for an unauthenticated write, got %d: %s", rec.Code, rec.Body.String())
+		}
+	})
+}
+
+// TestMCP_ToolCallEnsurePath is the tree-tools end-to-end round trip: an admin
+// ensures a nested route path over HTTP (missing segments become sections),
+// then reads the deepest segment back by path; a viewer is refused with
+// mcp_forbidden and nothing is created; an unauthenticated caller is refused
+// with 401 before any tool runs.
+func TestMCP_ToolCallEnsurePath(t *testing.T) {
+	w, router := newMCPRouterTest(t, false)
+	sess := loginSession(t, router, "admin", "adminpassword")
+
+	initRec := mcpPost(t, router, mcpInitializeBody, "", &sess)
+	if initRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for initialize, got %d: %s", initRec.Code, initRec.Body.String())
+	}
+	sessionID := initRec.Header().Get("Mcp-Session-Id")
+	if sessionID == "" {
+		t.Fatal("expected the initialize response to carry a Mcp-Session-Id header")
+	}
+
+	const ensurePathBody = `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ensure_path","arguments":{"path":"mcp-e2e/notes/meeting","title":"MCP E2E Meeting"}}}`
+	ensuredText := mcpToolCallText(t, router, ensurePathBody, sessionID, &sess)
+	if !strings.Contains(ensuredText, "MCP E2E Meeting") {
+		t.Fatalf("ensure_path did not return the final node:\n%s", ensuredText)
+	}
+
+	// The deepest segment is then readable by its full route path.
+	byPathBody := `{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_page_by_path","arguments":{"path":"mcp-e2e/notes/meeting"}}}`
+	byPathText := mcpToolCallText(t, router, byPathBody, sessionID, &sess)
+	if !strings.Contains(byPathText, "MCP E2E Meeting") {
+		t.Fatalf("get_page_by_path did not return the ensured node:\n%s", byPathText)
+	}
+
+	t.Run("a viewer is refused with mcp_forbidden", func(t *testing.T) {
+		if _, err := w.UserService().CreateUser("mcp-tree-viewer", "mcp-tree-viewer@example.com", "viewerpass1", coreauth.RoleViewer); err != nil {
+			t.Fatalf("CreateUser (viewer) error: %v", err)
+		}
+		viewer := loginSession(t, router, "mcp-tree-viewer", "viewerpass1")
+
+		viewerInit := mcpPost(t, router, mcpInitializeBody, "", &viewer)
+		if viewerInit.Code != http.StatusOK {
+			t.Fatalf("expected 200 for the viewer's initialize, got %d: %s", viewerInit.Code, viewerInit.Body.String())
+		}
+		viewerSession := viewerInit.Header().Get("Mcp-Session-Id")
+		if viewerSession == "" {
+			t.Fatal("expected the viewer's initialize response to carry a Mcp-Session-Id header")
+		}
+
+		viewerBody := `{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"ensure_path","arguments":{"path":"mcp-e2e/denied","title":"MCP E2E Denied"}}}`
+		rec := mcpPost(t, router, viewerBody, viewerSession, &viewer)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 for an errored tool result, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var resp mcpToolCallResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode tools/call response %q: %v", rec.Body.String(), err)
+		}
+		if resp.Error != nil {
+			t.Fatalf("tools/call returned a JSON-RPC error: %+v", resp.Error)
+		}
+		if !resp.Result.IsError {
+			t.Fatalf("expected the viewer's ensure_path to be an errored tool result")
+		}
+		for _, c := range resp.Result.Content {
+			if c.Type == "text" && !strings.Contains(c.Text, "mcp_forbidden") {
+				t.Fatalf("expected mcp_forbidden in the error result, got %q", c.Text)
+			}
+		}
+		// The refusal happens before the delegate: the path does not exist.
+		absentBody := `{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"get_page_by_path","arguments":{"path":"mcp-e2e/denied"}}}`
+		rec = mcpPost(t, router, absentBody, sessionID, &sess)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 for the admin's read-back, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var absent mcpToolCallResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &absent); err != nil {
+			t.Fatalf("decode read-back response %q: %v", rec.Body.String(), err)
+		}
+		if !absent.Result.IsError {
+			t.Fatal("expected the viewer's ensure_path to leave no path behind")
+		}
+	})
+
+	t.Run("an unauthenticated caller is refused with 401", func(t *testing.T) {
+		rec := mcpPost(t, router, ensurePathBody, "", nil)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("expected 401 for an unauthenticated ensure_path, got %d: %s", rec.Code, rec.Body.String())
 		}
 	})
 }

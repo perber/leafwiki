@@ -94,6 +94,9 @@ func newStreamableHandler(name, version string, log *slog.Logger, ops PageOps) h
 		newPatchPageTool(log, ops),
 		newDeletePageTool(log, ops),
 		newMovePageTool(log, ops),
+		newEnsurePathTool(log, ops),
+		newConvertNodeTool(log, ops),
+		newCopyPageTool(log, ops),
 	)
 	return mcpserver.NewStreamableHTTPServer(server,
 		mcpserver.WithStreamableHTTPLogger(log),

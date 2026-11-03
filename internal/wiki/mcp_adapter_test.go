@@ -938,3 +938,296 @@ func TestWikiMCPAdapter_MovePage_FailedCollisionLeavesSlugBehind(t *testing.T) {
 		t.Fatal("the old slug still resolves after the rename")
 	}
 }
+
+// TestWikiMCPAdapter_EnsurePath_Effects proves the ensure-path effects on the
+// live tree: the missing segments of the path are created (intermediates as
+// sections, the last with the given kind), an existing segment is reused
+// rather than clobbered (its title survives), and a second call is
+// idempotent — the same final node, no duplicate segments, the new title
+// ignored for the existing nodes.
+func TestWikiMCPAdapter_EnsurePath_Effects(t *testing.T) {
+	w, adapter := newMCPWriteTestWiki(t)
+
+	// An existing node the path must reuse (and not rename).
+	section, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(), Title: "MCP Ensure Section", Slug: "mcp-ensure-sec", Kind: "section",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage (section) error: %v", err)
+	}
+
+	out, err := adapter.EnsurePath(context.Background(), wikimcp.EnsurePathInput{
+		Actor: mcpActor(), Path: "mcp-ensure-sec/deep/final-page", Title: "Final Page",
+	})
+	if err != nil {
+		t.Fatalf("EnsurePath error: %v", err)
+	}
+	if out.Path != "mcp-ensure-sec/deep/final-page" || out.Kind != "page" {
+		t.Fatalf("ensured node = %+v, want the final page at the full path", out)
+	}
+
+	// Every segment exists with the right kind…
+	existing, err := adapter.GetPageByPath(context.Background(), "mcp-ensure-sec")
+	if err != nil {
+		t.Fatalf("the pre-existing segment must survive: %v", err)
+	}
+	if existing.ID != section.ID || existing.Kind != "section" {
+		t.Fatalf("existing segment = %+v, want the reused section", existing)
+	}
+	if existing.Title != "MCP Ensure Section" {
+		t.Fatalf("existing segment was clobbered: title = %q, want %q", existing.Title, "MCP Ensure Section")
+	}
+	mid, err := adapter.GetPageByPath(context.Background(), "mcp-ensure-sec/deep")
+	if err != nil {
+		t.Fatalf("the intermediate segment must be created: %v", err)
+	}
+	if mid.Kind != "section" {
+		t.Fatalf("intermediate kind = %q, want section", mid.Kind)
+	}
+
+	// A second call is idempotent: the same final node, no new nodes, and the
+	// new title is ignored (existing nodes are not clobbered).
+	again, err := adapter.EnsurePath(context.Background(), wikimcp.EnsurePathInput{
+		Actor: mcpActor(), Path: "mcp-ensure-sec/deep/final-page", Title: "Renamed Title",
+	})
+	if err != nil {
+		t.Fatalf("second EnsurePath error: %v", err)
+	}
+	if again.ID != out.ID {
+		t.Fatalf("second call ensured a different node: %q, want %q", again.ID, out.ID)
+	}
+	if again.Title != "Final Page" {
+		t.Fatalf("second call clobbered the final node's title: %q", again.Title)
+	}
+
+	// …and no duplicate segment was created: exactly one "deep" node anywhere.
+	count := 0
+	var walk func(nodes []*tree.PageNode)
+	walk = func(nodes []*tree.PageNode) {
+		for _, n := range nodes {
+			if n.Slug == "deep" {
+				count++
+			}
+			walk(n.Children)
+		}
+	}
+	walk(w.tree.GetTree().Children)
+	if count != 1 {
+		t.Fatalf("duplicate intermediate segments after a second call: %d \"deep\" nodes, want 1", count)
+	}
+}
+
+// TestWikiMCPAdapter_ConvertNode_Effects converts a page to a section: the
+// kind flips and the page's children survive the conversion (still reachable
+// at their route paths).
+func TestWikiMCPAdapter_ConvertNode_Effects(t *testing.T) {
+	_, adapter := newMCPWriteTestWiki(t)
+
+	page, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(), Title: "MCP Convertible", Slug: "mcp-convertible", Content: "convert body",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage error: %v", err)
+	}
+	child, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(), Title: "MCP Convert Child", Slug: "mcp-convert-child", ParentID: &page.ID,
+	})
+	if err != nil {
+		t.Fatalf("CreatePage (child) error: %v", err)
+	}
+
+	if err := adapter.ConvertNode(context.Background(), wikimcp.ConvertNodeInput{
+		Actor: mcpActor(), ID: page.ID, Kind: "section",
+	}); err != nil {
+		t.Fatalf("ConvertNode error: %v", err)
+	}
+
+	got, err := adapter.GetPage(context.Background(), page.ID)
+	if err != nil {
+		t.Fatalf("GetPage after convert error: %v", err)
+	}
+	if got.Kind != "section" {
+		t.Fatalf("kind = %q, want section", got.Kind)
+	}
+	if got.Content != "convert body" {
+		t.Fatalf("content = %q, want the page's body kept", got.Content)
+	}
+	// The child survives the conversion, still parented under the section.
+	gotChild, err := adapter.GetPageByPath(context.Background(), "mcp-convertible/mcp-convert-child")
+	if err != nil {
+		t.Fatalf("the child must survive the conversion: %v", err)
+	}
+	if gotChild.ID != child.ID {
+		t.Fatalf("child path resolved to the wrong page: %+v", gotChild)
+	}
+}
+
+// TestWikiMCPAdapter_ConvertNode_SectionToPage pins the success direction the
+// Disallowed test's refusal contrasts with: an empty section converts to a
+// page, the kind flips, and the node keeps its ID and route path.
+func TestWikiMCPAdapter_ConvertNode_SectionToPage(t *testing.T) {
+	_, adapter := newMCPWriteTestWiki(t)
+
+	section, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(), Title: "MCP Empty Section", Slug: "mcp-empty-sec", Kind: "section",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage (section) error: %v", err)
+	}
+
+	if err := adapter.ConvertNode(context.Background(), wikimcp.ConvertNodeInput{
+		Actor: mcpActor(), ID: section.ID, Kind: "page",
+	}); err != nil {
+		t.Fatalf("ConvertNode error: %v", err)
+	}
+
+	got, err := adapter.GetPage(context.Background(), section.ID)
+	if err != nil {
+		t.Fatalf("GetPage after convert error: %v", err)
+	}
+	if got.Kind != "page" {
+		t.Fatalf("kind = %q, want page", got.Kind)
+	}
+	if got.ID != section.ID {
+		t.Fatalf("ID = %q, want the stable ID %q", got.ID, section.ID)
+	}
+	if got.Path != "mcp-empty-sec" {
+		t.Fatalf("path = %q, want the unchanged route path", got.Path)
+	}
+	// The converted page is reachable by the same route path.
+	byPath, err := adapter.GetPageByPath(context.Background(), "mcp-empty-sec")
+	if err != nil {
+		t.Fatalf("GetPageByPath after convert error: %v", err)
+	}
+	if byPath.ID != section.ID {
+		t.Fatalf("path resolved to the wrong page: %+v", byPath)
+	}
+}
+
+// TestWikiMCPAdapter_ConvertNode_Disallowed answers a conversion the tree
+// refuses — a section that still has children to a page — with the
+// REST-parity code page_has_children (the REST convert route answers the same
+// code: the tree's section-to-page check runs before the node store's
+// not-empty-folder check can surface page_convert_not_allowed), leaving the
+// section and its child untouched.
+func TestWikiMCPAdapter_ConvertNode_Disallowed(t *testing.T) {
+	_, adapter := newMCPWriteTestWiki(t)
+
+	section, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(), Title: "MCP Busy Section", Slug: "mcp-busy-sec", Kind: "section",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage (section) error: %v", err)
+	}
+	if _, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(), Title: "MCP Busy Child", Slug: "mcp-busy-child", ParentID: &section.ID,
+	}); err != nil {
+		t.Fatalf("CreatePage (child) error: %v", err)
+	}
+
+	err = adapter.ConvertNode(context.Background(), wikimcp.ConvertNodeInput{
+		Actor: mcpActor(), ID: section.ID, Kind: "page",
+	})
+	assertPageError(t, err, wikipages.ErrCodePageHasChildren, "Page has children, use recursive delete")
+
+	// The refused conversion is a no-op: still a section, child intact.
+	got, err := adapter.GetPage(context.Background(), section.ID)
+	if err != nil {
+		t.Fatalf("the section must survive a refused convert: %v", err)
+	}
+	if got.Kind != "section" {
+		t.Fatalf("kind = %q after a refused convert, want section", got.Kind)
+	}
+	if _, err := adapter.GetPageByPath(context.Background(), "mcp-busy-sec/mcp-busy-child"); err != nil {
+		t.Fatalf("the child must survive a refused convert: %v", err)
+	}
+}
+
+// TestWikiMCPAdapter_ConvertNode_NotFound reports an unknown ID with the
+// REST-parity code page_not_found, the way the REST convert route answers a
+// missing page.
+func TestWikiMCPAdapter_ConvertNode_NotFound(t *testing.T) {
+	_, adapter := newMCPWriteTestWiki(t)
+
+	err := adapter.ConvertNode(context.Background(), wikimcp.ConvertNodeInput{
+		Actor: mcpActor(), ID: "no-such-page", Kind: "section",
+	})
+	assertPageError(t, err, wikipages.ErrCodePageNotFound, "Page not found")
+}
+
+// TestWikiMCPAdapter_CopyPage_Effects proves the copy effects: the copy
+// exists at the new slug with the source's content, and the source is left
+// untouched — the single-page REST copy semantics (a child of the source
+// stays with the source).
+func TestWikiMCPAdapter_CopyPage_Effects(t *testing.T) {
+	_, adapter := newMCPWriteTestWiki(t)
+
+	src, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(), Title: "MCP Copy Source", Slug: "mcp-copy-src", Content: "copy body",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage error: %v", err)
+	}
+	child, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(), Title: "MCP Copy Child", Slug: "mcp-copy-child", ParentID: &src.ID,
+	})
+	if err != nil {
+		t.Fatalf("CreatePage (child) error: %v", err)
+	}
+
+	copied, err := adapter.CopyPage(context.Background(), wikimcp.CopyPageInput{
+		Actor: mcpActor(), SourceID: src.ID, Title: "MCP Copied", Slug: "mcp-copied",
+	})
+	if err != nil {
+		t.Fatalf("CopyPage error: %v", err)
+	}
+	if copied.ID == src.ID {
+		t.Fatal("the copy shares the source's ID")
+	}
+	if copied.Path != "mcp-copied" || copied.Kind != "page" {
+		t.Fatalf("copy = %+v, want a page at the new root path", copied)
+	}
+	if copied.Content != "copy body" {
+		t.Fatalf("copy content = %q, want the source's content", copied.Content)
+	}
+
+	// The source is untouched…
+	got, err := adapter.GetPage(context.Background(), src.ID)
+	if err != nil {
+		t.Fatalf("GetPage (source) error: %v", err)
+	}
+	if got.Content != "copy body" {
+		t.Fatalf("source content = %q, want the original", got.Content)
+	}
+	// …and its child stays with the source, not the copy.
+	still, err := adapter.GetPageByPath(context.Background(), "mcp-copy-src/mcp-copy-child")
+	if err != nil {
+		t.Fatalf("the source's child must stay under the source: %v", err)
+	}
+	if still.ID != child.ID {
+		t.Fatalf("source child path resolved to the wrong page: %+v", still)
+	}
+	if _, err := adapter.GetPageByPath(context.Background(), "mcp-copied/mcp-copy-child"); err == nil {
+		t.Fatal("the child was copied with the page; the REST copy is single-page")
+	}
+}
+
+// TestWikiMCPAdapter_CopyPage_ExistingSlugConflict answers a copy onto a slug
+// already taken under the same parent with the REST-parity code
+// page_slug_conflict (the REST copy route fails the destination create the
+// same way).
+func TestWikiMCPAdapter_CopyPage_ExistingSlugConflict(t *testing.T) {
+	_, adapter := newMCPWriteTestWiki(t)
+
+	src, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(), Title: "MCP Copy Source", Slug: "mcp-copy-src",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage error: %v", err)
+	}
+
+	_, err = adapter.CopyPage(context.Background(), wikimcp.CopyPageInput{
+		Actor: mcpActor(), SourceID: src.ID, Title: "MCP Copied Again", Slug: "mcp-copy-src",
+	})
+	assertPageError(t, err, wikipages.ErrCodePageSlugConflict, "Page already exists")
+}

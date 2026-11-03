@@ -109,6 +109,34 @@ type MovePageInput struct {
 	Path  string
 }
 
+// EnsurePathInput is the input of the ensure_path tool: it ensures a route
+// path exists (missing segments become sections, existing nodes are reused)
+// with the last segment taking the given kind.
+type EnsurePathInput struct {
+	Actor Actor
+	Path  string
+	Title string // title of the last segment (an existing node keeps its own)
+	Kind  string // "page" (default) or "section"
+}
+
+// ConvertNodeInput is the input of the convert_node tool.
+type ConvertNodeInput struct {
+	Actor Actor
+	ID    string
+	Kind  string // target kind: "page" or "section"
+}
+
+// CopyPageInput is the input of the copy_page tool: it copies a page (and its
+// assets) under a new title and slug, optionally under a parent — the REST
+// copy route's single-page semantics (the children stay with the source).
+type CopyPageInput struct {
+	Actor    Actor
+	SourceID string
+	ParentID *string // nil copies at the wiki root
+	Title    string
+	Slug     string
+}
+
 // PageOps is the narrow consumer interface the page tools delegate to. The
 // slice never talks to the wiki's services directly: tool handlers bind their
 // arguments, gate the caller's role, call one of these, format the result, and
@@ -134,4 +162,10 @@ type PageOps interface {
 	DeletePage(ctx context.Context, in DeletePageInput) error
 	// MovePage moves a page to a new route path.
 	MovePage(ctx context.Context, in MovePageInput) error
+	// EnsurePath ensures a route path exists and returns the final node.
+	EnsurePath(ctx context.Context, in EnsurePathInput) (*Page, error)
+	// ConvertNode converts a page to a section or a section to a page.
+	ConvertNode(ctx context.Context, in ConvertNodeInput) error
+	// CopyPage copies a page (and its assets) to a new node and returns it.
+	CopyPage(ctx context.Context, in CopyPageInput) (*Page, error)
 }

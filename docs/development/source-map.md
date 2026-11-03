@@ -301,8 +301,9 @@ shape for that domain.
   the `Actor` extractor `actorFromContext`, and the role gate `requireRole` the tool handlers read.
   The tools are thin (one file each: the reads `get_page.go`, `get_page_by_path.go`, `search.go`,
   `list_tree.go` gated at `viewer`; the writes `create_page.go`, `update_page.go`, `patch_page.go`,
-  `delete_page.go`, `move_page.go` gated at `editor`, the role the equivalent REST mutation
-  requires): each binds its arguments, gates the caller's role (failing closed on a nil caller),
+  `delete_page.go`, `move_page.go`, `ensure_path.go`, `convert_node.go`, `copy_page.go` gated at
+  `editor`, the role the equivalent REST mutation requires): each binds its arguments, gates the
+  caller's role (failing closed on a nil caller),
   delegates to the `PageOps` interface (`ops.go`, the read-only DTOs plus the write input structs
   with their `Actor`), formats the result (`format.go`, which also holds the `patch_page`
   line-range format: `parsePatch`/`ApplyPatch`), and maps errors onto a `ToolError`. `errors.go` maps use-case errors onto MCP tool
@@ -313,9 +314,9 @@ shape for that domain.
   errors and stay out of the logs), and the internal detail never reaches the client. The
   composition root's `WikiMCPAdapter` (`internal/wiki/mcp_adapter.go`) implements `PageOps` by
   delegating the page reads and the search to the existing pages/search use cases, and the page
-  writes to the same use case constructors the REST routes use (create/update/patch/delete/move —
-  `pagesave` events, `AffectedPages`, and the asset/favorite/revision cleanup fire exactly as
-  through HTTP);
+  writes to the same use case constructors the REST routes use (create/update/patch/delete/move/
+  ensure-path/convert/copy — `pagesave` events, `AffectedPages`, and the asset/favorite/revision
+  cleanup fire exactly as through HTTP);
   `ListTree` has no use case — the adapter reads `tree.GetTree()` and strips the synthetic root,
   mirroring the REST tree route — and the adapter maps the tree's read (`mapReadError`) and write
   (`mapWriteError`) sentinels onto the `page_*` `LocalizedError`s `respondWithPageError` would

@@ -33,20 +33,28 @@ type recordingOps struct {
 	tree      []TreeNode
 	treeErr   error
 
-	lastCreate CreatePageInput
-	lastUpdate UpdatePageInput
-	lastPatch  PatchPageInput
-	lastDelete DeletePageInput
-	lastMove   MovePageInput
+	lastCreate  CreatePageInput
+	lastUpdate  UpdatePageInput
+	lastPatch   PatchPageInput
+	lastDelete  DeletePageInput
+	lastMove    MovePageInput
+	lastEnsure  EnsurePathInput
+	lastConvert ConvertNodeInput
+	lastCopy    CopyPageInput
 
-	created   *Page
-	createErr error
-	updated   *Page
-	updateErr error
-	patched   *Page
-	patchErr  error
-	deleteErr error
-	moveErr   error
+	created    *Page
+	createErr  error
+	updated    *Page
+	updateErr  error
+	patched    *Page
+	patchErr   error
+	deleteErr  error
+	moveErr    error
+	ensured    *Page
+	ensureErr  error
+	convertErr error
+	copied     *Page
+	copyErr    error
 }
 
 func (f *recordingOps) GetPage(_ context.Context, id string) (*Page, error) {
@@ -140,6 +148,36 @@ func (f *recordingOps) MovePage(_ context.Context, in MovePageInput) error {
 	f.calls = append(f.calls, "MovePage:"+in.ID)
 	f.lastMove = in
 	return f.moveErr
+}
+
+func (f *recordingOps) EnsurePath(_ context.Context, in EnsurePathInput) (*Page, error) {
+	f.calls = append(f.calls, "EnsurePath:"+in.Path)
+	f.lastEnsure = in
+	if f.ensureErr != nil {
+		return nil, f.ensureErr
+	}
+	if f.ensured != nil {
+		return f.ensured, nil
+	}
+	return defaultPage(), nil
+}
+
+func (f *recordingOps) ConvertNode(_ context.Context, in ConvertNodeInput) error {
+	f.calls = append(f.calls, "ConvertNode:"+in.ID)
+	f.lastConvert = in
+	return f.convertErr
+}
+
+func (f *recordingOps) CopyPage(_ context.Context, in CopyPageInput) (*Page, error) {
+	f.calls = append(f.calls, "CopyPage:"+in.SourceID)
+	f.lastCopy = in
+	if f.copyErr != nil {
+		return nil, f.copyErr
+	}
+	if f.copied != nil {
+		return f.copied, nil
+	}
+	return defaultPage(), nil
 }
 
 func defaultPage() *Page {
