@@ -77,6 +77,21 @@ func revisionIDArg(name, raw string, required bool) (string, string) {
 	return id, ""
 }
 
+// pageWindowArgs binds the read-paging arguments the page-read tools share:
+// offset is the zero-based index of the first line to read (default 0) and
+// lines the number of lines to return (default 0, like a negative value, all
+// remaining). A negative offset is answered with a client-facing message; an
+// offset past the end of the page is checked against the fetched page by the
+// caller (renderPageWindow), because only there is the page's line count
+// known.
+func pageWindowArgs(req mcpgo.CallToolRequest) (offset, lines int, message string) {
+	offset = req.GetInt("offset", 0)
+	if offset < 0 {
+		return 0, 0, "offset must not be negative"
+	}
+	return offset, req.GetInt("lines", 0), ""
+}
+
 // requireRole enforces a tool's minimum role. It fails closed: a nil caller
 // (no authenticated user lifted into the request context) is denied, not
 // treated as the minimum role. It returns nil to proceed, or a ToolError

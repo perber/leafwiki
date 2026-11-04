@@ -498,6 +498,130 @@ func TestWikiMCPAdapter_UpdatePage_MetadataReflectsThePageAfterTheWrite(t *testi
 	}
 }
 
+// TestWikiMCPAdapter_UpdatePage_Slug renames the page through the optional
+// slug: the returned view carries the new slug (the new route path resolves
+// to the same page, the old one no longer does).
+func TestWikiMCPAdapter_UpdatePage_Slug(t *testing.T) {
+	_, adapter := newMCPWriteTestWiki(t)
+
+	created, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(), Title: "MCP Slugged", Slug: "mcp-slugged",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage error: %v", err)
+	}
+
+	updated, err := adapter.UpdatePage(context.Background(), wikimcp.UpdatePageInput{
+		Actor: mcpActor(), ID: created.ID, Slug: "mcp-renamed",
+	})
+	if err != nil {
+		t.Fatalf("UpdatePage (slug) error: %v", err)
+	}
+	if updated.Path != "mcp-renamed" {
+		t.Fatalf("updated Path = %q, want the new slug %q", updated.Path, "mcp-renamed")
+	}
+	// The new route path resolves to the same page…
+	got, err := adapter.GetPageByPath(context.Background(), "mcp-renamed")
+	if err != nil {
+		t.Fatalf("GetPageByPath (new path) error: %v", err)
+	}
+	if got.ID != created.ID {
+		t.Fatalf("new path resolved to the wrong page: %+v", got)
+	}
+	// …and the old one is gone.
+	if _, err := adapter.GetPageByPath(context.Background(), "mcp-slugged"); err == nil {
+		t.Fatal("the old slug still resolves after the rename")
+	}
+}
+
+// TestWikiMCPAdapter_UpdatePage_SlugOmittedKeepsTheCurrentSlug pins the
+// omission: an update that carries no slug keeps the page's current one.
+func TestWikiMCPAdapter_UpdatePage_SlugOmittedKeepsTheCurrentSlug(t *testing.T) {
+	_, adapter := newMCPWriteTestWiki(t)
+
+	created, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(), Title: "MCP Slug Kept", Slug: "mcp-kept",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage error: %v", err)
+	}
+
+	body := "replaced body"
+	updated, err := adapter.UpdatePage(context.Background(), wikimcp.UpdatePageInput{
+		Actor:   mcpActor(),
+		ID:      created.ID,
+		Content: &body,
+	})
+	if err != nil {
+		t.Fatalf("UpdatePage (content) error: %v", err)
+	}
+	if updated.Path != "mcp-kept" {
+		t.Fatalf("updated Path = %q, want the unchanged slug %q", updated.Path, "mcp-kept")
+	}
+}
+
+// TestWikiMCPAdapter_UpdatePage_SlugConflict answers a rename onto a sibling
+// slug with the REST-parity code page_slug_conflict (the update use case's
+// rename fails on the tree's page-already-exists sentinel, mapped through the
+// same table as the REST route).
+func TestWikiMCPAdapter_UpdatePage_SlugConflict(t *testing.T) {
+	_, adapter := newMCPWriteTestWiki(t)
+
+	taker, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(), Title: "MCP Slug Taker", Slug: "mcp-taker",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage (taker) error: %v", err)
+	}
+	if _, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(), Title: "MCP Occupant", Slug: "mcp-occupant",
+	}); err != nil {
+		t.Fatalf("CreatePage (occupant) error: %v", err)
+	}
+
+	_, err = adapter.UpdatePage(context.Background(), wikimcp.UpdatePageInput{
+		Actor: mcpActor(), ID: taker.ID, Slug: "mcp-occupant",
+	})
+	assertPageError(t, err, wikipages.ErrCodePageSlugConflict, "Page already exists")
+
+	// The refused rename is a no-op: the page stays at its old slug.
+	got, err := adapter.GetPageByPath(context.Background(), "mcp-taker")
+	if err != nil {
+		t.Fatalf("GetPageByPath (old path) error: %v", err)
+	}
+	if got.ID != taker.ID {
+		t.Fatalf("the old path resolved to the wrong page: %+v", got)
+	}
+}
+
+// TestWikiMCPAdapter_UpdatePage_InvalidSlug reports a slug the slug service
+// rejects (invalid characters) with the use case's validation error on the
+// slug field — which the tool error mapper renders as mcp_invalid_input.
+func TestWikiMCPAdapter_UpdatePage_InvalidSlug(t *testing.T) {
+	_, adapter := newMCPWriteTestWiki(t)
+
+	created, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(), Title: "MCP Slug Invalid", Slug: "mcp-invalid-slug",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage error: %v", err)
+	}
+
+	_, err = adapter.UpdatePage(context.Background(), wikimcp.UpdatePageInput{
+		Actor: mcpActor(), ID: created.ID, Slug: "not a valid slug",
+	})
+	var vErr *sharederrors.ValidationErrors
+	if !errors.As(err, &vErr) {
+		t.Fatalf("expected a *sharederrors.ValidationErrors, got %T (%v)", err, err)
+	}
+	for _, fe := range vErr.Errors {
+		if fe.Field == "slug" {
+			return
+		}
+	}
+	t.Fatalf("the validation error names no slug field: %+v", vErr.Errors)
+}
+
 // TestWikiMCPAdapter_PatchPage_Effects applies a line-range patch to the live
 // page: the returned and the re-read page carry the patched body.
 func TestWikiMCPAdapter_PatchPage_Effects(t *testing.T) {

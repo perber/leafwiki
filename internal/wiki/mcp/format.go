@@ -12,6 +12,14 @@ import (
 // with 4-digit line numbers so an agent can reference lines precisely. It is
 // shared by get_page and get_page_by_path so their output stays consistent.
 func renderPage(p *Page) string {
+	return pageHeader(p) + withLineNumbers(p.Content)
+}
+
+// pageHeader renders the identifying-metadata half of a page-read result: the
+// title line, the metadata lines, and the blank line that separates the header
+// from the body. Shared by renderPage and renderPageWindow so the header is
+// byte-identical in the full and the windowed rendering.
+func pageHeader(p *Page) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "# %s\n", p.Title)
 	fmt.Fprintf(&sb, "ID: %s\n", p.ID)
@@ -35,8 +43,48 @@ func renderPage(p *Page) string {
 		}
 	}
 	sb.WriteString("\n")
-	sb.WriteString(withLineNumbers(p.Content))
 	return sb.String()
+}
+
+// renderPageWindow renders the page-read result windowed into a slice of the
+// body: the same header as renderPage, then the lines [offset, end) of the
+// content. offset is the zero-based index of the first line to read; lines is
+// how many lines to return, a non-positive value reading all remaining, and
+// end clamps to the page's last line. The body's line numbers stay absolute
+// 1-based over the whole document — the same line model withLineNumbers and
+// ApplyPatch use — so patch_page's ranges keep referencing the numbers the
+// agent read, even in a mid-page window. A window that ends before the page's
+// last line is followed by a truncation note stating the shown range and the
+// page's total; an offset past the end is an error the caller reports as
+// invalid input. With offset 0 and no lines the output is exactly
+// renderPage's.
+func renderPageWindow(p *Page, offset, lines int) (string, error) {
+	body := strings.Split(p.Content, "\n") // same split as withLineNumbers and ApplyPatch
+	total := len(body)
+	if offset >= total {
+		return "", fmt.Errorf("offset %d beyond end of page (page has %d lines)", offset, total)
+	}
+	end := total
+	if lines > 0 {
+		// Clamped before the add: lines is unbounded client input, and
+		// offset+lines would wrap negative for a lines past the page's end
+		// (a wrapped end renders an empty window and a nonsense note).
+		if remaining := total - offset; lines > remaining {
+			lines = remaining
+		}
+		end = offset + lines
+	}
+	var sb strings.Builder
+	for i := offset; i < end; i++ {
+		fmt.Fprintf(&sb, "%04d | %s", i+1, body[i])
+		if i < end-1 {
+			sb.WriteByte('\n')
+		}
+	}
+	if end < total {
+		fmt.Fprintf(&sb, "\n\n(Showing lines %d–%d of %d)", offset+1, end, total)
+	}
+	return pageHeader(p) + sb.String(), nil
 }
 
 // withLineNumbers prefixes every line of the content with a 4-digit, 1-based

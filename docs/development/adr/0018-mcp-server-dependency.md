@@ -73,9 +73,17 @@ session or a Bearer API key?
 ### The page tools (PRs 2–3 of the staged rollout)
 
 The second PR registered the four page-read tools (`get_page`,
-`get_page_by_path`, `search`, `list_tree`, gated at `viewer`). The third is a
-three-part series — `create_page` and `update_page` first, then `patch_page`,
-then `delete_page` and `move_page` — each gated at `editor`, the role the
+`get_page_by_path`, `search`, `list_tree`, gated at `viewer`). The two page-read
+tools also take an optional `offset`/`lines` pair that reads a slice of the
+page's body — line numbers stay absolute over the whole document (so
+`patch_page`'s ranges still reference the numbers the agent read), a window
+that ends mid-page carries a showing-lines note, and an offset past the end of
+the page is a clean `mcp_invalid_input` — restoring the fork's read-slice
+behaviour the drop-in replacement needs. The third is a three-part series —
+`create_page` and `update_page` first (with an optional `slug` that renames the
+page; an omitted slug is preserved, a rename onto a sibling's slug answers the
+REST-parity `page_slug_conflict`), then `patch_page`, then `delete_page` and
+`move_page` — each gated at `editor`, the role the
 equivalent REST mutation requires, each delegating through the same use case
 constructors the REST routes use (so `pagesave` events, `AffectedPages`, and
 the asset/favorite/revision cleanup fire exactly as through HTTP) and mapping

@@ -24,6 +24,33 @@ func TestUpdatePageTool(t *testing.T) {
 		if ops.lastUpdate.Title != "" {
 			t.Fatalf("Title = %q, want empty (keep current)", ops.lastUpdate.Title)
 		}
+		if ops.lastUpdate.Slug != "" {
+			t.Fatalf("Slug = %q, want empty (keep current)", ops.lastUpdate.Slug)
+		}
+	})
+
+	t.Run("a slug alone delegates as a slug-only change", func(t *testing.T) {
+		ops := &recordingOps{}
+		tool := newUpdatePageTool(discardLog, ops)
+		callTool(t, tool, toolCtx(mkUser(coreauth.RoleEditor)), map[string]any{"id": "p-1", "slug": "new-slug"})
+		if ops.lastUpdate.Slug != "new-slug" {
+			t.Fatalf("Slug = %q, want %q", ops.lastUpdate.Slug, "new-slug")
+		}
+		if ops.lastUpdate.Title != "" {
+			t.Fatalf("Title = %q, want empty (keep current)", ops.lastUpdate.Title)
+		}
+		if ops.lastUpdate.Content != nil {
+			t.Fatalf("Content = %v, want nil (keep current content)", ops.lastUpdate.Content)
+		}
+	})
+
+	t.Run("a slug is trimmed like create_page's and copy_page's", func(t *testing.T) {
+		ops := &recordingOps{}
+		tool := newUpdatePageTool(discardLog, ops)
+		callTool(t, tool, toolCtx(mkUser(coreauth.RoleEditor)), map[string]any{"id": "p-1", "slug": "  spaced  "})
+		if ops.lastUpdate.Slug != "spaced" {
+			t.Fatalf("Slug = %q, want the trimmed %q", ops.lastUpdate.Slug, "spaced")
+		}
 	})
 
 	t.Run("an empty string clears the content", func(t *testing.T) {

@@ -308,17 +308,21 @@ shape for that domain.
   valid only for the user who created it (for all three transport verbs: mcp-go validates
   the ID on POST and DELETE, `sessionIDOwnedBy` covers the GET verb that mcp-go skips), plus
   a nil-request sweep arm so mcp-go's idle-TTL sweeper reaps sessions of every user.
-  The tools are thin (one file each: the reads `get_page.go`, `get_page_by_path.go`, `search.go`,
-  `list_tree.go` gated at `viewer`; the writes `create_page.go`, `update_page.go`, `patch_page.go`,
-  `delete_page.go`, `move_page.go`, `ensure_path.go`, `convert_node.go`, `copy_page.go` gated at
+  The tools are thin (one file each: the reads `get_page.go` and `get_page_by_path.go` (each with an
+  optional `offset`/`lines` pair that reads a slice of the body — absolute line numbers, a
+  truncation note when the window ends mid-page, a past-end offset answering `mcp_invalid_input`),
+  `search.go`, `list_tree.go` gated at `viewer`; the writes `create_page.go`, `update_page.go`
+  (title/content plus an optional `slug` that renames the page; an omitted slug is preserved),
+  `patch_page.go`, `delete_page.go`, `move_page.go`, `ensure_path.go`, `convert_node.go`,
+  `copy_page.go` gated at
   `editor`, the role the equivalent REST mutation requires; the revision tools
   `get_page_revisions.go`, `get_page_revision.go` and `compare_page_revisions.go` gated at
   `viewer` — the minimum the plain API auth group the REST revision read routes sit behind
   requires — and `restore_page_revision.go` gated at `editor`, the `RequireEditorOrAdmin`
   middleware the REST restore route carries): each binds its arguments, gates the
   caller's role (failing closed on a nil caller),
-  delegates to the `PageOps` interface (`ops.go`, the read-only DTOs plus the write input structs
-  with their `Actor`), formats the result (`format.go`, which also holds the `patch_page`
+  delegates to the `PageOps` interface (`ops.go`, the read-only DTOs plus the write
+  input structs with their `Actor`), formats the result (`format.go`, which also holds the windowed page read `renderPageWindow` (the `offset`/`lines` read-paging) and the `patch_page`
   line-range format: `parsePatch`/`ApplyPatch`), and maps errors onto a `ToolError`. `errors.go` maps use-case errors onto MCP tool
   errors — a `LocalizedError` passes through with its code and message, validation failures become
   `mcp_invalid_input`, a denied role becomes `mcp_forbidden`, anything else becomes

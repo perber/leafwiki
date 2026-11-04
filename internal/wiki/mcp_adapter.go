@@ -158,6 +158,9 @@ func (a *WikiMCPAdapter) updatePageChange(ctx context.Context, actorID string, p
 	if title == "" {
 		title = page.Title
 	}
+	if slug == "" {
+		slug = page.Slug
+	}
 	out, err := wikipages.NewUpdatePageUseCase(a.tree, a.slug, a.orchestrator, a.log, a.metrics).Execute(ctx, wikipages.UpdatePageInput{
 		UserID: actorID, ID: page.ID, Version: page.Version(),
 		Title: title, Slug: slug, Content: content, Kind: &page.Kind,
@@ -186,20 +189,20 @@ func (a *WikiMCPAdapter) removeHalfCreated(ctx context.Context, actorID string, 
 	}
 }
 
-// UpdatePage fully replaces a page's title and/or content through the
+// UpdatePage fully replaces a page's title, slug and/or content through the
 // update-page use case the REST update route uses. The REST contract is a
 // full replace (title, slug, content all supplied); the tool's omitted fields
-// are filled from the live page first, so an omitted title or content keeps
-// the current value.
+// are filled from the live page first, so an omitted title, slug or content
+// keeps the current value.
 func (a *WikiMCPAdapter) UpdatePage(ctx context.Context, in wikimcp.UpdatePageInput) (*wikimcp.Page, error) {
 	view, err := a.pageViewByID(ctx, in.ID)
 	if err != nil {
 		return nil, err
 	}
-	// An empty title keeps the current one; nil content keeps the current
-	// body (the update-page use case's full-replace contract, with the
-	// tool's omitted fields filled from the live page).
-	if _, err := a.updatePageChange(ctx, in.Actor.ID, view.Page, in.Title, view.Page.Slug, in.Content); err != nil {
+	// An empty title or slug keeps the current value; nil content keeps the
+	// current body (the update-page use case's full-replace contract, with
+	// the tool's omitted fields filled in updatePageChange).
+	if _, err := a.updatePageChange(ctx, in.Actor.ID, view.Page, in.Title, in.Slug, in.Content); err != nil {
 		return nil, err
 	}
 	// A content replacement rewrites the page's frontmatter, so the result's

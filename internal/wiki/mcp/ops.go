@@ -67,12 +67,13 @@ type CreatePageInput struct {
 }
 
 // UpdatePageInput is the input of the update_page tool: a full replace of the
-// page's title and/or content, with omitted fields keeping their current
+// page's title, slug and/or content, with omitted fields keeping their current
 // values.
 type UpdatePageInput struct {
 	Actor   Actor
 	ID      string
 	Title   string  // empty keeps the current title
+	Slug    string  // empty keeps the current slug
 	Content *string // nil keeps the current content
 }
 
