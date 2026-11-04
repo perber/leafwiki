@@ -34,6 +34,7 @@ COPY . .
 # Copy built frontend
 COPY --from=frontend /ui/dist ./internal/http/dist
 
-RUN go build \
+# -tags nomsgpack drops gin's unused MessagePack codec (~5MB with -trimpath).
+RUN go build -trimpath -tags nomsgpack \
   -ldflags="-s -w -X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production -X main.Version=${APP_VERSION}" \
   -o /out/${OUTPUT} ./cmd/leafwiki

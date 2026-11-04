@@ -37,7 +37,7 @@ ui:
 
 # Self-contained binary with embedded UI (matches release/Docker builds).
 build: ui
-	go build -ldflags "$(LDFLAGS)" -o $(BINARY_NAME) $(CMD_DIR)
+	go build -trimpath -tags nomsgpack -ldflags "$(LDFLAGS)" -o $(BINARY_NAME) $(CMD_DIR)
 
 # API-only binary for local Vite-proxied development (no embedded SPA).
 build-api:
