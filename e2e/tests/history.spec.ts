@@ -126,15 +126,9 @@ async function openPreviousRevision(page: import('@playwright/test').Page) {
 test.describe('History', () => {
   test.beforeEach(async ({ page }) => {
     const loginPage = new LoginPage(page);
-    await loginPage.goto();
-    await loginPage.login(user, password);
+    await loginPage.loginViaApi(user, password);
     const viewPage = new ViewPage(page);
     await viewPage.expectUserLoggedIn();
-  });
-
-  test.afterEach(async ({ page }) => {
-    const viewPage = new ViewPage(page);
-    await viewPage.logout();
   });
 
   test('revision-list-panel-visible-on-history-page', async ({ page }) => {

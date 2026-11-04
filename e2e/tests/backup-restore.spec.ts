@@ -24,8 +24,7 @@ test('user management reflects a live restore without a server restart', async (
 
   const loginPage = new LoginPage(page);
   const viewPage = new ViewPage(page);
-  await loginPage.goto();
-  await loginPage.login(user, password);
+  await loginPage.loginViaApi(user, password);
   await viewPage.expectUserLoggedIn();
 
   const snapshots = new SnapshotSettingsPage(page);
@@ -50,8 +49,7 @@ test('user management reflects a live restore without a server restart', async (
   await snapshots.restoreLatest();
 
   // The restore just revoked every session, including this one.
-  await loginPage.goto();
-  await loginPage.login(user, password);
+  await loginPage.loginViaApi(user, password);
   await viewPage.expectUserLoggedIn();
 
   await users.goto();
@@ -88,8 +86,7 @@ test('a live restore brings back branding, public access and TOC settings', asyn
 
   const loginPage = new LoginPage(page);
   const viewPage = new ViewPage(page);
-  await loginPage.goto();
-  await loginPage.login(user, password);
+  await loginPage.loginViaApi(user, password);
   await viewPage.expectUserLoggedIn();
 
   const originalSiteName = (await (await page.request.get('/api/branding')).json())
@@ -108,8 +105,7 @@ test('a live restore brings back branding, public access and TOC settings', asyn
     await snapshots.goto();
     await snapshots.restoreLatest();
 
-    await loginPage.goto();
-    await loginPage.login(user, password);
+    await loginPage.loginViaApi(user, password);
     await viewPage.expectUserLoggedIn();
 
     const branding = await (await page.request.get('/api/branding')).json();

@@ -34,8 +34,7 @@ test('"always show TOC" shows the TOC for a page with only a few headings', asyn
 
   const loginPage = new LoginPage(page);
   const viewPage = new ViewPage(page);
-  await loginPage.goto();
-  await loginPage.login(user, password);
+  await loginPage.loginViaApi(user, password);
   await viewPage.expectUserLoggedIn();
 
   await page.goto(toAppPath(`/${slug}`));

@@ -25,6 +25,17 @@ export default class LoginPage {
     await expect(this.page.getByText('Invalid credentials')).toBeVisible();
   }
 
+  // Session cookies via the API (page.request shares the browser context's
+  // cookie jar), then open the app: ~1s faster than the form. Use the form
+  // (goto + login) only where the login UI itself is under test.
+  async loginViaApi(identifier: string, password: string) {
+    const resp = await this.page.request.post(toAppPath('/api/auth/login'), {
+      data: { identifier, password },
+    });
+    expect(resp.status(), `login as ${identifier}`).toBe(200);
+    await this.page.goto(toAppPath('/'));
+  }
+
   async login(identifier: string, password: string) {
     const identifierInput = await this.getUsernameInput();
     const passwordInput = await this.getPasswordInput();

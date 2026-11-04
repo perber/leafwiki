@@ -111,15 +111,9 @@ async function createSpacingPage(
 test.describe('Image + text paragraph spacing', () => {
   test.beforeEach(async ({ page }) => {
     const loginPage = new LoginPage(page);
-    await loginPage.goto();
-    await loginPage.login(user, password);
+    await loginPage.loginViaApi(user, password);
     const viewPage = new ViewPage(page);
     await viewPage.expectUserLoggedIn();
-  });
-
-  test.afterEach(async ({ page }) => {
-    const viewPage = new ViewPage(page);
-    await viewPage.logout();
   });
 
   // Regression for #1524: Tailwind Typography's `prose img` rule gives images

@@ -114,16 +114,13 @@ async function createLongPage(
 test.describe('Print layout', () => {
   test.beforeEach(async ({ page }) => {
     const loginPage = new LoginPage(page);
-    await loginPage.goto();
-    await loginPage.login(user, password);
+    await loginPage.loginViaApi(user, password);
     const viewPage = new ViewPage(page);
     await viewPage.expectUserLoggedIn();
   });
 
   test.afterEach(async ({ page }) => {
     await page.emulateMedia({ media: null });
-    const viewPage = new ViewPage(page);
-    await viewPage.logout();
   });
 
   // Regression for #1531: scroll/clip containers around the article must not

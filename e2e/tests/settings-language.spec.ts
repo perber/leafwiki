@@ -26,8 +26,7 @@ test.describe('Account settings — language', () => {
     const viewPage = new ViewPage(page);
     const settingsPage = new AccountSettingsPage(page);
 
-    await loginPage.goto();
-    await loginPage.login(user, password);
+    await loginPage.loginViaApi(user, password);
     await viewPage.expectUserLoggedIn();
 
     await settingsPage.goto();
@@ -59,8 +58,7 @@ test.describe('Account settings — language', () => {
       const viewPage = new ViewPage(page);
       const settingsPage = new AccountSettingsPage(page);
 
-      await loginPage.goto();
-      await loginPage.login(user, password);
+      await loginPage.loginViaApi(user, password);
       await viewPage.expectUserLoggedIn();
 
       await settingsPage.goto();

@@ -113,13 +113,8 @@ async function waitForAffectedPages(
 
 test.describe('WikiLink [[Title]] refactoring and link status', () => {
   test.beforeEach(async ({ page }) => {
-    await new LoginPage(page).goto();
-    await new LoginPage(page).login(user, password);
+    await new LoginPage(page).loginViaApi(user, password);
     await new ViewPage(page).expectUserLoggedIn();
-  });
-
-  test.afterEach(async ({ page }) => {
-    await new ViewPage(page).logout();
   });
 
   // ── Rename: preview and apply via API ─────────────────────────────────────

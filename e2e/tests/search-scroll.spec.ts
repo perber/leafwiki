@@ -23,8 +23,7 @@ test('opening a page with ?q= scrolls to and highlights the first match', async 
   await api.dispose();
 
   const loginPage = new LoginPage(page);
-  await loginPage.goto();
-  await loginPage.login(user, password);
+  await loginPage.loginViaApi(user, password);
   await new ViewPage(page).expectUserLoggedIn();
 
   await page.goto(toAppPath(`/${slug}?q=${needle}`));

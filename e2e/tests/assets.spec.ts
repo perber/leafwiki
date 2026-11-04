@@ -15,16 +15,10 @@ const uploadVideoPath = path.resolve(__dirname, '../assets/upload-test.mp4');
 test.describe('Asset Uploads', () => {
   test.beforeEach(async ({ page }) => {
     const loginPage = new LoginPage(page);
-    await loginPage.goto();
-    await loginPage.login(user, password);
+    await loginPage.loginViaApi(user, password);
 
     const viewPage = new ViewPage(page);
     await viewPage.expectUserLoggedIn();
-  });
-
-  test.afterEach(async ({ page }) => {
-    const viewPage = new ViewPage(page);
-    await viewPage.logout();
   });
 
   test('upload-asset-and-render-it-on-page', async ({ page }) => {
