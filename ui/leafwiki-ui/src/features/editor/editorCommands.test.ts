@@ -54,8 +54,6 @@ describe('tabIndentKeyBinding', () => {
     expect(handled).toBe(true)
     expect(doc).toBe('- item 1\n\t- ')
     expect(head).toBe('- item 1\n\t- '.length)
-    // Regression: the old "insertTab" usage produced "- item 1\n- \t"
-    expect(doc).not.toBe('- item 1\n- \t')
   })
 
   it.each([
@@ -67,11 +65,14 @@ describe('tabIndentKeyBinding', () => {
     { label: 'numbered paren list', input: '1) ', expected: '\t1) ' },
     { label: 'unchecked task list', input: '- [ ] ', expected: '\t- [ ] ' },
     { label: 'checked task list', input: '- [x] ', expected: '\t- [x] ' },
-  ])('indents the whole line when cursor follows $label ($input)', ({ input, expected }) => {
-    const { handled, doc } = runTab(input, { anchor: input.length })
-    expect(handled).toBe(true)
-    expect(doc).toBe(expected)
-  })
+  ])(
+    'indents the whole line when cursor follows $label ($input)',
+    ({ input, expected }) => {
+      const { handled, doc } = runTab(input, { anchor: input.length })
+      expect(handled).toBe(true)
+      expect(doc).toBe(expected)
+    },
+  )
 
   it('inserts a literal tab at the cursor when inside list item text', () => {
     // Cursor sits mid-text inside a list item: "- hello| world"
