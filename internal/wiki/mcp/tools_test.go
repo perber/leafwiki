@@ -59,6 +59,7 @@ type recordingOps struct {
 	lastListRevisions ListRevisionsInput
 	lastGetRevision   GetRevisionInput
 	lastCompare       CompareRevisionsInput
+	lastRestore       RestoreRevisionInput
 	revisions         []Revision
 	nextCursor        string
 	revisionsErr      error
@@ -66,6 +67,8 @@ type recordingOps struct {
 	snapshotErr       error
 	comparison        *RevisionComparison
 	comparisonErr     error
+	restored          *Page
+	restoreErr        error
 }
 
 func (f *recordingOps) GetPage(_ context.Context, id string) (*Page, error) {
@@ -225,6 +228,18 @@ func (f *recordingOps) CompareRevisions(_ context.Context, in CompareRevisionsIn
 		Base:   &RevisionSnapshot{Revision: &Revision{ID: in.BaseRevisionID}, Content: "old content"},
 		Target: &RevisionSnapshot{Revision: &Revision{ID: in.TargetRevisionID}, Content: "new content"},
 	}, nil
+}
+
+func (f *recordingOps) RestoreRevision(_ context.Context, in RestoreRevisionInput) (*Page, error) {
+	f.calls = append(f.calls, "RestoreRevision:"+in.RevisionID)
+	f.lastRestore = in
+	if f.restoreErr != nil {
+		return nil, f.restoreErr
+	}
+	if f.restored != nil {
+		return f.restored, nil
+	}
+	return defaultPage(), nil
 }
 
 func defaultPage() *Page {

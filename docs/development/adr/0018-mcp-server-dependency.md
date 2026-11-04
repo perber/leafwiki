@@ -123,21 +123,26 @@ refusal, reachable only from an on-disk drift state), and `CopyPageUseCase`
 (the REST single-page copy: the page and its assets, the children stay with
 the source; a destination slug collision answers `page_slug_conflict`).
 
-### The revision read tools (PR 5 of the staged rollout)
+### The revision tools (PR 5 of the staged rollout)
 
-The fifth PR starts with the three revision read tools:
-`get_page_revisions` (newest first, paged with the REST route's 50/200
-default/cap), `get_page_revision` (metadata plus the content with line
-numbers and the revision's assets) and `compare_page_revisions` (the
-comparison shape — the content-change flag, the asset differences, both
-contents — no diff algorithm). Each is gated at `viewer`, the minimum role
-the REST revision read routes sit behind (the plain API auth group). The
-adapter delegates the revisions use-case errors to the slice's shared
-`MapRevisionError` mapper — the non-HTTP core of
-`respondWithRevisionError`, so the REST route and the MCP tools can never
-drift apart (a LocalizedError passes through, a store `os.ErrNotExist`
-becomes `revision_not_found`, anything else `revision_internal_error`) —
-and tools/list now carries all fifteen tools.
+The fifth PR adds the four revision tools: `get_page_revisions` (newest
+first, paged with the REST route's 50/200 default/cap), `get_page_revision`
+(metadata plus the content with line numbers and the revision's assets),
+`compare_page_revisions` (the comparison shape — the content-change flag, the
+asset differences, both contents — no diff algorithm) and
+`restore_page_revision`. The three read tools are gated at `viewer`, the
+minimum role the REST revision read routes sit behind (the plain API auth
+group), and restore at `editor` — the `RequireEditorOrAdmin` middleware the
+REST restore route carries. Restore goes through the same
+`RestoreRevisionUseCase` the REST route uses, so the `pagesave` restore event
+and the page-save metrics fire exactly as through HTTP — and the restore
+itself is recorded as a new revision of type `restore`, so a rollback is
+visible in the history like any other save. The adapter delegates the
+revisions use-case errors to the slice's shared `MapRevisionError` mapper —
+the non-HTTP core of `respondWithRevisionError`, so the REST route and the
+MCP tools can never drift apart (a LocalizedError passes through, a store
+`os.ErrNotExist` becomes `revision_not_found`, anything else
+`revision_internal_error`) — and tools/list now carries all sixteen tools.
 
 ## Alternatives considered
 

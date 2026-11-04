@@ -116,6 +116,7 @@ func newStreamableHandler(name, version string, log *slog.Logger, ops PageOps) h
 		newGetPageRevisionsTool(log, ops),
 		newGetPageRevisionTool(log, ops),
 		newComparePageRevisionsTool(log, ops),
+		newRestorePageRevisionTool(log, ops),
 	)
 	return mcpserver.NewStreamableHTTPServer(server,
 		mcpserver.WithStreamableHTTPLogger(log),

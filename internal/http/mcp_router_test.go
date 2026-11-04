@@ -158,9 +158,9 @@ func TestMCP_DisabledByDefault(t *testing.T) {
 
 // TestMCP_SessionInitializeAndListsTools is the contract a cookie-authenticated
 // session sees: a valid MCP initialize (serverInfo named leafwiki) and a
-// tools/list carrying exactly the fifteen tools (four page reads, eight page
-// writes, three revision read tools) — the count and the set are both pinned,
-// so a sixteenth tool fails this test until the expected list is extended.
+// tools/list carrying exactly the sixteen tools (four page reads, eight page
+// writes, four revision tools) — the count and the set are both pinned, so a
+// seventeenth tool fails this test until the expected list is extended.
 func TestMCP_SessionInitializeAndListsTools(t *testing.T) {
 	_, router := newMCPRouterTest(t, false)
 	sess := loginSession(t, router, "admin", "adminpassword")
@@ -195,7 +195,7 @@ func TestMCP_SessionInitializeAndListsTools(t *testing.T) {
 	wantTools := []string{"get_page", "get_page_by_path", "search", "list_tree",
 		"create_page", "update_page", "patch_page", "delete_page", "move_page",
 		"ensure_path", "convert_node", "copy_page",
-		"get_page_revisions", "get_page_revision", "compare_page_revisions"}
+		"get_page_revisions", "get_page_revision", "compare_page_revisions", "restore_page_revision"}
 	if len(listResp.Result.Tools) != len(wantTools) {
 		t.Fatalf("expected exactly %d tools in tools/list, got %d: %+v", len(wantTools), len(listResp.Result.Tools), listResp.Result.Tools)
 	}
@@ -816,12 +816,16 @@ func mcpRevisionIDs(text string) []string {
 	return ids
 }
 
-// TestMCP_ToolCallRevisions is the revision-read-tools end-to-end round trip:
-// an admin creates a page and saves a second version, the history lists the
-// revisions newest first, and reading the newest revision back yields the
-// latest content.
+// TestMCP_ToolCallRevisions is the revision-tools end-to-end round trip: an
+// admin creates a page and saves a second version, the history lists the
+// revisions newest first, and restoring an older revision reverts the page to
+// that content — the restore itself is recorded, so the history grows by one
+// with a new "restore"-type entry. A viewer — the highest role below the
+// restore tool's editor minimum — is refused with mcp_forbidden and the
+// refusal is a no-op: the page is unchanged and no restore revision is
+// recorded.
 func TestMCP_ToolCallRevisions(t *testing.T) {
-	_, router := newMCPRouterTest(t, false)
+	w, router := newMCPRouterTest(t, false)
 	sess := loginSession(t, router, "admin", "adminpassword")
 
 	initRec := mcpPost(t, router, mcpInitializeBody, "", &sess)
@@ -860,12 +864,95 @@ func TestMCP_ToolCallRevisions(t *testing.T) {
 		t.Fatalf("expected at least two revisions after a create and an update, got %d:\n%s", len(ids), listText)
 	}
 
-	// The newest entry holds the latest content.
-	newestBody := fmt.Sprintf(
-		`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"get_page_revision","arguments":{"id":%q,"revision_id":%q}}}`,
-		pageID, ids[0])
-	newestText := mcpToolCallText(t, router, newestBody, sessionID, &sess)
-	if !strings.Contains(newestText, versionTwo) {
-		t.Fatalf("the newest revision must hold the latest content:\n%s", newestText)
+	// The list lines do not carry content, so read each entry back (newest
+	// first) to find the revision holding version 1.
+	restoreID := ""
+	for _, id := range ids {
+		getBody := fmt.Sprintf(
+			`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"get_page_revision","arguments":{"id":%q,"revision_id":%q}}}`,
+			pageID, id)
+		revText := mcpToolCallText(t, router, getBody, sessionID, &sess)
+		if strings.Contains(revText, versionOne) {
+			restoreID = id
+			break
+		}
 	}
+	if restoreID == "" {
+		t.Fatalf("no listed revision holds the first content:\n%s", listText)
+	}
+
+	restoreBody := fmt.Sprintf(
+		`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"restore_page_revision","arguments":{"id":%q,"revision_id":%q}}}`,
+		pageID, restoreID)
+	mcpToolCallText(t, router, restoreBody, sessionID, &sess)
+
+	getPageBody := fmt.Sprintf(
+		`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"get_page","arguments":{"id":%q}}}`,
+		pageID)
+	restoredText := mcpToolCallText(t, router, getPageBody, sessionID, &sess)
+	if !strings.Contains(restoredText, versionOne) || strings.Contains(restoredText, versionTwo) {
+		t.Fatalf("the restored page must carry the first content only:\n%s", restoredText)
+	}
+
+	// The restore itself is recorded: one more entry, a restore-type one.
+	listText = mcpToolCallText(t, router, listBody, sessionID, &sess)
+	newIDs := mcpRevisionIDs(listText)
+	if len(newIDs) != len(ids)+1 {
+		t.Fatalf("expected the restore to add one revision (%d + 1), got %d:\n%s", len(ids), len(newIDs), listText)
+	}
+	if !strings.Contains(listText, "(restore)") {
+		t.Fatalf("expected the recorded restore revision in the history:\n%s", listText)
+	}
+
+	t.Run("a viewer is refused with mcp_forbidden", func(t *testing.T) {
+		if _, err := w.UserService().CreateUser("mcp-rev-viewer", "mcp-rev-viewer@example.com", "viewerpass1", coreauth.RoleViewer); err != nil {
+			t.Fatalf("CreateUser (viewer) error: %v", err)
+		}
+		viewer := loginSession(t, router, "mcp-rev-viewer", "viewerpass1")
+
+		viewerInit := mcpPost(t, router, mcpInitializeBody, "", &viewer)
+		if viewerInit.Code != http.StatusOK {
+			t.Fatalf("expected 200 for the viewer's initialize, got %d: %s", viewerInit.Code, viewerInit.Body.String())
+		}
+		viewerSession := viewerInit.Header().Get("Mcp-Session-Id")
+		if viewerSession == "" {
+			t.Fatal("expected the viewer's initialize response to carry a Mcp-Session-Id header")
+		}
+
+		viewerRestoreBody := fmt.Sprintf(
+			`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"restore_page_revision","arguments":{"id":%q,"revision_id":%q}}}`,
+			pageID, restoreID)
+		rec := mcpPost(t, router, viewerRestoreBody, viewerSession, &viewer)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 for an errored tool result, got %d: %s", rec.Code, rec.Body.String())
+		}
+		var resp mcpToolCallResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode tools/call response %q: %v", rec.Body.String(), err)
+		}
+		if resp.Error != nil {
+			t.Fatalf("tools/call returned a JSON-RPC error: %+v", resp.Error)
+		}
+		if !resp.Result.IsError {
+			t.Fatal("expected the viewer's restore_page_revision to be an errored tool result")
+		}
+		for _, c := range resp.Result.Content {
+			if c.Type == "text" && !strings.Contains(c.Text, "mcp_forbidden") {
+				t.Fatalf("expected mcp_forbidden in the error result, got %q", c.Text)
+			}
+		}
+		// The refusal happens before the delegate: no restore side effect.
+		// The page keeps the restored content…
+		gotText := mcpToolCallText(t, router, getPageBody, sessionID, &sess)
+		if strings.Contains(gotText, versionTwo) {
+			t.Fatal("the viewer's refused restore must not change the page")
+		}
+		// …and no restore entry was recorded — a successful (but refused
+		// gate-bypassing) restore would grow the history by one.
+		afterRefusal := mcpToolCallText(t, router, listBody, sessionID, &sess)
+		if got := mcpRevisionIDs(afterRefusal); len(got) != len(newIDs) {
+			t.Fatalf("the refused restore must not record a revision: history went from %d to %d:\n%s",
+				len(newIDs), len(got), afterRefusal)
+		}
+	})
 }

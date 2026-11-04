@@ -302,10 +302,11 @@ shape for that domain.
   The tools are thin (one file each: the reads `get_page.go`, `get_page_by_path.go`, `search.go`,
   `list_tree.go` gated at `viewer`; the writes `create_page.go`, `update_page.go`, `patch_page.go`,
   `delete_page.go`, `move_page.go`, `ensure_path.go`, `convert_node.go`, `copy_page.go` gated at
-  `editor`, the role the equivalent REST mutation requires; the revision read tools
+  `editor`, the role the equivalent REST mutation requires; the revision tools
   `get_page_revisions.go`, `get_page_revision.go` and `compare_page_revisions.go` gated at
-  `viewer`, the minimum the plain API auth group the REST revision read routes sit behind
-  requires): each binds its arguments, gates the
+  `viewer` — the minimum the plain API auth group the REST revision read routes sit behind
+  requires — and `restore_page_revision.go` gated at `editor`, the `RequireEditorOrAdmin`
+  middleware the REST restore route carries): each binds its arguments, gates the
   caller's role (failing closed on a nil caller),
   delegates to the `PageOps` interface (`ops.go`, the read-only DTOs plus the write input structs
   with their `Actor`), formats the result (`format.go`, which also holds the `patch_page`
@@ -319,11 +320,13 @@ shape for that domain.
   delegating the page reads and the search to the existing pages/search use cases, the page
   writes to the same use case constructors the REST routes use (create/update/patch/delete/move/
   ensure-path/convert/copy — `pagesave` events, `AffectedPages`, and the asset/favorite/revision
-  cleanup fire exactly as through HTTP), and the revision read tools to the revisions use
-  cases, whose errors are mapped through the slice's shared `MapRevisionError`
-  (the non-HTTP core of `respondWithRevisionError`) — a LocalizedError passes
-  through, `os.ErrNotExist` becomes `revision_not_found`, anything else
-  `revision_internal_error`;
+  cleanup fire exactly as through HTTP), and the revision tools to the revisions use cases,
+  whose errors are mapped through the slice's shared `MapRevisionError` (the non-HTTP core of
+  `respondWithRevisionError`) — a LocalizedError passes through, `os.ErrNotExist` becomes
+  `revision_not_found`, anything else `revision_internal_error`; restore goes through the
+  same `RestoreRevisionUseCase` as the REST route, so the `pagesave` restore event and the
+  save metrics fire exactly as through HTTP and the restore itself is recorded as a new
+  revision;
   `ListTree` has no use case — the adapter reads `tree.GetTree()` and strips the synthetic root,
   mirroring the REST tree route — and the adapter maps the tree's read (`mapReadError`) and write
   (`mapWriteError`) sentinels onto the `page_*` `LocalizedError`s `respondWithPageError` would

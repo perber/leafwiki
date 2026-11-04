@@ -1398,6 +1398,87 @@ func TestWikiMCPAdapter_CompareRevisions(t *testing.T) {
 	}
 }
 
+// TestWikiMCPAdapter_RestoreRevision reverts the page to an earlier saved
+// state through the same use case the REST route uses: the page's content
+// becomes the restored one, and the restore itself is recorded — the history
+// grows by one with a "restore"-type entry at the top carrying that content.
+func TestWikiMCPAdapter_RestoreRevision(t *testing.T) {
+	_, adapter, sample := newMCPRevisionTestWiki(t)
+
+	res, err := adapter.ListRevisions(context.Background(), wikimcp.ListRevisionsInput{ID: sample.id})
+	if err != nil {
+		t.Fatalf("ListRevisions error: %v", err)
+	}
+	base := revisionByContent(t, adapter, sample.id, res.Revisions, sample.first)
+	before := len(res.Revisions)
+
+	page, err := adapter.RestoreRevision(context.Background(), wikimcp.RestoreRevisionInput{
+		Actor: mcpActor(), ID: sample.id, RevisionID: base.ID,
+	})
+	if err != nil {
+		t.Fatalf("RestoreRevision error: %v", err)
+	}
+	if page.Content != sample.first {
+		t.Errorf("restored page content = %q, want %q", page.Content, sample.first)
+	}
+
+	after, err := adapter.ListRevisions(context.Background(), wikimcp.ListRevisionsInput{ID: sample.id})
+	if err != nil {
+		t.Fatalf("ListRevisions (after restore) error: %v", err)
+	}
+	if len(after.Revisions) != before+1 {
+		t.Fatalf("history grew from %d to %d, want %d (the restore is recorded)",
+			before, len(after.Revisions), before+1)
+	}
+	if top := after.Revisions[0]; top.Type != "restore" {
+		t.Errorf("top revision type = %q, want %q", top.Type, "restore")
+	}
+	snap, err := adapter.GetRevision(context.Background(), wikimcp.GetRevisionInput{ID: sample.id, RevisionID: after.Revisions[0].ID})
+	if err != nil {
+		t.Fatalf("GetRevision (restored) error: %v", err)
+	}
+	if snap.Content != sample.first {
+		t.Errorf("restored revision content = %q, want %q", snap.Content, sample.first)
+	}
+}
+
+// TestWikiMCPAdapter_RestoreRevision_CurrentRevision pins the no-op restore:
+// restoring a page to the revision it already carries succeeds and the
+// content is unchanged — but the restore is still recorded, so the history
+// grows by one with a restore-type entry at the top.
+func TestWikiMCPAdapter_RestoreRevision_CurrentRevision(t *testing.T) {
+	_, adapter, sample := newMCPRevisionTestWiki(t)
+
+	res, err := adapter.ListRevisions(context.Background(), wikimcp.ListRevisionsInput{ID: sample.id})
+	if err != nil {
+		t.Fatalf("ListRevisions error: %v", err)
+	}
+	current := res.Revisions[0]
+	before := len(res.Revisions)
+
+	page, err := adapter.RestoreRevision(context.Background(), wikimcp.RestoreRevisionInput{
+		Actor: mcpActor(), ID: sample.id, RevisionID: current.ID,
+	})
+	if err != nil {
+		t.Fatalf("RestoreRevision (current) error: %v", err)
+	}
+	if page.Content != sample.second {
+		t.Errorf("page content = %q, want the unchanged %q", page.Content, sample.second)
+	}
+
+	after, err := adapter.ListRevisions(context.Background(), wikimcp.ListRevisionsInput{ID: sample.id})
+	if err != nil {
+		t.Fatalf("ListRevisions (after no-op restore) error: %v", err)
+	}
+	if len(after.Revisions) != before+1 {
+		t.Fatalf("history grew from %d to %d, want %d (a no-op restore is still recorded)",
+			before, len(after.Revisions), before+1)
+	}
+	if top := after.Revisions[0]; top.Type != "restore" {
+		t.Errorf("top revision type = %q, want %q", top.Type, "restore")
+	}
+}
+
 // TestWikiMCPAdapter_GetRevision_Unknown pins the os.ErrNotExist arm of the
 // revision error mapper: the store's not-found error is not a LocalizedError,
 // so the adapter answers with the code the REST route answers for the same
@@ -1438,12 +1519,12 @@ func TestWikiMCPAdapter_CompareRevisions_UnknownTarget(t *testing.T) {
 	assertRevisionError(t, err, wikirevisions.ErrCodeRevisionNotFound, "Revision resource not found")
 }
 
-// TestWikiMCPAdapter_RevisionReads_RevisionDisabled pins the intended
-// flag-off behaviour: with EnableRevision false (like the REST revision
-// routes, which hide behind the flag) the read ops degrade uniformly — an
-// empty list, and the not-found code for reads, with no page-existence
-// leak — instead of erroring.
-func TestWikiMCPAdapter_RevisionReads_RevisionDisabled(t *testing.T) {
+// TestWikiMCPAdapter_RevisionOps_RevisionDisabled pins the intended flag-off
+// behaviour: with EnableRevision false (like the REST revision routes, which
+// hide behind the flag) the ops degrade uniformly — an empty list, the
+// not-found code for the reads, the service-unavailable code for restore —
+// with no page-existence leak — instead of erroring.
+func TestWikiMCPAdapter_RevisionOps_RevisionDisabled(t *testing.T) {
 	w, err := NewWiki(&WikiOptions{
 		StorageDir:          t.TempDir(),
 		AdminPassword:       "adminpassword",
@@ -1479,6 +1560,11 @@ func TestWikiMCPAdapter_RevisionReads_RevisionDisabled(t *testing.T) {
 		ID: page.ID, BaseRevisionID: "r-1", TargetRevisionID: "r-2",
 	})
 	assertRevisionError(t, err, wikirevisions.ErrCodeRevisionNotFound, "Revision not found")
+
+	_, err = adapter.RestoreRevision(context.Background(), wikimcp.RestoreRevisionInput{
+		Actor: mcpActor(), ID: page.ID, RevisionID: "no-such-revision",
+	})
+	assertRevisionError(t, err, wikirevisions.ErrCodeRevisionServiceUnavailable, "Revision service is not available")
 }
 
 // TestWikiMCPAdapter_ListRevisions_InvalidPageID pins the mapper's default
@@ -1490,4 +1576,27 @@ func TestWikiMCPAdapter_ListRevisions_InvalidPageID(t *testing.T) {
 
 	_, err := adapter.ListRevisions(context.Background(), wikimcp.ListRevisionsInput{ID: "a/b"})
 	assertRevisionError(t, err, wikirevisions.ErrCodeRevisionInternalError, "Revision request failed")
+}
+
+// TestWikiMCPAdapter_RestoreRevision_UnknownRevision pins the restore use
+// case's own code for an unknown revision: it is a LocalizedError, so the
+// adapter passes it through unchanged.
+func TestWikiMCPAdapter_RestoreRevision_UnknownRevision(t *testing.T) {
+	_, adapter, sample := newMCPRevisionTestWiki(t)
+
+	_, err := adapter.RestoreRevision(context.Background(), wikimcp.RestoreRevisionInput{
+		Actor: mcpActor(), ID: sample.id, RevisionID: "no-such-revision",
+	})
+	assertRevisionError(t, err, wikirevisions.ErrCodeRevisionRestoreRevisionNotFound, "Restore revision not found")
+}
+
+// TestWikiMCPAdapter_RestoreRevision_UnknownPage pins the restore use case's
+// code for a page that does not exist.
+func TestWikiMCPAdapter_RestoreRevision_UnknownPage(t *testing.T) {
+	_, adapter, _ := newMCPRevisionTestWiki(t)
+
+	_, err := adapter.RestoreRevision(context.Background(), wikimcp.RestoreRevisionInput{
+		Actor: mcpActor(), ID: "no-such-page", RevisionID: "no-such-revision",
+	})
+	assertRevisionError(t, err, wikirevisions.ErrCodeRevisionRestorePageNotFound, "Page not found")
 }

@@ -207,6 +207,13 @@ type CompareRevisionsInput struct {
 	TargetRevisionID string
 }
 
+// RestoreRevisionInput is the input of the restore_page_revision tool.
+type RestoreRevisionInput struct {
+	Actor      Actor
+	ID         string
+	RevisionID string
+}
+
 // PageOps is the narrow consumer interface the page tools delegate to. The
 // slice never talks to the wiki's services directly: tool handlers bind their
 // arguments, gate the caller's role, call one of these, format the result, and
@@ -245,4 +252,6 @@ type PageOps interface {
 	GetRevision(ctx context.Context, in GetRevisionInput) (*RevisionSnapshot, error)
 	// CompareRevisions compares two revisions of one page.
 	CompareRevisions(ctx context.Context, in CompareRevisionsInput) (*RevisionComparison, error)
+	// RestoreRevision restores a page to a revision and returns the page.
+	RestoreRevision(ctx context.Context, in RestoreRevisionInput) (*Page, error)
 }

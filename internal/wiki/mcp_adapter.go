@@ -460,6 +460,20 @@ func (a *WikiMCPAdapter) CompareRevisions(ctx context.Context, in wikimcp.Compar
 	return mcpComparisonFromComparison(out.Comparison), nil
 }
 
+// RestoreRevision restores a page to a revision through the same
+// RestoreRevisionUseCase the REST restore route uses, so the pagesave restore
+// event and the page-save metrics fire exactly as through HTTP — and the
+// restore itself is recorded as a new revision.
+func (a *WikiMCPAdapter) RestoreRevision(ctx context.Context, in wikimcp.RestoreRevisionInput) (*wikimcp.Page, error) {
+	out, err := wikirevisions.NewRestoreRevisionUseCase(a.revision, a.tree, a.orchestrator, a.log, a.metrics).Execute(ctx, wikirevisions.RestoreRevisionInput{
+		UserID: in.Actor.ID, PageID: in.ID, RevisionID: in.RevisionID,
+	})
+	if err != nil {
+		return nil, mapRevisionError(err)
+	}
+	return mcpPageFromPage(out.Page), nil
+}
+
 // mapRevisionError converts a revisions use-case error onto the LocalizedError
 // the REST route would return for it (respondWithRevisionError): a
 // LocalizedError passes through (the core service already answers with
