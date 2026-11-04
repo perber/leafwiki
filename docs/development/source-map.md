@@ -59,7 +59,10 @@ filesystem-canonical (`tree`, `revision`) and SQLite-derived (`links`, `tags`, `
 - **`internal/core/markdown`** — markdown-file abstraction independent of the tree: `markdown.go`
   (`MarkdownFile` — path-aware read/write with title extraction), `frontmatter.go` (YAML frontmatter
   parse/serialize), `reserved.go` (`IsSystemKey` — `tags` and any `leafwiki_`-prefixed key are
-  reserved, `title` is not and round-trips as a normal custom property).
+  reserved, `title` is not and round-trips as a normal custom property), `links.go`
+  (`ParseWikiLinks` — the `[[Target|Alias]]` pattern; `NormalizeRoutePath` and
+  `ResolveFolderRelative` — "page is folder" resolution of relative hrefs; tree lookups stay in
+  `internal/links`).
 - **`internal/core/auth`** — local identity and session primitives, largest `core` package.
   `auth_service.go` (`AuthService`, password+TOTP login orchestration, `loginChallengeLifetime` =
   5 min bridging the two login steps), `session_manager.go` (`SessionManager` — JWT access/refresh

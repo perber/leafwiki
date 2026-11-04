@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/perber/wiki/internal/core/markdown"
 	"github.com/perber/wiki/internal/core/tree"
 )
 
@@ -115,7 +116,7 @@ func (b *LinkService) UpdateRewrittenLinksAndHealForPages(pages []*tree.Page, ru
 		if page == nil {
 			continue
 		}
-		pagePath := normalizeWikiPath(page.CalculatePath())
+		pagePath := markdown.NormalizeRoutePath(page.CalculatePath())
 		targets := rewriteResolvedTargets(pagePath, outgoingByPageID[page.ID], rules, b.treeService)
 		updates = append(updates, PageLinkUpdate{
 			FromPageID: page.ID,
@@ -133,7 +134,7 @@ func (b *LinkService) UpdateRewrittenLinksAndHealForPages(pages []*tree.Page, ru
 }
 
 func (b *LinkService) GetLinkStatusForPage(pageID string, pagePath string) (*LinkStatusResult, error) {
-	pagePath = normalizeWikiPath(pagePath)
+	pagePath = markdown.NormalizeRoutePath(pagePath)
 	page, err := b.treeService.GetPage(pageID)
 	if err != nil {
 		return nil, err
@@ -252,7 +253,7 @@ func (b *LinkService) UpdateLinksAndHealForPages(pages []*tree.Page) error {
 		if page == nil {
 			continue
 		}
-		pagePath := normalizeWikiPath(page.CalculatePath())
+		pagePath := markdown.NormalizeRoutePath(page.CalculatePath())
 		targets := collectTargetsFromContent(b.treeService, pagePath, page.Content)
 		updates = append(updates, PageLinkUpdate{
 			FromPageID: page.ID,
@@ -281,18 +282,18 @@ func (b *LinkService) MarkIncomingLinksBrokenForPage(pageID string) error {
 
 // MarkLinksBrokenForPath marks links pointing to an exact path as broken.
 func (b *LinkService) MarkLinksBrokenForPath(toPath string) error {
-	toPath = normalizeWikiPath(toPath)
+	toPath = markdown.NormalizeRoutePath(toPath)
 	return b.store.MarkLinksBrokenForPath(toPath)
 }
 
 // MarkLinksBrokenForPrefix marks all links under a prefix as broken (subtree move/delete).
 func (b *LinkService) MarkLinksBrokenForPrefix(prefix string) error {
-	prefix = normalizeWikiPath(prefix)
+	prefix = markdown.NormalizeRoutePath(prefix)
 	return b.store.MarkLinksBrokenForPrefix(prefix)
 }
 
 func (b *LinkService) HealLinksForExactPath(page *tree.Page) error {
-	toPath := normalizeWikiPath(page.CalculatePath())
+	toPath := markdown.NormalizeRoutePath(page.CalculatePath())
 	return b.store.HealLinksForPath(toPath, page.ID)
 }
 
@@ -354,7 +355,7 @@ func rewriteResolvedTargets(currentPath string, outgoings []Outgoing, rules []Re
 			wikiTitles = append(wikiTitles, rewriteWikiTitle(WikilinkTitleFromSentinel(outgoing.ToPath), rules))
 			continue
 		}
-		targetPath := normalizeWikiPath(outgoing.ToPath)
+		targetPath := markdown.NormalizeRoutePath(outgoing.ToPath)
 		if rewritten, ok := applyRewriteRules(targetPath, rules); ok {
 			targetPath = rewritten
 		}
