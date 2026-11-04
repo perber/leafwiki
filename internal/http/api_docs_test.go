@@ -248,11 +248,16 @@ type opSpec struct {
 	bearer bool
 	// descriptionMentions are lower-case phrases the description must contain.
 	descriptionMentions []string
-	// query lists every parameter; all must be in the query string.
-	query map[string]queryParam
+	// query and pathParams list every parameter of their kind; a nil map means
+	// none. Any other kind of parameter fails the check.
+	query      map[string]queryParam
+	pathParams map[string]queryParam
 	// arrayOf is the model suffix of the 200 array items, with its properties.
+	// An operation answering with an object sets okRef and okProps instead.
 	arrayOf      string
 	arrayOfProps map[string]string
+	okRef        string
+	okProps      map[string]string
 	// refs maps a status to the model suffix its schema references.
 	refs map[string]string
 	// broad maps a status with several real shapes to the model names its
@@ -278,6 +283,18 @@ func apiReadGroupGET(path, tag string) opSpec {
 		refs:                map[string]string{"400": "ErrorResponse", "401": "LegacyError", "429": "LegacyError", "503": "LegacyError"},
 		broad:               map[string][]string{"500": {"ErrorResponse", "LegacyError"}},
 		absent:              []string{"403"},
+	}
+}
+
+// assertParams compares the documented parameters of one kind with the wanted
+// ones; a nil and an empty map both mean "no parameters".
+func assertParams(t *testing.T, kind string, got, want map[string]queryParam) {
+	t.Helper()
+	if len(got) == 0 && len(want) == 0 {
+		return
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("%s parameters = %v, want %v", kind, got, want)
 	}
 }
 
@@ -307,30 +324,43 @@ func assertOperation(t *testing.T, doc map[string]any, spec opSpec) {
 		}
 	}
 
-	got := map[string]queryParam{}
+	gotQuery := map[string]queryParam{}
+	gotPath := map[string]queryParam{}
 	params, _ := op["parameters"].([]any)
 	for _, raw := range params {
 		p := raw.(map[string]any)
-		if docString(p, "in") != "query" {
-			t.Errorf("parameter %v is not a query parameter", p)
-		}
 		required, _ := p["required"].(bool)
-		got[docString(p, "name")] = queryParam{docString(p, "type"), required}
+		param := queryParam{docString(p, "type"), required}
+		switch in := docString(p, "in"); in {
+		case "query":
+			gotQuery[docString(p, "name")] = param
+		case "path":
+			gotPath[docString(p, "name")] = param
+		default:
+			t.Errorf("parameter %v is in %q, want query or path", p, in)
+		}
 	}
-	if !reflect.DeepEqual(got, spec.query) {
-		t.Errorf("query parameters = %v, want %v", got, spec.query)
-	}
+	assertParams(t, "query", gotQuery, spec.query)
+	assertParams(t, "path", gotPath, spec.pathParams)
 
 	responses := docObject(t, op, "responses")
 	ok := docObject(t, responses, "200", "schema")
-	if docString(ok, "type") != "array" {
-		t.Fatalf("200 schema = %v, want an array", ok)
+	if spec.okRef != "" {
+		name, model := resolveDefinition(t, doc, ok)
+		if !strings.HasSuffix(name, spec.okRef) {
+			t.Errorf("200 references %q, want %s", name, spec.okRef)
+		}
+		assertProperties(t, model, spec.okProps)
+	} else {
+		if docString(ok, "type") != "array" {
+			t.Fatalf("200 schema = %v, want an array", ok)
+		}
+		name, model := resolveDefinition(t, doc, docObject(t, ok, "items"))
+		if !strings.HasSuffix(name, spec.arrayOf) {
+			t.Errorf("200 items reference %q, want %s", name, spec.arrayOf)
+		}
+		assertProperties(t, model, spec.arrayOfProps)
 	}
-	name, model := resolveDefinition(t, doc, docObject(t, ok, "items"))
-	if !strings.HasSuffix(name, spec.arrayOf) {
-		t.Errorf("200 items reference %q, want %s", name, spec.arrayOf)
-	}
-	assertProperties(t, model, spec.arrayOfProps)
 
 	for status, want := range spec.refs {
 		if name, _ := resolveDefinition(t, doc, docObject(t, responses, status, "schema")); !strings.HasSuffix(name, want) {
@@ -395,16 +425,109 @@ func TestAPIDocs_Properties_DescribeReadOperations(t *testing.T) {
 	}
 }
 
+func TestAPIDocs_Search_DescribeReadOperations(t *testing.T) {
+	search := apiReadGroupGET("/search", "search")
+	search.query = map[string]queryParam{
+		"q": {"string", false}, "tags": {"array", false}, "offset": {"integer", false}, "limit": {"integer", false},
+	}
+	search.okRef = "SearchResult"
+	search.okProps = map[string]string{"limit": "integer", "offset": "integer", "count": "integer", "items": "array", "tag_facets": "array"}
+	search.descriptionMentions = append(search.descriptionMentions, "limit", "offset")
+
+	// The handler cannot fail: no localized 400 and the only 500s come from the
+	// authentication middleware.
+	status := apiReadGroupGET("/search/status", "search")
+	status.okRef = "IndexingStatus"
+	status.okProps = map[string]string{"active": "boolean", "indexed": "integer", "failed": "integer", "finished_at": "string"}
+	status.descriptionMentions = append(status.descriptionMentions, "finished_at")
+	delete(status.refs, "400")
+	status.absent = append(status.absent, "400")
+	status.broad = nil
+	status.refs["500"] = "LegacyError"
+
+	doc := readAPIDocument(t, "swagger.json")
+	for _, spec := range []opSpec{search, status} {
+		t.Run(spec.path, func(t *testing.T) { assertOperation(t, doc, spec) })
+	}
+
+	t.Run("nested models", func(t *testing.T) {
+		assertProperties(t, docObject(t, doc, "definitions", "dto.SearchResultItem"), map[string]string{
+			"page_id": "string", "title": "string", "path": "string", "kind": "string",
+			"rank": "number", "excerpt": "string", "tags": "array",
+		})
+		assertProperties(t, docObject(t, doc, "definitions", "dto.SearchTagFacet"), map[string]string{"tag": "string", "count": "integer"})
+	})
+}
+
+func TestAPIDocs_Links_DescribeOperations(t *testing.T) {
+	// No 400: the page ID is any string, an unknown one is a 404.
+	status := apiReadGroupGET("/pages/{id}/links", "links")
+	status.pathParams = map[string]queryParam{"id": {"string", true}}
+	status.okRef = "LinkStatus"
+	status.okProps = map[string]string{
+		"backlinks": "array", "broken_incoming": "array", "outgoings": "array", "broken_outgoings": "array", "counts": "",
+	}
+	delete(status.refs, "400")
+	status.refs["404"] = "ErrorResponse"
+	status.absent = append(status.absent, "400")
+
+	// Admin-only, so it sits behind APIAuthGroup + RequireAdmin instead of
+	// APIReadGroup: 403 is documented, there is no anonymous read.
+	broken := opSpec{
+		method:              "get",
+		path:                "/links/broken",
+		onlyOperation:       true,
+		tag:                 "links",
+		bearer:              true,
+		descriptionMentions: []string{"admin", "public access"},
+		okRef:               "BrokenLinks",
+		okProps:             map[string]string{"links": "array"},
+		refs:                map[string]string{"401": "LegacyError", "403": "LegacyError", "429": "LegacyError", "503": "LegacyError"},
+		broad:               map[string][]string{"500": {"ErrorResponse", "LegacyError"}},
+		absent:              []string{"400", "404"},
+	}
+
+	doc := readAPIDocument(t, "swagger.json")
+	for _, spec := range []opSpec{status, broken} {
+		t.Run(spec.path, func(t *testing.T) { assertOperation(t, doc, spec) })
+	}
+
+	t.Run("nested models", func(t *testing.T) {
+		assertProperties(t, docObject(t, doc, "definitions", "dto.Backlink"), map[string]string{
+			"from_page_id": "string", "from_title": "string", "from_path": "string", "broken": "boolean", "to_page_id": "string",
+		})
+		assertProperties(t, docObject(t, doc, "definitions", "dto.OutgoingLink"), map[string]string{
+			"to_page_id": "string", "to_page_title": "string", "to_path": "string", "broken": "boolean", "from_page_id": "string",
+		})
+		assertProperties(t, docObject(t, doc, "definitions", "dto.LinkStatusCounts"), map[string]string{
+			"backlinks": "integer", "broken_incoming": "integer", "outgoings": "integer", "broken_outgoings": "integer",
+		})
+		assertProperties(t, docObject(t, doc, "definitions", "dto.BrokenLink"), map[string]string{
+			"from_page_id": "string", "from_title": "string", "from_path": "string", "to_path": "string",
+		})
+	})
+}
+
 // documentedModels maps every definition in the spec to the Go type swag
 // generated it from. A new documented model must be added here, so its
 // required list is checked against the code.
 var documentedModels = map[string]reflect.Type{
+	"dto.Backlink":          reflect.TypeFor[dto.Backlink](),
+	"dto.BrokenLink":        reflect.TypeFor[dto.BrokenLink](),
+	"dto.BrokenLinks":       reflect.TypeFor[dto.BrokenLinks](),
 	"dto.ErrorDetail":       reflect.TypeFor[dto.ErrorDetail](),
 	"dto.ErrorResponse":     reflect.TypeFor[dto.ErrorResponse](),
+	"dto.IndexingStatus":    reflect.TypeFor[dto.IndexingStatus](),
 	"dto.LegacyError":       reflect.TypeFor[dto.LegacyError](),
+	"dto.LinkStatus":        reflect.TypeFor[dto.LinkStatus](),
+	"dto.LinkStatusCounts":  reflect.TypeFor[dto.LinkStatusCounts](),
+	"dto.OutgoingLink":      reflect.TypeFor[dto.OutgoingLink](),
 	"dto.PropertyEntry":     reflect.TypeFor[dto.PropertyEntry](),
 	"dto.PropertyKeyCount":  reflect.TypeFor[dto.PropertyKeyCount](),
 	"dto.PropertyPage":      reflect.TypeFor[dto.PropertyPage](),
+	"dto.SearchResult":      reflect.TypeFor[dto.SearchResult](),
+	"dto.SearchResultItem":  reflect.TypeFor[dto.SearchResultItem](),
+	"dto.SearchTagFacet":    reflect.TypeFor[dto.SearchTagFacet](),
 	"dto.TagCount":          reflect.TypeFor[dto.TagCount](),
 	"dto.TaggedPage":        reflect.TypeFor[dto.TaggedPage](),
 	"dto.UserLabel":         reflect.TypeFor[dto.UserLabel](),

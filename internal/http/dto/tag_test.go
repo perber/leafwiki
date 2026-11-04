@@ -29,13 +29,18 @@ func TestToTagCounts_Marshal_MatchesCoreType(t *testing.T) {
 	}
 }
 
-func assertMarshalsTo(t *testing.T, v any, want string) {
+func marshalString(t *testing.T, v any) string {
 	t.Helper()
 	got, err := json.Marshal(v)
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
-	if string(got) != want {
+	return string(got)
+}
+
+func assertMarshalsTo(t *testing.T, v any, want string) {
+	t.Helper()
+	if got := marshalString(t, v); got != want {
 		t.Errorf("got %s, want %s", got, want)
 	}
 }
