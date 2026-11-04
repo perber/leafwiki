@@ -73,6 +73,13 @@ func TestMapPageError(t *testing.T) {
 			wantNotIn:   "/abs/storage/wiki/docs/intro.md",
 		},
 		{name: "wrapped sentinel keeps its code", err: errors.Join(fmt.Errorf("creating page: %w", tree.ErrPageNotFound)), wantCode: ErrCodePageNotFound, wantMessage: "Page not found"},
+		{
+			name:        "wrapped drift error keeps the fixed message",
+			err:         fmt.Errorf("could not convert node: %w", &tree.DriftError{NodeID: "n-2", Kind: tree.NodeKindPage, Path: "/abs/storage/wiki/docs/guide.md", Reason: "file changed on disk"}),
+			wantCode:    ErrCodePageInternalError,
+			wantMessage: "Storage drift detected",
+			wantNotIn:   "/abs/storage/wiki/docs/guide.md",
+		},
 		{name: "unknown error is the internal-error arm", err: unknown, wantCode: ErrCodePageInternalError, wantMessage: "disk on fire"},
 	}
 	for _, tc := range tests {
