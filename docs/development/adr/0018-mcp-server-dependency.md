@@ -40,9 +40,9 @@ session or a Bearer API key?
    `server.NewStreamableHTTPServer` as an `http.Handler`; `server.
    WithHTTPContextFunc` is the one hook that carries request-scoped values
    into the MCP request context the tools receive. The streamable server runs
-   with `server.WithStateful(true)` (session IDs are tracked; the
-   transport's DELETE verb really terminates a session, unknown IDs get a
-   404 — mcp-go's default manager issues IDs but never validates them) and
+   with `server.WithSessionIdManagerResolver` (one stateful session manager
+   per user, so a session ID is valid only for the user who created it — see
+   the session owner-binding below) and
    `server.WithSessionIdleTTL(30*time.Minute)` (idle sessions are reaped
    even when the client never sends the teardown DELETE).
 2. **Registration:** a new slice `internal/wiki/mcp` with the standard
@@ -144,6 +144,31 @@ MCP tools can never drift apart (a LocalizedError passes through, a store
 `os.ErrNotExist` becomes `revision_not_found`, anything else
 `revision_internal_error`) — and tools/list now carries all sixteen tools.
 
+### Session owner-binding (PR 6a of the staged rollout)
+
+The PR 1 security review carried one finding: `WithStateful(true)` tracks
+every session in one global manager, so any authenticated user could
+reference — or DELETE — another user's live session ID. The owner-binding
+fixes it by binding each session ID to the authenticated user who created
+it: the streamable server now runs with a `WithSessionIdManagerResolver` that
+returns one mcp-go stateful session manager per user (keyed by the user's
+stable ID, resolved from the caller the gin wrapper lifts into the request
+context) instead of the global manager `WithStateful` installs. Another user
+presenting a session ID gets the same 404 the transport answers for an
+unknown ID, and their DELETE is a no-op for it. The guarantee holds for all
+three transport verbs: mcp-go validates the session ID against the resolved
+manager in its POST and DELETE handlers, but its GET (SSE stream) handler
+deliberately skips the check (the spec does not require session validation
+for GET), so the gin wrapper (routes.go) enforces the binding there — a
+caller presenting another user's session ID on GET gets the transport's own
+404, never that user's live stream — while a GET with the owner's own ID
+opens the stream as before. The idle-TTL sweeper is the one non-request
+caller of the resolver (the nil-request case in mcp-go's documented
+contract); it gets a sweep manager whose `Terminate` fans out to all
+per-user managers, so idle sessions are still reaped across every user.
+The per-user manager map is a `sync.Map` — the registry is shared across
+concurrent requests (sessions.go).
+
 ## Alternatives considered
 
 - **Hand-rolled JSON-RPC/MCP layer:** ~50 lines gets you a request/response
@@ -175,6 +200,15 @@ MCP tools can never drift apart (a LocalizedError passes through, a store
   client) can accumulate meaningful per-session state.
 - The binary grows even when `--enable-mcp` is off (Go does not split
   packages out at link time); the feature itself stays off by default.
+- The session owner-binding depends on mcp-go v0.55.0 leaving the
+  streamable server's cached `sessionIdManager` unset when a non-default
+  `SessionIdManagerResolver` is installed: with the cache empty, every
+  request — POST, GET, DELETE — and the idle-TTL sweeper resolve the manager
+  per request, and nothing can reach a session outside the caller's
+  per-user manager. A future mcp-go version bump must re-check this: a
+  version that cached a default manager behind the resolver, or started
+  validating GETs itself, would move the binding (and the wrapper's GET
+  guard) with it.
 - Tool handlers must treat the caller from the request context as the
   authoritative identity and re-check roles per tool.
 - Revisit this decision if: the MCP spec's session model outgrows mcp-go's

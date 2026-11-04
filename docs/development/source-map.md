@@ -293,12 +293,21 @@ shape for that domain.
   (`--enable-mcp`, [ADR-0018](./adr/0018-mcp-server-dependency.md)): one endpoint `/api/mcp` on the
   streamable-HTTP transport of `github.com/mark3labs/mcp-go`, registered through the `RouteRegistrar`
   seam behind `APIAuthGroup`'s existing session/API-key auth chain. `routes.go` lifts the resolved
-  user and the key-auth marker into the mcp-go request context and caps the POST body at
+  user and the key-auth marker into the mcp-go request context, enforces the session
+  owner-binding for the GET (SSE) verb that mcp-go's GET handler skips (the spec does not
+  require session validation for GET — a cross-user session ID gets the transport's own 404
+  instead of that user's live stream), and caps the POST body at
   `maxRequestBodyBytes` (500 MiB — the platform's bulk-content upload ceiling, strictly tighter
   than the uncapped REST page-update route; mcp-go reads bodies with an unbounded `io.ReadAll`);
   `server.go` builds the MCP server (`MCPServer` + `StreamableHTTPServer` as an `http.Handler`),
   registers the page tools, and holds the context helpers `userFromContext`/`keyAuthFromContext`,
   the `Actor` extractor `actorFromContext`, and the role gate `requireRole` the tool handlers read.
+  Session IDs are bound to their owner (ADR-0018): `sessions.go` holds the per-user
+  session-manager registry (`userSessionRegistry`) that `server.go` installs via
+  `WithSessionIdManagerResolver` — one mcp-go stateful manager per user, so a session ID is
+  valid only for the user who created it (for all three transport verbs: mcp-go validates
+  the ID on POST and DELETE, `sessionIDOwnedBy` covers the GET verb that mcp-go skips), plus
+  a nil-request sweep arm so mcp-go's idle-TTL sweeper reaps sessions of every user.
   The tools are thin (one file each: the reads `get_page.go`, `get_page_by_path.go`, `search.go`,
   `list_tree.go` gated at `viewer`; the writes `create_page.go`, `update_page.go`, `patch_page.go`,
   `delete_page.go`, `move_page.go`, `ensure_path.go`, `convert_node.go`, `copy_page.go` gated at

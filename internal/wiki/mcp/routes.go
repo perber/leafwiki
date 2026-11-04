@@ -24,6 +24,11 @@ import (
 type Routes struct {
 	handler     http.Handler
 	authService *coreauth.AuthService
+	// sessions is the per-user session-manager registry the owner binding
+	// resolves against (ADR-0018); the same instance the streamable handler
+	// installs as the resolver, so the GET guard checks against exactly the
+	// manager the transport validated POST and DELETE with.
+	sessions *userSessionRegistry
 }
 
 // RoutesConfig holds the dependencies required to build a Routes instance.
@@ -39,9 +44,11 @@ type RoutesConfig struct {
 
 // NewRoutes constructs the mcp RouteRegistrar.
 func NewRoutes(cfg RoutesConfig) *Routes {
+	sessions := &userSessionRegistry{}
 	return &Routes{
-		handler:     newStreamableHandler(cfg.Name, cfg.Version, cfg.Log, cfg.Ops),
+		handler:     newStreamableHandler(cfg.Name, cfg.Version, cfg.Log, cfg.Ops, sessions),
 		authService: cfg.AuthService,
+		sessions:    sessions,
 	}
 }
 
@@ -84,5 +91,25 @@ func (r *Routes) handleMCP(c *gin.Context) {
 	if authmw.IsAPIKeyAuth(c) {
 		ctx = context.WithValue(ctx, mcpKeyAuthKey, true)
 	}
-	r.handler.ServeHTTP(c.Writer, c.Request.WithContext(ctx))
+	req := c.Request.WithContext(ctx)
+	// mcp-go's GET (SSE) handler deliberately does not validate the session
+	// ID (the spec does not require it for GET), so the owner binding is
+	// enforced here for the third verb: a caller presenting another user's
+	// session ID gets the 404 the transport answers for an unknown ID,
+	// never that user's live stream.
+	if req.Method == http.MethodGet {
+		owned, terminated := r.sessions.sessionIDOwnedBy(req)
+		if !owned || terminated {
+			msg := "Invalid session ID"
+			if terminated {
+				msg = "Session terminated"
+			}
+			// Byte-identical to the transport's writeHTTPError: text/plain,
+			// nosniff, the message plus a trailing newline.
+			c.Header("X-Content-Type-Options", "nosniff")
+			c.Data(http.StatusNotFound, "text/plain; charset=utf-8", []byte(msg+"\n"))
+			return
+		}
+	}
+	r.handler.ServeHTTP(c.Writer, req)
 }

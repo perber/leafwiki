@@ -99,6 +99,29 @@ func mcpPostRequest(body, sessionID string, sess *testSession) *http.Request {
 	return req
 }
 
+// mcpGet opens the SSE stream (or gets a transport-level refusal) for an
+// MCP session, like an authenticated browser GET. No CSRF token: the
+// middleware enforces it on state-changing methods only, and a GET never
+// reaches the auth chain unauthenticated (APIAuthGroup rejects first).
+// A successful stream blocks until the request context is cancelled, so a
+// test that expects 200 must serve the router over a real
+// httptest.Server — a recorder would hang the test.
+func mcpGet(t *testing.T, router http.Handler, sessionID string, sess *testSession) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/api/mcp", nil)
+	if sessionID != "" {
+		req.Header.Set("Mcp-Session-Id", sessionID)
+	}
+	if sess != nil {
+		for _, c := range sess.cookies {
+			req.AddCookie(c)
+		}
+	}
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	return rec
+}
+
 // mcpPostBearer sends a JSON-RPC body authenticated with a Bearer API key.
 // A resolved key skips CSRF in the middleware chain, so only the
 // Authorization header is needed.

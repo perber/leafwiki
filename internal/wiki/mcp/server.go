@@ -98,7 +98,7 @@ func requireRole(ctx context.Context, minRole string) *ToolError {
 // PR — without it mcp-go answers tools/list with "tools not supported" until
 // the first tool lands, which would make the endpoint's shape change mid-way
 // through the PR series.
-func newStreamableHandler(name, version string, log *slog.Logger, ops PageOps) http.Handler {
+func newStreamableHandler(name, version string, log *slog.Logger, ops PageOps, sessions *userSessionRegistry) http.Handler {
 	server := mcpserver.NewMCPServer(name, version, mcpserver.WithToolCapabilities(false))
 	server.AddTools(
 		newGetPageTool(log, ops),
@@ -121,13 +121,19 @@ func newStreamableHandler(name, version string, log *slog.Logger, ops PageOps) h
 	return mcpserver.NewStreamableHTTPServer(server,
 		mcpserver.WithStreamableHTTPLogger(log),
 		mcpserver.WithHTTPContextFunc(httpContextFromRequest),
-		// mcp-go's default session manager issues session IDs but never
-		// validates them: a terminated or unknown session would keep
-		// working. Stateful mode tracks sessions, so the transport's
-		// DELETE verb really terminates a session and unknown IDs get a
-		// 404. Its sticky-session requirement is moot for a single
-		// binary like LeafWiki.
-		mcpserver.WithStateful(true),
+		// Session IDs are bound to their owner (ADR-0018): one stateful
+		// session manager per user, resolved from the caller the gin
+		// wrapper lifted into the request context, so a session ID from
+		// another user gets the same 404 as an unknown ID instead of
+		// letting that user read, call or DELETE the live session. mcp-go's
+		// default manager likewise issues IDs that never validate; the
+		// per-user stateful managers keep the transport's POST and DELETE
+		// verbs validating the session ID (its GET/SSE verb skips the
+		// check — the spec does not require it for GET — so the gin
+		// wrapper enforces the binding there). The resolver's
+		// nil-request arm keeps the idle-TTL sweeper reaping sessions of
+		// every user.
+		mcpserver.WithSessionIdManagerResolver(sessions),
 		// mcp-go keeps per-session state (client info, request IDs, event
 		// channels) until an explicit DELETE; an idle TTL bounds the slow
 		// leak from clients that disconnect without one.
