@@ -839,7 +839,7 @@ test.describe('Editor formatting', () => {
 
     const editPage = new EditPage(page);
     await page.locator('.cm-editor').click();
-    await page.keyboard.press('Control+b');
+    await page.keyboard.press('ControlOrMeta+b');
     await page.keyboard.type('Bold Text');
     await page.keyboard.press('ArrowRight');
     await page.keyboard.press('ArrowRight');
@@ -866,7 +866,7 @@ test.describe('Editor formatting', () => {
 
     const editPage = new EditPage(page);
     await page.locator('.cm-editor').click();
-    await page.keyboard.press('Control+i');
+    await page.keyboard.press('ControlOrMeta+i');
     await page.keyboard.type('Italic Text');
     await page.keyboard.press('ArrowRight');
 
