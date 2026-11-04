@@ -12,7 +12,7 @@ COPY ./ui/leafwiki-ui/ ./
 RUN VITE_API_URL=/ APP_VERSION=${APP_VERSION} npm run build
 
 # Stage 2: Go backend build
-FROM golang:1.27.3-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd AS builder
+FROM golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS builder
 
 ARG APP_VERSION
 ARG GOOS
