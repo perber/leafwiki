@@ -124,10 +124,6 @@ LeafWiki is intentionally narrower than those systems. That focus is part of the
 
 ---
 
-**Prefer not to run your own server?** Free hosted beta — 10 spots, starting September 2026. [Get a beta spot →](https://leafwiki.com/hosted/#waitlist) and help shape the hosted version.
-
----
-
 ## Install
 
 ### Docker
@@ -784,7 +780,6 @@ If it's useful to you:
 - ⭐ **[Star the repo](https://github.com/perber/leafwiki)** — helps others find it
 - 💛 **[Sponsor on GitHub](https://github.com/sponsors/perber)** — supports ongoing maintenance, bug fixes, and new features
 - ☕ **[Buy a coffee on Ko-fi](https://ko-fi.com/perber)** — a one-time thank-you
-- 🚀 **[Don't want to self-host? LeafWiki Hosted](https://leafwiki.com/hosted/)** — managed LeafWiki, your content stays plain Markdown
 
 Need help deploying LeafWiki for your team? [Business support & setup →](https://leafwiki.com/support/)
 
