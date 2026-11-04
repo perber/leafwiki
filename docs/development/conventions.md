@@ -76,6 +76,7 @@ Rules:
    | Seam | Where | Used for |
    |---|---|---|
    | `RouteRegistrar` | `internal/http/registrar.go` | each slice registers its own routes |
+   | `RouterContext.CapabilityGroup` | `internal/http/registrar.go` | read-only routes whose URL secret is the authorization (share links); no identity, hardened, never logged ([ADR-0018](./adr/0018-capability-routes-without-identity.md)) |
    | `PageSideEffect` | `internal/wiki/pagesave` | reactions to page create/update/move/delete/restore |
    | `ShellResponder` / `ShellContributor` on `FrontendConfig` | `internal/http/shell.go` | the HTML document served for SPA routes: title, head and `#root` markup, or another response ([ADR-0017](./adr/0017-spa-shell-contributors.md)) |
    | `Provider` interfaces + `settings.Value` (`Managed`/`Fixed`) | `internal/publicaccess`, `internal/tocdisplay`, `internal/core/settings` | instance settings changeable at runtime or pinned by a flag |
@@ -213,6 +214,7 @@ Accept a `ctx`, check `ctx.Err()` between phases and return it (see `runReloadPh
   | `_not_found` | 404 | `page_not_found` |
   | `_already_exists`, `_conflict`, `_already_running`, `_version_conflict` | 409 | `page_version_conflict` |
   | `_too_large` | 413 | `asset_file_too_large` |
+  | `_too_many_<what>` | 429 | `share_link_too_many_attempts` |
   | `_unavailable` (temporary, e.g. a store suspended during restore) | 503 | `auth_user_store_unavailable` |
   | `_internal_error`, `_failed` | 500 | `asset_upload_failed` |
 

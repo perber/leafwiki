@@ -22,6 +22,7 @@ import (
 	"github.com/perber/wiki/internal/http/dto"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/publicaccess"
+	"github.com/perber/wiki/internal/scopedread"
 	"github.com/perber/wiki/internal/test_utils"
 	"github.com/perber/wiki/internal/tocdisplay"
 	"github.com/perber/wiki/internal/wiki"
@@ -409,6 +410,7 @@ var documentedModels = map[string]reflect.Type{
 	"dto.TaggedPage":        reflect.TypeFor[dto.TaggedPage](),
 	"dto.UserLabel":         reflect.TypeFor[dto.UserLabel](),
 	"health.HealthResponse": reflect.TypeFor[health.HealthResponse](),
+	"scopedread.PageView":   reflect.TypeFor[scopedread.PageView](),
 }
 
 // alwaysPresentJSONFields lists the JSON keys of a struct's fields without
@@ -732,6 +734,7 @@ func newAPIDocsRouterWith(t *testing.T, override func(*httpinternal.RouterOption
 		RefreshTokenTimeout:    7 * 24 * time.Hour,
 		EnableRevision:         true,
 		EnableAPIKeyManagement: true,
+		EnableShareLinks:       true,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create wiki instance: %v", err)

@@ -41,6 +41,7 @@ import (
 	wikiresync "github.com/perber/wiki/internal/wiki/resync"
 	wikirevisions "github.com/perber/wiki/internal/wiki/revisions"
 	wikisearch "github.com/perber/wiki/internal/wiki/search"
+	wikishares "github.com/perber/wiki/internal/wiki/shares"
 	wikisnapshot "github.com/perber/wiki/internal/wiki/snapshot"
 	wikitags "github.com/perber/wiki/internal/wiki/tags"
 	wikiusersettings "github.com/perber/wiki/internal/wiki/usersettings"
@@ -76,6 +77,7 @@ type Wiki struct {
 	brandingRoutes         *wikibranding.Routes
 	avatarRoutes           *wikiavatar.Routes
 	apiKeysRoutes          *wikiapikeys.Routes
+	sharesRoutes           *wikishares.Routes
 	importerRoutes         *wikiimporter.Routes
 	healthRoutes           *wikihealth.Routes
 	revision               *revision.Service
@@ -255,6 +257,12 @@ func (w *Wiki) Favorites() *favorites.FavoritesStore {
 // into restore.Config.
 func (w *Wiki) UserSettingsService() *usersettings.UserSettingsService {
 	return w.userSettings
+}
+
+// ShareLinkService returns the share link service, or nil when share links
+// are disabled.
+func (w *Wiki) ShareLinkService() *sharing.ShareLinkService {
+	return w.shareLinks
 }
 
 // StateStores returns the state stores (other than users.db) that exist in
