@@ -55,6 +55,17 @@ type recordingOps struct {
 	convertErr error
 	copied     *Page
 	copyErr    error
+
+	lastListRevisions ListRevisionsInput
+	lastGetRevision   GetRevisionInput
+	lastCompare       CompareRevisionsInput
+	revisions         []Revision
+	nextCursor        string
+	revisionsErr      error
+	snapshot          *RevisionSnapshot
+	snapshotErr       error
+	comparison        *RevisionComparison
+	comparisonErr     error
 }
 
 func (f *recordingOps) GetPage(_ context.Context, id string) (*Page, error) {
@@ -178,6 +189,42 @@ func (f *recordingOps) CopyPage(_ context.Context, in CopyPageInput) (*Page, err
 		return f.copied, nil
 	}
 	return defaultPage(), nil
+}
+
+func (f *recordingOps) ListRevisions(_ context.Context, in ListRevisionsInput) (*ListRevisionsResult, error) {
+	f.calls = append(f.calls, "ListRevisions:"+in.ID)
+	f.lastListRevisions = in
+	if f.revisionsErr != nil {
+		return nil, f.revisionsErr
+	}
+	return &ListRevisionsResult{Revisions: f.revisions, NextCursor: f.nextCursor}, nil
+}
+
+func (f *recordingOps) GetRevision(_ context.Context, in GetRevisionInput) (*RevisionSnapshot, error) {
+	f.calls = append(f.calls, "GetRevision:"+in.RevisionID)
+	f.lastGetRevision = in
+	if f.snapshotErr != nil {
+		return nil, f.snapshotErr
+	}
+	if f.snapshot != nil {
+		return f.snapshot, nil
+	}
+	return &RevisionSnapshot{Revision: &Revision{ID: in.RevisionID}, Content: "old content"}, nil
+}
+
+func (f *recordingOps) CompareRevisions(_ context.Context, in CompareRevisionsInput) (*RevisionComparison, error) {
+	f.calls = append(f.calls, "CompareRevisions:"+in.BaseRevisionID+":"+in.TargetRevisionID)
+	f.lastCompare = in
+	if f.comparisonErr != nil {
+		return nil, f.comparisonErr
+	}
+	if f.comparison != nil {
+		return f.comparison, nil
+	}
+	return &RevisionComparison{
+		Base:   &RevisionSnapshot{Revision: &Revision{ID: in.BaseRevisionID}, Content: "old content"},
+		Target: &RevisionSnapshot{Revision: &Revision{ID: in.TargetRevisionID}, Content: "new content"},
+	}, nil
 }
 
 func defaultPage() *Page {

@@ -18,6 +18,7 @@ import (
 	wikimcp "github.com/perber/wiki/internal/wiki/mcp"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
 	"github.com/perber/wiki/internal/wiki/pagesave"
+	wikirevisions "github.com/perber/wiki/internal/wiki/revisions"
 	wikisearch "github.com/perber/wiki/internal/wiki/search"
 )
 
@@ -410,6 +411,72 @@ func (a *WikiMCPAdapter) CopyPage(ctx context.Context, in wikimcp.CopyPageInput)
 	return mcpPageFromPage(out.Page), nil
 }
 
+// ListRevisions lists a page's revision history, newest first, through the
+// list-revisions use case the REST list route uses; an empty result (no error)
+// is what a page without a history — or revision recording off — returns.
+func (a *WikiMCPAdapter) ListRevisions(ctx context.Context, in wikimcp.ListRevisionsInput) (*wikimcp.ListRevisionsResult, error) {
+	out, err := wikirevisions.NewListRevisionsUseCase(a.revision).Execute(ctx, wikirevisions.ListRevisionsInput{
+		PageID: in.ID, Cursor: in.Cursor, Limit: in.Limit,
+	})
+	if err != nil {
+		return nil, mapRevisionError(err)
+	}
+	revs := make([]wikimcp.Revision, 0, len(out.Revisions))
+	for _, r := range out.Revisions {
+		revs = append(revs, mcpRevisionFromRevision(r))
+	}
+	return &wikimcp.ListRevisionsResult{Revisions: revs, NextCursor: out.NextCursor}, nil
+}
+
+// GetRevision reads one revision's snapshot through the get-revision use case
+// the REST get route uses. A nil snapshot (revision recording off) is the
+// state the REST route answers 404 for, so it surfaces with the same code.
+func (a *WikiMCPAdapter) GetRevision(ctx context.Context, in wikimcp.GetRevisionInput) (*wikimcp.RevisionSnapshot, error) {
+	out, err := wikirevisions.NewGetRevisionUseCase(a.revision).Execute(ctx, wikirevisions.GetRevisionInput{
+		PageID: in.ID, RevisionID: in.RevisionID,
+	})
+	if err != nil {
+		return nil, mapRevisionError(err)
+	}
+	if out.Snapshot == nil || out.Snapshot.Revision == nil {
+		return nil, sharederrors.NewLocalizedError(wikirevisions.ErrCodeRevisionNotFound, "Revision not found", "revision not found", nil)
+	}
+	return mcpSnapshotFromSnapshot(out.Snapshot), nil
+}
+
+// CompareRevisions compares two revisions of a page through the
+// compare-revisions use case the REST compare route uses; a nil comparison
+// (revision recording off) surfaces with the REST route's 404 code.
+func (a *WikiMCPAdapter) CompareRevisions(ctx context.Context, in wikimcp.CompareRevisionsInput) (*wikimcp.RevisionComparison, error) {
+	out, err := wikirevisions.NewCompareRevisionsUseCase(a.revision).Execute(ctx, wikirevisions.CompareRevisionsInput{
+		PageID: in.ID, BaseRevisionID: in.BaseRevisionID, TargetRevisionID: in.TargetRevisionID,
+	})
+	if err != nil {
+		return nil, mapRevisionError(err)
+	}
+	if out.Comparison == nil || out.Comparison.Base == nil || out.Comparison.Target == nil {
+		return nil, sharederrors.NewLocalizedError(wikirevisions.ErrCodeRevisionNotFound, "Revision not found", "revision not found", nil)
+	}
+	return mcpComparisonFromComparison(out.Comparison), nil
+}
+
+// mapRevisionError converts a revisions use-case error onto the LocalizedError
+// the REST route would return for it (respondWithRevisionError): a
+// LocalizedError passes through (the core service already answers with
+// revision_* codes), and everything else goes through the revisions slice's
+// shared table (MapRevisionError) — a store os.ErrNotExist becomes
+// revision_not_found, anything else revision_internal_error — so the tools
+// report the same client-facing codes the REST API does.
+func mapRevisionError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if _, ok := sharederrors.AsLocalizedError(err); ok {
+		return err
+	}
+	return wikirevisions.MapRevisionError(err)
+}
+
 // Search runs a full-text search, delegating to the existing search use case.
 func (a *WikiMCPAdapter) Search(ctx context.Context, query string, limit int) (*wikimcp.SearchResult, error) {
 	out, err := wikisearch.NewSearchUseCase(a.searchIndex, a.tags, a.tree).Execute(
@@ -457,6 +524,52 @@ func mcpPageFromPage(page *tree.Page) *wikimcp.Page {
 		Content:   page.Content,
 		CreatedAt: page.Metadata.CreatedAt,
 		UpdatedAt: page.Metadata.UpdatedAt,
+	}
+}
+
+// mcpRevisionFromRevision maps a core revision onto the slice's Revision DTO.
+func mcpRevisionFromRevision(rev *revision.Revision) wikimcp.Revision {
+	if rev == nil {
+		return wikimcp.Revision{}
+	}
+	return wikimcp.Revision{
+		ID:        rev.ID,
+		Type:      string(rev.Type),
+		AuthorID:  rev.AuthorID,
+		CreatedAt: rev.CreatedAt,
+		Title:     rev.Title,
+		Path:      rev.Path,
+		Summary:   rev.Summary,
+	}
+}
+
+// mcpSnapshotFromSnapshot maps a revision snapshot onto the slice's DTO,
+// keeping the asset names, sizes and types (not their content hashes).
+func mcpSnapshotFromSnapshot(snap *revision.RevisionSnapshot) *wikimcp.RevisionSnapshot {
+	assets := make([]wikimcp.RevisionAsset, 0, len(snap.Assets))
+	for _, a := range snap.Assets {
+		assets = append(assets, wikimcp.RevisionAsset{Name: a.Name, SizeBytes: a.SizeBytes, MIMEType: a.MIMEType})
+	}
+	rev := mcpRevisionFromRevision(snap.Revision)
+	return &wikimcp.RevisionSnapshot{
+		Revision: &rev,
+		Content:  snap.Content,
+		Assets:   assets,
+	}
+}
+
+// mcpComparisonFromComparison maps a revision comparison onto the slice's
+// Comparison DTO.
+func mcpComparisonFromComparison(cmp *revision.RevisionComparison) *wikimcp.RevisionComparison {
+	changes := make([]wikimcp.RevisionAssetChange, 0, len(cmp.AssetChanges))
+	for _, c := range cmp.AssetChanges {
+		changes = append(changes, wikimcp.RevisionAssetChange{Name: c.Name, Status: c.Status})
+	}
+	return &wikimcp.RevisionComparison{
+		Base:           mcpSnapshotFromSnapshot(cmp.Base),
+		Target:         mcpSnapshotFromSnapshot(cmp.Target),
+		ContentChanged: cmp.ContentChanged,
+		AssetChanges:   changes,
 	}
 }
 

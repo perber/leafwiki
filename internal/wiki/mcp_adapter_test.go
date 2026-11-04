@@ -12,6 +12,7 @@ import (
 	"github.com/perber/wiki/internal/test_utils"
 	wikimcp "github.com/perber/wiki/internal/wiki/mcp"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
+	wikirevisions "github.com/perber/wiki/internal/wiki/revisions"
 )
 
 // newMCPTestWiki boots a real wiki, creates a page with searchable content, and
@@ -1230,4 +1231,263 @@ func TestWikiMCPAdapter_CopyPage_ExistingSlugConflict(t *testing.T) {
 		Actor: mcpActor(), SourceID: src.ID, Title: "MCP Copied Again", Slug: "mcp-copy-src",
 	})
 	assertPageError(t, err, wikipages.ErrCodePageSlugConflict, "Page already exists")
+}
+
+// ─── Revision ops ────────────────────────────────────────────────────────────
+
+type revisionSample struct {
+	id     string
+	first  string
+	second string
+}
+
+// newMCPRevisionTestWiki is newMCPWriteTestWiki with one page saved twice, so
+// its history holds at least two content revisions (the first and the second
+// saved content, newest first in the list).
+func newMCPRevisionTestWiki(t *testing.T) (*Wiki, *WikiMCPAdapter, *revisionSample) {
+	t.Helper()
+	w, adapter := newMCPWriteTestWiki(t)
+
+	page, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(), Title: "MCP Revisions Sample", Slug: "mcp-revisions-sample",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage error: %v", err)
+	}
+	first := "first version of the sample page"
+	if _, err := adapter.UpdatePage(context.Background(), wikimcp.UpdatePageInput{
+		Actor: mcpActor(), ID: page.ID, Content: &first,
+	}); err != nil {
+		t.Fatalf("UpdatePage (first) error: %v", err)
+	}
+	second := "second version of the sample page"
+	if _, err := adapter.UpdatePage(context.Background(), wikimcp.UpdatePageInput{
+		Actor: mcpActor(), ID: page.ID, Content: &second,
+	}); err != nil {
+		t.Fatalf("UpdatePage (second) error: %v", err)
+	}
+	return w, adapter, &revisionSample{id: page.ID, first: first, second: second}
+}
+
+// revisionByContent returns the entry of the listed history whose content is
+// the given one, failing the test if none carries it.
+func revisionByContent(t *testing.T, adapter *WikiMCPAdapter, pageID string, revisions []wikimcp.Revision, content string) wikimcp.Revision {
+	t.Helper()
+	for _, r := range revisions {
+		snap, err := adapter.GetRevision(context.Background(), wikimcp.GetRevisionInput{ID: pageID, RevisionID: r.ID})
+		if err != nil {
+			t.Fatalf("GetRevision(%s) error: %v", r.ID, err)
+		}
+		if snap.Content == content {
+			return r
+		}
+	}
+	t.Fatalf("no listed revision carries content %q", content)
+	return wikimcp.Revision{}
+}
+
+// assertRevisionError asserts err is the expected revisions-domain
+// LocalizedError with its client-facing code and message.
+func assertRevisionError(t *testing.T, err error, wantCode, wantMessage string) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("expected an error, got nil")
+	}
+	loc, ok := sharederrors.AsLocalizedError(err)
+	if !ok {
+		t.Fatalf("error = %T (%v), want *sharederrors.LocalizedError", err, err)
+	}
+	if loc.Code != wantCode {
+		t.Errorf("code = %q, want %q", loc.Code, wantCode)
+	}
+	if loc.Message != wantMessage {
+		t.Errorf("message = %q, want %q", loc.Message, wantMessage)
+	}
+}
+
+// TestWikiMCPAdapter_ListRevisions returns the history newest first: the
+// newest entry postdates the oldest and holds the latest saved content.
+func TestWikiMCPAdapter_ListRevisions(t *testing.T) {
+	_, adapter, sample := newMCPRevisionTestWiki(t)
+
+	res, err := adapter.ListRevisions(context.Background(), wikimcp.ListRevisionsInput{ID: sample.id})
+	if err != nil {
+		t.Fatalf("ListRevisions error: %v", err)
+	}
+	if len(res.Revisions) < 2 {
+		t.Fatalf("expected at least two revisions after two saves, got %d", len(res.Revisions))
+	}
+	newest, oldest := res.Revisions[0], res.Revisions[len(res.Revisions)-1]
+	if newest.ID == oldest.ID {
+		t.Fatalf("expected distinct revision IDs, got %q twice", newest.ID)
+	}
+	if newest.CreatedAt.Before(oldest.CreatedAt) {
+		t.Errorf("expected newest first; newest %q (at %s) predates oldest %q (at %s)",
+			newest.ID, newest.CreatedAt, oldest.ID, oldest.CreatedAt)
+	}
+	snap, err := adapter.GetRevision(context.Background(), wikimcp.GetRevisionInput{ID: sample.id, RevisionID: newest.ID})
+	if err != nil {
+		t.Fatalf("GetRevision (newest) error: %v", err)
+	}
+	if snap.Content != sample.second {
+		t.Errorf("newest revision content = %q, want the second saved content %q", snap.Content, sample.second)
+	}
+}
+
+// TestWikiMCPAdapter_GetRevision reads each saved content state back by the
+// ID the list reports.
+func TestWikiMCPAdapter_GetRevision(t *testing.T) {
+	_, adapter, sample := newMCPRevisionTestWiki(t)
+
+	res, err := adapter.ListRevisions(context.Background(), wikimcp.ListRevisionsInput{ID: sample.id})
+	if err != nil {
+		t.Fatalf("ListRevisions error: %v", err)
+	}
+	for _, want := range []string{sample.first, sample.second} {
+		rev := revisionByContent(t, adapter, sample.id, res.Revisions, want)
+		snap, err := adapter.GetRevision(context.Background(), wikimcp.GetRevisionInput{ID: sample.id, RevisionID: rev.ID})
+		if err != nil {
+			t.Fatalf("GetRevision(%s) error: %v", rev.ID, err)
+		}
+		if snap.Revision.ID != rev.ID {
+			t.Errorf("snapshot revision ID = %q, want %q", snap.Revision.ID, rev.ID)
+		}
+		if snap.Content != want {
+			t.Errorf("GetRevision(%s) content = %q, want %q", rev.ID, snap.Content, want)
+		}
+	}
+}
+
+// TestWikiMCPAdapter_CompareRevisions flags the content change between the two
+// saved states, and no change for a revision compared with itself.
+func TestWikiMCPAdapter_CompareRevisions(t *testing.T) {
+	_, adapter, sample := newMCPRevisionTestWiki(t)
+
+	res, err := adapter.ListRevisions(context.Background(), wikimcp.ListRevisionsInput{ID: sample.id})
+	if err != nil {
+		t.Fatalf("ListRevisions error: %v", err)
+	}
+	base := revisionByContent(t, adapter, sample.id, res.Revisions, sample.first)
+	target := res.Revisions[0]
+
+	cmp, err := adapter.CompareRevisions(context.Background(), wikimcp.CompareRevisionsInput{
+		ID: sample.id, BaseRevisionID: base.ID, TargetRevisionID: target.ID,
+	})
+	if err != nil {
+		t.Fatalf("CompareRevisions error: %v", err)
+	}
+	if !cmp.ContentChanged {
+		t.Error("expected ContentChanged for two different saved states")
+	}
+	if cmp.Base.Content != sample.first || cmp.Target.Content != sample.second {
+		t.Errorf("base content = %q, target content = %q; want the first and second saved contents",
+			cmp.Base.Content, cmp.Target.Content)
+	}
+
+	same, err := adapter.CompareRevisions(context.Background(), wikimcp.CompareRevisionsInput{
+		ID: sample.id, BaseRevisionID: base.ID, TargetRevisionID: base.ID,
+	})
+	if err != nil {
+		t.Fatalf("CompareRevisions (same) error: %v", err)
+	}
+	if same.ContentChanged {
+		t.Error("a revision compared with itself must not change the content")
+	}
+	if len(same.AssetChanges) != 0 {
+		t.Errorf("a revision compared with itself must have no asset changes, got %+v", same.AssetChanges)
+	}
+}
+
+// TestWikiMCPAdapter_GetRevision_Unknown pins the os.ErrNotExist arm of the
+// revision error mapper: the store's not-found error is not a LocalizedError,
+// so the adapter answers with the code the REST route answers for the same
+// request, revision_not_found.
+func TestWikiMCPAdapter_GetRevision_Unknown(t *testing.T) {
+	_, adapter, sample := newMCPRevisionTestWiki(t)
+
+	_, err := adapter.GetRevision(context.Background(), wikimcp.GetRevisionInput{ID: sample.id, RevisionID: "no-such-revision"})
+	assertRevisionError(t, err, wikirevisions.ErrCodeRevisionNotFound, "Revision resource not found")
+}
+
+// TestWikiMCPAdapter_CompareRevisions_Unknown pins the same mapping for the
+// compare op, with the unknown revision in the base slot.
+func TestWikiMCPAdapter_CompareRevisions_Unknown(t *testing.T) {
+	_, adapter, sample := newMCPRevisionTestWiki(t)
+
+	_, err := adapter.CompareRevisions(context.Background(), wikimcp.CompareRevisionsInput{
+		ID: sample.id, BaseRevisionID: "no-such-revision", TargetRevisionID: "also-unknown",
+	})
+	assertRevisionError(t, err, wikirevisions.ErrCodeRevisionNotFound, "Revision resource not found")
+}
+
+// TestWikiMCPAdapter_CompareRevisions_UnknownTarget pins the same mapping for
+// the unknown revision in the target slot (the unknown base is pinned in
+// TestWikiMCPAdapter_CompareRevisions_Unknown).
+func TestWikiMCPAdapter_CompareRevisions_UnknownTarget(t *testing.T) {
+	_, adapter, sample := newMCPRevisionTestWiki(t)
+
+	res, err := adapter.ListRevisions(context.Background(), wikimcp.ListRevisionsInput{ID: sample.id})
+	if err != nil {
+		t.Fatalf("ListRevisions error: %v", err)
+	}
+	known := res.Revisions[0].ID
+
+	_, err = adapter.CompareRevisions(context.Background(), wikimcp.CompareRevisionsInput{
+		ID: sample.id, BaseRevisionID: known, TargetRevisionID: "no-such-revision",
+	})
+	assertRevisionError(t, err, wikirevisions.ErrCodeRevisionNotFound, "Revision resource not found")
+}
+
+// TestWikiMCPAdapter_RevisionReads_RevisionDisabled pins the intended
+// flag-off behaviour: with EnableRevision false (like the REST revision
+// routes, which hide behind the flag) the read ops degrade uniformly — an
+// empty list, and the not-found code for reads, with no page-existence
+// leak — instead of erroring.
+func TestWikiMCPAdapter_RevisionReads_RevisionDisabled(t *testing.T) {
+	w, err := NewWiki(&WikiOptions{
+		StorageDir:          t.TempDir(),
+		AdminPassword:       "adminpassword",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create wiki instance: %v", err)
+	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(w.Close, t) })
+	adapter := NewWikiMCPAdapter(w)
+
+	page, err := adapter.CreatePage(context.Background(), wikimcp.CreatePageInput{
+		Actor: mcpActor(), Title: "Flag Off Sample", Slug: "flag-off-sample",
+	})
+	if err != nil {
+		t.Fatalf("CreatePage error: %v", err)
+	}
+
+	res, err := adapter.ListRevisions(context.Background(), wikimcp.ListRevisionsInput{ID: page.ID})
+	if err != nil {
+		t.Fatalf("ListRevisions error: %v", err)
+	}
+	if len(res.Revisions) != 0 {
+		t.Fatalf("flag-off list returned %d revisions, want none", len(res.Revisions))
+	}
+
+	_, err = adapter.GetRevision(context.Background(), wikimcp.GetRevisionInput{ID: page.ID, RevisionID: "no-such-revision"})
+	assertRevisionError(t, err, wikirevisions.ErrCodeRevisionNotFound, "Revision not found")
+
+	_, err = adapter.CompareRevisions(context.Background(), wikimcp.CompareRevisionsInput{
+		ID: page.ID, BaseRevisionID: "r-1", TargetRevisionID: "r-2",
+	})
+	assertRevisionError(t, err, wikirevisions.ErrCodeRevisionNotFound, "Revision not found")
+}
+
+// TestWikiMCPAdapter_ListRevisions_InvalidPageID pins the mapper's default
+// arm: a page ID the store rejects (a path separator) is a plain error, so
+// the adapter answers revision_internal_error, the code the REST route
+// answers for the same request.
+func TestWikiMCPAdapter_ListRevisions_InvalidPageID(t *testing.T) {
+	_, adapter, _ := newMCPRevisionTestWiki(t)
+
+	_, err := adapter.ListRevisions(context.Background(), wikimcp.ListRevisionsInput{ID: "a/b"})
+	assertRevisionError(t, err, wikirevisions.ErrCodeRevisionInternalError, "Revision request failed")
 }

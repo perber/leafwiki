@@ -56,6 +56,7 @@ func newMCPRouterTest(t *testing.T, apiKeys bool) (*wiki.Wiki, http.Handler) {
 		AccessTokenTimeout:     15 * time.Minute,
 		RefreshTokenTimeout:    7 * 24 * time.Hour,
 		EnableMCP:              true,
+		EnableRevision:         true,
 		EnableAPIKeyManagement: apiKeys,
 	})
 	if err != nil {
@@ -157,9 +158,9 @@ func TestMCP_DisabledByDefault(t *testing.T) {
 
 // TestMCP_SessionInitializeAndListsTools is the contract a cookie-authenticated
 // session sees: a valid MCP initialize (serverInfo named leafwiki) and a
-// tools/list carrying exactly the twelve page tools (four reads, eight
-// writes) — the count and the set are both pinned, so a thirteenth tool fails
-// this test until the expected list is extended.
+// tools/list carrying exactly the fifteen tools (four page reads, eight page
+// writes, three revision read tools) — the count and the set are both pinned,
+// so a sixteenth tool fails this test until the expected list is extended.
 func TestMCP_SessionInitializeAndListsTools(t *testing.T) {
 	_, router := newMCPRouterTest(t, false)
 	sess := loginSession(t, router, "admin", "adminpassword")
@@ -193,7 +194,8 @@ func TestMCP_SessionInitializeAndListsTools(t *testing.T) {
 	}
 	wantTools := []string{"get_page", "get_page_by_path", "search", "list_tree",
 		"create_page", "update_page", "patch_page", "delete_page", "move_page",
-		"ensure_path", "convert_node", "copy_page"}
+		"ensure_path", "convert_node", "copy_page",
+		"get_page_revisions", "get_page_revision", "compare_page_revisions"}
 	if len(listResp.Result.Tools) != len(wantTools) {
 		t.Fatalf("expected exactly %d tools in tools/list, got %d: %+v", len(wantTools), len(listResp.Result.Tools), listResp.Result.Tools)
 	}
@@ -794,4 +796,76 @@ func TestMCP_ToolCallEnsurePath(t *testing.T) {
 			t.Fatalf("expected 401 for an unauthenticated ensure_path, got %d: %s", rec.Code, rec.Body.String())
 		}
 	})
+}
+
+// mcpRevisionIDs extracts the revision IDs from a get_page_revisions result:
+// each entry line starts with "- <ID> …" (the rest carries type, author and
+// time, which the test does not need).
+func mcpRevisionIDs(text string) []string {
+	var ids []string
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "- ") {
+			continue
+		}
+		fields := strings.Fields(strings.TrimPrefix(line, "- "))
+		if len(fields) > 0 {
+			ids = append(ids, fields[0])
+		}
+	}
+	return ids
+}
+
+// TestMCP_ToolCallRevisions is the revision-read-tools end-to-end round trip:
+// an admin creates a page and saves a second version, the history lists the
+// revisions newest first, and reading the newest revision back yields the
+// latest content.
+func TestMCP_ToolCallRevisions(t *testing.T) {
+	_, router := newMCPRouterTest(t, false)
+	sess := loginSession(t, router, "admin", "adminpassword")
+
+	initRec := mcpPost(t, router, mcpInitializeBody, "", &sess)
+	if initRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for initialize, got %d: %s", initRec.Code, initRec.Body.String())
+	}
+	sessionID := initRec.Header().Get("Mcp-Session-Id")
+	if sessionID == "" {
+		t.Fatal("expected the initialize response to carry a Mcp-Session-Id header")
+	}
+
+	const (
+		versionOne = "revisions e2e version 1"
+		versionTwo = "revisions e2e version 2"
+	)
+	createBody := fmt.Sprintf(
+		`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"create_page","arguments":{"title":"MCP Revisions E2E","content":%q}}}`,
+		versionOne)
+	createdText := mcpToolCallText(t, router, createBody, sessionID, &sess)
+	pageID := mcpPageID(createdText)
+	if pageID == "" {
+		t.Fatalf("could not extract a page ID from:\n%s", createdText)
+	}
+
+	updateBody := fmt.Sprintf(
+		`{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"update_page","arguments":{"id":%q,"content":%q}}}`,
+		pageID, versionTwo)
+	mcpToolCallText(t, router, updateBody, sessionID, &sess)
+
+	listBody := fmt.Sprintf(
+		`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_page_revisions","arguments":{"id":%q}}}`,
+		pageID)
+	listText := mcpToolCallText(t, router, listBody, sessionID, &sess)
+	ids := mcpRevisionIDs(listText)
+	if len(ids) < 2 {
+		t.Fatalf("expected at least two revisions after a create and an update, got %d:\n%s", len(ids), listText)
+	}
+
+	// The newest entry holds the latest content.
+	newestBody := fmt.Sprintf(
+		`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"get_page_revision","arguments":{"id":%q,"revision_id":%q}}}`,
+		pageID, ids[0])
+	newestText := mcpToolCallText(t, router, newestBody, sessionID, &sess)
+	if !strings.Contains(newestText, versionTwo) {
+		t.Fatalf("the newest revision must hold the latest content:\n%s", newestText)
+	}
 }

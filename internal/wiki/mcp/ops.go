@@ -137,6 +137,76 @@ type CopyPageInput struct {
 	Slug     string
 }
 
+// Revision is one entry in a page's revision history (the get_page_revisions
+// output); author identity stays an ID — user resolution happens outside the
+// slice (ADR-0018).
+type Revision struct {
+	ID        string
+	Type      string // "content_update", "asset_update", "structure_update", "restore"
+	AuthorID  string
+	CreatedAt time.Time
+	Title     string
+	Path      string
+	Summary   string
+}
+
+// RevisionAsset is one asset attached to a revision.
+type RevisionAsset struct {
+	Name      string
+	SizeBytes int64
+	MIMEType  string
+}
+
+// RevisionSnapshot is one revision with its content — the output of
+// get_page_revision, the REST revision-snapshot shape without user resolution.
+type RevisionSnapshot struct {
+	Revision *Revision
+	Content  string
+	Assets   []RevisionAsset
+}
+
+// RevisionAssetChange is one asset difference between two revisions.
+type RevisionAssetChange struct {
+	Name   string
+	Status string // "added", "removed" or "changed"
+}
+
+// RevisionComparison is the output of compare_page_revisions: both revision
+// snapshots, whether the content differs, and the asset differences — the
+// REST comparison shape.
+type RevisionComparison struct {
+	Base           *RevisionSnapshot
+	Target         *RevisionSnapshot
+	ContentChanged bool
+	AssetChanges   []RevisionAssetChange
+}
+
+// ListRevisionsInput is the input of the get_page_revisions tool.
+type ListRevisionsInput struct {
+	ID     string
+	Cursor string // "" starts at the newest
+	Limit  int
+}
+
+// ListRevisionsResult is the output of the ListRevisions op.
+type ListRevisionsResult struct {
+	Revisions  []Revision
+	NextCursor string
+}
+
+// GetRevisionInput is the input of the get_page_revision tool.
+type GetRevisionInput struct {
+	ID         string
+	RevisionID string
+}
+
+// CompareRevisionsInput is the input of the compare_page_revisions tool.
+type CompareRevisionsInput struct {
+	ID               string
+	BaseRevisionID   string
+	TargetRevisionID string
+}
+
 // PageOps is the narrow consumer interface the page tools delegate to. The
 // slice never talks to the wiki's services directly: tool handlers bind their
 // arguments, gate the caller's role, call one of these, format the result, and
@@ -168,4 +238,11 @@ type PageOps interface {
 	ConvertNode(ctx context.Context, in ConvertNodeInput) error
 	// CopyPage copies a page (and its assets) to a new node and returns it.
 	CopyPage(ctx context.Context, in CopyPageInput) (*Page, error)
+	// ListRevisions returns a page's revision history, newest first, and the
+	// cursor for the next page; empty when the page has no revisions.
+	ListRevisions(ctx context.Context, in ListRevisionsInput) (*ListRevisionsResult, error)
+	// GetRevision reads one revision's content and assets by page and revision ID.
+	GetRevision(ctx context.Context, in GetRevisionInput) (*RevisionSnapshot, error)
+	// CompareRevisions compares two revisions of one page.
+	CompareRevisions(ctx context.Context, in CompareRevisionsInput) (*RevisionComparison, error)
 }

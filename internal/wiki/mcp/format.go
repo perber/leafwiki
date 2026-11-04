@@ -53,6 +53,96 @@ func withLineNumbers(content string) string {
 	return sb.String()
 }
 
+// renderRevisions renders a page's revision history, newest first (the order
+// the store returns it): one line per revision carrying the ID the agent can
+// hand to get_page_revision and restore_page_revision, the type, the author's
+// ID, the creation time and an optional summary. An empty history is reported
+// plainly, like an empty search.
+func renderRevisions(id string, res *ListRevisionsResult) string {
+	if res == nil || len(res.Revisions) == 0 {
+		return "No revisions found for page " + id + "."
+	}
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Revisions for page %s (newest first):\n", id)
+	for _, r := range res.Revisions {
+		fmt.Fprintf(&sb, "- %s (%s) by %s at %s", r.ID, r.Type, r.AuthorID, r.CreatedAt.Format("2006-01-02 15:04:05"))
+		if r.Summary != "" {
+			fmt.Fprintf(&sb, " — %s", r.Summary)
+		}
+		sb.WriteByte('\n')
+	}
+	if res.NextCursor != "" {
+		fmt.Fprintf(&sb, "\nNext page cursor: %s", res.NextCursor)
+	}
+	return sb.String()
+}
+
+// renderRevision renders one revision (the get_page_revision output): its
+// metadata, the content with line numbers, and the assets (omitted when the
+// revision carries none).
+func renderRevision(snap *RevisionSnapshot) string {
+	var sb strings.Builder
+	if rev := snap.Revision; rev != nil {
+		fmt.Fprintf(&sb, "# Revision %s\n", rev.ID)
+		fmt.Fprintf(&sb, "Type: %s\n", rev.Type)
+		if rev.AuthorID != "" {
+			fmt.Fprintf(&sb, "Author: %s\n", rev.AuthorID)
+		}
+		if !rev.CreatedAt.IsZero() {
+			fmt.Fprintf(&sb, "Created: %s\n", rev.CreatedAt.Format("2006-01-02 15:04:05"))
+		}
+		if rev.Title != "" {
+			fmt.Fprintf(&sb, "Title: %s\n", rev.Title)
+		}
+		if rev.Path != "" {
+			fmt.Fprintf(&sb, "Path: %s\n", rev.Path)
+		}
+		if rev.Summary != "" {
+			fmt.Fprintf(&sb, "Summary: %s\n", rev.Summary)
+		}
+		sb.WriteString("\n## Content\n\n")
+	}
+	sb.WriteString(withLineNumbers(snap.Content))
+	if len(snap.Assets) > 0 {
+		sb.WriteString("\n\n## Assets\n\n")
+		for _, a := range snap.Assets {
+			fmt.Fprintf(&sb, "- %s (%d bytes", a.Name, a.SizeBytes)
+			if a.MIMEType != "" {
+				fmt.Fprintf(&sb, ", %s", a.MIMEType)
+			}
+			sb.WriteString(")\n")
+		}
+	}
+	return sb.String()
+}
+
+// renderComparison renders the compare_page_revisions output: the content-change
+// flag, the asset differences and both contents with line numbers. No diff is
+// computed here — the comparison already decided what changed (the REST
+// comparison shape, not a re-implementation).
+func renderComparison(cmp *RevisionComparison) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "# Comparison: %s → %s\n\n", cmp.Base.Revision.ID, cmp.Target.Revision.ID)
+	if cmp.ContentChanged {
+		sb.WriteString("Content changed: yes\n")
+	} else {
+		sb.WriteString("Content changed: no\n")
+	}
+	if len(cmp.AssetChanges) > 0 {
+		parts := make([]string, 0, len(cmp.AssetChanges))
+		for _, c := range cmp.AssetChanges {
+			parts = append(parts, c.Name+" "+c.Status)
+		}
+		fmt.Fprintf(&sb, "Asset changes: %s\n", strings.Join(parts, "; "))
+	} else {
+		sb.WriteString("Asset changes: none\n")
+	}
+	fmt.Fprintf(&sb, "\n## Base (%s)\n\n%s\n\n## Target (%s)\n\n%s",
+		cmp.Base.Revision.ID, withLineNumbers(cmp.Base.Content),
+		cmp.Target.Revision.ID, withLineNumbers(cmp.Target.Content))
+	return sb.String()
+}
+
 // sortedKeys returns a map's keys in sorted order so property rendering is
 // deterministic across calls.
 func sortedKeys(m map[string]string) []string {

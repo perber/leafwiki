@@ -16,10 +16,10 @@ import (
 // streamable-HTTP transport, behind the same API auth chain as the REST API:
 // a session cookie or, when API-key management is enabled, a Bearer API key.
 //
-// The registered page tools (reads and writes; revisions/admin in follow-up
-// PRs) are thin: they bind arguments, gate the caller's role, delegate to the
-// PageOps the composition root supplies (WikiMCPAdapter), format the result,
-// and map errors onto a ToolError. The adapter delegates to the existing
+// The registered page and revision tools (admin in a follow-up PR) are thin:
+// they bind arguments, gate the caller's role, delegate to the PageOps the
+// composition root supplies (WikiMCPAdapter), format the result, and map
+// errors onto a ToolError. The adapter delegates to the existing
 // pages/revisions/search use cases; the slice never talks to them directly.
 type Routes struct {
 	handler     http.Handler

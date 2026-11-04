@@ -61,6 +61,22 @@ func pageIDArg(req mcpgo.CallToolRequest) (string, string) {
 	return id, ""
 }
 
+// revisionIDArg trims and validates a revision-argument string (a revision ID
+// or the list cursor), bounding it the same way the page ID is
+// (maxPageIDArgLength) and returning the value and a client-facing message (""
+// when the argument is usable). An optional argument (the cursor) may be
+// empty.
+func revisionIDArg(name, raw string, required bool) (string, string) {
+	id := strings.TrimSpace(raw)
+	switch {
+	case id == "" && required:
+		return "", name + " is required"
+	case len(id) > maxPageIDArgLength:
+		return "", fmt.Sprintf("%s is too long (maximum %d characters)", name, maxPageIDArgLength)
+	}
+	return id, ""
+}
+
 // requireRole enforces a tool's minimum role. It fails closed: a nil caller
 // (no authenticated user lifted into the request context) is denied, not
 // treated as the minimum role. It returns nil to proceed, or a ToolError
@@ -97,6 +113,9 @@ func newStreamableHandler(name, version string, log *slog.Logger, ops PageOps) h
 		newEnsurePathTool(log, ops),
 		newConvertNodeTool(log, ops),
 		newCopyPageTool(log, ops),
+		newGetPageRevisionsTool(log, ops),
+		newGetPageRevisionTool(log, ops),
+		newComparePageRevisionsTool(log, ops),
 	)
 	return mcpserver.NewStreamableHTTPServer(server,
 		mcpserver.WithStreamableHTTPLogger(log),
