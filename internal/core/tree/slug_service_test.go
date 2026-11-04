@@ -88,6 +88,7 @@ func TestNormalizePath(t *testing.T) {
 		{"folder//subfolder///page.md", "folder/subfolder/page-md"},
 		{"/leading/slash/page.md", "leading/slash/page-md"},
 		{"only-file.md", "only-file-md"},
+		{"MediaWiki/Main_Page", "mediawiki/main_page"},
 	}
 
 	for _, test := range tests {
@@ -109,6 +110,36 @@ func TestIsValidSlug_AllowsUppercase(t *testing.T) {
 
 	if err := s.IsValidSlug("ABCD-efg"); err != nil {
 		t.Fatalf("expected uppercase slug to be valid, got %v", err)
+	}
+}
+
+func TestIsValidSlug_AllowsUnderscore(t *testing.T) {
+	s := NewSlugService()
+
+	if err := s.IsValidSlug("Main_Page-2"); err != nil {
+		t.Fatalf("expected underscore slug to be valid, got %v", err)
+	}
+	if err := s.IsValidSlug("main page"); err == nil {
+		t.Fatal("expected slug with space to be invalid")
+	}
+}
+
+func TestGenerateValidSlug_KeepsUnderscores(t *testing.T) {
+	s := NewSlugService()
+
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"Main_Page", "main_page"},
+		{"Foo_Bar (Baz)", "foo_bar-baz"},
+		{"_x_", "x"}, // gosimple/slug trims leading and trailing underscores
+	}
+
+	for _, test := range tests {
+		if got := s.GenerateValidSlug(test.input); got != test.expected {
+			t.Errorf("GenerateValidSlug(%q) = %q, want %q", test.input, got, test.expected)
+		}
 	}
 }
 
@@ -151,8 +182,8 @@ func TestNormalizeFilenameToValidSlug_UnderscoreFilename(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NormalizeFilenameToValidSlug err: %v", err)
 	}
-	if got != "code-of-conduct.md" {
-		t.Fatalf("NormalizeFilenameToValidSlug = %q, want code-of-conduct.md", got)
+	if got != "code_of_conduct.md" {
+		t.Fatalf("NormalizeFilenameToValidSlug = %q, want code_of_conduct.md", got)
 	}
 }
 
