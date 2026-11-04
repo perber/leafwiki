@@ -8,13 +8,8 @@ const password = process.env.E2E_ADMIN_PASSWORD || 'admin';
 
 test.describe('Mermaid rendering', () => {
   test.beforeEach(async ({ page }) => {
-    await new LoginPage(page).goto();
-    await new LoginPage(page).login(user, password);
+    await new LoginPage(page).loginViaApi(user, password);
     await new ViewPage(page).expectUserLoggedIn();
-  });
-
-  test.afterEach(async ({ page }) => {
-    await new ViewPage(page).logout();
   });
 
   test('mermaid-flowchart-renders-svg', async ({ page }) => {

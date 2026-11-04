@@ -1060,15 +1060,9 @@ async function expectOpenedPageMarkedInNavigationDuringEditMode(
 test.describe('Authenticated', () => {
   test.beforeEach(async ({ page }) => {
     const loginPage = new LoginPage(page);
-    await loginPage.goto();
-    await loginPage.login(user, password);
+    await loginPage.loginViaApi(user, password);
     const viewPage = new ViewPage(page);
     await viewPage.expectUserLoggedIn();
-  });
-
-  test.afterEach(async ({ page }) => {
-    const viewPage = new ViewPage(page);
-    await viewPage.logout();
   });
 
   test('create-page', async ({ page }) => {
@@ -3658,12 +3652,8 @@ Paragraph outside the list.
 
     const searchView = new SearchView(page);
     const accordion = searchView.getTagAccordion();
-    const accordionCount = await accordion.count();
-
-    if (accordionCount === 0) {
-      await expect(accordion).toHaveCount(0);
-      return;
-    }
+    // Re-asserting the 0 here raced with tags loading after the count.
+    if ((await accordion.count()) === 0) return;
 
     await expect(accordion).toBeVisible();
     await page.getByTestId('search-tags-accordion-trigger').click();

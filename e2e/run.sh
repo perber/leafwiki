@@ -7,10 +7,19 @@ repo_root="$(cd "$current_dir/.." && pwd)"
 app_port="${E2E_PORT:-8085}"
 app_url="${E2E_BASE_URL:-http://localhost:${app_port}}"
 run_mode="${E2E_RUN_MODE:-docker}"
-server_pid=""
-server_log=""
-server_bin=""
-local_data_dir=""
+# Local mode starts one server per Playwright worker (own port and data dir),
+# so parallel workers never see each other's pages, users or settings.
+# Docker mode keeps one container and one worker.
+# ports is comma-separated; playwright.config.ts maps worker N to the Nth one.
+ports="$app_port"
+if [ "$run_mode" = "local" ]; then
+  workers="${E2E_PLAYWRIGHT_WORKERS:-$(( $(getconf _NPROCESSORS_ONLN) / 2 ))}"
+  [ "$workers" -ge 1 ] || workers=1
+  for ((i = 1; i < workers; i++)); do ports="$ports,$((app_port + i))"; done
+else
+  workers="${E2E_PLAYWRIGHT_WORKERS:-1}"
+fi
+local_run_dir=""
 docker_data_volume=""
 
 print_runner_diagnostics() {
@@ -26,12 +35,12 @@ print_runner_diagnostics() {
     return
   fi
 
-  if [ -n "$server_log" ] && [ -f "$server_log" ]; then
-    echo "--- local server log (last 200 lines) ---"
-    tail -n 200 "$server_log" || true
-  else
-    echo "No local server log available."
-  fi
+  local log
+  for log in "${local_run_dir:-/nonexistent}"/server-*.log; do
+    [ -f "$log" ] || { echo "No local server log available."; continue; }
+    echo "--- local server log $log (last 200 lines) ---"
+    tail -n 200 "$log" || true
+  done
 }
 
 build_frontend_for_local_e2e() {
@@ -101,14 +110,9 @@ start_local() {
   echo "🟢 Starting local LeafWiki process..."
   build_frontend_for_local_e2e
 
-  local_data_dir="$(mktemp -d /tmp/leafwiki-e2e-data.XXXXXX)"
-  server_log="$(mktemp /tmp/leafwiki-e2e-server.XXXXXX.log)"
-  server_bin="$(mktemp /tmp/leafwiki-e2e-bin.XXXXXX)"
+  local_run_dir="$(mktemp -d /tmp/leafwiki-e2e.XXXXXX)"
+  local server_bin="$local_run_dir/leafwiki"
 
-  # Build the binary first, then run it directly in the background. Using
-  # `go run` here would make `$!` the PID of the `go run` wrapper, not of the
-  # compiled server it execs as a child — so `stop_local`'s `kill` would leave
-  # the real server orphaned, holding the port after the script exits.
   echo "🔨 Building leafwiki binary for local E2E run..."
   (
     cd "$repo_root"
@@ -118,41 +122,42 @@ start_local() {
       ./cmd/leafwiki
   )
 
-  (
-    cd "$repo_root"
-    exec "$server_bin" \
-      --host 127.0.0.1 \
-      --port "$app_port" \
-      --data-dir "$local_data_dir" \
-      --allow-insecure=true \
-      --enable-revision=true \
-      --enable-link-refactor=true \
-      --revision-coalesce-window=0 \
-      --jwt-secret=e2e-tests-secret \
-      --totp-encryption-key=e2e-tests-totp-encryption-key-32 \
-      --admin-password=admine2epassword
-  ) >"$server_log" 2>&1 &
-
-  server_pid=$!
-  echo "✅ Local process started on $app_url (pid $server_pid)"
+  # Run the binary directly in the background, not via `go run`: `$!` would
+  # be the `go run` wrapper and `stop_local`'s `kill` would orphan the server.
+  local i port
+  for ((i = 0; i < workers; i++)); do
+    port=$((app_port + i))
+    mkdir -p "$local_run_dir/data-$i"
+    (
+      cd "$repo_root"
+      exec "$server_bin" \
+        --host 127.0.0.1 \
+        --port "$port" \
+        --data-dir "$local_run_dir/data-$i" \
+        --allow-insecure=true \
+        --enable-revision=true \
+        --enable-link-refactor=true \
+        --revision-coalesce-window=0 \
+        --jwt-secret=e2e-tests-secret \
+        --totp-encryption-key=e2e-tests-totp-encryption-key-32 \
+        --admin-password=admine2epassword
+    ) >"$local_run_dir/server-$i.log" 2>&1 &
+    echo $! >>"$local_run_dir/pids"
+    echo "✅ Local process started on http://localhost:$port (pid $!)"
+  done
 }
 
 stop_local() {
-  echo "🛑 Stopping local LeafWiki process..."
-  if [ -n "$server_pid" ] && kill -0 "$server_pid" >/dev/null 2>&1; then
-    kill "$server_pid" >/dev/null 2>&1 || true
-    wait "$server_pid" >/dev/null 2>&1 || true
+  echo "🛑 Stopping local LeafWiki processes..."
+  if [ -n "$local_run_dir" ] && [ -f "$local_run_dir/pids" ]; then
+    local pid
+    while read -r pid; do
+      kill "$pid" >/dev/null 2>&1 || true
+      wait "$pid" >/dev/null 2>&1 || true
+    done <"$local_run_dir/pids"
   fi
-  if [ -n "$local_data_dir" ] && [ -d "$local_data_dir" ]; then
-    rm -rf "$local_data_dir"
-  fi
-
-  if [ -n "$server_log" ] && [ -f "$server_log" ]; then
-    rm -f "$server_log"
-  fi
-
-  if [ -n "$server_bin" ] && [ -f "$server_bin" ]; then
-    rm -f "$server_bin"
+  if [ -n "$local_run_dir" ] && [ -d "$local_run_dir" ]; then
+    rm -rf "$local_run_dir"
   fi
 }
 
@@ -180,16 +185,17 @@ run_playwright_tests() {
   (
     cd "$current_dir"
     local reporter="${E2E_PLAYWRIGHT_REPORTER:-line}"
-    local workers="${E2E_PLAYWRIGHT_WORKERS:-1}"
 
     if command -v stdbuf >/dev/null 2>&1; then
       E2E_BASE_URL="$app_url" \
+      E2E_PORTS="$([ "$run_mode" = "local" ] && echo "$ports")" \
       E2E_ADMIN_USER="${E2E_ADMIN_USER:-admin}" \
       E2E_ADMIN_PASSWORD="${E2E_ADMIN_PASSWORD:-admine2epassword}" \
       PLAYWRIGHT_FORCE_TTY=1 \
       stdbuf -oL -eL npx playwright test --workers="$workers" --reporter="$reporter" "$@"
     else
       E2E_BASE_URL="$app_url" \
+      E2E_PORTS="$([ "$run_mode" = "local" ] && echo "$ports")" \
       E2E_ADMIN_USER="${E2E_ADMIN_USER:-admin}" \
       E2E_ADMIN_PASSWORD="${E2E_ADMIN_PASSWORD:-admine2epassword}" \
       PLAYWRIGHT_FORCE_TTY=1 \
@@ -199,37 +205,36 @@ run_playwright_tests() {
 }
 
 wait_until_reachable() {
+  local url="$1"
   local max_attempts=60
   local attempt=0
 
-  until curl -s "$app_url" >/dev/null; do
+  until curl -s "$url" >/dev/null; do
     printf '.'
     sleep 2
     attempt=$((attempt + 1))
     if [ "$attempt" -ge "$max_attempts" ]; then
       echo
-      echo "❌ LeafWiki is not reachable after 2 minutes."
-      if [ "$run_mode" = "local" ] && [ -f "$server_log" ]; then
-        echo "--- local server log ---"
-        tail -n 200 "$server_log" || true
-      fi
+      echo "❌ LeafWiki is not reachable at $url after 2 minutes."
       exit 1
     fi
   done
 
   echo
-  echo "✅ LeafWiki is reachable."
+  echo "✅ LeafWiki is reachable at $url."
 }
 
-if nc -z localhost "$app_port" >/dev/null 2>&1; then
-  if docker ps -a --format '{{.Names}}' | grep -q '^wiki-e2e-tests$'; then
-    echo "⚠️ Port $app_port already in use by an existing E2E container – restarting it..."
-    stop_docker
-  else
-    echo "❌ Port $app_port is already in use. Stop the existing process or choose another E2E_PORT."
-    exit 1
+for port in ${ports//,/ }; do
+  if nc -z localhost "$port" >/dev/null 2>&1; then
+    if docker ps -a --format '{{.Names}}' | grep -q '^wiki-e2e-tests$'; then
+      echo "⚠️ Port $port already in use by an existing E2E container – restarting it..."
+      stop_docker
+    else
+      echo "❌ Port $port is already in use. Stop the existing process or choose another E2E_PORT."
+      exit 1
+    fi
   fi
-fi
+done
 
 if [ "$run_mode" = "docker" ]; then
   start_docker
@@ -238,5 +243,9 @@ else
 fi
 trap cleanup_runner EXIT
 
-wait_until_reachable
+if [ "$run_mode" = "docker" ]; then
+  wait_until_reachable "$app_url"
+else
+  for port in ${ports//,/ }; do wait_until_reachable "http://localhost:$port"; done
+fi
 run_playwright_tests "$@"

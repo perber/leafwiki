@@ -13,15 +13,9 @@ const password = process.env.E2E_ADMIN_PASSWORD || 'admin';
 test.describe('WikiLink autocomplete', () => {
   test.beforeEach(async ({ page }) => {
     const loginPage = new LoginPage(page);
-    await loginPage.goto();
-    await loginPage.login(user, password);
+    await loginPage.loginViaApi(user, password);
     const viewPage = new ViewPage(page);
     await viewPage.expectUserLoggedIn();
-  });
-
-  test.afterEach(async ({ page }) => {
-    const viewPage = new ViewPage(page);
-    await viewPage.logout();
   });
 
   test('wikilink-autocomplete-shows-popup-on-double-bracket', async ({ page }) => {
