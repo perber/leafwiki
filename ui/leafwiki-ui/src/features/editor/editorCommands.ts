@@ -1,17 +1,70 @@
 import { indentLess, insertTab } from '@codemirror/commands'
-import { indentUnit } from '@codemirror/language'
-import { Extension } from '@codemirror/state'
-import { EditorView, KeyBinding } from '@codemirror/view'
+import { indentUnit, syntaxTree } from '@codemirror/language'
+import { EditorState, Extension, SelectionRange } from '@codemirror/state'
+import { Command, EditorView, KeyBinding } from '@codemirror/view'
+
+// Everything up to the cursor when it sits right behind a list marker: indent
+// or blockquote markers, the marker, and an optional task checkbox.
+const LIST_PREFIX_RE =
+  /^(?<lead>[\s>]*)(?:[-*+]|(?<number>\d+)[.)])\s+(?:\[[ xX]\]\s+)?$/
+
+// The list item a Tab at this cursor can nest under its previous sibling.
+// Without a previous sibling there is nothing to nest under: Markdown would read
+// the indented line as a code block or as plain text of the item above, so the
+// list would silently disappear from the page.
+function findNestableListItem(state: EditorState, range: SelectionRange) {
+  if (!range.empty) return null
+
+  const line = state.doc.lineAt(range.head)
+  const match = LIST_PREFIX_RE.exec(line.text.slice(0, range.head - line.from))
+  if (!match?.groups) return null
+
+  const from = line.from + match.groups.lead.length
+  const item = syntaxTree(state).resolveInner(from, 1).parent
+  if (item?.name !== 'ListItem' || !item.prevSibling) return null
+
+  return { from, number: match.groups.number }
+}
+
+// Tab right behind a list marker moves the item one level in, so nothing has to
+// walk the cursor back in front of the marker first. Everything else stays with
+// `insertTab`, including items that can't be nested.
+const indentListItemOrInsertTab: Command = (view) => {
+  const { state } = view
+  if (state.readOnly) return false
+
+  const items = state.selection.ranges.map((range) =>
+    findNestableListItem(state, range),
+  )
+  if (items.some((item) => item === null)) return insertTab(view)
+
+  const unit = state.facet(indentUnit)
+  // Two cursors can sit behind the same marker; that line is indented once.
+  const itemsByStart = new Map(items.map((item) => [item!.from, item!]))
+  const changes = [...itemsByStart.values()].map(({ from, number }) =>
+    // Only "1" may start a nested ordered list, any other number would stay
+    // plain text of the item above.
+    number
+      ? { from, to: from + number.length, insert: `${unit}1` }
+      : { from, insert: unit },
+  )
+
+  view.dispatch(
+    state.update({ changes, scrollIntoView: true, userEvent: 'input.indent' }),
+  )
+  return true
+}
 
 // Tab inserts a single indentation character at the cursor, and only falls back
 // to indenting whole lines when the selection actually spans them (that's what
 // `insertTab` does). This replaces CodeMirror's `indentWithTab`, which always
 // ran `indentMore` — indenting the entire current line even for a collapsed
 // cursor, so pressing Tab mid-line shifted the whole line instead of inserting
-// at the caret. Shift-Tab still dedents via `indentLess`.
+// at the caret. List items right behind their marker are the one exception.
+// Shift-Tab still dedents via `indentLess`.
 export const tabIndentKeyBinding: KeyBinding = {
   key: 'Tab',
-  run: insertTab,
+  run: indentListItemOrInsertTab,
   shift: indentLess,
 }
 
