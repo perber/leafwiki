@@ -12,7 +12,7 @@ export default class EditPage {
   async openReplacePanel() {
     const editor = this.page.locator('.cm-editor');
     await editor.click();
-    await this.page.keyboard.press('Control+h');
+    await this.page.keyboard.press('ControlOrMeta+h');
     await this.page.locator('.cm-search input[main-field="true"]').waitFor({ state: 'visible' });
   }
 
