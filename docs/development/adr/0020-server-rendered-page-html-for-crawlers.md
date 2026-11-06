@@ -56,6 +56,10 @@ type Options struct { BasePath, RoutePath string; ResolveWikiLink func(target st
   same-origin paths; protocol-relative URLs (`//host`, `\\host`, `/\host`, also after leading
   whitespace) are dropped. `input` only as a task-list checkbox. A test pins the frontend
   schema's hash, so changing `previewSanitizeSchema.ts` forces a look at this policy.
+- **Containment**: after the sanitizer, the output is parsed as a fragment in the context of a
+  `div` and serialized again (`balanceHTML`). The sanitizer drops tags but does not balance
+  them, so a stray `</div>` would close `#root` and an unclosed element would swallow the shell.
+  It has to run last, because dropping tags is what can leave the input unbalanced.
 
 ## Alternatives considered
 
@@ -76,7 +80,7 @@ type Options struct { BasePath, RoutePath string; ResolveWikiLink func(target st
 - Crawlers see the page's content, links and images; the visible page in a browser is still
   the SPA's rendering. The two renderers can diverge in details (flexible markers, image size
   syntax, footnotes, math), which only affects what crawlers index.
-- The cost is about 1 ms per KB of dense Markdown on a desktop CPU (`BenchmarkRenderHTML`,
+- The cost is about 1.5 ms per KB of dense Markdown on a desktop CPU (`BenchmarkRenderHTML`,
   100 KB), more on a Raspberry Pi; it runs per crawler request only.
 - Every new tag or attribute the crawler HTML needs is a policy change with an XSS-corpus
   test (`policy_test.go`). Revisit when the shell gets a CSP, or when the frontend schema
