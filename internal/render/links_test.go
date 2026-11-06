@@ -52,8 +52,8 @@ func TestRenderHTML_Images_UseBasePathForAssets(t *testing.T) {
 		{name: "external unchanged", content: "![pic](https://example.com/x.png)", want: []string{`<img src="https://example.com/x.png" alt="pic"`}},
 		{name: "other relative unchanged", content: "![pic](x.png)", want: []string{`<img src="x.png" alt="pic"`}},
 		{name: "title kept", content: `![pic](assets/x.png "Title")`, want: []string{`title="Title"`}},
-		{name: "raw img kept with size", content: `<img src="https://example.com/x.png" alt="a" width="100" height="50%">`, want: []string{`<img src="https://example.com/x.png" alt="a" width="100" height="50%">`}},
-		{name: "protocol-relative src dropped", content: "![pic](//evil.example/x.png)", want: []string{`<img alt="pic">`}, wantNot: []string{"src=", "evil"}},
+		{name: "raw img kept with size", content: `<img src="https://example.com/x.png" alt="a" width="100" height="50%">`, want: []string{`<img src="https://example.com/x.png" alt="a" width="100" height="50%"/>`}},
+		{name: "protocol-relative src dropped", content: "![pic](//evil.example/x.png)", want: []string{`<img alt="pic"/>`}, wantNot: []string{"src=", "evil"}},
 	}
 	runRenderCases(t, cases, testOptions(nil))
 }

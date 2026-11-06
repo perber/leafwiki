@@ -129,7 +129,7 @@ func TestRenderHTML_XSSCorpus_IsNeutralized(t *testing.T) {
 		{name: "xmp raw text", content: "<xmp><img src=x onerror=alert(1)></xmp>", wantNot: []string{"<xmp", "<img"}},
 		{name: "cdata section", content: "<![CDATA[<script>alert(1)</script>]]>", wantNot: []string{"<script", "CDATA"}},
 		{name: "a ping and download dropped", content: `<a href="https://e.example" ping="https://e.example" download rel="opener">d</a>`, wantNot: []string{"ping", "download", "rel="}},
-		{name: "checkbox with form attributes", content: `<input type=checkbox formaction=x form=f autofocus onfocus=alert(1)>`, want: []string{`<input type="checkbox">`}},
+		{name: "checkbox with form attributes", content: `<input type=checkbox formaction=x form=f autofocus onfocus=alert(1)>`, want: []string{`<input type="checkbox"/>`}},
 		{name: "wikilink resolving to a scheme stays a path", content: "[[JS]]", want: []string{`href="/wiki/javascript:alert%281%29"`}},
 		{name: "wikilink resolving protocol-relative stays local", content: "[[Proto]]", want: []string{`href="/wiki/evil.example"`}},
 		{name: "dot segments cannot build protocol-relative", content: "[x](/..//evil.example) [y](.//evil.example) [z](../../..//evil.example)", wantNot: []string{`href="//`}},

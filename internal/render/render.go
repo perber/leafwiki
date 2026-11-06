@@ -17,6 +17,8 @@ import (
 	"github.com/yuin/goldmark/parser"
 	gmhtml "github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/util"
+	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 )
 
 // Options configures one RenderHTML call.
@@ -64,7 +66,28 @@ func RenderHTML(content string, opt Options) (string, error) {
 	if err := markdownRenderer.Convert([]byte(content), &buf, parser.WithContext(pc)); err != nil {
 		return "", fmt.Errorf("render markdown: %w", err)
 	}
-	return string(policy.SanitizeBytes(buf.Bytes())), nil
+	return balanceHTML(policy.SanitizeBytes(buf.Bytes()))
+}
+
+// balanceHTML parses sanitized HTML the way a browser does inside #root and
+// serializes it again. The sanitizer filters tags but keeps them unbalanced, so
+// a stray </div> would close #root and an unclosed <div> would swallow the
+// shell behind it. It must run after the sanitizer: the sanitizer drops tags
+// without their content, which is what can leave the input unbalanced.
+func balanceHTML(sanitized []byte) (string, error) {
+	nodes, err := html.ParseFragment(bytes.NewReader(sanitized), &html.Node{
+		Type: html.ElementNode, Data: "div", DataAtom: atom.Div,
+	})
+	if err != nil {
+		return "", fmt.Errorf("balance html: %w", err)
+	}
+	var out strings.Builder
+	for _, node := range nodes {
+		if err := html.Render(&out, node); err != nil {
+			return "", fmt.Errorf("balance html: %w", err)
+		}
+	}
+	return out.String(), nil
 }
 
 func optionsFrom(pc parser.Context) *Options {
