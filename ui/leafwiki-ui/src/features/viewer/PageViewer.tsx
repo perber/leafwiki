@@ -120,7 +120,7 @@ export default function PageViewer() {
   useScrollToHeadline({ content: page?.content || '', isLoading: loading })
   useScrollToSearchQuery({ content: page?.content || '', isLoading: loading })
   useToolbarActions(actions)
-  useSetPageTitle({ page })
+  useSetPageTitle({ page, settled: notFound || !!error })
 
   useEffect(() => {
     const path = toWikiLookupPath(pathname)
