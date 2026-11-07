@@ -732,6 +732,7 @@ func newAPIDocsRouterWith(t *testing.T, override func(*httpinternal.RouterOption
 		RefreshTokenTimeout:    7 * 24 * time.Hour,
 		EnableRevision:         true,
 		EnableAPIKeyManagement: true,
+		EnableMCP:              true,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create wiki instance: %v", err)

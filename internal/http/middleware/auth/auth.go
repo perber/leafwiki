@@ -148,7 +148,7 @@ func RequireEditorOrAdmin() gin.HandlerFunc {
 			return
 		}
 
-		if user.HasRole(auth.RoleAdmin) || user.HasRole(auth.RoleEditor) {
+		if auth.HasAtLeastRole(user, auth.RoleEditor) {
 			c.Next()
 			return
 		}

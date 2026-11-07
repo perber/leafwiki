@@ -55,24 +55,37 @@ func respondWithRevisionStatusError(c *gin.Context, status int, code, message, t
 	})
 }
 
-// respondWithRevisionError is the central error handler for revision endpoints.
+// MapRevisionError maps an error a revisions use case passes through onto
+// the LocalizedError the revision routes would respond with: a store
+// os.ErrNotExist gets revision_not_found, and anything else falls into the
+// internal-error arm with the route's fixed client message (the raw detail
+// stays in the cause, off the wire). It is the non-HTTP core of
+// respondWithRevisionError: consumers outside the HTTP layer map errors onto
+// the same table instead of keeping a copy (ADR-0019).
+func MapRevisionError(err error) *sharederrors.LocalizedError {
+	if errors.Is(err, os.ErrNotExist) {
+		return sharederrors.NewLocalizedError(ErrCodeRevisionNotFound, "Revision resource not found", "revision resource not found", err)
+	}
+	return sharederrors.NewLocalizedError(ErrCodeRevisionInternalError, "Revision request failed", "revision request failed", err)
+}
+
+// respondWithRevisionError is the central error handler for revision
+// endpoints. It checks for LocalizedError first (rich, template-ready), then
+// falls back to MapRevisionError's table so that lower-level service errors
+// produce correct HTTP statuses.
 func respondWithRevisionError(c *gin.Context, err error) {
 	if localized, ok := sharederrors.AsLocalizedError(err); ok {
 		respondWithRevisionStatusError(c, revisionErrorStatus(localized.Code), localized.Code, localized.Message, localized.Template, localized.Args...)
 		return
 	}
 
-	switch {
-	case errors.Is(err, os.ErrNotExist):
-		respondWithRevisionStatusError(c, http.StatusNotFound, ErrCodeRevisionNotFound, "Revision resource not found", "revision resource not found")
-	default:
-		respondWithRevisionStatusError(c, http.StatusInternalServerError, ErrCodeRevisionInternalError, "Revision request failed", "revision request failed")
-	}
+	loc := MapRevisionError(err)
+	respondWithRevisionStatusError(c, revisionErrorStatus(loc.Code), loc.Code, loc.Message, loc.Template, loc.Args...)
 }
 
 func revisionErrorStatus(code string) int {
 	switch code {
-	case ErrCodeRevisionRestoreRevisionNotFound, ErrCodeRevisionRestorePageNotFound, ErrCodeRevisionPreviewAssetNotFound:
+	case ErrCodeRevisionNotFound, ErrCodeRevisionRestoreRevisionNotFound, ErrCodeRevisionRestorePageNotFound, ErrCodeRevisionPreviewAssetNotFound:
 		return http.StatusNotFound
 	case ErrCodeRevisionRestoreInvalidPageID, ErrCodeRevisionRestoreInvalidRevision, ErrCodeRevisionPreviewAssetInvalidName:
 		return http.StatusBadRequest

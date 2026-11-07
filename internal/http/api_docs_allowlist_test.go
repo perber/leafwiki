@@ -98,6 +98,11 @@ var undocumentedAPIRouteLiteral = map[string]string{
 	"POST /api/api-keys":        "apikeys: pending package documentation",
 	"DELETE /api/api-keys/{id}": "apikeys: pending package documentation",
 
+	// mcp (internal/wiki/mcp)
+	"GET /api/mcp":    "mcp: pending package documentation",
+	"POST /api/mcp":   "mcp: pending package documentation",
+	"DELETE /api/mcp": "mcp: pending package documentation",
+
 	// importer (internal/wiki/importer)
 	"POST /api/import/execute": "importer: pending package documentation",
 	"GET /api/import/plan":     "importer: pending package documentation",

@@ -15,9 +15,9 @@ derived-index packages (`internal/links`, `internal/tags`, `internal/properties`
 `internal/tocdisplay`, `internal/snapshot`, `internal/restore`, `internal/backup`,
 `internal/branding`, `internal/importer`), then into the `internal/wiki/<domain>` slices (`pages`,
 `pagesave`, `auth`, `resync`, `revisions`, `search`, `links`, `tags`, `properties`, `apikeys`,
-`assets`, `avatar`, `backup`, `branding`, `health`, `importer`, `instancesettings`, `restore`,
-`seo`, `snapshot`, `usersettings`) that each expose HTTP routes (or, for `seo`, SPA shell
-responders) via `internal/http`. See [ADR-0001: Filesystem as Source of Truth](./adr/0001-filesystem-source-of-truth.md) for why the split between
+`mcp`, `assets`, `avatar`, `backup`, `branding`, `health`, `importer`, `instancesettings`,
+`restore`, `seo`, `snapshot`, `usersettings`) that each expose HTTP routes (or, for
+`seo`, SPA shell responders) via `internal/http`. See [ADR-0001: Filesystem as Source of Truth](./adr/0001-filesystem-source-of-truth.md) for why the split between
 filesystem-canonical (`tree`, `revision`) and SQLite-derived (`links`, `tags`, `properties`,
 `search`) packages exists.
 
@@ -289,6 +289,62 @@ shape for that domain.
   package (search query endpoint, tag listing/filter, property listing/filter, backlink/link-status
   endpoints respectively).
 - **`internal/wiki/apikeys`** — API key CRUD HTTP surface over `core/auth`'s `APIKeyService`.
+- **`internal/wiki/mcp`** — the experimental MCP (Model Context Protocol) server
+  (`--enable-mcp`, [ADR-0019](./adr/0019-mcp-server-dependency.md)): one endpoint `/api/mcp` on the
+  streamable-HTTP transport of `github.com/mark3labs/mcp-go`, registered through the `RouteRegistrar`
+  seam behind `APIAuthGroup`'s existing session/API-key auth chain. `routes.go` lifts the resolved
+  user and the key-auth marker into the mcp-go request context, enforces the session
+  owner-binding for the GET (SSE) verb that mcp-go's GET handler skips (the spec does not
+  require session validation for GET — a cross-user session ID gets the transport's own 404
+  instead of that user's live stream), and caps the POST body at
+  `maxRequestBodyBytes` (500 MiB — the platform's bulk-content upload ceiling, strictly tighter
+  than the uncapped REST page-update route; mcp-go reads bodies with an unbounded `io.ReadAll`);
+  `server.go` builds the MCP server (`MCPServer` + `StreamableHTTPServer` as an `http.Handler`),
+  registers the page tools, and holds the context helpers `userFromContext`/`keyAuthFromContext`,
+  the `Actor` extractor `actorFromContext`, and the role gate `requireRole` the tool handlers read.
+  Session IDs are bound to their owner (ADR-0019): `sessions.go` holds the per-user
+  session-manager registry (`userSessionRegistry`) that `server.go` installs via
+  `WithSessionIdManagerResolver` — one mcp-go stateful manager per user, so a session ID is
+  valid only for the user who created it (for all three transport verbs: mcp-go validates
+  the ID on POST and DELETE, `sessionIDOwnedBy` covers the GET verb that mcp-go skips), plus
+  a nil-request sweep arm so mcp-go's idle-TTL sweeper reaps sessions of every user.
+  The tools are thin (one file each: the reads `get_page.go` and `get_page_by_path.go` (each with an
+  optional `offset`/`lines` pair that reads a slice of the body — absolute line numbers, a
+  truncation note when the window ends mid-page, a past-end offset answering `mcp_invalid_input`),
+  `search.go`, `list_tree.go` gated at `viewer`; the writes `create_page.go`, `update_page.go`
+  (title/content plus an optional `slug` that renames the page; an omitted slug is preserved),
+  `patch_page.go`, `delete_page.go`, `move_page.go`, `ensure_path.go`, `convert_node.go`,
+  `copy_page.go` gated at
+  `editor`, the role the equivalent REST mutation requires; the revision tools
+  `get_page_revisions.go`, `get_page_revision.go` and `compare_page_revisions.go` gated at
+  `viewer` — the minimum the plain API auth group the REST revision read routes sit behind
+  requires — and `restore_page_revision.go` gated at `editor`, the `RequireEditorOrAdmin`
+  middleware the REST restore route carries): each binds its arguments, gates the
+  caller's role (failing closed on a nil caller),
+  delegates to the `PageOps` interface (`ops.go`, the read-only DTOs plus the write
+  input structs with their `Actor`), formats the result (`format.go`, which also holds the windowed page read `renderPageWindow` (the `offset`/`lines` read-paging) and the `patch_page`
+  line-range format: `parsePatch`/`ApplyPatch`), and maps errors onto a `ToolError`. `errors.go` maps use-case errors onto MCP tool
+  errors — a `LocalizedError` passes through with its code and message, validation failures become
+  `mcp_invalid_input`, a denied role becomes `mcp_forbidden`, anything else becomes
+  `mcp_internal_error` (500-equivalent codes — `mcp_internal_error` and a slice's own
+  `<domain>_internal_error` — are logged once at that point; domain codes are expected client
+  errors and stay out of the logs), and the internal detail never reaches the client. The
+  composition root's `WikiMCPAdapter` (`internal/wiki/mcp_adapter.go`) implements `PageOps` by
+  delegating the page reads and the search to the existing pages/search use cases, the page
+  writes to the same use case constructors the REST routes use (create/update/patch/delete/move/
+  ensure-path/convert/copy — `pagesave` events, `AffectedPages`, and the asset/favorite/revision
+  cleanup fire exactly as through HTTP), and the revision tools to the revisions use cases,
+  whose errors are mapped through the slice's shared `MapRevisionError` (the non-HTTP core of
+  `respondWithRevisionError`) — a LocalizedError passes through, `os.ErrNotExist` becomes
+  `revision_not_found`, anything else `revision_internal_error`; restore goes through the
+  same `RestoreRevisionUseCase` as the REST route, so the `pagesave` restore event and the
+  save metrics fire exactly as through HTTP and the restore itself is recorded as a new
+  revision;
+  `ListTree` has no use case — the adapter reads `tree.GetTree()` and strips the synthetic root,
+  mirroring the REST tree route — and the adapter maps the tree's read (`mapReadError`) and write
+  (`mapWriteError`) sentinels onto the `page_*` `LocalizedError`s `respondWithPageError` would
+  return — the write mapper runs the pages slice's shared sentinel table
+  (`pages.MapPageError`), so the slice never talks to `internal/core` directly.
 - **`internal/wiki/assets`** — per-page asset upload/list/delete HTTP surface over
   `core/assets`.
 - **`internal/wiki/auth`** — login/logout/refresh/TOTP-setup HTTP surface over `core/auth`'s

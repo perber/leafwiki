@@ -271,6 +271,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		EnableRevision:         cfg.frontend.enableRevision,
 		EnableAPIKeyManagement: cfg.frontend.enableAPIKeyManagement,
 		EnableShareLinks:       cfg.frontend.enableShareLinks,
+		EnableMCP:              cfg.frontend.enableMCP,
 		MaxRevisionHistory:     cfg.frontend.maxRevisionHistory,
 		EditorLimit:            cfg.auth.editorLimit,
 		RevisionCoalesceWindow: cfg.frontend.revisionCoalesceWindow,
@@ -289,6 +290,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		Metrics:      metrics,
 		PublicAccess: publicAccessService,
 		PublicURL:    publicURL,
+		Version:      Version,
 	})
 	if err != nil {
 		if msg, ok := corruptDatabaseMessage(err); ok {

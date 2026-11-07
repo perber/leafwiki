@@ -40,6 +40,21 @@ func (u *User) HasRole(role string) bool {
 	return u.Role == role
 }
 
+// HasAtLeastRole reports whether the user's role is minRole or higher in the
+// hierarchy viewer < editor < admin, ordered by roleRank — the composition
+// RequireEditorOrAdmin builds on (HasRole(RoleAdmin) || HasRole(RoleEditor)).
+// A nil user, an unknown user role, or an unknown minRole all report false.
+func HasAtLeastRole(user *User, minRole string) bool {
+	if user == nil {
+		return false
+	}
+	min, known := roleRank[minRole]
+	if !known {
+		return false
+	}
+	return roleRank[user.Role] >= min
+}
+
 func (u *User) ToPublicUser() *PublicUser {
 	return &PublicUser{
 		ID:              u.ID,

@@ -1,12 +1,16 @@
 package pages
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
+	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/favorites"
 )
 
@@ -34,5 +38,62 @@ func TestRespondWithPageError_FavoritesStoreUnavailable_Returns503(t *testing.T)
 
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+	}
+}
+
+// TestMapPageError pins the sentinel table the REST route and every non-HTTP
+// consumer share: each sentinel gets its domain code and client-facing
+// message, and an unknown error falls into the internal-error arm.
+func TestMapPageError(t *testing.T) {
+	unknown := errors.New("disk on fire")
+	tests := []struct {
+		name        string
+		err         error
+		wantCode    string
+		wantMessage string
+		// wantNotIn is the substring the message must not contain (the
+		// drift row: the absolute storage path stays server-side).
+		wantNotIn string
+	}{
+		{name: "page not found", err: tree.ErrPageNotFound, wantCode: ErrCodePageNotFound, wantMessage: "Page not found"},
+		{name: "parent not found", err: tree.ErrParentNotFound, wantCode: ErrCodePageParentNotFound, wantMessage: "Parent page not found"},
+		{name: "page has children", err: tree.ErrPageHasChildren, wantCode: ErrCodePageHasChildren, wantMessage: "Page has children, use recursive delete"},
+		{name: "slug conflict", err: tree.ErrPageAlreadyExists, wantCode: ErrCodePageSlugConflict, wantMessage: "Page already exists"},
+		{name: "circular move", err: tree.ErrMovePageCircularReference, wantCode: ErrCodePageCircularMove, wantMessage: "Move would create a circular reference"},
+		{name: "move to self", err: tree.ErrPageCannotBeMovedToItself, wantCode: ErrCodePageCannotMoveToSelf, wantMessage: "Page cannot be moved to itself"},
+		{name: "convert not allowed", err: tree.ErrConvertNotAllowed, wantCode: ErrCodePageConvertNotAllowed, wantMessage: "Convert operation not allowed"},
+		{name: "version conflict", err: tree.ErrVersionConflict, wantCode: ErrCodePageVersionConflict, wantMessage: "Page was changed by another request"},
+		{name: "version required", err: tree.ErrVersionRequired, wantCode: ErrCodePageVersionRequired, wantMessage: "Page version is required"},
+		{name: "tree not loaded", err: tree.ErrTreeNotLoaded, wantCode: ErrCodePageInternalError, wantMessage: "Tree not loaded"},
+		{
+			name:        "drift error keeps the storage path off the client",
+			err:         &tree.DriftError{NodeID: "n-1", Kind: tree.NodeKindPage, Path: "/abs/storage/wiki/docs/intro.md", Reason: "expected file missing"},
+			wantCode:    ErrCodePageInternalError,
+			wantMessage: "Storage drift detected",
+			wantNotIn:   "/abs/storage/wiki/docs/intro.md",
+		},
+		{name: "wrapped sentinel keeps its code", err: errors.Join(fmt.Errorf("creating page: %w", tree.ErrPageNotFound)), wantCode: ErrCodePageNotFound, wantMessage: "Page not found"},
+		{
+			name:        "wrapped drift error keeps the fixed message",
+			err:         fmt.Errorf("could not convert node: %w", &tree.DriftError{NodeID: "n-2", Kind: tree.NodeKindPage, Path: "/abs/storage/wiki/docs/guide.md", Reason: "file changed on disk"}),
+			wantCode:    ErrCodePageInternalError,
+			wantMessage: "Storage drift detected",
+			wantNotIn:   "/abs/storage/wiki/docs/guide.md",
+		},
+		{name: "unknown error is the internal-error arm", err: unknown, wantCode: ErrCodePageInternalError, wantMessage: "disk on fire"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			loc := MapPageError(tc.err)
+			if loc.Code != tc.wantCode {
+				t.Fatalf("code = %q, want %q", loc.Code, tc.wantCode)
+			}
+			if loc.Message != tc.wantMessage {
+				t.Fatalf("message = %q, want %q", loc.Message, tc.wantMessage)
+			}
+			if tc.wantNotIn != "" && strings.Contains(loc.Message, tc.wantNotIn) {
+				t.Fatalf("message %q must not contain %q", loc.Message, tc.wantNotIn)
+			}
+		})
 	}
 }
