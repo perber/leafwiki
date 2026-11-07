@@ -68,7 +68,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 	// Branding static file server (logos, favicons) — path traversal protected.
 	base.GET("/branding/:filename", r.handleServeBrandingAsset)
-	base.GET("/favicon.ico", r.handleServeCurrentFavicon)
+	base.Match(httpinternal.GetAndHead, "/favicon.ico", r.handleServeCurrentFavicon)
 
 	// Auth-gated branding mutations (admin only).
 	authGroup := ctx.APIAuthGroup(r.authService)

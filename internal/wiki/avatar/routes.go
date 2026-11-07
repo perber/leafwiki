@@ -47,7 +47,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	// Public avatar static file server — unauthenticated, path-traversal
 	// protected. A missing avatar returns a bare 404 so the frontend's
 	// AvatarImage -> AvatarFallback degrades to initials automatically.
-	base.GET("/avatars/:userId", r.handleServeAvatar)
+	base.Match(httpinternal.GetAndHead, "/avatars/:userId", r.handleServeAvatar)
 
 	authGroup := ctx.APIAuthGroup(r.authService)
 	authGroup.POST("/user/avatar", r.handleUploadAvatar)
