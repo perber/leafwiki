@@ -84,7 +84,7 @@ func respondWithPageStatusError(c *gin.Context, status int, code, message, templ
 // gets a fixed message and keeps the DriftError as the cause — the path stays
 // in the log and the cause, never in the client response. It is the non-HTTP
 // core of respondWithPageError: consumers outside the HTTP layer map errors
-// onto the same table instead of keeping a copy (ADR-0018).
+// onto the same table instead of keeping a copy (ADR-0019).
 func MapPageError(err error) *sharederrors.LocalizedError {
 	switch {
 	case errors.Is(err, tree.ErrPageNotFound):

@@ -107,7 +107,7 @@ func requireRole(ctx context.Context, minRole string) *ToolError {
 }
 
 // newStreamableHandler builds the MCP server and serves it on the
-// streamable-HTTP transport as a plain http.Handler (ADR-0018). The page tools
+// streamable-HTTP transport as a plain http.Handler (ADR-0019). The page tools
 // register here, each capturing the PageOps the composition root hands in.
 // WithToolCapabilities keeps the tools capability advertised from the first
 // PR — without it mcp-go answers tools/list with "tools not supported" until
@@ -136,7 +136,7 @@ func newStreamableHandler(name, version string, log *slog.Logger, ops PageOps, s
 	return mcpserver.NewStreamableHTTPServer(server,
 		mcpserver.WithStreamableHTTPLogger(log),
 		mcpserver.WithHTTPContextFunc(httpContextFromRequest),
-		// Session IDs are bound to their owner (ADR-0018): one stateful
+		// Session IDs are bound to their owner (ADR-0019): one stateful
 		// session manager per user, resolved from the caller the gin
 		// wrapper lifted into the request context, so a session ID from
 		// another user gets the same 404 as an unknown ID instead of

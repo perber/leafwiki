@@ -12,7 +12,7 @@ import (
 // IDs, event channels), not a credential — but with one global session
 // manager (what mcp-go's WithStateful(true) uses) any authenticated user
 // could reference, or DELETE, another user's live session. The
-// userSessionRegistry fixes that (ADR-0018): one mcp-go stateful session
+// userSessionRegistry fixes that (ADR-0019): one mcp-go stateful session
 // manager per user, so a session ID is valid only for the authenticated user
 // who created it; anyone else presenting it gets the same 404 the transport
 // answers for an unknown ID — for all three transport verbs. mcp-go

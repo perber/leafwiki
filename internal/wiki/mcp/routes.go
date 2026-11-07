@@ -12,7 +12,7 @@ import (
 )
 
 // Routes is the RouteRegistrar for the experimental MCP (Model Context
-// Protocol) server (ADR-0018). It serves the wiki at /api/mcp on the
+// Protocol) server (ADR-0019). It serves the wiki at /api/mcp on the
 // streamable-HTTP transport, behind the same API auth chain as the REST API:
 // a session cookie or, when API-key management is enabled, a Bearer API key.
 //
@@ -25,7 +25,7 @@ type Routes struct {
 	handler     http.Handler
 	authService *coreauth.AuthService
 	// sessions is the per-user session-manager registry the owner binding
-	// resolves against (ADR-0018); the same instance the streamable handler
+	// resolves against (ADR-0019); the same instance the streamable handler
 	// installs as the resolver, so the GET guard checks against exactly the
 	// manager the transport validated POST and DELETE with.
 	sessions *userSessionRegistry
@@ -72,7 +72,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 // — both 500 MiB, the bulk-content ceiling the platform already serves. The
 // adjacent REST page-update route sets no cap at all, so this is strictly
 // tighter; looser would only widen an authenticated-DoS lever (the body is
-// fully buffered and JSON-decoded per request). See ADR-0018.
+// fully buffered and JSON-decoded per request). See ADR-0019.
 const maxRequestBodyBytes = 500 << 20
 
 // handleMCP lifts the caller resolved by the auth chain into the request

@@ -26,7 +26,7 @@ func requestWithCaller(t *testing.T, user *coreauth.User) *http.Request {
 // TestUserSessionRegistry_ScopesSessionsToTheirOwner is the owner-binding:
 // a session ID generated for user A validates for A and is unknown to B's
 // manager — the transport answers B's request with the same 404 it answers
-// for any unknown ID (ADR-0018).
+// for any unknown ID (ADR-0019).
 func TestUserSessionRegistry_ScopesSessionsToTheirOwner(t *testing.T) {
 	registry := &userSessionRegistry{}
 	userA := &coreauth.User{ID: "user-a"}

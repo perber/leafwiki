@@ -219,7 +219,7 @@ func (w *Wiki) buildAPIKeysRoutes() *wikiapikeys.Routes {
 	})
 }
 
-// buildMCPRoutes builds the experimental MCP server routes (ADR-0018); nil
+// buildMCPRoutes builds the experimental MCP server routes (ADR-0019); nil
 // when --enable-mcp is off, so Registrars registers nothing.
 func (w *Wiki) buildMCPRoutes(options *WikiOptions) *wikimcp.Routes {
 	if !options.EnableMCP {

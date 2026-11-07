@@ -23,7 +23,7 @@ import (
 )
 
 // WikiMCPAdapter implements mcp.PageOps by delegating to the existing
-// pages/search use cases (ADR-0018). It is the only place the MCP slice meets
+// pages/search use cases (ADR-0019). It is the only place the MCP slice meets
 // the wiki's services: the slice never talks to internal/core or the
 // top-level index packages directly, it calls PageOps, and this adapter fills
 // in the slice's DTOs. The write ops use the same use case constructors as

@@ -8,7 +8,7 @@ import (
 // Page is the read-only view of a page that the page-read tools return. It
 // mirrors the fields the existing page DTO surfaces (content, title, path,
 // metadata) without the slice depending on other slices or on internal/core
-// types (ADR-0018); the composition root's WikiMCPAdapter fills it in.
+// types (ADR-0019); the composition root's WikiMCPAdapter fills it in.
 type Page struct {
 	ID         string
 	Title      string
@@ -140,7 +140,7 @@ type CopyPageInput struct {
 
 // Revision is one entry in a page's revision history (the get_page_revisions
 // output); author identity stays an ID — user resolution happens outside the
-// slice (ADR-0018).
+// slice (ADR-0019).
 type Revision struct {
 	ID        string
 	Type      string // "content_update", "asset_update", "structure_update", "restore"

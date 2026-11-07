@@ -61,7 +61,7 @@ func respondWithRevisionStatusError(c *gin.Context, status int, code, message, t
 // internal-error arm with the route's fixed client message (the raw detail
 // stays in the cause, off the wire). It is the non-HTTP core of
 // respondWithRevisionError: consumers outside the HTTP layer map errors onto
-// the same table instead of keeping a copy (ADR-0018).
+// the same table instead of keeping a copy (ADR-0019).
 func MapRevisionError(err error) *sharederrors.LocalizedError {
 	if errors.Is(err, os.ErrNotExist) {
 		return sharederrors.NewLocalizedError(ErrCodeRevisionNotFound, "Revision resource not found", "revision resource not found", err)

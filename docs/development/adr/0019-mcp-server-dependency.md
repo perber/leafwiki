@@ -1,4 +1,4 @@
-# ADR-0018: The MCP server depends on mcp-go and plugs into the RouteRegistrar seam
+# ADR-0019: The MCP server depends on mcp-go and plugs into the RouteRegistrar seam
 
 ## Status
 

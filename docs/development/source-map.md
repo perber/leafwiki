@@ -290,7 +290,7 @@ shape for that domain.
   endpoints respectively).
 - **`internal/wiki/apikeys`** — API key CRUD HTTP surface over `core/auth`'s `APIKeyService`.
 - **`internal/wiki/mcp`** — the experimental MCP (Model Context Protocol) server
-  (`--enable-mcp`, [ADR-0018](./adr/0018-mcp-server-dependency.md)): one endpoint `/api/mcp` on the
+  (`--enable-mcp`, [ADR-0019](./adr/0019-mcp-server-dependency.md)): one endpoint `/api/mcp` on the
   streamable-HTTP transport of `github.com/mark3labs/mcp-go`, registered through the `RouteRegistrar`
   seam behind `APIAuthGroup`'s existing session/API-key auth chain. `routes.go` lifts the resolved
   user and the key-auth marker into the mcp-go request context, enforces the session
@@ -302,7 +302,7 @@ shape for that domain.
   `server.go` builds the MCP server (`MCPServer` + `StreamableHTTPServer` as an `http.Handler`),
   registers the page tools, and holds the context helpers `userFromContext`/`keyAuthFromContext`,
   the `Actor` extractor `actorFromContext`, and the role gate `requireRole` the tool handlers read.
-  Session IDs are bound to their owner (ADR-0018): `sessions.go` holds the per-user
+  Session IDs are bound to their owner (ADR-0019): `sessions.go` holds the per-user
   session-manager registry (`userSessionRegistry`) that `server.go` installs via
   `WithSessionIdManagerResolver` — one mcp-go stateful manager per user, so a session ID is
   valid only for the user who created it (for all three transport verbs: mcp-go validates

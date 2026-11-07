@@ -12,7 +12,7 @@ import (
 	"github.com/perber/wiki/internal/test_utils"
 )
 
-// TestMCP_SessionIsBoundToItsOwner is the owner-binding end to end (ADR-0018):
+// TestMCP_SessionIsBoundToItsOwner is the owner-binding end to end (ADR-0019):
 // a session ID is valid only for the authenticated user who created it. User
 // B presenting A's ID gets the same 404 the transport answers for an unknown
 // ID — B cannot list tools, call a tool, or terminate the session over it —
