@@ -3,9 +3,9 @@ package auth
 import "testing"
 
 // TestHasAtLeastRole pins the role hierarchy viewer < editor < admin that
-// RequireEditorOrAdmin (and, later, the MCP admin tools) build on: a role
-// satisfies a minimum when it is the minimum itself or above it. Nil users
-// and unknown roles (on either side) never satisfy.
+// RequireEditorOrAdmin and the MCP role gates build on: a role satisfies a
+// minimum when it is the minimum itself or above it. Nil users and unknown
+// roles (on either side) never satisfy.
 func TestHasAtLeastRole(t *testing.T) {
 	tests := []struct {
 		name    string

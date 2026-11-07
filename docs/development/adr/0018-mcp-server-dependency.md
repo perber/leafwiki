@@ -58,7 +58,7 @@ session or a Bearer API key?
    (`c.Get("user")`) and the key-auth marker (`IsAPIKeyAuth`) into the
    request context; `WithHTTPContextFunc` moves them into the MCP context.
    Tool handlers read them via `userFromContext`/`keyAuthFromContext`.
-4. **Tool wiring (from the second PR on):** the slice's tool handlers are
+4. **Tool wiring:** the slice's tool handlers are
    thin and delegate through a composition-root adapter
    (`WikiMCPAdapter`) to the existing pages/revisions/search use cases — the
    slice never talks to `internal/core` or the top-level index packages
@@ -67,20 +67,21 @@ session or a Bearer API key?
    middleware (a Bearer API key authenticates when API-key management is
    enabled), so a caller's identity and role are exactly what the REST
    API would see for the same credential.
-6. **First PR scope:** endpoint skeleton only — a client gets a valid
-   `initialize` and an empty `tools/list`. Zero tools registered.
+6. **Staged landing:** the endpoint skeleton (a client gets a valid
+   `initialize` and an empty `tools/list`) lands in the first commit, the tools
+   in the commits that follow — each commit green on its own.
 
-### The page tools (PRs 2–3 of the staged rollout)
+### The page tools
 
-The second PR registered the four page-read tools (`get_page`,
-`get_page_by_path`, `search`, `list_tree`, gated at `viewer`). The two page-read
-tools also take an optional `offset`/`lines` pair that reads a slice of the
+The page-read tools are `get_page`, `get_page_by_path`, `search` and
+`list_tree`, gated at `viewer`. The two page-read tools also take an optional
+`offset`/`lines` pair that reads a slice of the
 page's body — line numbers stay absolute over the whole document (so
 `patch_page`'s ranges still reference the numbers the agent read), a window
 that ends mid-page carries a showing-lines note, and an offset past the end of
 the page is a clean `mcp_invalid_input` — restoring the fork's read-slice
-behaviour the drop-in replacement needs. The third is a three-part series —
-`create_page` and `update_page` first (with an optional `slug` that renames the
+behaviour the drop-in replacement needs. The write tools are a three-part
+series — `create_page` and `update_page` first (with an optional `slug` that renames the
 page; an omitted slug is preserved, a rename onto a sibling's slug answers the
 REST-parity `page_slug_conflict`), then `patch_page`, then `delete_page` and
 `move_page` — each gated at `editor`, the role the
@@ -117,10 +118,10 @@ write tools:
   suffix every slice's 500-equivalent code carries by the `<domain>_<reason>`
   convention, so exposing more slices' tools later needs no change there.
 
-### The tree tools (PR 4 of the staged rollout)
+### The tree tools
 
-The fourth PR adds the three tree tools — `ensure_path`, `convert_node`,
-`copy_page` — each gated at `editor`, the role the equivalent REST mutation
+The three tree tools — `ensure_path`, `convert_node`, `copy_page` — are each
+gated at `editor`, the role the equivalent REST mutation
 requires, and each a thin delegation to the existing use case the REST route
 uses: `EnsurePathUseCase` (missing segments become sections, existing nodes are
 reused — a repeated call creates nothing and never clobbers a title),
@@ -131,9 +132,9 @@ refusal, reachable only from an on-disk drift state), and `CopyPageUseCase`
 (the REST single-page copy: the page and its assets, the children stay with
 the source; a destination slug collision answers `page_slug_conflict`).
 
-### The revision tools (PR 5 of the staged rollout)
+### The revision tools
 
-The fifth PR adds the four revision tools: `get_page_revisions` (newest
+The four revision tools: `get_page_revisions` (newest
 first, paged with the REST route's 50/200 default/cap), `get_page_revision`
 (metadata plus the content with line numbers and the revision's assets),
 `compare_page_revisions` (the comparison shape — the content-change flag, the
@@ -152,9 +153,9 @@ MCP tools can never drift apart (a LocalizedError passes through, a store
 `os.ErrNotExist` becomes `revision_not_found`, anything else
 `revision_internal_error`) — and tools/list now carries all sixteen tools.
 
-### Session owner-binding (PR 6a of the staged rollout)
+### Session owner-binding
 
-The PR 1 security review carried one finding: `WithStateful(true)` tracks
+The initial security review carried one finding: `WithStateful(true)` tracks
 every session in one global manager, so any authenticated user could
 reference — or DELETE — another user's live session ID. The owner-binding
 fixes it by binding each session ID to the authenticated user who created
