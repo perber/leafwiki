@@ -138,5 +138,7 @@ Contract for responders and contributors:
   unchanged and never check the method: the router hands them a writer that forwards headers
   and status to gin's writer (request log, metrics and rate limiting see the real status) and
   drops the body. The shell sets `Content-Length`, so HEAD reports the length GET sends. HEAD
-  costs a full render like GET. `/custom.css` and `/favicon.svg` now register HEAD themselves,
-  so it no longer falls through to the shell (text/html); `/api` keeps its 404.
+  costs a full render like GET. `/custom.css`, `/favicon.svg`, `/favicon.ico` and `/avatars/:userId` now
+  register HEAD themselves (`httpinternal.GetAndHead`), so it no longer falls through to the
+  shell (text/html); `/api` keeps its 404. A new non-API GET route outside the reserved
+  prefixes needs the same.

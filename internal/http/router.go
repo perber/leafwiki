@@ -248,7 +248,7 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 	// Serve custom stylesheet if a valid path was provided.
 	if customStylesheetPath != "" {
 		cssPath := customStylesheetPath
-		base.Match(getAndHead, "/custom.css", func(c *gin.Context) {
+		base.Match(GetAndHead, "/custom.css", func(c *gin.Context) {
 			if _, err := os.Stat(cssPath); os.IsNotExist(err) {
 				c.Status(http.StatusNotFound)
 				return
@@ -276,7 +276,7 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 
 		base.StaticFS("/static", http.FS(staticFS))
 
-		base.Match(getAndHead, "/favicon.svg", func(c *gin.Context) {
+		base.Match(GetAndHead, "/favicon.svg", func(c *gin.Context) {
 			disableClientCache(c)
 			// favicon is served by the branding registrar if a custom one exists;
 			// fall back to the default leaf SVG.
@@ -290,9 +290,11 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 	return engine
 }
 
-// getAndHead registers frontend files for HEAD too; without it HEAD falls
-// through to the SPA shell, which answers HEAD like GET.
-var getAndHead = []string{http.MethodGet, http.MethodHead}
+// GetAndHead registers a route for GET and HEAD. Use it for every non-API GET
+// route outside the reserved prefixes (/api, /assets, /static, /branding):
+// registered for GET only, HEAD falls through to the SPA shell, which answers
+// HEAD like GET with the shell's 200 text/html.
+var GetAndHead = []string{http.MethodGet, http.MethodHead}
 
 func BuildFrontendFaviconHref(basePath, faviconFile string) string {
 	if faviconFile != "" {
