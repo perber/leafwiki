@@ -65,3 +65,4 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Deprecated`, `Superseded by 
 | [0018](./0018-search-engine-rendering-for-public-wikis.md) | Public wikis are rendered for search engines through the `seo` slice, gated on public access | Accepted |
 | [0019](./0019-capability-routes-without-identity.md) | Capability-URL routes run without identity, in their own route group | Proposed |
 | [0020](./0020-server-rendered-page-html-for-crawlers.md) | Page HTML for crawlers is rendered in `internal/render` and sanitized by a stricter server policy | Proposed |
+| [0021](./0021-page-side-panel-sections.md) | The page side panel renders sections composed by the page viewer | Proposed |

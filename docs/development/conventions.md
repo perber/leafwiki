@@ -86,6 +86,7 @@ Rules:
    | Scoped readers (`ReadScope` + one reader per resource) | `internal/scopedread` | reading part of the wiki for a caller that may not see all of it ([ADR-0015](./adr/0015-scoped-read-boundary.md)) |
    | Dialog, panel-item and settings-section registries | `ui/leafwiki-ui/src/lib/registries/` | dialogs, sidebar panels, settings pages |
    | Toolbar actions | `useToolbarActions` per feature | toolbar buttons |
+   | Page panel sections (`PagePanelSection`) | `features/preview/pagePanelSection.ts`, composed in `features/viewer/PageViewer.tsx` | groups in the page side panel and its dropdown (headings, attachments, …) ([ADR-0021](./adr/0021-page-side-panel-sections.md)) |
 
 2. **No fitting seam → add the extension point first**, in its own PR, with the existing
    behaviour as its first user and no behaviour change. Then build the feature on it. A new
