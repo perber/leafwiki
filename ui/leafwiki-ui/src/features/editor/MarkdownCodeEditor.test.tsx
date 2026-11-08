@@ -78,6 +78,8 @@ vi.mock('./internalLinkCompletion', () => ({
   wikiLinkCompletionSource: {},
 }))
 
+vi.mock('./spellcheck', () => ({ spellcheck: [] }))
+
 import MarkdownCodeEditor from './MarkdownCodeEditor'
 
 describe('MarkdownCodeEditor – resetKey controls reinitialization', () => {
