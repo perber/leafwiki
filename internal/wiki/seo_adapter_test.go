@@ -2,10 +2,13 @@ package wiki
 
 import (
 	"context"
+	"encoding/xml"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -480,6 +483,11 @@ func TestWiki_RobotsAndSitemap_FollowPublicAccessAtRuntime(t *testing.T) {
 		{name: "robots.txt outside the base path", public: true, path: "/robots.txt", wantStatus: http.StatusNotFound},
 		{name: "robots.txt, private again", path: "/wiki/robots.txt", wantStatus: http.StatusOK, wantContain: []string{"Disallow: /"}},
 		{name: "sitemap.xml, private again", path: "/wiki/sitemap.xml", wantStatus: http.StatusNotFound},
+		{
+			name: "sitemap.xml, public again", public: true, path: "/wiki/sitemap.xml", wantStatus: http.StatusOK,
+			wantContain: []string{"<loc>https://wiki.example.com/wiki/docs/setup</loc>"},
+		},
+		{name: "robots.txt, public again", public: true, path: "/wiki/robots.txt", wantStatus: http.StatusOK, wantMissing: []string{"Disallow"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -525,5 +533,187 @@ func TestSEOPageRouteLister_TreeNotLoaded_ReturnsError(t *testing.T) {
 	routes, truncated, err := lister.ListPageRoutes(context.Background(), 0)
 	if !errors.Is(err, tree.ErrTreeNotLoaded) || routes != nil || truncated {
 		t.Fatalf("ListPageRoutes = %v, %v, %v; want nil, false, ErrTreeNotLoaded", routes, truncated, err)
+	}
+}
+
+// Look-alike paths on the real router (shell fallback, trailing-slash
+// redirects) never answer with robots or sitemap content, and a private wiki
+// lists no page through any of them.
+func TestWiki_RobotsAndSitemap_LookalikePaths_LeakNothing(t *testing.T) {
+	w, public, router := newSEOTestRouterWithPublicURL(t, "/wiki", "https://wiki.example.com/wiki")
+	createPageForTest(t, w, SYSTEM_USER_ID, nil, "Secret Plans", "secret-plans", pageNodeKind())
+	paths := []string{
+		"/wiki/Robots.txt", "/wiki/ROBOTS.TXT", "/wiki/Sitemap.xml", "/wiki/sitemap.XML", "/wiki/sitemap.xml.gz",
+		"/wiki/robots.txt/", "/wiki/sitemap.xml/", "/wiki/sitemap.xml/x", "/wiki//sitemap.xml", "/wiki/./sitemap.xml",
+		"/robots.txt", "/sitemap.xml", "/wiki/api/sitemap.xml",
+	}
+	// Percent-encoded unreserved characters are the same URL (RFC 3986 6.2.2.2):
+	// they may serve the files, but only through the public-access gate.
+	encoded := []string{"/wiki/%73itemap.xml", "/wiki/sitemap%2Exml", "/wiki/robots%2Etxt"}
+	for _, enabled := range []bool{false, true} {
+		setPublicAccess(t, public, enabled)
+		for _, p := range paths {
+			rec := serveGET(router, p, nil)
+			if rec.Code >= 500 {
+				t.Errorf("public=%v %s: status %d", enabled, p, rec.Code)
+			}
+			body := rec.Body.String()
+			if strings.Contains(body, "<urlset") || strings.Contains(body, "User-agent") {
+				// A redirect to the canonical path is fine, content is not.
+				t.Errorf("public=%v %s: seo content (%d):\n%s", enabled, p, rec.Code, body)
+			}
+			if !enabled && strings.Contains(body, "secret-plans") {
+				t.Errorf("private %s lists a page (%d):\n%s", p, rec.Code, body)
+			}
+			if loc := rec.Header().Get("Location"); loc != "" && !strings.HasPrefix(loc, "/wiki/") {
+				t.Errorf("public=%v %s: redirect leaves the wiki: %q", enabled, p, loc)
+			}
+		}
+		for _, p := range encoded {
+			rec := serveGET(router, p, nil)
+			if rec.Code >= 500 {
+				t.Errorf("public=%v %s: status %d", enabled, p, rec.Code)
+			}
+			if !enabled && (strings.Contains(rec.Body.String(), "<loc>") || strings.Contains(rec.Body.String(), "Allow: /\n")) {
+				t.Errorf("private %s passes the gate (%d):\n%s", p, rec.Code, rec.Body.String())
+			}
+		}
+	}
+}
+
+// Pages whose slugs look like the seo files are ordinary pages: listed in the
+// sitemap, and they do not shadow robots.txt or sitemap.xml.
+func TestWiki_Sitemap_LookalikeSlugs_AreOrdinaryPages(t *testing.T) {
+	w, public, router := newSEOTestRouterWithPublicURL(t, "", "https://wiki.example.com")
+	setPublicAccess(t, public, true)
+	sectionKind := tree.NodeKindSection
+	createPageForTest(t, w, SYSTEM_USER_ID, nil, "Robots", "robots-txt", pageNodeKind())
+	section := createPageForTest(t, w, SYSTEM_USER_ID, nil, "Sitemap", "sitemap-xml", &sectionKind)
+	createPageForTest(t, w, SYSTEM_USER_ID, &section.ID, "Robots inside", "robots", pageNodeKind())
+
+	sitemap := serveGET(router, "/sitemap.xml", nil)
+	if sitemap.Code != http.StatusOK {
+		t.Fatalf("sitemap status = %d", sitemap.Code)
+	}
+	for _, want := range []string{"https://wiki.example.com/robots-txt", "https://wiki.example.com/sitemap-xml", "https://wiki.example.com/sitemap-xml/robots"} {
+		if !strings.Contains(sitemap.Body.String(), "<loc>"+want+"</loc>") {
+			t.Errorf("sitemap misses %s:\n%s", want, sitemap.Body.String())
+		}
+	}
+	if robots := serveGET(router, "/robots.txt", nil); robots.Body.String() != "User-agent: *\nAllow: /\n\nSitemap: https://wiki.example.com/sitemap.xml\n" {
+		t.Errorf("robots.txt = %q", robots.Body.String())
+	}
+}
+
+// Deeply nested sections are listed with their full route path, parents first.
+func TestWiki_Sitemap_DeeplyNestedSections(t *testing.T) {
+	w, public, router := newSEOTestRouterWithPublicURL(t, "", "https://wiki.example.com")
+	setPublicAccess(t, public, true)
+	sectionKind := tree.NodeKindSection
+	var parent *string
+	path := ""
+	for i := range 25 {
+		slug := fmt.Sprintf("level-%d", i)
+		node := createPageForTest(t, w, SYSTEM_USER_ID, parent, slug, slug, &sectionKind)
+		parent = &node.ID
+		path += "/" + slug
+	}
+	createPageForTest(t, w, SYSTEM_USER_ID, parent, "Leaf", "leaf", pageNodeKind())
+
+	rec := serveGET(router, "/sitemap.xml", nil)
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	deepest := strings.Index(body, "<loc>https://wiki.example.com"+path+"/leaf</loc>")
+	parentAt := strings.Index(body, "<loc>https://wiki.example.com"+path+"</loc>")
+	if deepest < 0 || parentAt < 0 || parentAt > deepest {
+		t.Errorf("nested routes missing or out of order (parent %d, leaf %d):\n%s", parentAt, deepest, body)
+	}
+	assertWellFormedSitemap(t, body)
+}
+
+// Run with -race: crawler fetches while editors create pages must neither race
+// nor produce a broken document.
+func TestWiki_Sitemap_ConcurrentWithPageCreation(t *testing.T) {
+	w, public, router := newSEOTestRouterWithPublicURL(t, "", "https://wiki.example.com")
+	setPublicAccess(t, public, true)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := range 30 {
+			slug := fmt.Sprintf("page-%d", i)
+			createPageForTest(t, w, SYSTEM_USER_ID, nil, slug, slug, pageNodeKind())
+		}
+	}()
+	var wg sync.WaitGroup
+	for range 4 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range 15 {
+				rec := serveGET(router, "/sitemap.xml", nil)
+				if rec.Code != http.StatusOK {
+					t.Errorf("status = %d", rec.Code)
+					return
+				}
+				assertWellFormedSitemap(t, rec.Body.String())
+			}
+		}()
+	}
+	wg.Wait()
+	<-done
+
+	if n := strings.Count(serveGET(router, "/sitemap.xml", nil).Body.String(), "<loc>"); n != 31 {
+		t.Errorf("final sitemap has %d entries, want 31 (welcome page + 30)", n)
+	}
+}
+
+// Host and X-Forwarded-* never reach the sitemap or robots.txt on the real router.
+func TestWiki_RobotsAndSitemap_IgnoreRequestHostHeaders(t *testing.T) {
+	_, public, router := newSEOTestRouterWithPublicURL(t, "/wiki", "https://wiki.example.com/wiki")
+	setPublicAccess(t, public, true)
+	headers := map[string]string{"Host": "evil.example", "X-Forwarded-Host": "evil.example", "X-Forwarded-Proto": "http", "X-Forwarded-Prefix": "/evil"}
+
+	for _, p := range []string{"/wiki/robots.txt", "/wiki/sitemap.xml"} {
+		rec := serveGET(router, p, headers)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: status = %d", p, rec.Code)
+		}
+		if strings.Contains(rec.Body.String(), "evil") {
+			t.Errorf("%s uses a request header:\n%s", p, rec.Body.String())
+		}
+	}
+}
+
+// assertWellFormedSitemap parses the document strictly against the
+// sitemaps.org namespace and checks every lastmod is RFC 3339.
+func assertWellFormedSitemap(t *testing.T, doc string) {
+	t.Helper()
+	if !strings.HasPrefix(doc, `<?xml version="1.0" encoding="UTF-8"?>`) {
+		t.Errorf("sitemap does not start with the XML declaration: %.80q", doc)
+	}
+	var set struct {
+		XMLName xml.Name `xml:"http://www.sitemaps.org/schemas/sitemap/0.9 urlset"`
+		URLs    []struct {
+			Loc     string `xml:"http://www.sitemaps.org/schemas/sitemap/0.9 loc"`
+			LastMod string `xml:"http://www.sitemaps.org/schemas/sitemap/0.9 lastmod"`
+		} `xml:"http://www.sitemaps.org/schemas/sitemap/0.9 url"`
+	}
+	dec := xml.NewDecoder(strings.NewReader(doc))
+	dec.Strict = true
+	if err := dec.Decode(&set); err != nil {
+		t.Fatalf("sitemap is not well-formed: %v\n%s", err, doc)
+	}
+	for _, u := range set.URLs {
+		if !strings.HasPrefix(u.Loc, "https://wiki.example.com/") {
+			t.Errorf("loc %q is not under the public url", u.Loc)
+		}
+		if u.LastMod != "" {
+			if _, err := time.Parse(time.RFC3339, u.LastMod); err != nil {
+				t.Errorf("lastmod %q is not RFC 3339: %v", u.LastMod, err)
+			}
+		}
 	}
 }

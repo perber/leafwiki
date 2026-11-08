@@ -2,12 +2,14 @@ package seo_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -267,4 +269,133 @@ func assertHeader(t *testing.T, rec *httptest.ResponseRecorder, name, want strin
 	if got := rec.Header().Get(name); got != want {
 		t.Errorf("%s = %q, want %q", name, got, want)
 	}
+}
+
+// Absolute URLs come from --public-url only: Host and X-Forwarded-* headers
+// must not reach the sitemap either.
+func TestRoutes_Sitemap_IgnoresRequestHostHeaders(t *testing.T) {
+	f := newRoutesFixture(t, true, "https://wiki.example.com", "", routesAt("docs"))
+
+	rec := f.serve(http.MethodGet, "/sitemap.xml", map[string]string{
+		"Host": "evil.example", "X-Forwarded-Host": "evil.example", "X-Forwarded-Proto": "http", "Forwarded": "host=evil.example",
+	})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if strings.Contains(rec.Body.String(), "evil.example") {
+		t.Errorf("sitemap uses a request header:\n%s", rec.Body.String())
+	}
+	if got := sitemapLocs(t, rec.Body.String()); strings.Join(got, " ") != "https://wiki.example.com/docs" {
+		t.Errorf("locs = %v", got)
+	}
+}
+
+// Look-alike paths are not the seo routes: they must not answer with robots
+// or sitemap content (and must not read pages), whatever public access is.
+func TestRoutes_LookalikePaths_AreNotServed(t *testing.T) {
+	paths := []string{"/Robots.txt", "/ROBOTS.TXT", "/Sitemap.xml", "/sitemap.XML", "/sitemap.xml.gz", "/sitemap.xml/x", "/robots.txt/x", "/wiki/sitemap.xml", "/./sitemap.xml/.."}
+	for _, public := range []bool{false, true} {
+		f := newRoutesFixture(t, public, "https://wiki.example.com", "", nil)
+		for _, p := range paths {
+			rec := f.serve(http.MethodGet, p, nil)
+			if rec.Code >= 500 {
+				t.Errorf("public=%v %s: status %d", public, p, rec.Code)
+			}
+			if body := rec.Body.String(); strings.Contains(body, "<urlset") || strings.Contains(body, "User-agent") {
+				t.Errorf("public=%v %s: answered with seo content (%d):\n%s", public, p, rec.Code, body)
+			}
+		}
+		if f.lister.reads != 0 {
+			t.Errorf("public=%v: reads = %d, want 0", public, f.lister.reads)
+		}
+	}
+}
+
+// A trailing slash or a query string must not bypass the public-access gate.
+func TestRoutes_PrivateWiki_SlashAndQueryVariants_LeakNoRoutes(t *testing.T) {
+	f := newRoutesFixture(t, false, "https://wiki.example.com", "", nil)
+	for _, p := range []string{"/sitemap.xml/", "/sitemap.xml?x=1", "/sitemap.xml?", "/robots.txt/", "/robots.txt?x=1"} {
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			rec := f.serve(method, p, nil)
+			if strings.Contains(rec.Body.String(), "<loc>") || strings.Contains(rec.Body.String(), "Allow: /\n") {
+				t.Errorf("%s %s leaks (%d):\n%s", method, p, rec.Code, rec.Body.String())
+			}
+		}
+	}
+	if f.lister.reads != 0 {
+		t.Errorf("reads = %d, want 0", f.lister.reads)
+	}
+}
+
+// Methods other than GET and HEAD are not served.
+func TestRoutes_OtherMethods_AreNotServed(t *testing.T) {
+	f := newRoutesFixture(t, true, "https://wiki.example.com", "", nil)
+	for _, p := range []string{"/robots.txt", "/sitemap.xml"} {
+		for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch, http.MethodOptions} {
+			rec := f.serve(method, p, nil)
+			if rec.Code == http.StatusOK {
+				t.Errorf("%s %s = 200, want not served", method, p)
+			}
+		}
+	}
+	if f.lister.reads != 0 {
+		t.Errorf("reads = %d, want 0", f.lister.reads)
+	}
+}
+
+// The truncation warning is logged once even under concurrent fetches.
+func TestRoutes_Sitemap_Truncated_ConcurrentFetches_WarnOnce(t *testing.T) {
+	lister := &concurrentLister{truncated: true}
+	logs := &lockedBuffer{}
+	gin.SetMode(gin.TestMode)
+	routes := seo.NewRoutes(seo.RoutesConfig{
+		Public:  seo.NewPublicOnly(publicaccess.Fixed(true)),
+		Robots:  seo.NewGetRobotsUseCase("https://wiki.example.com"),
+		Sitemap: seo.NewBuildSitemapUseCase(lister, "https://wiki.example.com"),
+		Log:     slog.New(slog.NewTextHandler(logs, nil)),
+	})
+	engine := gin.New()
+	routes.RegisterRoutes(wikihttp.RouterContext{Engine: engine, Base: engine.Group(""), Opts: wikihttp.RouterOptions{}})
+
+	var wg sync.WaitGroup
+	for range 20 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			rec := httptest.NewRecorder()
+			engine.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/sitemap.xml", nil))
+			if rec.Code != http.StatusOK {
+				t.Errorf("status = %d", rec.Code)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if n := strings.Count(logs.String(), "level=WARN"); n != 1 {
+		t.Errorf("warnings = %d, want 1", n)
+	}
+}
+
+type concurrentLister struct{ truncated bool }
+
+func (l *concurrentLister) ListPageRoutes(context.Context, int) ([]seo.PageRoute, bool, error) {
+	return []seo.PageRoute{{RoutePath: "docs"}}, l.truncated, nil
+}
+
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }

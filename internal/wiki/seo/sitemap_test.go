@@ -120,6 +120,34 @@ func TestBuildSitemapUseCase_ListsEveryRoute(t *testing.T) {
 		},
 		{name: "unusable route paths are left out", routes: []string{"", "docs//intro", "/docs", "about"}, publicURL: "https://wiki.example.com", want: []string{"https://wiki.example.com/about"}},
 		{name: "empty wiki", publicURL: "https://wiki.example.com", want: []string{}},
+		{name: "percent sign is escaped", routes: []string{"100%"}, publicURL: "https://wiki.example.com", want: []string{"https://wiki.example.com/100%25"}},
+		{name: "apostrophe survives the xml round trip", routes: []string{"it's"}, publicURL: "https://wiki.example.com", want: []string{"https://wiki.example.com/it%27s"}},
+		{
+			name:      "backslash, question mark, hash and space are escaped",
+			routes:    []string{`a\b`, "c?d#e f"},
+			publicURL: "https://wiki.example.com",
+			want:      []string{"https://wiki.example.com/a%5Cb", "https://wiki.example.com/c%3Fd%23e%20f"},
+		},
+		{
+			// Characters XML 1.0 cannot carry must not break the document.
+			name:      "control characters and invalid utf-8 are escaped",
+			routes:    []string{"a\x01b", "c\xffd", "e\r\nf"},
+			publicURL: "https://wiki.example.com",
+			want:      []string{"https://wiki.example.com/a%01b", "https://wiki.example.com/c%FFd", "https://wiki.example.com/e%0D%0Af"},
+		},
+		{name: "query and fragment of the public url are dropped", routes: []string{"docs"}, publicURL: "https://wiki.example.com/?utm=1#top", want: []string{"https://wiki.example.com/docs"}},
+		{name: "credentials in the public url never appear", routes: []string{"docs"}, publicURL: "https://admin:s3cret@wiki.example.com", want: []string{"https://wiki.example.com/docs"}},
+		{name: "upper-case scheme is normalised", routes: []string{"docs"}, publicURL: "HTTPS://wiki.example.com", want: []string{"https://wiki.example.com/docs"}},
+		{name: "public url with surrounding spaces", routes: []string{"docs"}, publicURL: "  https://wiki.example.com  ", want: []string{"https://wiki.example.com/docs"}},
+		{name: "base path with trailing slash", routes: []string{"docs"}, publicURL: "https://wiki.example.com/wiki/", basePath: "/wiki/", want: []string{"https://wiki.example.com/wiki/docs"}},
+		{name: "base path of a single slash", routes: []string{"docs"}, publicURL: "https://wiki.example.com", basePath: "/", want: []string{"https://wiki.example.com/docs"}},
+		{
+			name:      "very long route path",
+			routes:    []string{strings.Repeat("a", 2000) + "/" + strings.Repeat("b", 2000)},
+			publicURL: "https://wiki.example.com",
+			want:      []string{"https://wiki.example.com/" + strings.Repeat("a", 2000) + "/" + strings.Repeat("b", 2000)},
+		},
+		{name: "ipv6 host with port", routes: []string{"docs"}, publicURL: "http://[::1]:8080", want: []string{"http://[::1]:8080/docs"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

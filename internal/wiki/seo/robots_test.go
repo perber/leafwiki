@@ -27,6 +27,23 @@ func TestGetRobotsUseCase_PublicWiki_AllowsCrawling(t *testing.T) {
 			want:      "User-agent: *\nAllow: /\n\nSitemap: https://wiki.example.com/wiki/sitemap.xml\n",
 		},
 		{name: "unusable public url: no sitemap line", publicURL: "not a url", want: "User-agent: *\nAllow: /\n"},
+		{
+			name:      "query, fragment and credentials of the public url are dropped",
+			publicURL: "https://admin:s3cret@wiki.example.com/?utm=1#top",
+			want:      "User-agent: *\nAllow: /\n\nSitemap: https://wiki.example.com/sitemap.xml\n",
+		},
+		{
+			name:      "base path with trailing slash",
+			publicURL: "https://wiki.example.com/wiki",
+			basePath:  "/wiki/",
+			want:      "User-agent: *\nAllow: /\n\nSitemap: https://wiki.example.com/wiki/sitemap.xml\n",
+		},
+		{
+			// A newline in --public-url must not inject robots.txt directives.
+			name:      "newline in public url injects no directive",
+			publicURL: "https://wiki.example.com\nDisallow: /",
+			want:      "User-agent: *\nAllow: /\n",
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
