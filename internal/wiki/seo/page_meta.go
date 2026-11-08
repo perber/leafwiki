@@ -3,7 +3,6 @@ package seo
 import (
 	"context"
 	"html"
-	"net/url"
 	"strings"
 	"unicode/utf8"
 
@@ -86,8 +85,8 @@ func (uc *GetPageMetaUseCase) Execute(ctx context.Context, in GetPageMetaInput) 
 	// The canonical URL is built from --public-url only, never from Host or
 	// X-Forwarded-* headers (ADR-0018).
 	if uc.publicOrigin != "" {
-		if path, err := wikiPath(in.BasePath, routePath); err == nil {
-			out.CanonicalURL = uc.publicOrigin + path
+		if canonical, err := absoluteURL(uc.publicOrigin, in.BasePath, routePath); err == nil {
+			out.CanonicalURL = canonical
 		}
 	}
 	return out, nil
@@ -131,13 +130,4 @@ func capDescription(d string) string {
 		cut = cut[:lastSpace]
 	}
 	return strings.TrimSpace(cut) + "..."
-}
-
-// origin returns "scheme://host" of an absolute http(s) URL, or "".
-func origin(publicURL string) string {
-	u, err := url.Parse(strings.TrimSpace(publicURL))
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return ""
-	}
-	return u.Scheme + "://" + u.Host
 }

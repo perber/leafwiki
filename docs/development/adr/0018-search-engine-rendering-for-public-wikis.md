@@ -136,3 +136,28 @@ fixing that is a separate change.
   [ADR-0017](./0017-spa-shell-contributors.md), "Later changes"), so the root redirect and the
   page meta apply to HEAD too. The sentence above that HEAD is outside this decision is
   superseded.
+- **2026-11 (#1292, `robots.txt` and `sitemap.xml`):** the slice's first own routes,
+  registered through `seo.Routes` (a `RouteRegistrar`) for GET and HEAD; both handlers go
+  through `PublicOnly.Handler(on, off)`. Amends the sentence above that a private wiki keeps
+  today's responses for these paths (that was the SPA shell with status 200):
+  - Private wiki: `robots.txt` is `User-agent: *` / `Disallow: /`, `sitemap.xml` is 404.
+    Neither reads a page.
+  - Public wiki: `robots.txt` is `User-agent: *` / `Allow: /`, plus `Sitemap: <url>` only with
+    `--public-url`. `/api` is never disallowed, because search engines render the SPA, which
+    reads pages through it.
+  - `sitemap.xml` lists every page and section in navigation order with `<lastmod>` (RFC 3339,
+    UTC; left out when unknown), from one locked tree read (`TreeService.PageRoutes`, no file
+    reads). The root is not listed: it is a 302 to the first page, which is listed itself.
+    Without `--public-url` there is no sitemap (404). Above 50,000 routes (the sitemaps.org
+    limit per file) only the first 50,000 are listed and a warning is logged once per process;
+    a sitemap index is left for when a wiki needs it.
+  - Both are `Cache-Control: no-cache`, so toggling public access is seen on the next fetch.
+  - Under `--base-path` both are served below the base path only. Crawlers read `robots.txt`
+    only at the host root, so there it has no effect; the sitemap still works (its scope is its
+    directory), but has to be submitted to the search engine by hand.
+  - The document is streamed with `encoding/xml`, never held whole in memory.
+    `BenchmarkSitemap` (`internal/wiki/seo`, fake lister, so without the tree walk) allocates
+    2.5 MB / 70,000 times for 10,000 routes and 13 MB / 350,000 times for 50,000 (seven per
+    entry, mostly the URL strings and the encoder's reflection). Time was 0.27 s and 0.83 s
+    on a heavily loaded laptop, so treat it as an upper bound; rerun it on a Raspberry Pi
+    before raising the limit or adding fields per entry.

@@ -1,16 +1,6 @@
 package seo
 
-import (
-	"context"
-	"errors"
-	"net/url"
-	"strings"
-)
-
-var (
-	errInvalidRoutePath = errors.New("seo: page has an invalid route path")
-	errUnsafeWikiPath   = errors.New("seo: path would leave the wiki")
-)
+import "context"
 
 // FirstPage is the page a public wiki opens at its root.
 type FirstPage struct {
@@ -66,25 +56,4 @@ func (uc *GetRootTargetUseCase) Execute(ctx context.Context, in GetRootTargetInp
 		return nil, err
 	}
 	return &GetRootTargetOutput{Location: location}, nil
-}
-
-// wikiPath returns the escaped, server-relative path of a page: the base path
-// and every route path segment escaped. Escaping turns CR, LF, "?", "#" and
-// "\" into percent escapes; a path starting with "//" (a protocol-relative
-// URL to another host) is refused.
-func wikiPath(basePath, routePath string) (string, error) {
-	var b strings.Builder
-	b.WriteString((&url.URL{Path: strings.TrimRight(basePath, "/")}).EscapedPath())
-	for _, segment := range strings.Split(routePath, "/") {
-		if segment == "" {
-			return "", errInvalidRoutePath
-		}
-		b.WriteString("/")
-		b.WriteString(url.PathEscape(segment))
-	}
-	location := b.String()
-	if !strings.HasPrefix(location, "/") || strings.HasPrefix(location, "//") {
-		return "", errUnsafeWikiPath
-	}
-	return location, nil
 }

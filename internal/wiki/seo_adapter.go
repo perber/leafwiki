@@ -30,6 +30,17 @@ func (w *Wiki) seoShellContributors() []httpinternal.ShellContributor {
 	}
 }
 
+// seoRoutes builds the seo slice's own routes (robots.txt, sitemap.xml),
+// gated on public access by one seo.PublicOnly.
+func (w *Wiki) seoRoutes() *seo.Routes {
+	return seo.NewRoutes(seo.RoutesConfig{
+		Public:  seo.NewPublicOnly(w.publicAccess),
+		Robots:  seo.NewGetRobotsUseCase(w.publicURL),
+		Sitemap: seo.NewBuildSitemapUseCase(seoPageRouteLister{uc: wikipages.NewListPageRoutesUseCase(w.tree)}, w.publicURL),
+		Log:     w.log.With("component", "SEO"),
+	})
+}
+
 // seoFirstPageReader implements seo.FirstPageReader with the pages slice's
 // read use case; seo must not import pages.
 type seoFirstPageReader struct {
@@ -62,4 +73,23 @@ func (r seoPageReader) PageByRoutePath(ctx context.Context, routePath string) (*
 		return nil, err
 	}
 	return &seo.Page{Title: view.Page.Title, Body: view.Page.Content, Properties: view.Properties}, nil
+}
+
+// seoPageRouteLister implements seo.PageRouteLister with the pages slice's
+// read use case; seo must not import pages. A public wiki shows every page to
+// anonymous readers, so every page and section is listed (ADR-0018).
+type seoPageRouteLister struct {
+	uc *wikipages.ListPageRoutesUseCase
+}
+
+func (l seoPageRouteLister) ListPageRoutes(ctx context.Context, limit int) ([]seo.PageRoute, bool, error) {
+	out, err := l.uc.Execute(ctx, wikipages.ListPageRoutesInput{Limit: limit})
+	if err != nil {
+		return nil, false, err
+	}
+	routes := make([]seo.PageRoute, len(out.Routes))
+	for i, r := range out.Routes {
+		routes[i] = seo.PageRoute{RoutePath: r.RoutePath, UpdatedAt: r.UpdatedAt}
+	}
+	return routes, out.Truncated, nil
 }
