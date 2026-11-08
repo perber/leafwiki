@@ -14,9 +14,13 @@ import (
 // gated on public access by one seo.PublicOnly.
 func (w *Wiki) seoShellResponders() []httpinternal.ShellResponder {
 	public := seo.NewPublicOnly(w.publicAccess)
+	log := w.log.With("component", "SEO")
 	rootTarget := seo.NewGetRootTargetUseCase(seoFirstPageReader{uc: wikipages.NewGetFirstPagePathUseCase(w.tree)})
+	pageMarkdown := seo.NewGetPageMarkdownUseCase(seoPageReader{uc: wikipages.NewGetPageViewByPathUseCase(w.tree)})
 	return []httpinternal.ShellResponder{
-		public.Responder(seo.NewRootRedirect(rootTarget, w.log.With("component", "SEO"))),
+		// The root redirect comes first: "/" is a 302 for Markdown clients too.
+		public.Responder(seo.NewRootRedirect(rootTarget, log)),
+		public.Responder(seo.NewPageMarkdown(pageMarkdown, log)),
 	}
 }
 

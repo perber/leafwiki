@@ -3,8 +3,10 @@ package seo
 import (
 	"context"
 	"html/template"
+	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	httpinternal "github.com/perber/wiki/internal/http"
@@ -86,6 +88,66 @@ func (r *rootRedirect) RespondShell(w http.ResponseWriter, req httpinternal.Shel
 	w.Header().Set("Location", out.Location)
 	w.WriteHeader(http.StatusFound)
 	return true
+}
+
+// pageMarkdown answers a page route with the page's Markdown when the
+// request's Accept header prefers text/markdown over text/html.
+type pageMarkdown struct {
+	markdown *GetPageMarkdownUseCase
+	log      *slog.Logger
+}
+
+// NewPageMarkdown returns the shell responder for the Markdown representation
+// of pages.
+func NewPageMarkdown(markdown *GetPageMarkdownUseCase, log *slog.Logger) httpinternal.ShellResponder {
+	return &pageMarkdown{markdown: markdown, log: log}
+}
+
+func (p *pageMarkdown) RespondShell(w http.ResponseWriter, req httpinternal.ShellRequest) bool {
+	// The response depends on Accept whether this handles it or the shell is
+	// served, so caches must keep the variants apart (ADR-0017 contract).
+	addVary(w.Header(), "Accept")
+	out, err := p.markdown.Execute(req.Request.Context(), GetPageMarkdownInput{
+		RoutePath: req.RoutePath,
+		Accept:    strings.Join(req.Request.Header.Values("Accept"), ","),
+	})
+	if err != nil {
+		// Swallowed here: the visitor gets the shell instead of the Markdown.
+		p.log.Warn("page markdown skipped, serving the shell", "error", err)
+		return false
+	}
+	if out == nil {
+		return false
+	}
+	h := w.Header()
+	h.Set("Content-Type", "text/markdown; charset=utf-8")
+	// The body is raw user content; never let a browser sniff it as HTML.
+	h.Set("X-Content-Type-Options", "nosniff")
+	// Opened directly in a browser, the content runs no script and reaches no
+	// storage of the wiki's origin, whatever a client does with the type.
+	h.Set("Content-Security-Policy", "sandbox")
+	// The content changes with every edit, and a variant must not outlive
+	// public access being turned off.
+	h.Set("Cache-Control", "no-cache")
+	// Set explicitly so HEAD reports the length GET sends.
+	h.Set("Content-Length", strconv.Itoa(len(out.Markdown)))
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.WriteString(w, out.Markdown)
+	return true
+}
+
+// addVary adds field to the Vary header unless a Vary line already lists it
+// (case-insensitive, also inside a comma list) or lists "*".
+func addVary(h http.Header, field string) {
+	for _, line := range h.Values("Vary") {
+		for listed := range strings.SplitSeq(line, ",") {
+			listed = strings.TrimSpace(listed)
+			if listed == "*" || strings.EqualFold(listed, field) {
+				return
+			}
+		}
+	}
+	h.Add("Vary", field)
 }
 
 // pageMeta adds the page title, description, Open Graph tags and (with

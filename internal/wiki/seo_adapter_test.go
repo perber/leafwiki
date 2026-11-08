@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -715,5 +717,107 @@ func assertWellFormedSitemap(t *testing.T, doc string) {
 				t.Errorf("lastmod %q is not RFC 3339: %v", u.LastMod, err)
 			}
 		}
+	}
+}
+
+func serveMarkdown(router http.Handler, method, path string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, path, nil)
+	req.Header.Set("Accept", "text/markdown")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestWiki_PageMarkdown_PublicWiki_ServesBodyWithoutFrontmatter(t *testing.T) {
+	w, public, router := newSEOTestRouter(t, "/wiki")
+	setPublicAccess(t, public, true)
+	body := "# Setup\n\nInstall it."
+	createDescribedPage(t, w, "Setup", "setup", body, "How to set it up.")
+	onDisk, err := os.ReadFile(filepath.Join(w.GetStorageDir(), "root", "setup.md"))
+	if err != nil || !strings.HasPrefix(string(onDisk), "---") || !strings.Contains(string(onDisk), "How to set it up.") {
+		t.Fatalf("setup.md = %q, %v; want frontmatter with the description on disk", onDisk, err)
+	}
+
+	get := serveMarkdown(router, http.MethodGet, "/wiki/setup")
+	head := serveMarkdown(router, http.MethodHead, "/wiki/setup")
+
+	if get.Code != http.StatusOK || get.Body.String() != body {
+		t.Fatalf("GET = %d %q, want 200 %q", get.Code, get.Body.String(), body)
+	}
+	if head.Code != http.StatusOK || head.Body.Len() != 0 {
+		t.Fatalf("HEAD = %d %q, want 200 without body", head.Code, head.Body.String())
+	}
+	for _, h := range []string{"Content-Type", "X-Content-Type-Options", "Content-Security-Policy", "Cache-Control", "Vary", "Content-Length"} {
+		if got, want := head.Header().Values(h), get.Header().Values(h); strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Errorf("%s: HEAD %q, GET %q", h, got, want)
+		}
+	}
+	if got := get.Header().Get("Content-Type"); got != "text/markdown; charset=utf-8" {
+		t.Errorf("Content-Type = %q", got)
+	}
+	if got := get.Header().Get("Content-Security-Policy"); got != "sandbox" {
+		t.Errorf("Content-Security-Policy = %q, want sandbox", got)
+	}
+	if got := get.Header().Values("Vary"); len(got) != 1 || got[0] != "Accept" {
+		t.Errorf("Vary = %q, want [Accept]", got)
+	}
+}
+
+func TestWiki_PageMarkdown_NotAPageOrPrivate_ServesNoMarkdown(t *testing.T) {
+	tests := []struct {
+		name     string
+		public   bool
+		path     string
+		wantVary bool
+	}{
+		{name: "unknown page declines with Vary", public: true, path: "/wiki/missing", wantVary: true},
+		{name: "SPA route declines with Vary", public: true, path: "/wiki/settings/branding", wantVary: true},
+		{name: "permalink route is not resolved", public: true, path: "/wiki/p/someid", wantVary: true},
+		{name: "private wiki: no Vary", public: false, path: "/wiki/welcome-to-leafwiki", wantVary: false},
+	}
+	_, public, router := newSEOTestRouter(t, "/wiki")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			setPublicAccess(t, public, tc.public)
+
+			rec := serveMarkdown(router, http.MethodGet, tc.path)
+
+			if strings.HasPrefix(rec.Header().Get("Content-Type"), "text/markdown") {
+				t.Fatalf("got markdown %q, want the shell", rec.Body.String())
+			}
+			if got := rec.Header().Get("Vary") == "Accept"; got != tc.wantVary {
+				t.Errorf("Vary = %q, want Accept: %v", rec.Header().Values("Vary"), tc.wantVary)
+			}
+		})
+	}
+}
+
+func TestWiki_PageMarkdown_Root_StillRedirects(t *testing.T) {
+	_, public, router := newSEOTestRouter(t, "/wiki")
+	setPublicAccess(t, public, true)
+
+	rec := serveMarkdown(router, http.MethodGet, "/wiki/")
+
+	if rec.Code != http.StatusFound || rec.Header().Get("Location") != "/wiki/welcome-to-leafwiki" {
+		t.Fatalf("status = %d, Location = %q; want 302 to the first page", rec.Code, rec.Header().Get("Location"))
+	}
+}
+
+func TestWiki_PageMarkdown_FollowsPublicAccessAtRuntime(t *testing.T) {
+	_, public, router := newSEOTestRouter(t, "")
+	isMarkdown := func() bool {
+		return serveMarkdown(router, http.MethodGet, "/welcome-to-leafwiki").Header().Get("Content-Type") == "text/markdown; charset=utf-8"
+	}
+
+	if isMarkdown() {
+		t.Fatal("public access off: got markdown")
+	}
+	setPublicAccess(t, public, true)
+	if !isMarkdown() {
+		t.Fatal("after enabling public access: no markdown")
+	}
+	setPublicAccess(t, public, false)
+	if isMarkdown() {
+		t.Fatal("after disabling public access: got markdown")
 	}
 }
