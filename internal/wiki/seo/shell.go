@@ -11,7 +11,7 @@ import (
 	"github.com/perber/wiki/internal/publicaccess"
 )
 
-// PublicOnly gates this package's shell registrations on public access. The
+// PublicOnly gates this package's shell registrations and routes on public access. The
 // setting is read per request, so toggling it at runtime takes effect
 // immediately.
 type PublicOnly struct {
@@ -40,6 +40,18 @@ func (p PublicOnly) Contributor(c httpinternal.ShellContributor) httpinternal.Sh
 		}
 		return c.ContributeShell(ctx, req)
 	})
+}
+
+// Handler returns a handler for the slice's own routes that runs on while
+// public access is on and off otherwise. off must not read pages.
+func (p PublicOnly) Handler(on, off http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if p.enabled() {
+			on(w, r)
+			return
+		}
+		off(w, r)
+	}
 }
 
 func (p PublicOnly) enabled() bool {

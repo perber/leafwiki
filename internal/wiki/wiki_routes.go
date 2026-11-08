@@ -264,6 +264,7 @@ func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
 		w.importerRoutes,
 		w.healthRoutes,
 		w.resyncRoutes,
+		w.seoRoutes(),
 	}
 	if w.backupRoutes != nil {
 		registrars = append(registrars, w.backupRoutes)

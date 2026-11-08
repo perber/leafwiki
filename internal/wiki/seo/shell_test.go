@@ -61,6 +61,32 @@ func TestPublicOnly_Responder_RunsOnlyWithPublicAccess(t *testing.T) {
 	}
 }
 
+func TestPublicOnly_Handler_PicksHandlerByPublicAccess(t *testing.T) {
+	tests := []struct {
+		name string
+		gate publicaccess.ReadGate
+		want string
+	}{
+		{name: "public access off", gate: publicaccess.Fixed(false), want: "off"},
+		{name: "no gate counts as off", gate: nil, want: "off"},
+		{name: "public access on", gate: publicaccess.Fixed(true), want: "on"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var ran []string
+			handler := func(name string) http.HandlerFunc {
+				return func(http.ResponseWriter, *http.Request) { ran = append(ran, name) }
+			}
+
+			seo.NewPublicOnly(tc.gate).Handler(handler("on"), handler("off")).ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/robots.txt", nil))
+
+			if strings.Join(ran, ",") != tc.want {
+				t.Errorf("ran %v, want only %s", ran, tc.want)
+			}
+		})
+	}
+}
+
 func TestRootRedirect_Root_RedirectsToFirstPage(t *testing.T) {
 	tests := []struct {
 		name     string

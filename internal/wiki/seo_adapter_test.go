@@ -2,6 +2,7 @@ package wiki
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -20,7 +21,13 @@ import (
 // on top of it; public access is settings-managed so tests can toggle it.
 func newSEOTestRouter(t *testing.T, basePath string) (*Wiki, *publicaccess.Service, *gin.Engine) {
 	t.Helper()
-	w, public := newSEOTestWiki(t, "")
+	return newSEOTestRouterWithPublicURL(t, basePath, "")
+}
+
+// newSEOTestRouterWithPublicURL is newSEOTestRouter with --public-url set.
+func newSEOTestRouterWithPublicURL(t *testing.T, basePath, publicURL string) (*Wiki, *publicaccess.Service, *gin.Engine) {
+	t.Helper()
+	w, public := newSEOTestWiki(t, publicURL)
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		BasePath:          basePath,
 		PublicAccess:      public,
@@ -395,6 +402,9 @@ func TestWiki_Head_MatchesGetOnRealRouter(t *testing.T) {
 		{name: "SPA route", public: true, path: "/wiki/settings/branding", sameAsGet: true},
 		{name: "favicon.svg", public: true, path: "/wiki/favicon.svg", sameAsGet: true},
 		{name: "favicon.ico", public: true, path: "/wiki/favicon.ico"},
+		{name: "robots.txt, public", public: true, path: "/wiki/robots.txt", sameAsGet: true},
+		{name: "robots.txt, private", public: false, path: "/wiki/robots.txt", sameAsGet: true},
+		{name: "sitemap.xml, private", public: false, path: "/wiki/sitemap.xml", sameAsGet: true},
 		{name: "avatar of unknown user", public: true, path: "/wiki/avatars/nobody"},
 		{name: "branding asset", public: true, path: "/wiki/branding/missing.png"},
 		{name: "api health", public: true, path: "/wiki/api/health"},
@@ -430,5 +440,90 @@ func TestWiki_Head_MatchesGetOnRealRouter(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestWiki_RobotsAndSitemap_FollowPublicAccessAtRuntime(t *testing.T) {
+	w, public, router := newSEOTestRouterWithPublicURL(t, "/wiki", "https://wiki.example.com/wiki")
+	sectionKind := tree.NodeKindSection
+	section := createPageForTest(t, w, SYSTEM_USER_ID, nil, "Docs", "docs", &sectionKind)
+	createPageForTest(t, w, SYSTEM_USER_ID, &section.ID, "Setup", "setup", pageNodeKind())
+
+	tests := []struct {
+		name        string
+		public      bool
+		path        string
+		wantStatus  int
+		wantType    string
+		wantContain []string
+		wantMissing []string
+	}{
+		{
+			name: "robots.txt, private", path: "/wiki/robots.txt", wantStatus: http.StatusOK, wantType: "text/plain; charset=utf-8",
+			wantContain: []string{"Disallow: /"}, wantMissing: []string{"Sitemap:"},
+		},
+		{name: "sitemap.xml, private", path: "/wiki/sitemap.xml", wantStatus: http.StatusNotFound},
+		{
+			name: "robots.txt, public", public: true, path: "/wiki/robots.txt", wantStatus: http.StatusOK, wantType: "text/plain; charset=utf-8",
+			wantContain: []string{"Allow: /", "Sitemap: https://wiki.example.com/wiki/sitemap.xml"}, wantMissing: []string{"Disallow"},
+		},
+		{
+			name: "sitemap.xml, public", public: true, path: "/wiki/sitemap.xml", wantStatus: http.StatusOK, wantType: "application/xml; charset=utf-8",
+			wantContain: []string{
+				"<loc>https://wiki.example.com/wiki/welcome-to-leafwiki</loc>",
+				"<loc>https://wiki.example.com/wiki/docs</loc>",
+				"<loc>https://wiki.example.com/wiki/docs/setup</loc>",
+				"<lastmod>",
+			},
+			wantMissing: []string{"<loc>https://wiki.example.com/wiki/</loc>"},
+		},
+		{name: "robots.txt outside the base path", public: true, path: "/robots.txt", wantStatus: http.StatusNotFound},
+		{name: "robots.txt, private again", path: "/wiki/robots.txt", wantStatus: http.StatusOK, wantContain: []string{"Disallow: /"}},
+		{name: "sitemap.xml, private again", path: "/wiki/sitemap.xml", wantStatus: http.StatusNotFound},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			setPublicAccess(t, public, tc.public)
+
+			rec := serveGET(router, tc.path, nil)
+
+			if rec.Code != tc.wantStatus {
+				t.Fatalf("status = %d, want %d", rec.Code, tc.wantStatus)
+			}
+			if tc.wantType != "" && rec.Header().Get("Content-Type") != tc.wantType {
+				t.Errorf("Content-Type = %q, want %q", rec.Header().Get("Content-Type"), tc.wantType)
+			}
+			for _, s := range tc.wantContain {
+				if !strings.Contains(rec.Body.String(), s) {
+					t.Errorf("body does not contain %q:\n%s", s, rec.Body.String())
+				}
+			}
+			for _, s := range tc.wantMissing {
+				if strings.Contains(rec.Body.String(), s) {
+					t.Errorf("body contains %q:\n%s", s, rec.Body.String())
+				}
+			}
+		})
+	}
+}
+
+func TestWiki_Sitemap_WithoutPublicURL_NotFound(t *testing.T) {
+	_, public, router := newSEOTestRouter(t, "")
+	setPublicAccess(t, public, true)
+
+	if rec := serveGET(router, "/sitemap.xml", nil); rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", rec.Code)
+	}
+	if rec := serveGET(router, "/robots.txt", nil); strings.Contains(rec.Body.String(), "Sitemap:") {
+		t.Fatalf("robots.txt announces a sitemap without --public-url:\n%s", rec.Body.String())
+	}
+}
+
+func TestSEOPageRouteLister_TreeNotLoaded_ReturnsError(t *testing.T) {
+	lister := seoPageRouteLister{uc: wikipages.NewListPageRoutesUseCase(tree.NewTreeService(t.TempDir()))}
+
+	routes, truncated, err := lister.ListPageRoutes(context.Background(), 0)
+	if !errors.Is(err, tree.ErrTreeNotLoaded) || routes != nil || truncated {
+		t.Fatalf("ListPageRoutes = %v, %v, %v; want nil, false, ErrTreeNotLoaded", routes, truncated, err)
 	}
 }

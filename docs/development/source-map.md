@@ -315,13 +315,18 @@ shape for that domain.
 - **`internal/wiki/instancesettings`** — admin-only instance settings changeable at runtime
   instead of via flag + restart; today the public-access toggle.
 - **`internal/wiki/seo`** — search-engine rendering for public wikis
-  ([ADR-0018](./adr/0018-search-engine-rendering-for-public-wikis.md)); no routes, it registers
-  SPA shell responders and contributors. `shell.go`: `PublicOnly` (every registration of the
-  slice runs only while public access is on), the root redirect (`GET /` → 302 to the first
-  page) and the page meta contributor; `root_target.go`: `GetRootTargetUseCase` behind the narrow
-  `FirstPageReader`; `page_meta.go`: `GetPageMetaUseCase` (title, description, canonical URL)
-  behind `PageReader`. Both readers are implemented in `internal/wiki/seo_adapter.go` with the
-  pages slice's read use cases.
+  ([ADR-0018](./adr/0018-search-engine-rendering-for-public-wikis.md)); registers SPA shell
+  responders and contributors and its own routes. One file per feature holds its seo-owned
+  types, reader interface and use case. `shell.go`: `PublicOnly` (every registration and route
+  of the slice runs only while public access is on; `Handler(on, off)` for routes), the root
+  redirect (`GET /` → 302 to the first page) and the page meta contributor; `routes.go`:
+  `Routes` (`robots.txt`, `sitemap.xml`, GET and HEAD); `root_target.go`:
+  `GetRootTargetUseCase` behind the narrow `FirstPageReader`; `urls.go`: the URL helpers the
+  features share (escaped wiki path, absolute URL from `--public-url`); `page_meta.go`:
+  `GetPageMetaUseCase` (title, description, canonical URL) behind `PageReader`; `robots.go`:
+  `GetRobotsUseCase` and `PrivateRobots`; `sitemap.go`: `BuildSitemapUseCase` behind
+  `PageRouteLister`, streamed by `WriteXML`. The readers are implemented in
+  `internal/wiki/seo_adapter.go` with the pages slice's read use cases.
 
 ## Frontend — `ui/leafwiki-ui/src/`
 
