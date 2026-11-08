@@ -54,6 +54,13 @@ function addHeading(id: string, top: number): HTMLElement {
   return el
 }
 
+function expectActive(testId: string, active: boolean) {
+  const { classList } = screen.getByTestId(testId)
+  expect(classList.contains('page-viewer__toc-panel-entry--active')).toBe(
+    active,
+  )
+}
+
 let scrollContainer: HTMLDivElement
 
 beforeEach(() => {
@@ -176,9 +183,7 @@ describe('TocSidePanel — scroll spy', () => {
 
     render(<Panel entries={entries} />)
 
-    expect(screen.getByTestId('toc-entry-introduction').className).toMatch(
-      /page-viewer__toc-panel-entry--active/,
-    )
+    expectActive('toc-entry-introduction', true)
   })
 
   it('activates heading whose top has passed triggerY on mount', () => {
@@ -188,9 +193,7 @@ describe('TocSidePanel — scroll spy', () => {
 
     render(<Panel entries={entries} />)
 
-    expect(screen.getByTestId('toc-entry-introduction').className).toMatch(
-      /page-viewer__toc-panel-entry--active/,
-    )
+    expectActive('toc-entry-introduction', true)
   })
 
   it('updates active heading when scrolling', () => {
@@ -212,9 +215,7 @@ describe('TocSidePanel — scroll spy', () => {
       scrollContainer.dispatchEvent(new Event('scroll'))
     })
 
-    expect(screen.getByTestId('toc-entry-background').className).toMatch(
-      /page-viewer__toc-panel-entry--active/,
-    )
+    expectActive('toc-entry-background', true)
   })
 
   it('picks the deepest heading past triggerY (last one in document order)', () => {
@@ -224,12 +225,8 @@ describe('TocSidePanel — scroll spy', () => {
 
     render(<Panel entries={entries} />)
 
-    expect(screen.getByTestId('toc-entry-background').className).toMatch(
-      /page-viewer__toc-panel-entry--active/,
-    )
-    expect(screen.getByTestId('toc-entry-introduction').className).not.toMatch(
-      /page-viewer__toc-panel-entry--active/,
-    )
+    expectActive('toc-entry-background', true)
+    expectActive('toc-entry-introduction', false)
   })
 
   it('activates last visible heading when scroll is at the bottom', () => {
@@ -262,9 +259,7 @@ describe('TocSidePanel — scroll spy', () => {
 
     render(<Panel entries={entries} />)
 
-    expect(screen.getByTestId('toc-entry-details').className).toMatch(
-      /page-viewer__toc-panel-entry--active/,
-    )
+    expectActive('toc-entry-details', true)
   })
 
   it('removes scroll listener on unmount', () => {

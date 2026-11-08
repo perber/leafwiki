@@ -210,27 +210,36 @@ describe('TocDropdownButton — downloads', () => {
     expect(screen.queryByText('Attached Media')).not.toBeInTheDocument()
   })
 
-  it('shows the downloads label as the trigger text when there are no entries', () => {
-    render(<Dropdown entries={[]} downloads={downloads} />)
-    expect(
-      screen.getByRole('button', { name: 'Attached Media' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: /on this page/i }),
-    ).not.toBeInTheDocument()
-  })
-
-  it('keeps the "on this page" trigger text when entries are present, even with downloads', () => {
-    render(<Dropdown entries={entries} downloads={downloads} />)
-    expect(
-      screen.getByRole('button', { name: /on this page/i }),
-    ).toBeInTheDocument()
-  })
-
-  it('falls back to "on this page" when there are neither entries nor downloads', () => {
-    render(<Dropdown entries={[]} downloads={[]} />)
-    expect(
-      screen.getByRole('button', { name: /on this page/i }),
-    ).toBeInTheDocument()
-  })
+  it.each([
+    {
+      name: 'attachments only',
+      rowEntries: [],
+      rowDownloads: downloads,
+      want: 'Attached Media',
+      notWant: 'On this page',
+    },
+    {
+      name: 'headings and attachments',
+      rowEntries: entries,
+      rowDownloads: downloads,
+      want: 'On this page',
+      notWant: 'Attached Media',
+    },
+    {
+      name: 'neither headings nor attachments',
+      rowEntries: [],
+      rowDownloads: [],
+      want: 'On this page',
+      notWant: 'Attached Media',
+    },
+  ])(
+    'labels the trigger after the first non-empty section: $name',
+    ({ rowEntries, rowDownloads, want, notWant }) => {
+      render(<Dropdown entries={rowEntries} downloads={rowDownloads} />)
+      expect(screen.getByRole('button', { name: want })).toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: notWant }),
+      ).not.toBeInTheDocument()
+    },
+  )
 })
