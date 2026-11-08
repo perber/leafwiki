@@ -318,7 +318,7 @@ shape for that domain.
   ([ADR-0018](./adr/0018-search-engine-rendering-for-public-wikis.md)); no routes, it registers
   SPA shell responders and contributors. `shell.go`: `PublicOnly` (every registration of the
   slice runs only while public access is on), the root redirect (`GET /` → 302 to the first
-  page) and the page meta contributor; `use_cases.go`: `GetRootTargetUseCase` behind the narrow
+  page) and the page meta contributor; `root_target.go`: `GetRootTargetUseCase` behind the narrow
   `FirstPageReader`; `page_meta.go`: `GetPageMetaUseCase` (title, description, canonical URL)
   behind `PageReader`. Both readers are implemented in `internal/wiki/seo_adapter.go` with the
   pages slice's read use cases.
