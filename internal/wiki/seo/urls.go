@@ -53,6 +53,16 @@ func absoluteURL(publicOrigin, basePath, routePath string) (string, error) {
 	return publicOrigin + path, nil
 }
 
+// pageRoutePath returns the route path a shell request's page is read at:
+// without the leading "/" and without trailing slashes, so "/docs/" reads
+// "docs" and "/" or "//" are the root (""). It mirrors the SPA's page read
+// (normalizeWikiRoutePath in ui/leafwiki-ui/src/lib/wikiPath.ts), which
+// shows the page there; change both together. Empty segments inside the path
+// are kept, so such a route finds no page.
+func pageRoutePath(routePath string) string {
+	return strings.TrimRight(strings.TrimPrefix(routePath, "/"), "/")
+}
+
 // permalinkID returns the page ID of a permalink route path (without the
 // leading "/"): "p/<id>" or "p/<id>/<slug>", trailing slashes allowed, "p" in
 // any case. It mirrors the SPA route "/p/:id/:slug?"

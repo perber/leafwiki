@@ -74,7 +74,10 @@ type seoPageReader struct {
 
 func (r seoPageReader) PageByRoutePath(ctx context.Context, routePath string) (*seo.Page, error) {
 	view, err := r.uc.Execute(ctx, wikipages.GetPageViewByPathInput{RoutePath: routePath})
-	if errors.Is(err, tree.ErrPageNotFound) || errors.Is(err, tree.ErrTreeNotLoaded) {
+	if errors.Is(err, tree.ErrPageNotFound) {
+		return nil, seo.ErrPageNotFound
+	}
+	if errors.Is(err, tree.ErrTreeNotLoaded) {
 		return nil, nil
 	}
 	if err != nil {
@@ -91,7 +94,10 @@ type seoPermalinkResolver struct {
 
 func (r seoPermalinkResolver) ResolvePermalink(_ context.Context, id string) (*seo.PermalinkTarget, error) {
 	target, err := r.queries.ResolvePermalink(id)
-	if errors.Is(err, tree.ErrPageNotFound) || errors.Is(err, tree.ErrTreeNotLoaded) {
+	if errors.Is(err, tree.ErrPageNotFound) {
+		return nil, seo.ErrPageNotFound
+	}
+	if errors.Is(err, tree.ErrTreeNotLoaded) {
 		return nil, nil
 	}
 	if err != nil {

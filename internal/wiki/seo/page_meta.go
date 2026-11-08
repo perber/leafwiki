@@ -2,6 +2,7 @@ package seo
 
 import (
 	"context"
+	"errors"
 	"html"
 	"strings"
 	"unicode/utf8"
@@ -20,8 +21,8 @@ type PermalinkTarget struct {
 }
 
 // PermalinkResolver resolves a stable page ID to the page's current route
-// path. It returns nil and no error when no page has the ID or the tree is
-// not loaded yet.
+// path. It returns ErrPageNotFound when no page has the ID, and nil and no
+// error when it can't tell (tree not loaded yet).
 type PermalinkResolver interface {
 	ResolvePermalink(ctx context.Context, id string) (*PermalinkTarget, error)
 }
@@ -44,6 +45,10 @@ type GetPageMetaOutput struct {
 	Description string
 	// CanonicalURL is absolute, or "" when --public-url is not set.
 	CanonicalURL string
+	// NoIndex is set when no page is at the route (an unknown page or
+	// permalink, or an app screen like /login): search engines must not index
+	// the shell there. All other fields are empty then.
+	NoIndex bool
 }
 
 // GetPageMetaUseCase builds the title, description and canonical URL of the
@@ -62,15 +67,16 @@ func NewGetPageMetaUseCase(pages PageReader, permalinks PermalinkResolver, siteN
 	return &GetPageMetaUseCase{pages: pages, permalinks: permalinks, siteName: siteName, publicOrigin: origin(publicURL)}
 }
 
-// Execute returns the page's metadata, or nil when the route is not a page.
+// Execute returns the page's metadata; only NoIndex when no page is at the
+// route; nil for the root and when the readers can't tell (tree not loaded).
 // A permalink route gets the metadata of the page its ID points at, with
 // that page's route path as canonical URL.
 func (uc *GetPageMetaUseCase) Execute(ctx context.Context, in GetPageMetaInput) (*GetPageMetaOutput, error) {
-	routePath := strings.TrimPrefix(in.RoutePath, "/")
+	routePath := pageRoutePath(in.RoutePath)
 	if id, ok := permalinkID(routePath); ok {
 		target, err := uc.permalinks.ResolvePermalink(ctx, id)
 		if err != nil || target == nil {
-			return nil, err
+			return noPage(err)
 		}
 		routePath = target.RoutePath
 	}
@@ -79,7 +85,7 @@ func (uc *GetPageMetaUseCase) Execute(ctx context.Context, in GetPageMetaInput) 
 	}
 	page, err := uc.pages.PageByRoutePath(ctx, routePath)
 	if err != nil || page == nil {
-		return nil, err
+		return noPage(err)
 	}
 	siteName := uc.siteName()
 	if siteName == "" {
@@ -99,6 +105,15 @@ func (uc *GetPageMetaUseCase) Execute(ctx context.Context, in GetPageMetaInput) 
 		}
 	}
 	return out, nil
+}
+
+// noPage is Execute's result when a reader found no page: NoIndex for
+// ErrPageNotFound, otherwise nil and the error (nil when the reader can't tell).
+func noPage(err error) (*GetPageMetaOutput, error) {
+	if errors.Is(err, ErrPageNotFound) {
+		return &GetPageMetaOutput{NoIndex: true}, nil
+	}
+	return nil, err
 }
 
 // DocumentTitle is the <title> of a page: "<page title> - <site name>". The

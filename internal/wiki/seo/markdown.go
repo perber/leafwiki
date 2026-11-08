@@ -2,6 +2,7 @@ package seo
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"strings"
 )
@@ -38,7 +39,7 @@ func NewGetPageMarkdownUseCase(pages PageReader) *GetPageMarkdownUseCase {
 // prefer Markdown or is a permalink (then nothing is read), or the route is
 // not a page.
 func (uc *GetPageMarkdownUseCase) Execute(ctx context.Context, in GetPageMarkdownInput) (*GetPageMarkdownOutput, error) {
-	routePath := strings.TrimPrefix(in.RoutePath, "/")
+	routePath := pageRoutePath(in.RoutePath)
 	if routePath == "" || !prefersMarkdown(in.Accept) {
 		return nil, nil
 	}
@@ -48,6 +49,10 @@ func (uc *GetPageMarkdownUseCase) Execute(ctx context.Context, in GetPageMarkdow
 		return nil, nil
 	}
 	page, err := uc.pages.PageByRoutePath(ctx, routePath)
+	if errors.Is(err, ErrPageNotFound) {
+		// The shell is served; the page meta marks it noindex.
+		return nil, nil
+	}
 	if err != nil || page == nil {
 		return nil, err
 	}

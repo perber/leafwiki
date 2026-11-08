@@ -9,13 +9,15 @@ import (
 	"github.com/perber/wiki/internal/wiki/seo"
 )
 
-// fakePageReader returns pages by route path (missing = no page) or a fixed
-// error, and counts its reads.
+// fakePageReader returns pages by route path (missing = seo.ErrPageNotFound),
+// nothing at all while notLoaded (like a tree that is not loaded yet), or a
+// fixed error, and counts its reads.
 type fakePageReader struct {
-	pages map[string]*seo.Page
-	err   error
-	reads int
-	asked []string
+	pages     map[string]*seo.Page
+	notLoaded bool
+	err       error
+	reads     int
+	asked     []string
 }
 
 func (f *fakePageReader) PageByRoutePath(_ context.Context, routePath string) (*seo.Page, error) {
@@ -24,7 +26,14 @@ func (f *fakePageReader) PageByRoutePath(_ context.Context, routePath string) (*
 	if f.err != nil {
 		return nil, f.err
 	}
-	return f.pages[routePath], nil
+	if f.notLoaded {
+		return nil, nil
+	}
+	page, ok := f.pages[routePath]
+	if !ok {
+		return nil, seo.ErrPageNotFound
+	}
+	return page, nil
 }
 
 func pageAt(routePath string, page seo.Page) *fakePageReader {
@@ -33,12 +42,14 @@ func pageAt(routePath string, page seo.Page) *fakePageReader {
 
 func staticSiteName(name string) func() string { return func() string { return name } }
 
-// fakePermalinkResolver resolves page IDs to route paths (missing = no page)
-// or returns a fixed error, and records the IDs it was asked for.
+// fakePermalinkResolver resolves page IDs to route paths (missing =
+// seo.ErrPageNotFound), resolves nothing at all while notLoaded, or returns a
+// fixed error, and records the IDs it was asked for.
 type fakePermalinkResolver struct {
-	targets map[string]string
-	err     error
-	asked   []string
+	targets   map[string]string
+	notLoaded bool
+	err       error
+	asked     []string
 }
 
 func (f *fakePermalinkResolver) ResolvePermalink(_ context.Context, id string) (*seo.PermalinkTarget, error) {
@@ -46,9 +57,12 @@ func (f *fakePermalinkResolver) ResolvePermalink(_ context.Context, id string) (
 	if f.err != nil {
 		return nil, f.err
 	}
+	if f.notLoaded {
+		return nil, nil
+	}
 	routePath, ok := f.targets[id]
 	if !ok {
-		return nil, nil
+		return nil, seo.ErrPageNotFound
 	}
 	return &seo.PermalinkTarget{RoutePath: routePath}, nil
 }
@@ -195,26 +209,65 @@ func TestGetPageMetaUseCase_Page_BuildsMeta(t *testing.T) {
 	}
 }
 
-func TestGetPageMetaUseCase_NoPage_ReturnsNoMeta(t *testing.T) {
+// A route without a page gets only NoIndex: the SPA shows an app screen or
+// "not found" there. Without an answer (root, tree not loaded) there is no meta.
+func TestGetPageMetaUseCase_NoPage_MarksNoindexOrNothing(t *testing.T) {
 	tests := []struct {
 		name      string
 		reader    *fakePageReader
 		routePath string
+		want      *seo.GetPageMetaOutput
 		wantReads int
 	}{
 		{name: "root is not a page route", reader: pageAt("", seo.Page{Title: "x"}), routePath: "/", wantReads: 0},
-		{name: "unknown page", reader: &fakePageReader{}, routePath: "/missing", wantReads: 1},
+		{name: "tree not loaded: no meta", reader: &fakePageReader{notLoaded: true}, routePath: "/missing", wantReads: 1},
+		{name: "unknown page: noindex", reader: &fakePageReader{}, routePath: "/missing", want: &seo.GetPageMetaOutput{NoIndex: true}, wantReads: 1},
+		{name: "SPA route: noindex", reader: &fakePageReader{}, routePath: "/login", want: &seo.GetPageMetaOutput{NoIndex: true}, wantReads: 1},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			uc := seo.NewGetPageMetaUseCase(tc.reader, noPermalinks(), staticSiteName(""), "https://wiki.example.com")
 
 			out, err := uc.Execute(context.Background(), seo.GetPageMetaInput{RoutePath: tc.routePath})
-			if err != nil || out != nil {
-				t.Fatalf("Execute = %+v, %v; want nil, nil", out, err)
+			if err != nil {
+				t.Fatalf("Execute failed: %v", err)
+			}
+			if (out == nil) != (tc.want == nil) || (out != nil && *out != *tc.want) {
+				t.Fatalf("meta = %+v, want %+v", out, tc.want)
 			}
 			if tc.reader.reads != tc.wantReads {
 				t.Errorf("reads = %d, want %d", tc.reader.reads, tc.wantReads)
+			}
+		})
+	}
+}
+
+// The page read drops the leading slash and every trailing slash, like the
+// SPA's page read; the root stays the root, empty segments inside stay.
+func TestGetPageMetaUseCase_RoutePath_ReadsItNormalized(t *testing.T) {
+	tests := []struct {
+		name      string
+		routePath string
+		wantReads []string
+	}{
+		{name: "page", routePath: "/docs/setup", wantReads: []string{"docs/setup"}},
+		{name: "trailing slash", routePath: "/docs/setup/", wantReads: []string{"docs/setup"}},
+		{name: "several trailing slashes", routePath: "/docs/setup///", wantReads: []string{"docs/setup"}},
+		{name: "empty segment inside stays", routePath: "/docs//setup", wantReads: []string{"docs//setup"}},
+		{name: "root is not read", routePath: "/"},
+		{name: "empty route is not read", routePath: ""},
+		{name: "slashes only are the root", routePath: "//"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			reader := &fakePageReader{}
+			uc := seo.NewGetPageMetaUseCase(reader, noPermalinks(), staticSiteName(""), "")
+
+			if _, err := uc.Execute(context.Background(), seo.GetPageMetaInput{RoutePath: tc.routePath}); err != nil {
+				t.Fatalf("Execute failed: %v", err)
+			}
+			if strings.Join(reader.asked, ",") != strings.Join(tc.wantReads, ",") {
+				t.Errorf("reader asked %q, want %q", reader.asked, tc.wantReads)
 			}
 		})
 	}
@@ -270,39 +323,52 @@ func TestGetPageMetaUseCase_Permalink_UsesTargetPage(t *testing.T) {
 }
 
 // Routes that are no permalink in the SPA ("/p/" alone, an empty ID, extra
-// segments) stay ordinary page routes; a permalink without a page gets no meta.
-func TestGetPageMetaUseCase_PermalinkNoPage_ReturnsNoMeta(t *testing.T) {
+// segments) stay ordinary page routes. A permalink or page route without a
+// page gets only NoIndex; the root's ID and a tree that is not loaded get no meta.
+func TestGetPageMetaUseCase_PermalinkNoPage_MarksNoindexOrNothing(t *testing.T) {
 	tests := []struct {
 		name          string
 		routePath     string
-		targets       map[string]string
+		permalinks    *fakePermalinkResolver
+		wantNoIndex   bool
 		wantResolved  []string
 		wantPageReads []string
 	}{
-		{name: "unknown id", routePath: "/p/unknown", wantResolved: []string{"unknown"}},
-		{name: "id of the root", routePath: "/p/root", targets: map[string]string{"root": ""}, wantResolved: []string{"root"}},
-		{name: "target gone before the page read", routePath: "/p/abc123", targets: map[string]string{"abc123": "gone"}, wantResolved: []string{"abc123"}, wantPageReads: []string{"gone"}},
-		{name: "p alone is a page route", routePath: "/p", wantPageReads: []string{"p"}},
-		{name: "p with slash is a page route", routePath: "/p/", wantPageReads: []string{"p/"}},
-		{name: "empty id is a page route", routePath: "/p//setup", wantPageReads: []string{"p//setup"}},
-		{name: "extra segments are a page route", routePath: "/p/abc123/setup/more", wantPageReads: []string{"p/abc123/setup/more"}},
-		{name: "prefix without separator is a page route", routePath: "/pabc123", wantPageReads: []string{"pabc123"}},
+		{name: "unknown id", routePath: "/p/unknown", wantNoIndex: true, wantResolved: []string{"unknown"}},
+		{name: "id of the root", routePath: "/p/root", permalinks: &fakePermalinkResolver{targets: map[string]string{"root": ""}}, wantResolved: []string{"root"}},
+		{name: "tree not loaded", routePath: "/p/abc123", permalinks: &fakePermalinkResolver{notLoaded: true}, wantResolved: []string{"abc123"}},
+		{name: "target gone before the page read", routePath: "/p/abc123", permalinks: &fakePermalinkResolver{targets: map[string]string{"abc123": "gone"}}, wantNoIndex: true, wantResolved: []string{"abc123"}, wantPageReads: []string{"gone"}},
+		{name: "p alone is a page route", routePath: "/p", wantNoIndex: true, wantPageReads: []string{"p"}},
+		{name: "p with slash is the page route p", routePath: "/p/", wantNoIndex: true, wantPageReads: []string{"p"}},
+		{name: "empty id is a page route", routePath: "/p//setup", wantNoIndex: true, wantPageReads: []string{"p//setup"}},
+		{name: "extra segments are a page route", routePath: "/p/abc123/setup/more", wantNoIndex: true, wantPageReads: []string{"p/abc123/setup/more"}},
+		{name: "prefix without separator is a page route", routePath: "/pabc123", wantNoIndex: true, wantPageReads: []string{"pabc123"}},
 		// The ID reaches the resolver as is; it is a map key there, never a path.
-		{name: "unicode id", routePath: "/p/größe", wantResolved: []string{"größe"}},
-		{name: "dot-dot id", routePath: "/p/..", wantResolved: []string{".."}},
-		{name: "id with markup characters", routePath: `/p/a b"<x>&`, wantResolved: []string{`a b"<x>&`}},
-		{name: "very long id", routePath: "/p/" + strings.Repeat("a", 10000), wantResolved: []string{strings.Repeat("a", 10000)}},
-		{name: "double slash before the id is a page route", routePath: "/p//abc123", wantPageReads: []string{"p//abc123"}},
+		{name: "unicode id", routePath: "/p/größe", wantNoIndex: true, wantResolved: []string{"größe"}},
+		{name: "dot-dot id", routePath: "/p/..", wantNoIndex: true, wantResolved: []string{".."}},
+		{name: "id with markup characters", routePath: `/p/a b"<x>&`, wantNoIndex: true, wantResolved: []string{`a b"<x>&`}},
+		{name: "very long id", routePath: "/p/" + strings.Repeat("a", 10000), wantNoIndex: true, wantResolved: []string{strings.Repeat("a", 10000)}},
+		{name: "double slash before the id is a page route", routePath: "/p//abc123", wantNoIndex: true, wantPageReads: []string{"p//abc123"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			reader := &fakePageReader{}
-			permalinks := &fakePermalinkResolver{targets: tc.targets}
+			permalinks := tc.permalinks
+			if permalinks == nil {
+				permalinks = noPermalinks()
+			}
 			uc := seo.NewGetPageMetaUseCase(reader, permalinks, staticSiteName(""), "https://wiki.example.com")
 
 			out, err := uc.Execute(context.Background(), seo.GetPageMetaInput{RoutePath: tc.routePath})
-			if err != nil || out != nil {
-				t.Fatalf("Execute = %+v, %v; want nil, nil", out, err)
+			if err != nil {
+				t.Fatalf("Execute failed: %v", err)
+			}
+			if tc.wantNoIndex {
+				if out == nil || *out != (seo.GetPageMetaOutput{NoIndex: true}) {
+					t.Fatalf("meta = %+v, want only NoIndex", out)
+				}
+			} else if out != nil {
+				t.Fatalf("meta = %+v, want nil", out)
 			}
 			if strings.Join(permalinks.asked, ",") != strings.Join(tc.wantResolved, ",") {
 				t.Errorf("resolver asked %q, want %q", permalinks.asked, tc.wantResolved)

@@ -21,6 +21,7 @@ import (
 	httpinternal "github.com/perber/wiki/internal/http"
 	"github.com/perber/wiki/internal/publicaccess"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
+	"github.com/perber/wiki/internal/wiki/seo"
 )
 
 // newSEOTestRouter builds a real wiki (with its welcome page) and the router
@@ -348,19 +349,18 @@ func TestWiki_PageMeta_FollowsPublicAccessAtRuntime(t *testing.T) {
 	}
 }
 
-func TestWiki_PageMeta_NotAPage_ContributesNothing(t *testing.T) {
+// noindexParts is what the page meta contributor adds for a route without a page.
+var noindexParts = httpinternal.ShellParts{Head: `<meta name="robots" content="noindex">`, NoCache: true}
+
+// The root and the root's permalink are no page route: the root redirect or
+// the SPA decides there, so nothing is added.
+func TestWiki_PageMeta_NotAPageRoute_ContributesNothing(t *testing.T) {
 	tests := []struct {
 		name      string
 		routePath string
 	}{
 		{name: "root", routePath: "/"},
-		{name: "unknown page", routePath: "/missing"},
-		{name: "unknown child of a page", routePath: "/welcome-to-leafwiki/missing"},
-		{name: "trailing slash", routePath: "/welcome-to-leafwiki/"},
-		{name: "SPA route", routePath: "/settings/branding"},
-		{name: "permalink with unknown id", routePath: "/p/unknownid"},
 		{name: "permalink of the root", routePath: "/p/root"},
-		{name: "permalink route without id", routePath: "/p/"},
 	}
 	w, public := newSEOTestWiki(t, "https://wiki.example.com")
 	setPublicAccess(t, public, true)
@@ -373,12 +373,100 @@ func TestWiki_PageMeta_NotAPage_ContributesNothing(t *testing.T) {
 	}
 }
 
-func TestSEOPageReader_TreeNotLoaded_ReturnsNoPage(t *testing.T) {
-	reader := seoPageReader{uc: wikipages.NewGetPageViewByPathUseCase(tree.NewTreeService(t.TempDir()))}
+// Every other route without a page gets only noindex, app screens included:
+// their first segment is a reserved slug (core/tree), so no page can take it.
+func TestWiki_PageMeta_NoPage_AddsOnlyNoindex(t *testing.T) {
+	tests := []struct {
+		name      string
+		routePath string
+	}{
+		{name: "unknown page", routePath: "/missing"},
+		{name: "unknown child of a page", routePath: "/welcome-to-leafwiki/missing"},
+		{name: "login", routePath: "/login"},
+		{name: "settings", routePath: "/settings/branding"},
+		{name: "editor", routePath: "/e/welcome-to-leafwiki"},
+		{name: "history", routePath: "/history/welcome-to-leafwiki"},
+		{name: "users", routePath: "/users"},
+		{name: "permalink with unknown id", routePath: "/p/unknownid"},
+		{name: "permalink route without id", routePath: "/p/"},
+	}
+	w, public := newSEOTestWiki(t, "https://wiki.example.com")
+	setPublicAccess(t, public, true)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := contributeShell(t, w, "", tc.routePath, nil); got != noindexParts {
+				t.Fatalf("parts = %+v, want %+v", got, noindexParts)
+			}
+		})
+	}
+}
 
-	page, err := reader.PageByRoutePath(context.Background(), "docs")
-	if page != nil || err != nil {
-		t.Fatalf("PageByRoutePath = %+v, %v; want nil, nil", page, err)
+// The SPA drops trailing slashes before its page read (normalizeWikiRoutePath
+// in ui/leafwiki-ui/src/lib/wikiPath.ts), so "/<page>/" shows the page: it
+// gets the page's meta, with the canonical link to the path without slash.
+func TestWiki_PageMeta_TrailingSlash_UsesThePage(t *testing.T) {
+	sectionKind := tree.NodeKindSection
+	w, public := newSEOTestWiki(t, "https://wiki.example.com")
+	setPublicAccess(t, public, true)
+	docs := createPageForTest(t, w, SYSTEM_USER_ID, nil, "Docs", "docs", &sectionKind)
+	createPageForTest(t, w, SYSTEM_USER_ID, &docs.ID, "Setup", "setup", pageNodeKind())
+	tests := []struct {
+		name          string
+		routePath     string
+		wantTitle     string
+		wantCanonical string
+	}{
+		{name: "trailing slash", routePath: "/welcome-to-leafwiki/", wantTitle: "Welcome to LeafWiki - LeafWiki", wantCanonical: "https://wiki.example.com/welcome-to-leafwiki"},
+		{name: "several trailing slashes", routePath: "/welcome-to-leafwiki//", wantTitle: "Welcome to LeafWiki - LeafWiki", wantCanonical: "https://wiki.example.com/welcome-to-leafwiki"},
+		{name: "nested page", routePath: "/docs/setup/", wantTitle: "Setup - LeafWiki", wantCanonical: "https://wiki.example.com/docs/setup"},
+		{name: "section", routePath: "/docs/", wantTitle: "Docs - LeafWiki", wantCanonical: "https://wiki.example.com/docs"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := contributeShell(t, w, "", tc.routePath, nil)
+
+			if got.Title != tc.wantTitle {
+				t.Errorf("Title = %q, want %q", got.Title, tc.wantTitle)
+			}
+			if want := `<link rel="canonical" href="` + tc.wantCanonical + `">`; !strings.Contains(string(got.Head), want) {
+				t.Errorf("Head = %s\nwant it to contain %s", got.Head, want)
+			}
+			if strings.Contains(string(got.Head), `name="robots"`) {
+				t.Errorf("Head = %s, want no robots tag", got.Head)
+			}
+		})
+	}
+}
+
+func TestWiki_PageMeta_NoPage_PublicAccessOff_ContributesNothing(t *testing.T) {
+	w, _ := newSEOTestWiki(t, "https://wiki.example.com")
+
+	for _, routePath := range []string{"/missing", "/login", "/p/unknownid"} {
+		if got := contributeShell(t, w, "", routePath, nil); got != (httpinternal.ShellParts{}) {
+			t.Errorf("%s: parts = %+v, want none", routePath, got)
+		}
+	}
+}
+
+func TestSEOPageReader_UnknownOrNotLoaded_MapsToErrOrNil(t *testing.T) {
+	w, _ := newSEOTestWiki(t, "")
+	tests := []struct {
+		name    string
+		trees   *tree.TreeService
+		wantErr error
+	}{
+		{name: "unknown page", trees: w.tree, wantErr: seo.ErrPageNotFound},
+		{name: "tree not loaded", trees: tree.NewTreeService(t.TempDir())},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			reader := seoPageReader{uc: wikipages.NewGetPageViewByPathUseCase(tc.trees)}
+
+			page, err := reader.PageByRoutePath(context.Background(), "docs")
+			if page != nil || !errors.Is(err, tc.wantErr) || (tc.wantErr == nil && err != nil) {
+				t.Fatalf("PageByRoutePath = %+v, %v; want nil, %v", page, err, tc.wantErr)
+			}
+		})
 	}
 }
 
@@ -422,8 +510,8 @@ func TestWiki_PageMeta_Permalink_CanonicalFollowsThePage(t *testing.T) {
 			t.Errorf("%s: canonical = %q, want https://wiki.example.com/setup", routePath, got)
 		}
 	}
-	if got := contributeShell(t, w, "", "/p/"+page.ID+"/setup/more", nil); got != (httpinternal.ShellParts{}) {
-		t.Errorf("extra segments: parts = %+v, want none", got)
+	if got := contributeShell(t, w, "", "/p/"+page.ID+"/setup/more", nil); got != noindexParts {
+		t.Errorf("extra segments: parts = %+v, want only noindex", got)
 	}
 
 	movePageForTest(t, w, page, parent.ID)
@@ -466,7 +554,7 @@ func TestWiki_PageMeta_Permalink_TargetNode(t *testing.T) {
 		name string
 		// prepare builds the wiki and returns the shell route path.
 		prepare       func(t *testing.T, w *Wiki) string
-		wantTitle     string // "" = no meta at all
+		wantTitle     string // "" = no page there: only noindex
 		wantCanonical string
 	}{
 		{
@@ -555,8 +643,8 @@ func TestWiki_PageMeta_Permalink_TargetNode(t *testing.T) {
 			got := contributeShell(t, w, "", routePath, nil)
 
 			if tc.wantTitle == "" {
-				if got != (httpinternal.ShellParts{}) {
-					t.Fatalf("parts = %+v, want none", got)
+				if got != noindexParts {
+					t.Fatalf("parts = %+v, want %+v", got, noindexParts)
 				}
 				return
 			}
@@ -646,13 +734,14 @@ func TestWiki_PageMeta_Permalink_OutsideBasePath_NoShell(t *testing.T) {
 	}
 }
 
-func TestSEOPermalinkResolver_UnknownOrNotLoaded_ReturnsNoTarget(t *testing.T) {
+func TestSEOPermalinkResolver_UnknownOrNotLoaded_MapsToErrOrNil(t *testing.T) {
 	w, _ := newSEOTestWiki(t, "")
 	tests := []struct {
-		name  string
-		trees *tree.TreeService
+		name    string
+		trees   *tree.TreeService
+		wantErr error
 	}{
-		{name: "unknown id", trees: w.tree},
+		{name: "unknown id", trees: w.tree, wantErr: seo.ErrPageNotFound},
 		{name: "tree not loaded", trees: tree.NewTreeService(t.TempDir())},
 	}
 	for _, tc := range tests {
@@ -660,8 +749,65 @@ func TestSEOPermalinkResolver_UnknownOrNotLoaded_ReturnsNoTarget(t *testing.T) {
 			resolver := seoPermalinkResolver{queries: wikipages.NewPageQueries(tc.trees)}
 
 			target, err := resolver.ResolvePermalink(context.Background(), "unknownid")
-			if target != nil || err != nil {
-				t.Fatalf("ResolvePermalink = %+v, %v; want nil, nil", target, err)
+			if target != nil || !errors.Is(err, tc.wantErr) || (tc.wantErr == nil && err != nil) {
+				t.Fatalf("ResolvePermalink = %+v, %v; want nil, %v", target, err, tc.wantErr)
+			}
+		})
+	}
+}
+
+// On the real router a shell route without a page carries noindex for GET
+// and HEAD alike; pages, valid permalinks, the empty wiki's root and a
+// private wiki don't. A Markdown client gets that shell too.
+func TestWiki_PageMeta_Noindex_OnRealRouter(t *testing.T) {
+	useEmbeddedFrontend(t)
+	const noindex = `<meta name="robots" content="noindex">`
+	tests := []struct {
+		name        string
+		public      bool
+		emptyWiki   bool
+		path        string
+		accept      string
+		wantNoindex bool
+	}{
+		{name: "login", public: true, path: "/wiki/login", wantNoindex: true},
+		{name: "unknown page", public: true, path: "/wiki/missing", wantNoindex: true},
+		{name: "unknown page, Markdown requested", public: true, path: "/wiki/missing", accept: "text/markdown", wantNoindex: true},
+		{name: "unknown permalink", public: true, path: "/wiki/p/unknownid", wantNoindex: true},
+		{name: "page", public: true, path: "/wiki/welcome-to-leafwiki"},
+		{name: "valid permalink", public: true, path: "/wiki/p/<id>/stale"},
+		{name: "empty wiki root", public: true, emptyWiki: true, path: "/wiki/"},
+		{name: "private wiki, login", path: "/wiki/login"},
+		{name: "private wiki, unknown page", path: "/wiki/missing"},
+	}
+	shared, sharedPublic, sharedRouter := newSEOTestRouter(t, "/wiki")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			public, router := sharedPublic, sharedRouter
+			if tc.emptyWiki {
+				var w *Wiki
+				w, public, router = newSEOTestRouter(t, "/wiki")
+				deletePageForTest(t, w, SYSTEM_USER_ID, w.tree.GetTree().Children[0].ID, true)
+			}
+			setPublicAccess(t, public, tc.public)
+			path := strings.Replace(tc.path, "<id>", shared.tree.GetTree().Children[0].ID, 1)
+
+			get := serveAccept(router, http.MethodGet, path, tc.accept, nil)
+			head := serveAccept(router, http.MethodHead, path, tc.accept, nil)
+
+			if get.Code != http.StatusOK || !strings.HasPrefix(get.Header().Get("Content-Type"), "text/html") {
+				t.Fatalf("GET: got %d %q, want the 200 shell", get.Code, get.Header().Get("Content-Type"))
+			}
+			if got := strings.Contains(get.Body.String(), noindex); got != tc.wantNoindex {
+				t.Errorf("GET: shell has noindex = %v, want %v", got, tc.wantNoindex)
+			}
+			if head.Code != get.Code || head.Body.Len() != 0 {
+				t.Fatalf("HEAD: got %d with %d body bytes, want %d without a body", head.Code, head.Body.Len(), get.Code)
+			}
+			for _, h := range []string{"Content-Type", "Cache-Control", "Content-Length"} {
+				if got, want := head.Header().Get(h), get.Header().Get(h); got != want {
+					t.Errorf("%s: HEAD %q, GET %q", h, got, want)
+				}
 			}
 		})
 	}
@@ -694,6 +840,7 @@ func TestWiki_Head_MatchesGetOnRealRouter(t *testing.T) {
 		{name: "page, public", public: true, path: "/wiki/welcome-to-leafwiki", sameAsGet: true},
 		{name: "page, private", public: false, path: "/wiki/welcome-to-leafwiki", sameAsGet: true},
 		{name: "SPA route", public: true, path: "/wiki/settings/branding", sameAsGet: true},
+		{name: "unknown page, public", public: true, path: "/wiki/missing", sameAsGet: true},
 		{name: "permalink, public", public: true, path: "/wiki/p/" + w.tree.GetTree().Children[0].ID + "/stale", sameAsGet: true},
 		{name: "permalink, private", public: false, path: "/wiki/p/" + w.tree.GetTree().Children[0].ID, sameAsGet: true},
 		{name: "favicon.svg", public: true, path: "/wiki/favicon.svg", sameAsGet: true},
@@ -1166,6 +1313,9 @@ func TestWiki_PageMarkdown_MarkdownRequested_GetAndHeadServePageBody(t *testing.
 		{name: "section with children serves its own content", section: &page{"Docs", "docs", "# Docs index"}, pages: []page{{"Setup", "setup", "child"}}, path: "/docs", want: "# Docs index"},
 		{name: "child of a section", section: &page{"Docs", "docs", "# Docs index"}, pages: []page{{"Setup", "setup", "child"}}, path: "/docs/setup", want: "child"},
 		{name: "forwarded headers have no effect", pages: []page{{"Setup", "setup", "x"}}, path: "/setup", headers: map[string]string{"X-Forwarded-Host": "evil.example", "X-Forwarded-Prefix": "/evil"}, want: "x"},
+		// Trailing slashes are dropped like the SPA does before its page read.
+		{name: "trailing slash on a page", pages: []page{{"Setup", "setup", "x"}}, path: "/setup/", want: "x"},
+		{name: "trailing slash with base path", basePath: "/wiki", pages: []page{{"Setup", "setup", "x"}}, path: "/wiki/setup//", want: "x"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1232,7 +1382,6 @@ func TestWiki_PageMarkdown_NotAPageOrNotPreferred_ServesTheShell(t *testing.T) {
 		{name: "browser Accept on a page", public: true, path: "/wiki/welcome-to-leafwiki", accept: "text/html,application/xhtml+xml,*/*;q=0.8", wantShell: true, wantVary: true},
 		{name: "html weighted higher", public: true, path: "/wiki/welcome-to-leafwiki", accept: "text/html,text/markdown;q=0.9", wantShell: true, wantVary: true},
 		{name: "no Accept header", public: true, path: "/wiki/welcome-to-leafwiki", wantShell: true, wantVary: true},
-		{name: "trailing slash on a page", public: true, path: "/wiki/welcome-to-leafwiki/", accept: "text/markdown", wantShell: true, wantVary: true},
 		{name: "double slash", public: true, path: "/wiki//welcome-to-leafwiki", accept: "text/markdown"},
 		{name: "dot-dot segment", public: true, path: "/wiki/x/../welcome-to-leafwiki", accept: "text/markdown"},
 		{name: "percent-encoded dot-dot", public: true, path: "/wiki/%2e%2e/welcome-to-leafwiki", accept: "text/markdown"},

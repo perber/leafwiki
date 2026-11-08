@@ -198,3 +198,32 @@ fixing that is a separate change.
   is resolved through the pages slice's permalink lookup behind `seo.PermalinkResolver`; an
   unknown ID or a tree that is not loaded means no meta. Permalinks have no Markdown
   representation: the Markdown responder declines them without reading, so they get the shell.
+- **2026-11 (#1292, noindex for routes without a page):** the page meta contributor adds
+  `<meta name="robots" content="noindex">` (and `Cache-Control: no-cache`) to the shell of a
+  public wiki when no page is at the route: an unknown page path, a permalink whose ID no page
+  has, or a permalink whose target is gone. Amends the entries above that unknown pages and
+  unknown permalink IDs get the plain shell:
+  - Only noindex, no title, description or canonical link, and the status stays 200. A 404
+    would also hit the SPA's own screens, which are served by the same shell.
+  - There is no list of SPA routes: `/login`, `/settings/...`, `/users`, `/e/...`,
+    `/history/...` get noindex because no page exists there. That is intended, they are app
+    screens, not content. `login`, `settings`, `users`, `e` and `history` are reserved slugs in
+    `core/tree`, so no page can be created there. `forgot-password`, `reset-password`,
+    `accept-invite` and `p` are not: a page with such a top-level slug keeps its own meta
+    there, although the SPA shows the app screen (or the permalink) instead. A valid permalink
+    gets the target page's meta and no noindex.
+  - Nothing is added when the readers can't tell: a tree that is not loaded, the root (the
+    root redirect, or the plain shell of an empty wiki) and the root's permalink. Read errors
+    are logged and give the plain shell, as before. While public access is off nothing is read
+    and nothing is added.
+  - The readers tell the cases apart through `seo.ErrPageNotFound` (unknown) and `nil, nil`
+    (tree not loaded). The Markdown responder still declines unknown pages, so those clients
+    get the noindex shell. Once drafts or hidden pages exist, the seo readers go through
+    `internal/scopedread` and map its `ErrNotFound` to `seo.ErrPageNotFound`, so a hidden page
+    looks exactly like a missing one (noindex, no title or description, no Markdown; a hidden
+    page's permalink ID is an unknown ID), per [ADR-0015](./0015-scoped-read-boundary.md),
+    decision 6.
+  - Trailing slashes are dropped before every page read (page meta and Markdown,
+    `pageRoutePath` in `urls.go`), like the SPA's own page read: `/<page>/` gets the page's
+    meta with the canonical link to `/<page>`, and its Markdown. `/` and `//` stay the root;
+    empty segments inside the path (`/a//b`) find no page and get noindex.
