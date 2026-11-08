@@ -236,6 +236,13 @@ func TestGetPageMetaUseCase_Permalink_UsesTargetPage(t *testing.T) {
 		{name: "id and wrong slug", routePath: "/p/abc123/old-name", wantURL: "https://wiki.example.com/docs/setup"},
 		{name: "trailing slash", routePath: "/p/abc123/", wantURL: "https://wiki.example.com/docs/setup"},
 		{name: "with base path", routePath: "/p/abc123/setup", basePath: "/wiki", wantURL: "https://wiki.example.com/wiki/docs/setup"},
+		// The SPA ignores any number of trailing slashes and takes ".." as a
+		// slug (react-router matchRoutes).
+		{name: "several trailing slashes", routePath: "/p/abc123//", wantURL: "https://wiki.example.com/docs/setup"},
+		{name: "slug with trailing slash", routePath: "/p/abc123/setup/", wantURL: "https://wiki.example.com/docs/setup"},
+		{name: "dot-dot slug is decorative", routePath: "/p/abc123/..", wantURL: "https://wiki.example.com/docs/setup"},
+		// react-router matches path segments case-insensitively.
+		{name: "upper-case P", routePath: "/P/abc123", wantURL: "https://wiki.example.com/docs/setup"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -280,6 +287,12 @@ func TestGetPageMetaUseCase_PermalinkNoPage_ReturnsNoMeta(t *testing.T) {
 		{name: "empty id is a page route", routePath: "/p//setup", wantPageReads: []string{"p//setup"}},
 		{name: "extra segments are a page route", routePath: "/p/abc123/setup/more", wantPageReads: []string{"p/abc123/setup/more"}},
 		{name: "prefix without separator is a page route", routePath: "/pabc123", wantPageReads: []string{"pabc123"}},
+		// The ID reaches the resolver as is; it is a map key there, never a path.
+		{name: "unicode id", routePath: "/p/größe", wantResolved: []string{"größe"}},
+		{name: "dot-dot id", routePath: "/p/..", wantResolved: []string{".."}},
+		{name: "id with markup characters", routePath: `/p/a b"<x>&`, wantResolved: []string{`a b"<x>&`}},
+		{name: "very long id", routePath: "/p/" + strings.Repeat("a", 10000), wantResolved: []string{strings.Repeat("a", 10000)}},
+		{name: "double slash before the id is a page route", routePath: "/p//abc123", wantPageReads: []string{"p//abc123"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

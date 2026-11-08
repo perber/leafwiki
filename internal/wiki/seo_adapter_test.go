@@ -458,6 +458,194 @@ func TestWiki_PageMeta_Permalink_ServedInTheShell(t *testing.T) {
 	}
 }
 
+// The node a permalink ID points at decides the meta, whatever its kind,
+// position or history; the request path under "p/" never does.
+func TestWiki_PageMeta_Permalink_TargetNode(t *testing.T) {
+	sectionKind := tree.NodeKindSection
+	tests := []struct {
+		name string
+		// prepare builds the wiki and returns the shell route path.
+		prepare       func(t *testing.T, w *Wiki) string
+		wantTitle     string // "" = no meta at all
+		wantCanonical string
+	}{
+		{
+			name: "section",
+			prepare: func(t *testing.T, w *Wiki) string {
+				section := createPageForTest(t, w, SYSTEM_USER_ID, nil, "Docs", "docs", &sectionKind)
+				return "/p/" + section.ID
+			},
+			wantTitle: "Docs - LeafWiki", wantCanonical: "https://wiki.example.com/docs",
+		},
+		{
+			name: "nested page with a unicode title",
+			prepare: func(t *testing.T, w *Wiki) string {
+				section := createPageForTest(t, w, SYSTEM_USER_ID, nil, "Docs", "docs", &sectionKind)
+				page := createPageForTest(t, w, SYSTEM_USER_ID, &section.ID, "Größe", "groesse", pageNodeKind())
+				return "/p/" + page.ID + "/stale"
+			},
+			wantTitle: "Größe - LeafWiki", wantCanonical: "https://wiki.example.com/docs/groesse",
+		},
+		{
+			name: "renamed slug",
+			prepare: func(t *testing.T, w *Wiki) string {
+				page := createPageForTest(t, w, SYSTEM_USER_ID, nil, "Setup", "setup", pageNodeKind())
+				updatePageForTest(t, w, SYSTEM_USER_ID, page.ID, "Install", "install", nil, nil)
+				return "/p/" + page.ID + "/setup"
+			},
+			wantTitle: "Install - LeafWiki", wantCanonical: "https://wiki.example.com/install",
+		},
+		{
+			name: "deleted page",
+			prepare: func(t *testing.T, w *Wiki) string {
+				page := createPageForTest(t, w, SYSTEM_USER_ID, nil, "Setup", "setup", pageNodeKind())
+				deletePageForTest(t, w, SYSTEM_USER_ID, page.ID, false)
+				return "/p/" + page.ID
+			},
+		},
+		{
+			// The SPA shows a not-found permalink at /p/legacy, not the page.
+			name: "real page at p/<slug> is no permalink target",
+			prepare: func(t *testing.T, w *Wiki) string {
+				p := createPageForTest(t, w, SYSTEM_USER_ID, nil, "P", "p", pageNodeKind())
+				createPageForTest(t, w, SYSTEM_USER_ID, &p.ID, "Legacy", "legacy", pageNodeKind())
+				return "/p/legacy"
+			},
+		},
+		{
+			name: "real page p itself keeps its own meta",
+			prepare: func(t *testing.T, w *Wiki) string {
+				createPageForTest(t, w, SYSTEM_USER_ID, nil, "P", "p", pageNodeKind())
+				return "/p"
+			},
+			wantTitle: "P - LeafWiki", wantCanonical: "https://wiki.example.com/p",
+		},
+		{
+			// /p/a/b is the permalink "a" with slug "b" in the SPA too.
+			name: "real page at p/<slug>/<slug> is no permalink target",
+			prepare: func(t *testing.T, w *Wiki) string {
+				p := createPageForTest(t, w, SYSTEM_USER_ID, nil, "P", "p", pageNodeKind())
+				a := createPageForTest(t, w, SYSTEM_USER_ID, &p.ID, "A", "a", pageNodeKind())
+				createPageForTest(t, w, SYSTEM_USER_ID, &a.ID, "B", "b", pageNodeKind())
+				return "/p/a/b"
+			},
+		},
+		{
+			name: "real page three levels under p keeps its own meta",
+			prepare: func(t *testing.T, w *Wiki) string {
+				p := createPageForTest(t, w, SYSTEM_USER_ID, nil, "P", "p", pageNodeKind())
+				a := createPageForTest(t, w, SYSTEM_USER_ID, &p.ID, "A", "a", pageNodeKind())
+				b := createPageForTest(t, w, SYSTEM_USER_ID, &a.ID, "B", "b", pageNodeKind())
+				createPageForTest(t, w, SYSTEM_USER_ID, &b.ID, "C", "c", pageNodeKind())
+				return "/p/a/b/c"
+			},
+			wantTitle: "C - LeafWiki", wantCanonical: "https://wiki.example.com/p/a/b/c",
+		},
+		{
+			name:    "id with path characters",
+			prepare: func(t *testing.T, w *Wiki) string { return "/p/../welcome-to-leafwiki" },
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w, public := newSEOTestWiki(t, "https://wiki.example.com")
+			setPublicAccess(t, public, true)
+			routePath := tc.prepare(t, w)
+
+			got := contributeShell(t, w, "", routePath, nil)
+
+			if tc.wantTitle == "" {
+				if got != (httpinternal.ShellParts{}) {
+					t.Fatalf("parts = %+v, want none", got)
+				}
+				return
+			}
+			if got.Title != tc.wantTitle {
+				t.Errorf("Title = %q, want %q", got.Title, tc.wantTitle)
+			}
+			wantLink := `<link rel="canonical" href="` + tc.wantCanonical + `">`
+			if !strings.Contains(string(got.Head), wantLink) {
+				t.Errorf("Head = %s\nwant it to contain %s", got.Head, wantLink)
+			}
+		})
+	}
+}
+
+// The target page's title reaches the head escaped, as on its own route.
+func TestWiki_PageMeta_Permalink_EscapesTheTargetTitle(t *testing.T) {
+	w, public := newSEOTestWiki(t, "")
+	setPublicAccess(t, public, true)
+	page := createPageForTest(t, w, SYSTEM_USER_ID, nil, `Fish & <Chips> "x"`, "fish", pageNodeKind())
+
+	viaPermalink := contributeShell(t, w, "", "/p/"+page.ID, nil)
+	viaPath := contributeShell(t, w, "", "/fish", nil)
+
+	if viaPermalink != viaPath {
+		t.Fatalf("permalink parts = %+v\npath parts      = %+v", viaPermalink, viaPath)
+	}
+	if strings.Contains(string(viaPermalink.Head), "<Chips>") {
+		t.Errorf("unescaped title in head: %s", viaPermalink.Head)
+	}
+}
+
+// Host and X-Forwarded-* never reach a permalink's canonical link on the
+// real router; without --public-url there is none at all.
+func TestWiki_PageMeta_Permalink_IgnoresRequestHostHeaders(t *testing.T) {
+	useEmbeddedFrontend(t)
+	for _, publicURL := range []string{"https://wiki.example.com/wiki", ""} {
+		w, public, router := newSEOTestRouterWithPublicURL(t, "/wiki", publicURL)
+		setPublicAccess(t, public, true)
+		req := httptest.NewRequest(http.MethodGet, "/wiki/p/"+w.tree.GetTree().Children[0].ID, nil)
+		req.Host = "evil.example"
+		for k, v := range map[string]string{"X-Forwarded-Host": "evil.example", "X-Forwarded-Proto": "http", "X-Forwarded-Prefix": "/evil"} {
+			req.Header.Set(k, v)
+		}
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+
+		body := rec.Body.String()
+		if rec.Code != http.StatusOK || !strings.Contains(body, `<meta property="og:title" content="Welcome to LeafWiki">`) {
+			t.Fatalf("public url %q: got %d without the page meta", publicURL, rec.Code)
+		}
+		if strings.Contains(body, "evil") {
+			t.Errorf("public url %q: shell uses a request header", publicURL)
+		}
+		if hasCanonical := strings.Contains(body, `rel="canonical"`); hasCanonical != (publicURL != "") {
+			t.Errorf("public url %q: canonical link present = %v", publicURL, hasCanonical)
+		}
+	}
+}
+
+// On the real router the shell sees the decoded path, so an encoded slash
+// splits the ID ("<id>%2Fx" is the ID <id> with slug x). The SPA keeps %2F
+// inside the segment and asks for the ID "<id>/x", which does not exist; the
+// canonical link still names the real page.
+func TestWiki_PageMeta_Permalink_EncodedSlash(t *testing.T) {
+	useEmbeddedFrontend(t)
+	w, public, router := newSEOTestRouterWithPublicURL(t, "", "https://wiki.example.com")
+	setPublicAccess(t, public, true)
+	id := w.tree.GetTree().Children[0].ID
+
+	rec := serveGET(router, "/p/"+id+"%2Fx", nil)
+
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `<link rel="canonical" href="https://wiki.example.com/welcome-to-leafwiki">`) {
+		t.Fatalf("got %d, want the shell with the target page canonical", rec.Code)
+	}
+}
+
+// Outside the base path a permalink is no shell route at all.
+func TestWiki_PageMeta_Permalink_OutsideBasePath_NoShell(t *testing.T) {
+	useEmbeddedFrontend(t)
+	w, public, router := newSEOTestRouterWithPublicURL(t, "/wiki", "https://wiki.example.com/wiki")
+	setPublicAccess(t, public, true)
+
+	rec := serveGET(router, "/p/"+w.tree.GetTree().Children[0].ID, nil)
+
+	if strings.Contains(rec.Body.String(), "og:title") {
+		t.Fatalf("got %d with page meta outside the base path", rec.Code)
+	}
+}
+
 func TestSEOPermalinkResolver_UnknownOrNotLoaded_ReturnsNoTarget(t *testing.T) {
 	w, _ := newSEOTestWiki(t, "")
 	tests := []struct {
@@ -487,7 +675,7 @@ func TestWiki_Head_MatchesGetOnRealRouter(t *testing.T) {
 	old := httpinternal.EmbedFrontend
 	httpinternal.EmbedFrontend = "true"
 	t.Cleanup(func() { httpinternal.EmbedFrontend = old })
-	_, public, router := newSEOTestRouter(t, "/wiki")
+	w, public, router := newSEOTestRouter(t, "/wiki")
 	setPublicAccess(t, public, true)
 	if rec := serveGET(router, "/wiki/welcome-to-leafwiki", nil); !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/html") {
 		t.Skip("requires built frontend (make ui)")
@@ -506,6 +694,8 @@ func TestWiki_Head_MatchesGetOnRealRouter(t *testing.T) {
 		{name: "page, public", public: true, path: "/wiki/welcome-to-leafwiki", sameAsGet: true},
 		{name: "page, private", public: false, path: "/wiki/welcome-to-leafwiki", sameAsGet: true},
 		{name: "SPA route", public: true, path: "/wiki/settings/branding", sameAsGet: true},
+		{name: "permalink, public", public: true, path: "/wiki/p/" + w.tree.GetTree().Children[0].ID + "/stale", sameAsGet: true},
+		{name: "permalink, private", public: false, path: "/wiki/p/" + w.tree.GetTree().Children[0].ID, sameAsGet: true},
 		{name: "favicon.svg", public: true, path: "/wiki/favicon.svg", sameAsGet: true},
 		{name: "favicon.ico", public: true, path: "/wiki/favicon.ico"},
 		{name: "robots.txt, public", public: true, path: "/wiki/robots.txt", sameAsGet: true},
