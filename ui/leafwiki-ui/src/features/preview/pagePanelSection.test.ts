@@ -37,63 +37,30 @@ function pageSections(
 
 describe('panelTitleKey', () => {
   it.each([
-    {
-      name: 'headings only',
-      headings: 3,
-      attachments: 0,
-      want: 'toc.onThisPage',
-    },
+    { name: 'headings only', counts: [3, 0, 0], want: 'toc.onThisPage' },
     {
       name: 'headings and attachments',
-      headings: 3,
-      attachments: 2,
+      counts: [3, 0, 2],
       want: 'toc.onThisPage',
     },
-    {
-      name: 'attachments only',
-      headings: 0,
-      attachments: 2,
-      want: 'toc.downloads',
-    },
-    { name: 'neither', headings: 0, attachments: 0, want: 'toc.onThisPage' },
-    {
-      name: 'all three',
-      headings: 3,
-      highlights: 1,
-      attachments: 2,
-      want: 'toc.onThisPage',
-    },
-    {
-      name: 'highlights only',
-      headings: 0,
-      highlights: 1,
-      attachments: 0,
-      want: 'toc.highlights',
-    },
+    { name: 'all three', counts: [3, 1, 2], want: 'toc.onThisPage' },
+    { name: 'highlights only', counts: [0, 1, 0], want: 'toc.highlights' },
+    // The middle section titles the panel once it is the first non-empty one.
     {
       name: 'highlights and attachments',
-      headings: 0,
-      highlights: 1,
-      attachments: 2,
+      counts: [0, 1, 2],
       want: 'toc.highlights',
     },
+    { name: 'attachments only', counts: [0, 0, 2], want: 'toc.downloads' },
+    { name: 'none', counts: [0, 0, 0], want: 'toc.onThisPage' },
   ])(
     'titles the panel after the first non-empty section: $name',
-    ({ headings, highlights = 0, attachments, want }) => {
+    ({ counts: [headings, highlights, attachments], want }) => {
       expect(
         panelTitleKey(pageSections(headings, highlights, attachments)),
       ).toBe(want)
     },
   )
-
-  it('uses a section placed between the others once it is the first non-empty one', () => {
-    const sections = [
-      section('headings', 'toc.onThisPage', 0),
-      section('middle', 'toc.middle', 1),
-      section('attachments', 'toc.downloads', 2),
-    ]
-    expect(panelTitleKey(sections)).toBe('toc.middle')
-  })
 
   it('falls back to "on this page" without any sections', () => {
     expect(panelTitleKey([])).toBe('toc.onThisPage')
