@@ -23,6 +23,7 @@ import {
   internalLinkCompletionSource,
   wikiLinkCompletionSource,
 } from './internalLinkCompletion'
+import { spellcheck } from './spellcheck'
 
 // Extensions toggled via lineWrapCompartment
 const noWrapExtensions = EditorView.theme({
@@ -211,6 +212,7 @@ export default function MarkdownCodeEditor({
         themeCompartment.of(designMode === 'light' ? githubLight : oneDark),
         lineWrapCompartment.of(lineWrap ? wrapExtensions : noWrapExtensions),
         markdown(),
+        spellcheck,
         tabIndentUnit,
         search({
           top: true,
