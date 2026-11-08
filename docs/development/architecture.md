@@ -241,6 +241,10 @@ Key facts:
 - `rehypeWhitelistStyles.ts` allows layout/typography properties (margin, padding, width/height,
   color, border, display, …) but **not** `position`, `z-index`, or `top/left/right/bottom` — so
   inline styles can't be used to escape the content container via `position: fixed` etc.
+- Mermaid diagrams don't go through this pipeline: `useMermaidInjector.ts` inserts the SVG from
+  `mermaid.render`, whose HTML labels mermaid runs through DOMPurify (`securityLevel:
+  'antiscript'` plus `labelSanitizeConfig`). Labels may format text and link, but form controls,
+  dialogs, popovers, `<style>`, `iframe`, inline `style` and `class` are dropped.
 - Both render targets wrap content in scoped containers (`.page-viewer__content`,
   `.markdown-editor__preview`, both `prose`-classed). Since parse5 guarantees proper nesting, a
   malformed tag can mis-render *within* that container's own subtree (wrong nesting, a box

@@ -13,6 +13,37 @@ function loadMermaid(): Promise<MermaidDefault> {
   return mermaidPromise
 }
 
+// Applied by mermaid to the HTML of every label (on top of 'antiscript').
+// Labels are author-controlled and end up in the live page through a
+// foreignObject, so they may format text and link, but not draw form controls
+// or escape their box: inline style and class (which would reach the app's
+// Tailwind utilities) are dropped, and so are dialogs and popovers, which the
+// browser draws above the whole page. Mermaid's own wrapper markup, classDef and
+// style statements are added outside this pass and keep working. Setting this
+// replaces mermaid's default, which forbids only <style>, so keep it here.
+const labelSanitizeConfig = {
+  FORBID_TAGS: [
+    'form',
+    'input',
+    'button',
+    'textarea',
+    'select',
+    'option',
+    'style',
+    'iframe',
+    'dialog',
+  ],
+  FORBID_ATTR: [
+    'style',
+    'class',
+    'popover',
+    'popovertarget',
+    'popovertargetaction',
+    'commandfor',
+    'command',
+  ],
+}
+
 let initializedTheme: 'default' | 'dark' | null = null
 
 async function ensureMermaidInitialized(
@@ -24,6 +55,7 @@ async function ensureMermaidInitialized(
     mermaid.initialize({
       startOnLoad: false,
       securityLevel: 'antiscript',
+      dompurifyConfig: labelSanitizeConfig,
       theme,
       deterministicIds: true,
       deterministicIDSeed: 'leafwiki',
@@ -140,8 +172,9 @@ export function useMermaidInjector({
         // injected into the DOM (raw XML error visible to the user).
         // Use <template> to keep the fragment inert (no side-effect fetches).
         // XSS: the SVG comes from mermaid.render with securityLevel 'antiscript',
-        // which runs HTML labels through DOMPurify. Keep that level (or stricter)
-        // when changing the mermaid config.
+        // which runs HTML labels through DOMPurify with labelSanitizeConfig.
+        // Keep that level (or stricter) and that config when changing the
+        // mermaid config.
         const template = document.createElement('template')
         // eslint-disable-next-line no-restricted-syntax
         template.innerHTML = svg
