@@ -154,7 +154,7 @@ func TestRootRedirect_NoTarget_Declines(t *testing.T) {
 }
 
 func pageMeta(reader *fakePageReader, publicURL string) wikihttp.ShellContributor {
-	return seo.NewPageMeta(seo.NewGetPageMetaUseCase(reader, staticSiteName("Team Wiki"), publicURL), discardLogger())
+	return seo.NewPageMeta(seo.NewGetPageMetaUseCase(reader, noPermalinks(), staticSiteName("Team Wiki"), publicURL), discardLogger())
 }
 
 func TestPublicOnly_Contributor_RunsOnlyWithPublicAccess(t *testing.T) {
@@ -288,6 +288,37 @@ func TestPageMeta_NoPage_ContributesNothing(t *testing.T) {
 				t.Errorf("parts = %+v, want empty", got)
 			}
 		})
+	}
+}
+
+func TestPageMeta_Permalink_AddsTargetPageMetaWithCanonical(t *testing.T) {
+	reader := pageAt("docs/setup", seo.Page{Title: "Setup"})
+	permalinks := &fakePermalinkResolver{targets: map[string]string{"abc123": "docs/setup"}}
+	contributor := seo.NewPageMeta(seo.NewGetPageMetaUseCase(reader, permalinks, staticSiteName("Team Wiki"), "https://wiki.example.com"), discardLogger())
+
+	got := contributor.ContributeShell(context.Background(), shellRequest("", "/p/abc123/old-slug"))
+
+	wantHead := `<link rel="canonical" href="https://wiki.example.com/docs/setup">` +
+		`<meta property="og:type" content="website">` +
+		`<meta property="og:title" content="Setup">` +
+		`<meta property="og:site_name" content="Team Wiki">` +
+		`<meta property="og:url" content="https://wiki.example.com/docs/setup">`
+	if got.Title != "Setup - Team Wiki" || string(got.Head) != wantHead || !got.NoCache {
+		t.Fatalf("parts = %+v\nwant Title %q, NoCache, Head\n%s", got, "Setup - Team Wiki", wantHead)
+	}
+}
+
+func TestPublicOnly_PermalinkMetaPublicAccessOff_ReadsNothing(t *testing.T) {
+	reader := pageAt("docs/setup", seo.Page{Title: "Setup"})
+	permalinks := &fakePermalinkResolver{targets: map[string]string{"abc123": "docs/setup"}}
+	contributor := seo.NewPublicOnly(publicaccess.Fixed(false)).Contributor(
+		seo.NewPageMeta(seo.NewGetPageMetaUseCase(reader, permalinks, staticSiteName(""), "https://wiki.example.com"), discardLogger()))
+
+	if got := contributor.ContributeShell(context.Background(), shellRequest("", "/p/abc123")); got != (wikihttp.ShellParts{}) {
+		t.Errorf("parts = %+v, want empty", got)
+	}
+	if len(permalinks.asked) != 0 || reader.reads != 0 {
+		t.Errorf("resolver asked %q, page reads %d; want nothing read", permalinks.asked, reader.reads)
 	}
 }
 

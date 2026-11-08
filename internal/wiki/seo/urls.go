@@ -52,3 +52,22 @@ func absoluteURL(publicOrigin, basePath, routePath string) (string, error) {
 	}
 	return publicOrigin + path, nil
 }
+
+// permalinkID returns the page ID of a permalink route path (without the
+// leading "/"): "p/<id>" or "p/<id>/<slug>", trailing slashes allowed, "p" in
+// any case. It mirrors the SPA route "/p/:id/:slug?"
+// (ui/leafwiki-ui/src/features/router/router.tsx), which react-router matches
+// case-insensitively; it is the only SPA route this package knows
+// (ADR-0018), so change both together. Anything else under "p/" falls
+// through to the SPA's page route, so it is an ordinary page route here too.
+func permalinkID(routePath string) (string, bool) {
+	prefix, rest, ok := strings.Cut(routePath, "/")
+	if !ok || !strings.EqualFold(prefix, "p") {
+		return "", false
+	}
+	id, slug, _ := strings.Cut(strings.TrimRight(rest, "/"), "/")
+	if id == "" || strings.Contains(slug, "/") {
+		return "", false
+	}
+	return id, true
+}

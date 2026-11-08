@@ -184,3 +184,17 @@ fixing that is a separate change.
     Markdown variant keeps an on→off toggle from serving a cached one.
   - Reader interfaces are one per read; use cases that need the same read share its interface
     (page meta and Markdown share `seo.PageReader`, which lives in `page.go`).
+- **2026-11 (#1292, permalinks):** a permalink `/p/<id>` or `/p/<id>/<slug>` gets the page
+  meta of the page the ID points at, with that page's route path as canonical link and
+  `og:url`; the slug is decorative and may be stale. The shell is served (200), not a server
+  redirect: the SPA already replaces the URL with the page's path, and the canonical link tells
+  search engines which URL to index. `/p/:id/:slug?` is the only SPA route the `seo` slice
+  knows (`permalinkID` in `urls.go`, shared by the page meta and the Markdown responder,
+  mirroring `router.tsx`). Like react-router, it matches the `p` segment in any case
+  (`/P/<id>` is a permalink too). Anything else under `/p/` (`/p/` alone, an empty ID, more
+  segments) is an ordinary page route there and here. An encoded `%2F` in the ID is decoded by
+  the server, so `/p/<id>%2Fx` is served as `<id>` with the slug `x`, while the SPA keeps it
+  inside the ID; that is harmless, because the canonical link still names a real page. The ID
+  is resolved through the pages slice's permalink lookup behind `seo.PermalinkResolver`; an
+  unknown ID or a tree that is not loaded means no meta. Permalinks have no Markdown
+  representation: the Markdown responder declines them without reading, so they get the shell.

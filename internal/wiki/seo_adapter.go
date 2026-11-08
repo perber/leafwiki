@@ -28,7 +28,11 @@ func (w *Wiki) seoShellResponders() []httpinternal.ShellResponder {
 // all gated on public access by one seo.PublicOnly.
 func (w *Wiki) seoShellContributors() []httpinternal.ShellContributor {
 	public := seo.NewPublicOnly(w.publicAccess)
-	pageMeta := seo.NewGetPageMetaUseCase(seoPageReader{uc: wikipages.NewGetPageViewByPathUseCase(w.tree)}, w.siteName, w.publicURL)
+	pageMeta := seo.NewGetPageMetaUseCase(
+		seoPageReader{uc: wikipages.NewGetPageViewByPathUseCase(w.tree)},
+		seoPermalinkResolver{queries: wikipages.NewPageQueries(w.tree)},
+		w.siteName, w.publicURL,
+	)
 	return []httpinternal.ShellContributor{
 		public.Contributor(seo.NewPageMeta(pageMeta, w.log.With("component", "SEO"))),
 	}
@@ -77,6 +81,23 @@ func (r seoPageReader) PageByRoutePath(ctx context.Context, routePath string) (*
 		return nil, err
 	}
 	return &seo.Page{Title: view.Page.Title, Body: view.Page.Content, Properties: view.Properties}, nil
+}
+
+// seoPermalinkResolver implements seo.PermalinkResolver with the pages
+// slice's permalink lookup; seo must not import pages.
+type seoPermalinkResolver struct {
+	queries *wikipages.PageQueries
+}
+
+func (r seoPermalinkResolver) ResolvePermalink(_ context.Context, id string) (*seo.PermalinkTarget, error) {
+	target, err := r.queries.ResolvePermalink(id)
+	if errors.Is(err, tree.ErrPageNotFound) || errors.Is(err, tree.ErrTreeNotLoaded) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &seo.PermalinkTarget{RoutePath: target.Path}, nil
 }
 
 // seoPageRouteLister implements seo.PageRouteLister with the pages slice's

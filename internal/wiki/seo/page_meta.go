@@ -12,6 +12,20 @@ import (
 
 // ─── GetPageMetaUseCase ──────────────────────────────────────────────────────
 
+// PermalinkTarget is the page a permalink points at.
+type PermalinkTarget struct {
+	// RoutePath is the page's current route path, without a leading "/"
+	// ("" for the wiki root).
+	RoutePath string
+}
+
+// PermalinkResolver resolves a stable page ID to the page's current route
+// path. It returns nil and no error when no page has the ID or the tree is
+// not loaded yet.
+type PermalinkResolver interface {
+	ResolvePermalink(ctx context.Context, id string) (*PermalinkTarget, error)
+}
+
 // GetPageMetaInput is the input for GetPageMetaUseCase.
 type GetPageMetaInput struct {
 	// RoutePath is the shell request's route path, starting with "/".
@@ -36,6 +50,7 @@ type GetPageMetaOutput struct {
 // page a shell request points at.
 type GetPageMetaUseCase struct {
 	pages        PageReader
+	permalinks   PermalinkResolver
 	siteName     func() string
 	publicOrigin string
 }
@@ -43,13 +58,22 @@ type GetPageMetaUseCase struct {
 // NewGetPageMetaUseCase constructs a GetPageMetaUseCase. publicURL is
 // --public-url; only its scheme and host are used, the path comes from the
 // base path. An empty or unusable publicURL means no canonical URLs.
-func NewGetPageMetaUseCase(pages PageReader, siteName func() string, publicURL string) *GetPageMetaUseCase {
-	return &GetPageMetaUseCase{pages: pages, siteName: siteName, publicOrigin: origin(publicURL)}
+func NewGetPageMetaUseCase(pages PageReader, permalinks PermalinkResolver, siteName func() string, publicURL string) *GetPageMetaUseCase {
+	return &GetPageMetaUseCase{pages: pages, permalinks: permalinks, siteName: siteName, publicOrigin: origin(publicURL)}
 }
 
 // Execute returns the page's metadata, or nil when the route is not a page.
+// A permalink route gets the metadata of the page its ID points at, with
+// that page's route path as canonical URL.
 func (uc *GetPageMetaUseCase) Execute(ctx context.Context, in GetPageMetaInput) (*GetPageMetaOutput, error) {
 	routePath := strings.TrimPrefix(in.RoutePath, "/")
+	if id, ok := permalinkID(routePath); ok {
+		target, err := uc.permalinks.ResolvePermalink(ctx, id)
+		if err != nil || target == nil {
+			return nil, err
+		}
+		routePath = target.RoutePath
+	}
 	if routePath == "" {
 		return nil, nil
 	}

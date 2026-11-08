@@ -35,10 +35,16 @@ func NewGetPageMarkdownUseCase(pages PageReader) *GetPageMarkdownUseCase {
 }
 
 // Execute returns the page's Markdown, or nil when the request does not
-// prefer Markdown (then nothing is read) or the route is not a page.
+// prefer Markdown or is a permalink (then nothing is read), or the route is
+// not a page.
 func (uc *GetPageMarkdownUseCase) Execute(ctx context.Context, in GetPageMarkdownInput) (*GetPageMarkdownOutput, error) {
 	routePath := strings.TrimPrefix(in.RoutePath, "/")
 	if routePath == "" || !prefersMarkdown(in.Accept) {
+		return nil, nil
+	}
+	// A permalink shows its target page in the SPA, not the page at this
+	// path; it has no Markdown representation (ADR-0018).
+	if _, ok := permalinkID(routePath); ok {
 		return nil, nil
 	}
 	page, err := uc.pages.PageByRoutePath(ctx, routePath)

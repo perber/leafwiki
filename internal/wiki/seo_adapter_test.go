@@ -358,6 +358,9 @@ func TestWiki_PageMeta_NotAPage_ContributesNothing(t *testing.T) {
 		{name: "unknown child of a page", routePath: "/welcome-to-leafwiki/missing"},
 		{name: "trailing slash", routePath: "/welcome-to-leafwiki/"},
 		{name: "SPA route", routePath: "/settings/branding"},
+		{name: "permalink with unknown id", routePath: "/p/unknownid"},
+		{name: "permalink of the root", routePath: "/p/root"},
+		{name: "permalink route without id", routePath: "/p/"},
 	}
 	w, public := newSEOTestWiki(t, "https://wiki.example.com")
 	setPublicAccess(t, public, true)
@@ -376,6 +379,103 @@ func TestSEOPageReader_TreeNotLoaded_ReturnsNoPage(t *testing.T) {
 	page, err := reader.PageByRoutePath(context.Background(), "docs")
 	if page != nil || err != nil {
 		t.Fatalf("PageByRoutePath = %+v, %v; want nil, nil", page, err)
+	}
+}
+
+func movePageForTest(t *testing.T, w *Wiki, page *tree.Page, parentID string) {
+	t.Helper()
+	current, err := w.tree.GetPage(page.ID)
+	if err != nil {
+		t.Fatalf("GetPage: %v", err)
+	}
+	err = wikipages.NewMovePageUseCase(w.tree, w.newPageOrchestrator(), w.log, nil).Execute(context.Background(), wikipages.MovePageInput{
+		UserID: SYSTEM_USER_ID, ID: page.ID, Version: current.Version(), ParentID: parentID,
+	})
+	if err != nil {
+		t.Fatalf("MovePage: %v", err)
+	}
+}
+
+// A permalink gets the meta of the page its ID points at, with the page's
+// current route path as canonical URL, also after the page moved.
+func TestWiki_PageMeta_Permalink_CanonicalFollowsThePage(t *testing.T) {
+	w, public := newSEOTestWiki(t, "https://wiki.example.com")
+	page := createPageForTest(t, w, SYSTEM_USER_ID, nil, "Setup", "setup", pageNodeKind())
+	parent := createPageForTest(t, w, SYSTEM_USER_ID, nil, "Guide", "guide", pageNodeKind())
+	canonical := func(routePath string) string {
+		t.Helper()
+		head := string(contributeShell(t, w, "", routePath, nil).Head)
+		_, href, ok := strings.Cut(head, `<link rel="canonical" href="`)
+		if !ok {
+			return ""
+		}
+		href, _, _ = strings.Cut(href, `"`)
+		return href
+	}
+
+	if got := contributeShell(t, w, "", "/p/"+page.ID, nil); got != (httpinternal.ShellParts{}) {
+		t.Fatalf("public access off: parts = %+v, want none", got)
+	}
+	setPublicAccess(t, public, true)
+	for _, routePath := range []string{"/p/" + page.ID, "/p/" + page.ID + "/setup", "/p/" + page.ID + "/wrong-slug"} {
+		if got := canonical(routePath); got != "https://wiki.example.com/setup" {
+			t.Errorf("%s: canonical = %q, want https://wiki.example.com/setup", routePath, got)
+		}
+	}
+	if got := contributeShell(t, w, "", "/p/"+page.ID+"/setup/more", nil); got != (httpinternal.ShellParts{}) {
+		t.Errorf("extra segments: parts = %+v, want none", got)
+	}
+
+	movePageForTest(t, w, page, parent.ID)
+
+	if got := canonical("/p/" + page.ID + "/setup"); got != "https://wiki.example.com/guide/setup" {
+		t.Errorf("after the move: canonical = %q, want https://wiki.example.com/guide/setup", got)
+	}
+	if got := contributeShell(t, w, "", "/p/"+page.ID, nil).Title; got != "Setup - LeafWiki" {
+		t.Errorf("after the move: Title = %q, want Setup - LeafWiki", got)
+	}
+}
+
+// On the real router a permalink is the 200 shell with the target's
+// canonical link, and Markdown clients get that shell too.
+func TestWiki_PageMeta_Permalink_ServedInTheShell(t *testing.T) {
+	useEmbeddedFrontend(t)
+	w, public, router := newSEOTestRouterWithPublicURL(t, "/wiki", "https://wiki.example.com/wiki")
+	setPublicAccess(t, public, true)
+	id := w.tree.GetTree().Children[0].ID
+	path := "/wiki/p/" + id + "/old-slug"
+	wantLink := `<link rel="canonical" href="https://wiki.example.com/wiki/welcome-to-leafwiki">`
+
+	for _, accept := range []string{"", "text/markdown"} {
+		rec := serveAccept(router, http.MethodGet, path, accept, nil)
+
+		if rec.Code != http.StatusOK || !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/html") {
+			t.Fatalf("Accept %q: got %d %q, want the 200 shell", accept, rec.Code, rec.Header().Get("Content-Type"))
+		}
+		if !strings.Contains(rec.Body.String(), wantLink) {
+			t.Errorf("Accept %q: shell does not contain %s", accept, wantLink)
+		}
+	}
+}
+
+func TestSEOPermalinkResolver_UnknownOrNotLoaded_ReturnsNoTarget(t *testing.T) {
+	w, _ := newSEOTestWiki(t, "")
+	tests := []struct {
+		name  string
+		trees *tree.TreeService
+	}{
+		{name: "unknown id", trees: w.tree},
+		{name: "tree not loaded", trees: tree.NewTreeService(t.TempDir())},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			resolver := seoPermalinkResolver{queries: wikipages.NewPageQueries(tc.trees)}
+
+			target, err := resolver.ResolvePermalink(context.Background(), "unknownid")
+			if target != nil || err != nil {
+				t.Fatalf("ResolvePermalink = %+v, %v; want nil, nil", target, err)
+			}
+		})
 	}
 }
 
