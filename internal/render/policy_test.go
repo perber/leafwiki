@@ -144,7 +144,7 @@ func TestRenderHTML_XSSCorpus_IsNeutralized(t *testing.T) {
 // policy in policy.go is compared against. When the schema changes, check
 // that the policy is still at least as strict (no id, name, class or style;
 // no media; same schemes), then update the hash.
-const previewSanitizeSchemaSHA256 = "3716d72d87b4b3250016788fa6863bd5a6201a57e8b963bc0ba5cc7be94f0300"
+const previewSanitizeSchemaSHA256 = "9d501978be8740849388d62ad8827c0642c503bcc193926c5bd3380a18520590"
 
 func TestPolicy_FrontendSchema_IsPinned(t *testing.T) {
 	data, err := os.ReadFile("../../ui/leafwiki-ui/src/features/preview/previewSanitizeSchema.ts")

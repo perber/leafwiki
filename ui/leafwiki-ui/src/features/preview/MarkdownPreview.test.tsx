@@ -594,6 +594,213 @@ describe('MarkdownPreview sanitizes raw HTML', () => {
     expect(remaining).not.toMatch(/position|z-index|url\(|behavior/i)
   })
 
+  function classTokens(root: Element) {
+    return new Set(
+      Array.from(root.querySelectorAll('[class]')).flatMap((el) =>
+        Array.from(el.classList),
+      ),
+    )
+  }
+
+  it.each([
+    ['div', '<div class="fixed inset-0 z-50 bg-background">x</div>'],
+    ['span', '<span class="fixed inset-0 z-50 opacity-0">x</span>'],
+    ['p', '<p class="absolute top-0 left-0">x</p>'],
+    ['img', '<img class="fixed inset-0" src="https://x.example/a.png">'],
+    ['mark', '<mark class="fixed inset-0">x</mark>'],
+    [
+      'KaTeX classes',
+      '<span class="katex"><span class="brace-left">x</span></span>',
+    ],
+    ['upper-case attribute', '<div CLASS="fixed inset-0">x</div>'],
+    ['mixed-case attribute', '<div ClAsS="fixed inset-0">x</div>'],
+    ['tab and newline separators', '<div class="fixed\tinset-0\nz-50">x</div>'],
+    ['className attribute', '<div className="fixed inset-0">x</div>'],
+    ['unquoted attribute', '<div class=fixed>x</div>'],
+    [
+      'table cells',
+      '<table class="fixed"><tr class="fixed"><td class="fixed inset-0">x</td></tr></table>',
+    ],
+    [
+      'details',
+      '<details class="fixed inset-0"><summary>s</summary>x</details>',
+    ],
+    ['input in a task list', '<input type="checkbox" class="fixed" disabled>'],
+    ['math-inline span', '<span class="math-inline fixed">x</span>'],
+  ])('drops class names that the app styles: %s', (_name, content) => {
+    const { container } = renderRouted(content)
+
+    const tokens = classTokens(container)
+    for (const token of [
+      'fixed',
+      'absolute',
+      'inset-0',
+      'top-0',
+      'left-0',
+      'z-50',
+      'opacity-0',
+      'bg-background',
+      'katex',
+      'brace-left',
+    ]) {
+      expect(tokens).not.toContain(token)
+    }
+  })
+
+  // The li, code, h2 and ul rows were already filtered by the default schema's
+  // per-element rules; they guard that an element's own rule never falls back
+  // to a free class.
+  it.each([
+    [
+      'mark',
+      '<mark class="flexible-marker fixed">x</mark>',
+      'mark',
+      'flexible-marker',
+    ],
+    [
+      'details',
+      '<details class="markdown-collapsible fixed"><summary>s</summary>x</details>',
+      'details',
+      'markdown-collapsible',
+    ],
+    [
+      'li',
+      '<ul><li class="fixed task-list-item">x</li></ul>',
+      'li',
+      'task-list-item',
+    ],
+    [
+      'code',
+      '<p><code class="language-x fixed">x</code></p>',
+      'code',
+      'language-x',
+    ],
+    ['h2', '<h2 class="sr-only fixed">x</h2>', 'h2', 'sr-only'],
+    [
+      'ul',
+      '<ul class="contains-task-list fixed"><li>x</li></ul>',
+      'ul',
+      'contains-task-list',
+    ],
+  ])(
+    'keeps only the allowed name of a mixed class list on %s',
+    (_name, content, selector, kept) => {
+      const { container } = renderRouted(content)
+
+      const el = container.querySelector(selector)
+      expect(el?.classList.contains(kept)).toBe(true)
+      expect(el?.classList.contains('fixed')).toBe(false)
+    },
+  )
+
+  it('keeps the class names markdown features emit', () => {
+    const { container } = renderRouted(`- [x] done
+
+Text[^1] ==marked== and $$a^2$$.
+
+[^1]: Note.
+
+\`\`\`js
+const a = 1
+\`\`\``)
+
+    expect(container.querySelector('ul.contains-task-list')).not.toBeNull()
+    expect(container.querySelector('li.task-list-item')).not.toBeNull()
+    expect(
+      container.querySelector('.markdown-footnotes.footnotes'),
+    ).not.toBeNull()
+    expect(container.querySelector('h2.sr-only')).not.toBeNull()
+    expect(
+      container.querySelector('mark.flexible-marker.flexible-marker-default'),
+    ).not.toBeNull()
+    expect(container.querySelector('code.language-js.hljs')).not.toBeNull()
+    expect(container.querySelector('.katex .msupsub')).not.toBeNull()
+  })
+
+  it('keeps the class names of colored markers', () => {
+    const { container } = renderRouted('=r=red== and =b=blue==')
+
+    expect(container.querySelector('mark.flexible-marker-red')).not.toBeNull()
+    expect(container.querySelector('mark.flexible-marker-blue')).not.toBeNull()
+  })
+
+  it.each([
+    ['flexible-marker', true],
+    ['flexible-marker-default', true],
+    ['flexible-marker-empty', true],
+    ['flexible-marker-red', true],
+    ['flexible-marker-', false],
+    ['flexible-marker-red-fixed', false],
+    ['flexible-marker-RED', false],
+    ['flexible-marker-1', false],
+    ['xflexible-marker', false],
+  ])('marker class %s is kept: %s', (name, kept) => {
+    const { container } = renderRouted(`<mark class="${name}">x</mark>`)
+
+    expect(container.querySelector('mark')?.classList.contains(name)).toBe(kept)
+  })
+
+  it.each([
+    [
+      'collapsible block',
+      ':::collapsible Title\nBody\n:::',
+      'details.markdown-collapsible',
+    ],
+    [
+      'collapsed block',
+      ':::collapsed Title\nBody\n:::',
+      'details.markdown-collapsible',
+    ],
+    ['blockquote', '> quoted', 'blockquote'],
+    [
+      'shoutout block',
+      ':::warning\nBody\n:::',
+      'aside.markdown-shoutout.markdown-shoutout--warning',
+    ],
+    ['code fence with line numbers', '```go=\na := 1\n```', 'code.language-go'],
+    [
+      'plain code fence with line numbers',
+      '```=\na\n```',
+      'code.language-plaintext',
+    ],
+    ['table', '| a | b |\n|---|---|\n| 1 | 2 |', '.table-wrapper table'],
+    ['math in a list', '- item $$a^2$$', 'li .katex'],
+    ['math in a table', '| a |\n|---|\n| $$a^2$$ |', 'td .katex'],
+    ['math in a shoutout', ':::info\n$$a^2$$\n:::', 'aside .katex'],
+    [
+      'math in a collapsible',
+      ':::collapsible T\n$$a^2$$\n:::',
+      'details .katex',
+    ],
+    [
+      'raw HTML language-math code',
+      '<code class="language-math">a^2</code>',
+      '.katex',
+    ],
+  ])('keeps %s', (_name, content, selector) => {
+    const { container } = renderRouted(content)
+
+    expect(container.querySelector(selector)).not.toBeNull()
+  })
+
+  it('renders an undefined macro as a KaTeX error, not as raw TeX only', () => {
+    const { container } = renderRouted('$$\n\\undefinedmacro{x}\n$$')
+
+    expect(container.textContent).toContain('undefinedmacro')
+    expect(
+      container.querySelector('.katex-error, .katex [style*="color"]'),
+    ).not.toBeNull()
+  })
+
+  it('does not trust math in raw HTML code elements', () => {
+    const { container } = renderRouted(
+      '<code class="language-math">\\htmlClass{fixed inset-0}{x}\\href{https://e.example/}{y}</code>',
+    )
+
+    expect(container.querySelector('.fixed, .inset-0')).toBeNull()
+    expect(container.querySelector('a[href^="https://e.example"]')).toBeNull()
+  })
+
   it('keeps whitelisted inline style and allowed media/mark tags', () => {
     const { container } = renderRouted(
       '<p style="color: red; position: fixed">kept</p>\n\n<mark>hi</mark>',

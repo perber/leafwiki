@@ -236,6 +236,12 @@ Key facts:
   the same spec-compliant HTML5 tree-construction algorithm browsers use. Unclosed tags get
   auto-closed exactly like a browser would; the result is always a well-formed tree. No
   `dangerouslySetInnerHTML` anywhere in the frontend.
+- Author HTML can't pick class names: the page shares the app's stylesheet, so a free `class`
+  would reach Tailwind utilities such as `fixed inset-0 z-50`. The schema allows class names
+  only per element and only those the markdown plugins emit before sanitizing (task lists,
+  footnotes, `language-*` on `code`, `flexible-marker*` on `mark`) or `normalizeMarkdownBlocks`
+  writes into the source (`markdown-collapsible` on `details`). Classes added by React
+  components after sanitizing (callouts, code blocks, headline anchors) are not affected.
 - Sanitize order is correct: `rehypeSanitize` runs *after* `rehypeRaw`, so raw HTML is never left
   unsanitized (this is the safe order — reversed, it would be an XSS hole).
 - `rehypeKatex` and `rehypeHighlight` run *after* `rehypeSanitize`. They generate markup from
@@ -256,5 +262,7 @@ Key facts:
   header, or other pages.
 
 **Worth a periodic audit:** the custom `rehypeSanitize` schema extends `defaultSchema` to allow
-`style`, `class`, `audio`/`video` `src`, and custom `wikilink-*` protocols. Check that these additions don't reopen a CSS-injection or protocol-based vector when the
-schema changes.
+`style`, per-element class names, `audio`/`video` `src`, and custom `wikilink-*` protocols.
+Check that these additions don't reopen a CSS-injection or protocol-based vector when the
+schema changes; a plugin that starts emitting a new class before sanitizing needs its own
+allowlist entry.

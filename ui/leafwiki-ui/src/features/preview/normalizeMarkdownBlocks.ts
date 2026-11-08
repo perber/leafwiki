@@ -1,3 +1,7 @@
+// Written into the source as raw HTML, so previewSanitizeSchema allows it on
+// <details>.
+export const COLLAPSIBLE_CLASS = 'markdown-collapsible'
+
 const blockOpenPattern =
   /^(?<indent> {0,3}):::\s*(?<type>[A-Za-z][\w-]*)(?:\s+(?<title>\S.*))?\s*$/
 const blockClosePattern = /^(?<indent> {0,3}):::\s*$/
@@ -156,7 +160,7 @@ function appendCollapsibleBlock(
 ) {
   const openAttr = blockType === 'collapsible' ? ' open' : ''
 
-  output.push(`${indent}<details class="markdown-collapsible"${openAttr}>`)
+  output.push(`${indent}<details class="${COLLAPSIBLE_CLASS}"${openAttr}>`)
 
   if (title) {
     output.push(`${indent}<summary>${title}</summary>`)
