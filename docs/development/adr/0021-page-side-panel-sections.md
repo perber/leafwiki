@@ -37,13 +37,18 @@ and, for headings, from per-page state (the scroll spy's active heading).
   `features/preview/useHeadingsSection.ts` (headings come from the Markdown preview pipeline)
   owns the scroll spy and the click-to-scroll behaviour, `features/viewer/attachmentsSection.ts`
   (`buildAttachmentsSection(attachments)`, the viewer fetches the attachments) maps
-  attachments to download items. A section `id` is unique within one list; the panels use it
-  as React key.
-- `features/viewer/PageViewer.tsx` composes the list (`[headings, attachments]`) and passes the
-  same array to both panels, so one scroll spy serves both. Whether the panel is shown is
-  derived from the sections (`sections.some(s => s.items.length > 0)`); the "always show TOC"
-  rule stays in what the viewer feeds the headings section. The inline TOC dropdown in
-  `MarkdownPreview.tsx` passes just the headings section.
+  attachments to download items. The highlights producer is split in two:
+  `features/preview/collectHighlights.ts` is a pure function that reads the `==text==` marks
+  out of rendered preview output (it takes the root as a parameter and sits next to the
+  pipeline that renders the marks, so a change to how marks render is made in one feature),
+  and `features/viewer/useHighlightsSection.ts` builds the section, because it reads the
+  viewer's content root (`.page-viewer__content`) after each render. A section `id` is unique
+  within one list; the panels use it as React key.
+- `features/viewer/PageViewer.tsx` composes the list (`[headings, highlights, attachments]`)
+  and passes the same array to both panels, so one scroll spy serves both. Whether the panel
+  is shown is derived from the sections (`sections.some(s => s.items.length > 0)`); the
+  "always show TOC" rule stays in what the viewer feeds the headings section. The inline TOC
+  dropdown in `MarkdownPreview.tsx` passes just the headings section.
 
 Adding a section is one more entry in that list. Adding an item kind (a new render primitive)
 changes the seam and both panels.
