@@ -842,6 +842,44 @@ func TestAuthService_LoginAndValidateToken(t *testing.T) {
 	}
 }
 
+// A locked account must take as long to reject as an unknown identifier, which
+// already pays for a dummy bcrypt comparison; a lock that answers without one
+// tells the two apart by response time alone. The minimum over several runs
+// keeps scheduler noise out: the gap being closed is a whole bcrypt run.
+func TestAuthService_Login_LockedAccountTakesAsLongAsUnknownUser(t *testing.T) {
+	authService := setupTestAuthService(t)
+
+	for i := 0; i < loginMaxFailures; i++ {
+		if _, err := authService.Login("testuser", "wrong-guess"); err != ErrUserInvalidCredentials {
+			t.Fatalf("attempt %d: expected ErrUserInvalidCredentials, got %v", i, err)
+		}
+	}
+
+	fastest := func(identifier string, wantErr error) time.Duration {
+		t.Helper()
+		var best time.Duration
+		for i := 0; i < 5; i++ {
+			start := time.Now()
+			_, err := authService.Login(identifier, "securepass")
+			elapsed := time.Since(start)
+			if err != wantErr {
+				t.Fatalf("Login(%q): expected %v, got %v", identifier, wantErr, err)
+			}
+			if i == 0 || elapsed < best {
+				best = elapsed
+			}
+		}
+		return best
+	}
+
+	unknown := fastest("no-such-user", ErrUserInvalidCredentials)
+	locked := fastest("testuser", ErrUserAccountLocked)
+
+	if locked < unknown/2 {
+		t.Fatalf("locked account rejected in %v, unknown identifier in %v: the lock is visible by timing", locked, unknown)
+	}
+}
+
 func TestAuthService_RevokeRefreshToken(t *testing.T) {
 	authService := setupTestAuthService(t)
 

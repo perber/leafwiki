@@ -174,6 +174,10 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 	}
 
 	if !a.attempts.recordAttempt(user.ID) {
+		// Pay for the same bcrypt comparison a wrong password costs, so the
+		// lock is not visible by response time. The result is discarded: a
+		// locked account is rejected whether or not the password matches.
+		_ = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
 		a.log.Warn("login rejected: account locked", "userID", user.ID)
 		return nil, ErrUserAccountLocked
 	}

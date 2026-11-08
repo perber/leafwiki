@@ -320,10 +320,11 @@ Full auth *model* (JWT structure, cookie strategy, role model) is covered in
    anyway (constant-time-ish defense against username enumeration via timing) before
    returning `ErrUserInvalidCredentials`.
 2. `a.attempts.recordAttempt(user.ID)` — per-user lockout counter; returns
-   `ErrUserAccountLocked` if tripped. The HTTP layer answers it exactly like
-   `ErrUserInvalidCredentials` (`401 auth_invalid_credentials`, see
-   `internal/wiki/auth/errors.go`), so the lock does not reveal that an account exists;
-   only the metrics (`"locked"`) and the server log tell the two apart.
+   `ErrUserAccountLocked` if tripped, after running the same bcrypt comparison a wrong
+   password costs (result discarded) so the lock is not visible by timing. The HTTP layer
+   answers it exactly like `ErrUserInvalidCredentials` (`401 auth_invalid_credentials`,
+   see `internal/wiki/auth/errors.go`), so the lock does not reveal that an account
+   exists; only the metrics (`"locked"`) and the server log tell the two apart.
 3. Verifies the password hash. On success, if `user.TOTPEnabled`: does **not** reset the
    attempt counter (TOTP brute-forcing shares the same counter as password brute-forcing —
    see the comment at `auth_service.go`) and returns a **TOTP challenge** instead of a
