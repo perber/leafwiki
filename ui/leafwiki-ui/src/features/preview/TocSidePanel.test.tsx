@@ -368,3 +368,61 @@ describe('TocSidePanel — downloads', () => {
     expect(screen.getByText('On this page')).toBeInTheDocument()
   })
 })
+
+describe('TocSidePanel — keyboard reachability', () => {
+  const downloads = [{ name: 'notes.pdf', url: '/assets/p1/notes.pdf' }]
+
+  it.each([
+    { name: 'expanded', collapsed: false, want: '0' },
+    { name: 'collapsed', collapsed: true, want: '-1' },
+  ])(
+    'gives headings and downloads tabIndex $want when $name',
+    ({ collapsed, want }) => {
+      useTocPanelStore.setState({ collapsed })
+      render(<Panel entries={entries} downloads={downloads} />)
+      for (const testId of [
+        'toc-entry-introduction',
+        'toc-download-notes.pdf',
+      ]) {
+        expect(screen.getByTestId(testId)).toHaveAttribute('tabindex', want)
+      }
+    },
+  )
+})
+
+describe('TocSidePanel — section order and file names', () => {
+  it('lists the headings, then the attachments header, then the downloads', () => {
+    render(
+      <Panel
+        entries={entries}
+        downloads={[{ name: 'notes.pdf', url: '/assets/p1/notes.pdf' }]}
+      />,
+    )
+    const rows = screen
+      .getByTestId('toc-side-panel-list')
+      .querySelectorAll(':scope > li')
+    expect(Array.from(rows, (li) => li.textContent)).toEqual([
+      'Introduction',
+      'Background',
+      'Details',
+      'Attached Media',
+      'notes.pdf',
+    ])
+  })
+
+  it.each([
+    { name: 'unicode and spaces', file: 'Bericht über Ä 日本 (1).pdf' },
+    { name: 'quotes and ampersand', file: `a "b" & 'c'.txt` },
+  ])('keeps the file name as-is in the link: $name', ({ file }) => {
+    render(
+      <Panel
+        entries={[]}
+        downloads={[{ name: file, url: `/assets/p1/${file}` }]}
+      />,
+    )
+    const link = screen.getByTestId(`toc-download-${file}`)
+    expect(link).toHaveAttribute('download', file)
+    expect(link).toHaveAttribute('title', file)
+    expect(link).toHaveTextContent(file)
+  })
+})

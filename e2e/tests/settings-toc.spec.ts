@@ -1,21 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { createPageViaApi, csrfHeader, loggedIn } from '../helpers/apiContext';
+import { createPageViaApi, csrfHeader, loggedIn, setAlwaysShowToc } from '../helpers/apiContext';
 import LoginPage from '../pages/LoginPage';
 import ViewPage from '../pages/ViewPage';
 import { toAppPath } from '../pages/appPath';
 
 const user = process.env.E2E_ADMIN_USER || 'admin';
 const password = process.env.E2E_ADMIN_PASSWORD || 'admin';
-
-async function setAlwaysShowToc(alwaysShow: boolean) {
-  const api = await loggedIn();
-  const resp = await api.put('/api/admin/settings/toc-display', {
-    headers: await csrfHeader(api),
-    data: { alwaysShow },
-  });
-  expect(resp.status()).toBe(200);
-  await api.dispose();
-}
 
 // Instance-wide setting: always reset it so other specs see the default.
 test.afterEach(async () => {
