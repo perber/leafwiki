@@ -7,21 +7,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import type { PageAttachment } from '@/lib/api/assets'
-import { withBasePath } from '@/lib/routePath'
-import { scrollToHeadlineHash } from '@/lib/scrollToHeadline'
 import { cn } from '@/lib/utils'
 import { ChevronDown } from 'lucide-react'
+import { Fragment } from 'react'
 import { useTranslation } from 'react-i18next'
-import { TocEntry } from './extractTocEntries'
-import { tocTitleKey } from './tocTitleKey'
-import { useTocScrollSpy } from './useTocScrollSpy'
+import {
+  panelTitleKey,
+  visiblePanelSections,
+  type PagePanelItem,
+  type PagePanelSection,
+} from './pagePanelSection'
 
 type Props = {
-  entries: TocEntry[]
-  clickable?: boolean
-  activeId?: string | null
-  downloads?: PageAttachment[]
+  sections: PagePanelSection[]
 }
 
 function getTocEntryClassName(level: number) {
@@ -40,25 +38,14 @@ function getTocEntryClassName(level: number) {
   return 'pl-12 text-sm'
 }
 
-export function TocDropdownButton({
-  entries,
-  clickable = true,
-  activeId: externalActiveId,
-  downloads = [],
-}: Props) {
+export function TocDropdownButton({ sections }: Props) {
   const { t } = useTranslation('viewer')
-  // When the parent provides activeId, skip internal scroll spy (no duplicate listener).
-  const internalActiveId = useTocScrollSpy(
-    externalActiveId !== undefined ? [] : entries,
-  )
-  const activeId =
-    externalActiveId !== undefined ? externalActiveId : internalActiveId
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm">
-          {t(tocTitleKey(entries.length, downloads.length))}
+          {t(panelTitleKey(sections))}
           <ChevronDown size={12} />
         </Button>
       </DropdownMenuTrigger>
@@ -66,51 +53,53 @@ export function TocDropdownButton({
         align="start"
         className="max-h-[70vh] max-w-96 min-w-48 overflow-y-auto"
       >
-        {entries.map((entry) => (
-          <DropdownMenuItem
-            key={entry.id}
-            className={cn(
-              getTocEntryClassName(entry.level),
-              activeId === entry.id && 'text-brand',
-              clickable && 'cursor-pointer',
-            )}
-            onSelect={
-              clickable
-                ? () => {
-                    scrollToHeadlineHash(`#${encodeURIComponent(entry.id)}`, {
-                      waitForStableLayout: false,
-                    })
-                  }
-                : undefined
-            }
-          >
-            {entry.text}
-          </DropdownMenuItem>
-        ))}
-        {downloads.length > 0 && (
-          <>
-            {entries.length > 0 && (
+        {visiblePanelSections(sections).map((section, index) => (
+          <Fragment key={section.id}>
+            {/* The first section is titled by the trigger button. */}
+            {index > 0 && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuLabel>{t('toc.downloads')}</DropdownMenuLabel>
+                <DropdownMenuLabel>{t(section.titleKey)}</DropdownMenuLabel>
               </>
             )}
-            {downloads.map((file) => (
-              <DropdownMenuItem key={file.url} asChild>
-                <a
-                  href={withBasePath(file.url)}
-                  download={file.name}
-                  className="cursor-pointer text-sm"
-                  title={file.name}
-                  data-testid={`toc-dropdown-download-${file.name}`}
-                >
-                  {file.name}
-                </a>
-              </DropdownMenuItem>
+            {section.items.map((item) => (
+              <DropdownItem key={item.key} item={item} />
             ))}
-          </>
-        )}
+          </Fragment>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+function DropdownItem({ item }: { item: PagePanelItem }) {
+  if (item.kind === 'download') {
+    return (
+      <DropdownMenuItem asChild>
+        <a
+          href={item.href}
+          download={item.fileName}
+          className="cursor-pointer text-sm"
+          title={item.label}
+          data-testid={`toc-dropdown-${item.testId}`}
+        >
+          {item.label}
+        </a>
+      </DropdownMenuItem>
+    )
+  }
+
+  return (
+    <DropdownMenuItem
+      className={cn(
+        getTocEntryClassName(item.level ?? 1),
+        item.active && 'text-brand',
+        item.onSelect && 'cursor-pointer',
+      )}
+      onSelect={item.onSelect}
+      data-testid={`toc-dropdown-${item.testId}`}
+    >
+      {item.label}
+    </DropdownMenuItem>
   )
 }

@@ -1,18 +1,17 @@
-import { scrollToHeadlineHash } from '@/lib/scrollToHeadline'
-import { withBasePath } from '@/lib/routePath'
 import { cn } from '@/lib/utils'
 import { useTocPanelStore } from '@/stores/tocPanel'
 import { PanelRightClose, PanelRightOpen } from 'lucide-react'
+import { Fragment } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { PageAttachment } from '@/lib/api/assets'
-import type { TocEntry } from './extractTocEntries'
-import { tocTitleKey } from './tocTitleKey'
-import { useTocScrollSpy } from './useTocScrollSpy'
+import {
+  panelTitleKey,
+  visiblePanelSections,
+  type PagePanelItem,
+  type PagePanelSection,
+} from './pagePanelSection'
 
 type Props = {
-  entries: TocEntry[]
-  activeId?: string | null
-  downloads?: PageAttachment[]
+  sections: PagePanelSection[]
 }
 
 function getIndentClass(level: number): string {
@@ -21,20 +20,11 @@ function getIndentClass(level: number): string {
   return 'pl-6'
 }
 
-export function TocSidePanel({
-  entries,
-  activeId: externalActiveId,
-  downloads = [],
-}: Props) {
+export function TocSidePanel({ sections }: Props) {
   const { t } = useTranslation('viewer')
   const collapsed = useTocPanelStore((state) => state.collapsed)
   const setCollapsed = useTocPanelStore((state) => state.setCollapsed)
-  // When the parent provides activeId, skip internal scroll spy (no duplicate listener).
-  const internalActiveId = useTocScrollSpy(
-    externalActiveId !== undefined ? [] : entries,
-  )
-  const activeId =
-    externalActiveId !== undefined ? externalActiveId : internalActiveId
+  const tabIndex = collapsed ? -1 : 0
 
   // The toggle button is a single, always-mounted element so it never moves
   // between the collapsed and expanded states — only its icon/label swaps.
@@ -57,7 +47,7 @@ export function TocSidePanel({
           )}
           aria-hidden={collapsed}
         >
-          {t(tocTitleKey(entries.length, downloads.length))}
+          {t(panelTitleKey(sections))}
         </p>
         <button
           type="button"
@@ -85,30 +75,10 @@ export function TocSidePanel({
         aria-hidden={collapsed}
         data-testid="toc-side-panel-list"
       >
-        {entries.map((entry) => (
-          <li key={entry.id}>
-            <button
-              className={cn(
-                'page-viewer__toc-panel-entry',
-                getIndentClass(entry.level),
-                activeId === entry.id && 'page-viewer__toc-panel-entry--active',
-              )}
-              onClick={() =>
-                scrollToHeadlineHash(`#${encodeURIComponent(entry.id)}`, {
-                  waitForStableLayout: false,
-                })
-              }
-              title={entry.text}
-              data-testid={`toc-entry-${entry.id}`}
-              tabIndex={collapsed ? -1 : 0}
-            >
-              {entry.text}
-            </button>
-          </li>
-        ))}
-        {downloads.length > 0 && (
-          <>
-            {entries.length > 0 && (
+        {visiblePanelSections(sections).map((section, index) => (
+          <Fragment key={section.id}>
+            {/* The first section is titled by the panel header. */}
+            {index > 0 && (
               <li>
                 <p
                   className={cn(
@@ -117,27 +87,73 @@ export function TocSidePanel({
                   )}
                   aria-hidden={collapsed}
                 >
-                  {t('toc.downloads')}
+                  {t(section.titleKey)}
                 </p>
               </li>
             )}
-            {downloads.map((file) => (
-              <li key={file.url}>
-                <a
-                  href={withBasePath(file.url)}
-                  download={file.name}
-                  className="page-viewer__toc-panel-entry"
-                  title={file.name}
-                  data-testid={`toc-download-${file.name}`}
-                  tabIndex={collapsed ? -1 : 0}
-                >
-                  {file.name}
-                </a>
+            {section.items.map((item) => (
+              <li key={item.key}>
+                <SidePanelItem item={item} tabIndex={tabIndex} />
               </li>
             ))}
-          </>
-        )}
+          </Fragment>
+        ))}
       </ul>
     </nav>
+  )
+}
+
+function SidePanelItem({
+  item,
+  tabIndex,
+}: {
+  item: PagePanelItem
+  tabIndex: number
+}) {
+  if (item.kind === 'download') {
+    return (
+      <a
+        href={item.href}
+        download={item.fileName}
+        className="page-viewer__toc-panel-entry"
+        title={item.label}
+        data-testid={`toc-${item.testId}`}
+        tabIndex={tabIndex}
+      >
+        {item.label}
+      </a>
+    )
+  }
+
+  const className = cn(
+    'page-viewer__toc-panel-entry',
+    getIndentClass(item.level ?? 1),
+    item.active && 'page-viewer__toc-panel-entry--active',
+  )
+
+  // Without onSelect the entry is plain text, like a non-clickable dropdown
+  // entry: no dead button in the tab order, no pointer cursor.
+  if (!item.onSelect) {
+    return (
+      <span
+        className={cn(className, 'cursor-default')}
+        title={item.label}
+        data-testid={`toc-${item.testId}`}
+      >
+        {item.label}
+      </span>
+    )
+  }
+
+  return (
+    <button
+      className={className}
+      onClick={item.onSelect}
+      title={item.label}
+      data-testid={`toc-${item.testId}`}
+      tabIndex={tabIndex}
+    >
+      {item.label}
+    </button>
   )
 }

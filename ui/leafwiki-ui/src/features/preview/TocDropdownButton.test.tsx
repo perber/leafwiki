@@ -2,7 +2,9 @@ import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TocDropdownButton } from './TocDropdownButton'
+import { downloadsSection } from './pagePanelSectionFixtures'
 import type { TocEntry } from './extractTocEntries'
+import { useHeadingsSection } from './useHeadingsSection'
 import type { PageAttachment } from '@/lib/api/assets'
 
 vi.mock('react-i18next', () => ({
@@ -27,6 +29,22 @@ const entries: TocEntry[] = [
   { level: 2, text: 'Background', id: 'background' },
   { level: 3, text: 'Details', id: 'details' },
 ]
+
+// Composes the sections the way PageViewer does: headings, then attachments.
+function Dropdown({
+  entries,
+  clickable,
+  downloads = [],
+}: {
+  entries: TocEntry[]
+  clickable?: boolean
+  downloads?: PageAttachment[]
+}) {
+  const headings = useHeadingsSection(entries, { clickable })
+  return (
+    <TocDropdownButton sections={[headings, downloadsSection(downloads)]} />
+  )
+}
 
 function addHeading(id: string, top: number): HTMLElement {
   const el = document.createElement('h2')
@@ -63,14 +81,14 @@ async function openDropdown(name: RegExp | string = /on this page/i) {
 
 describe('TocDropdownButton — rendering', () => {
   it('renders the trigger button', () => {
-    render(<TocDropdownButton entries={entries} />)
+    render(<Dropdown entries={entries} />)
     expect(
       screen.getByRole('button', { name: /on this page/i }),
     ).toBeInTheDocument()
   })
 
   it('shows all entries after opening', async () => {
-    render(<TocDropdownButton entries={entries} />)
+    render(<Dropdown entries={entries} />)
     await openDropdown()
     expect(await screen.findByText('Introduction')).toBeInTheDocument()
     expect(screen.getByText('Background')).toBeInTheDocument()
@@ -84,7 +102,7 @@ describe('TocDropdownButton — active state', () => {
     addHeading('background', 300)
     addHeading('details', 600)
 
-    render(<TocDropdownButton entries={entries} />)
+    render(<Dropdown entries={entries} />)
     await openDropdown()
 
     const introItem = await screen.findByText('Introduction')
@@ -98,7 +116,7 @@ describe('TocDropdownButton — active state', () => {
     const bgEl = addHeading('background', 300)
     addHeading('details', 600)
 
-    render(<TocDropdownButton entries={entries} />)
+    render(<Dropdown entries={entries} />)
 
     vi.spyOn(introEl, 'getBoundingClientRect').mockReturnValue({
       top: -100,
@@ -126,7 +144,7 @@ describe('TocDropdownButton — active state', () => {
     addHeading('background', 300)
     addHeading('details', 600)
 
-    render(<TocDropdownButton entries={entries} />)
+    render(<Dropdown entries={entries} />)
     await openDropdown()
 
     const bgItem = await screen.findByText('Background')
@@ -138,7 +156,7 @@ describe('TocDropdownButton — active state', () => {
 
 describe('TocDropdownButton — click navigation', () => {
   it('calls scrollToHeadlineHash when entry is clicked', async () => {
-    render(<TocDropdownButton entries={entries} clickable />)
+    render(<Dropdown entries={entries} clickable />)
     await openDropdown()
     const user = userEvent.setup()
     await user.click(await screen.findByText('Background'))
@@ -148,7 +166,7 @@ describe('TocDropdownButton — click navigation', () => {
   })
 
   it('does not call scrollToHeadlineHash when not clickable', async () => {
-    render(<TocDropdownButton entries={entries} clickable={false} />)
+    render(<Dropdown entries={entries} clickable={false} />)
     await openDropdown()
     const user = userEvent.setup()
     await user.click(await screen.findByText('Background'))
@@ -162,7 +180,7 @@ describe('TocDropdownButton — downloads', () => {
   ]
 
   it('lists attachments below the entries', async () => {
-    render(<TocDropdownButton entries={entries} downloads={downloads} />)
+    render(<Dropdown entries={entries} downloads={downloads} />)
     await openDropdown()
 
     const link = await screen.findByTestId('toc-dropdown-download-notes.pdf')
@@ -171,13 +189,13 @@ describe('TocDropdownButton — downloads', () => {
   })
 
   it('shows the downloads label when entries are also present', async () => {
-    render(<TocDropdownButton entries={entries} downloads={downloads} />)
+    render(<Dropdown entries={entries} downloads={downloads} />)
     await openDropdown()
     expect(await screen.findByText('Attached Media')).toBeInTheDocument()
   })
 
   it('omits the downloads label when there are no entries', async () => {
-    render(<TocDropdownButton entries={[]} downloads={downloads} />)
+    render(<Dropdown entries={[]} downloads={downloads} />)
     await openDropdown(/attached media/i)
     const menu = await screen.findByRole('menu')
     expect(
@@ -187,13 +205,13 @@ describe('TocDropdownButton — downloads', () => {
   })
 
   it('renders no downloads section when there are none', async () => {
-    render(<TocDropdownButton entries={entries} downloads={[]} />)
+    render(<Dropdown entries={entries} downloads={[]} />)
     await openDropdown()
     expect(screen.queryByText('Attached Media')).not.toBeInTheDocument()
   })
 
   it('shows the downloads label as the trigger text when there are no entries', () => {
-    render(<TocDropdownButton entries={[]} downloads={downloads} />)
+    render(<Dropdown entries={[]} downloads={downloads} />)
     expect(
       screen.getByRole('button', { name: 'Attached Media' }),
     ).toBeInTheDocument()
@@ -203,14 +221,14 @@ describe('TocDropdownButton — downloads', () => {
   })
 
   it('keeps the "on this page" trigger text when entries are present, even with downloads', () => {
-    render(<TocDropdownButton entries={entries} downloads={downloads} />)
+    render(<Dropdown entries={entries} downloads={downloads} />)
     expect(
       screen.getByRole('button', { name: /on this page/i }),
     ).toBeInTheDocument()
   })
 
   it('falls back to "on this page" when there are neither entries nor downloads', () => {
-    render(<TocDropdownButton entries={[]} downloads={[]} />)
+    render(<Dropdown entries={[]} downloads={[]} />)
     expect(
       screen.getByRole('button', { name: /on this page/i }),
     ).toBeInTheDocument()
