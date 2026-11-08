@@ -18,6 +18,7 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { useTrackLastWikiLocation } from '@/lib/useTrackLastWikiLocation'
 import { cn } from '@/lib/utils'
 import { useBrandingStore } from '@/stores/branding'
+import { useLayoutPortalsStore } from '@/stores/layoutPortals'
 import {
   MAX_SIDEBAR_WIDTH,
   MIN_SIDEBAR_WIDTH,
@@ -50,6 +51,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const sidebarVisible = useSidebarStore((s) => s.sidebarVisible)
   const setSidebarVisible = useSidebarStore((s) => s.setSidebarVisible)
   const tocPanelCollapsed = useTocPanelStore((s) => s.collapsed)
+  const setSubheaderRoot = useLayoutPortalsStore((s) => s.setSubheaderRoot)
+  const setTocPaneRoot = useLayoutPortalsStore((s) => s.setTocPaneRoot)
   const sidebarWidth = useSidebarStore((s) => s.sidebarWidth)
   const setSidebarWidth = useSidebarStore((s) => s.setSidebarWidth)
   const isMobile = useIsMobile()
@@ -305,7 +308,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           />
         )}
         <div className="app-layout__main-column">
-          <div id="app-subheader-root" className="app-layout__subheader-root" />
+          <div
+            id="app-subheader-root"
+            ref={setSubheaderRoot}
+            className="app-layout__subheader-root"
+          />
           <div
             id="scroll-container"
             className={`app-layout__content-row custom-scrollbar${isMobile && sidebarVisible ? 'overflow-hidden' : ''}`}
@@ -318,6 +325,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </main>
             <div
               id="app-toc-pane-root"
+              ref={setTocPaneRoot}
               className={cn(
                 'app-layout__toc-pane',
                 tocPanelCollapsed && 'app-layout__toc-pane--collapsed',

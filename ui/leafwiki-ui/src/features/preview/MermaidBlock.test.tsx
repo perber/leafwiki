@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { useEffect } from 'react'
+import { createRef, useEffect } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MermaidBlock from './MermaidBlock'
 import type { MermaidInjectorOps } from './useMermaidInjector'
@@ -36,7 +36,13 @@ describe('MermaidBlock', () => {
       onError({ message: 'Parse error on line 1', isChunkLoadError: false })
     })
 
-    render(<MermaidBlock code="graph LR\na---b" theme="default" />)
+    render(
+      <MermaidBlock
+        code="graph LR\na---b"
+        theme="default"
+        sandboxRef={createRef()}
+      />,
+    )
 
     expect(screen.getByText('mermaid.renderError')).toBeInTheDocument()
     expect(screen.getByText('Parse error on line 1')).toBeInTheDocument()
@@ -60,7 +66,13 @@ describe('MermaidBlock', () => {
       value: { ...window.location, reload: reloadSpy },
     })
 
-    render(<MermaidBlock code="graph LR\na---b" theme="default" />)
+    render(
+      <MermaidBlock
+        code="graph LR\na---b"
+        theme="default"
+        sandboxRef={createRef()}
+      />,
+    )
 
     expect(screen.getByText('mermaid.chunkLoadError')).toBeInTheDocument()
     // The raw browser error text is not shown for this case — the actionable
@@ -74,7 +86,13 @@ describe('MermaidBlock', () => {
   it('renders nothing but the diagram container when there is no error', () => {
     mermaidInjectorSpy.mockImplementation(() => {})
 
-    render(<MermaidBlock code="graph LR\na---b" theme="default" />)
+    render(
+      <MermaidBlock
+        code="graph LR\na---b"
+        theme="default"
+        sandboxRef={createRef()}
+      />,
+    )
 
     expect(screen.queryByText('mermaid.renderError')).not.toBeInTheDocument()
     expect(screen.queryByText('mermaid.chunkLoadError')).not.toBeInTheDocument()

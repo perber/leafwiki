@@ -525,6 +525,9 @@ Per [ADR-0006: Zustand Feature-Local Stores](./adr/0006-zustand-feature-local-st
 - **`import.ts`** — import plan create/execute/cancel state, wraps `lib/api/import.ts`.
 - **`tocPanel.ts`** — collapsed/expanded state of the right-hand "On this page" TOC pane,
   persisted.
+- **`layoutPortals.ts`** — the subheader and TOC pane elements `AppLayout` renders for
+  `PageViewer` to portal into, handed over by reference because page content may reuse their
+  ids.
 - **`users.ts`** — user list/create/update/delete, own-password change.
 
 ### `components/ui/*`

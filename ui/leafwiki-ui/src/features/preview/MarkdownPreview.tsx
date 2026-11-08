@@ -103,6 +103,9 @@ export default function MarkdownPreview({
     () => true,
   )
 
+  // Where mermaid measures labels before the SVG goes into its block.
+  const mermaidSandboxRef = useRef<HTMLDivElement>(null)
+
   const resolvedMode =
     designMode === 'system' ? (prefersLight ? 'light' : 'dark') : designMode
 
@@ -376,6 +379,7 @@ export default function MarkdownPreview({
               code={code}
               dataLine={dataLine}
               theme={resolvedMode === 'dark' ? 'dark' : 'default'}
+              sandboxRef={mermaidSandboxRef}
             />
           )
         }
@@ -501,7 +505,7 @@ export default function MarkdownPreview({
           >
             {normalizedContent}
           </ReactMarkdown>
-          <div id="mermaid-renderer"></div>
+          <div ref={mermaidSandboxRef}></div>
         </>
       </MarkdownPreviewErrorBoundary>
     ),

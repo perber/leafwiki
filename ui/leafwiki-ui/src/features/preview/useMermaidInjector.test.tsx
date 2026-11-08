@@ -19,7 +19,6 @@ afterEach(() => {
 
 async function renderDiagram(code: string): Promise<SVGSVGElement> {
   const sandbox = document.createElement('div')
-  sandbox.id = 'mermaid-renderer'
   const container = document.createElement('div')
   document.body.append(sandbox, container)
   const onError = vi.fn()
@@ -27,6 +26,7 @@ async function renderDiagram(code: string): Promise<SVGSVGElement> {
   renderHook(() =>
     useMermaidInjector({
       containerRef: { current: container },
+      sandboxRef: { current: sandbox },
       code,
       theme: 'default',
       onError,
@@ -202,5 +202,50 @@ describe('useMermaidInjector label HTML', () => {
 
     expect(svg.querySelector('strong')?.textContent).toBe('bold')
     expect(svg.querySelector('em')?.textContent).toBe('it')
+  }, 15000)
+})
+
+describe('useMermaidInjector sandbox', () => {
+  it('renders in the sandbox it is given, not in an element content gave the old sandbox id', async () => {
+    const mermaid = (await import('mermaid')).default
+    const renderSpy = vi.spyOn(mermaid, 'render')
+    const lookalike = document.createElement('div')
+    lookalike.id = 'mermaid-renderer'
+    const sandbox = document.createElement('div')
+    const container = document.createElement('div')
+    document.body.append(lookalike, sandbox, container)
+
+    try {
+      renderHook(() =>
+        useMermaidInjector({
+          containerRef: { current: container },
+          sandboxRef: { current: sandbox },
+          code: 'flowchart TD\n  A[one]',
+          theme: 'default',
+          onError: vi.fn(),
+        }),
+      )
+      await waitFor(
+        () => expect(container.querySelector('svg')).not.toBeNull(),
+        { timeout: 10000 },
+      )
+
+      expect(renderSpy).toHaveBeenCalled()
+      for (const [, , target] of renderSpy.mock.calls) {
+        expect(target).toBe(sandbox)
+      }
+    } finally {
+      renderSpy.mockRestore()
+    }
+  }, 15000)
+})
+
+describe('useMermaidInjector label names', () => {
+  it('drops name attributes from HTML labels', async () => {
+    const svg = await renderDiagram(`flowchart TD
+  A["<a name='labelname' href='https://example.com/'>link</a>"]`)
+
+    expect(svg.querySelector('foreignObject a')).not.toBeNull()
+    expect(svg.querySelector('[name]')).toBeNull()
   }, 15000)
 })

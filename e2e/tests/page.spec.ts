@@ -1897,6 +1897,44 @@ Content.`;
     await expect(lastEntry).toBeInViewport();
   });
 
+  test('toc side panel and subheader stay in the layout when headings use their ids', async ({
+    page,
+  }) => {
+    const timestamp = Date.now();
+    const slug = `toc-layout-ids-${timestamp}`;
+    const title = `Toc Layout Ids ${timestamp}`;
+    // The slugs of these headings are the ids of the layout's own portal
+    // targets.
+    const content = `# Intro
+
+Intro text.
+
+## App toc pane root
+
+Content.
+
+## App subheader root
+
+Content.
+
+## Section Three
+
+Content.`;
+
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    await expect(page.locator('article h2#app-toc-pane-root')).toBeVisible();
+    await expect(
+      page.locator('.app-layout__toc-pane [data-testid="toc-side-panel"]'),
+    ).toBeVisible();
+    await expect(page.locator('.app-layout__subheader-root .page-viewer__subheader')).toBeVisible();
+    await expect(page.locator('article [data-testid="toc-side-panel"]')).toHaveCount(0);
+    await expect(page.locator('article .page-viewer__subheader')).toHaveCount(0);
+  });
+
   test('subheader stays in lockstep with toc pane width when leaving a toc page', async ({
     page,
   }) => {

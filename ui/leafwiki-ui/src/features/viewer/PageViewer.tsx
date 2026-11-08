@@ -24,6 +24,7 @@ import {
 import { useConfigStore } from '@/stores/config'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useHotKeysStore } from '@/stores/hotkeys'
+import { useLayoutPortalsStore } from '@/stores/layoutPortals'
 import { useSessionStore } from '@/stores/session'
 import { useTocPanelStore } from '@/stores/tocPanel'
 import { useTreeStore } from '@/stores/tree'
@@ -219,8 +220,8 @@ export default function PageViewer() {
   const editorName = displayUser(page?.metadata?.lastAuthor)
   const updatedRelative = formatRelativeTime(page?.metadata?.updatedAt)
   const showUpdated = updatedRelative
-  const subheaderRoot = document.getElementById('app-subheader-root')
-  const tocPaneRoot = document.getElementById('app-toc-pane-root')
+  const subheaderRoot = useLayoutPortalsStore((state) => state.subheaderRoot)
+  const tocPaneRoot = useLayoutPortalsStore((state) => state.tocPaneRoot)
 
   const subheader =
     page && !error && subheaderRoot

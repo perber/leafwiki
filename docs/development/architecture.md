@@ -261,6 +261,12 @@ Key facts:
   `mermaid.render`, whose HTML labels mermaid runs through DOMPurify (`securityLevel:
   'antiscript'` plus `labelSanitizeConfig`). Labels may format text and link, but form controls,
   dialogs, popovers, `<style>`, `iframe`, inline `style` and `class` are dropped.
+- Rendered content keeps its ids, so it can carry any id the app uses. `document.getElementById`
+  returns the first match in document order, so an app element after the article (the TOC pane,
+  the Mermaid sandbox) must not be found by id: `AppLayout` hands its portal targets to pages
+  through `stores/layoutPortals.ts`, and `MarkdownPreview` passes its sandbox as a ref. The
+  remaining id lookups (`scroll-container`, `root`) are safe only because those elements are
+  ancestors of the article and therefore come first.
 - Both render targets wrap content in scoped containers (`.page-viewer__content`,
   `.markdown-editor__preview`, both `prose`-classed). Since parse5 guarantees proper nesting, a
   malformed tag can mis-render *within* that container's own subtree (wrong nesting, a box

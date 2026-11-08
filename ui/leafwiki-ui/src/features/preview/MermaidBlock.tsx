@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button'
 import i18next from '@/lib/i18n'
 import { RefreshCw } from 'lucide-react'
-import { memo, useRef, useState } from 'react'
+import { memo, RefObject, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { MermaidRenderError } from './useMermaidInjector'
 import { useMermaidInjector } from './useMermaidInjector'
@@ -10,10 +10,12 @@ export default memo(function MermaidBlock({
   code,
   dataLine,
   theme,
+  sandboxRef,
 }: {
   code: string
   dataLine?: string
   theme: 'default' | 'dark'
+  sandboxRef: RefObject<HTMLDivElement | null>
 }) {
   const { t } = useTranslation('viewer')
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -21,6 +23,7 @@ export default memo(function MermaidBlock({
 
   useMermaidInjector({
     containerRef,
+    sandboxRef,
     code,
     dataLine,
     theme,

@@ -41,6 +41,9 @@ const labelSanitizeConfig = {
     'popovertargetaction',
     'commandfor',
     'command',
+    // DOMPurify drops only names that already exist on document; any other
+    // name on an img would still define a new document property.
+    'name',
   ],
 }
 
@@ -76,6 +79,10 @@ export type MermaidRenderError = {
 
 export type MermaidInjectorOps = {
   containerRef: React.RefObject<HTMLDivElement | null>
+  // Element mermaid renders into to measure labels, owned by MarkdownPreview.
+  // Passed by reference: an id lookup could find an element of the rendered
+  // page instead, since content may use any id.
+  sandboxRef: React.RefObject<HTMLDivElement | null>
   code: string
   dataLine?: string
   theme: 'default' | 'dark'
@@ -105,6 +112,7 @@ function normalizeCode(code: string) {
 
 export function useMermaidInjector({
   containerRef,
+  sandboxRef,
   code,
   dataLine,
   theme,
@@ -150,7 +158,7 @@ export function useMermaidInjector({
         return // No need to re-render
       }
       // This is required to prevent layout shifts
-      const sandbox = document.getElementById('mermaid-renderer')
+      const sandbox = sandboxRef.current
       if (!sandbox) {
         console.warn('Mermaid renderer element not found')
         return
@@ -227,5 +235,5 @@ export function useMermaidInjector({
       cancelled = true
       if (raf1) cancelAnimationFrame(raf1)
     }
-  }, [containerRef, code, dataLine, theme, onError])
+  }, [containerRef, sandboxRef, code, dataLine, theme, onError])
 }

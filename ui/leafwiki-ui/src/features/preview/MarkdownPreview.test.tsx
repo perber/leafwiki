@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react'
+import { act, render, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import type { PageNode } from '@/lib/api/pages'
 import * as assetSrcModule from '@/lib/assetSrc'
@@ -628,6 +628,68 @@ describe('MarkdownPreview sanitizes raw HTML', () => {
     }
     expect(eventHandlerAttributes(container)).toEqual([])
     expect(container.innerHTML).not.toContain('window.__xss')
+  })
+
+  it('renders Mermaid in its own sandbox when content uses the old sandbox id', async () => {
+    const mermaid = (await import('mermaid')).default
+    const renderSpy = vi
+      .spyOn(mermaid, 'render')
+      .mockResolvedValue({ svg: '<svg></svg>' } as Awaited<
+        ReturnType<typeof mermaid.render>
+      >)
+
+    try {
+      const { container } = renderRouted(
+        '<div id="mermaid-renderer"></div>\n\n```mermaid\nflowchart TD\n  A[one]\n```',
+      )
+
+      await waitFor(() => expect(renderSpy).toHaveBeenCalled())
+      const lookalike = container.querySelector('#mermaid-renderer')
+      expect(lookalike).not.toBeNull()
+      for (const [, , sandbox] of renderSpy.mock.calls) {
+        expect(sandbox).not.toBe(lookalike)
+        expect(container.contains(sandbox as Node)).toBe(true)
+      }
+    } finally {
+      renderSpy.mockRestore()
+    }
+  })
+
+  // The layout's TOC pane comes after the article, so this heading id is
+  // why PageViewer must not look the pane up by id.
+  it('gives a heading the id of the layout TOC pane when its text matches', () => {
+    const { container } = renderRouted('## App toc pane root')
+
+    expect(container.querySelector('h2')?.id).toBe('app-toc-pane-root')
+  })
+
+  it('gives each of two previews its own Mermaid sandbox', async () => {
+    const mermaid = (await import('mermaid')).default
+    const renderSpy = vi
+      .spyOn(mermaid, 'render')
+      .mockResolvedValue({ svg: '<svg></svg>' } as Awaited<
+        ReturnType<typeof mermaid.render>
+      >)
+
+    try {
+      const diagram = '```mermaid\nflowchart TD\n  A[one]\n```'
+      const first = renderRouted(diagram)
+      const second = renderRouted(diagram.replace('one', 'two'))
+
+      await waitFor(() => expect(renderSpy).toHaveBeenCalledTimes(2))
+      const sandboxes = renderSpy.mock.calls.map(([, , sandbox]) => sandbox)
+      const firstSandbox = sandboxes.find((s) =>
+        first.container.contains(s as Node),
+      )
+      const secondSandbox = sandboxes.find((s) =>
+        second.container.contains(s as Node),
+      )
+      expect(firstSandbox).toBeDefined()
+      expect(secondSandbox).toBeDefined()
+      expect(firstSandbox).not.toBe(secondSandbox)
+    } finally {
+      renderSpy.mockRestore()
+    }
   })
 
   it.each([
