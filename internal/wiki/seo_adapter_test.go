@@ -389,6 +389,17 @@ func TestWiki_PageMeta_NoPage_AddsOnlyNoindex(t *testing.T) {
 		{name: "users", routePath: "/users"},
 		{name: "permalink with unknown id", routePath: "/p/unknownid"},
 		{name: "permalink route without id", routePath: "/p/"},
+		// Route lookup is case-sensitive (core/tree), like the SPA's by-path read.
+		{name: "case variant of a page", routePath: "/Welcome-To-Leafwiki"},
+		{name: "upper case page", routePath: "/WELCOME-TO-LEAFWIKI"},
+		{name: "unicode route", routePath: "/größe/übersicht"},
+		{name: "dot-dot segment", routePath: "/welcome-to-leafwiki/.."},
+		{name: "dot-dot escaping the root", routePath: "/../welcome-to-leafwiki"},
+		{name: "backslash", routePath: `/welcome-to-leafwiki\missing`},
+		{name: "empty segment inside the path", routePath: "/welcome-to-leafwiki//missing"},
+		{name: "markup characters", routePath: `/a"<x>&`},
+		{name: "very long route", routePath: "/" + strings.Repeat("a", 10000)},
+		{name: "very deep route", routePath: strings.Repeat("/a", 500)},
 	}
 	w, public := newSEOTestWiki(t, "https://wiki.example.com")
 	setPublicAccess(t, public, true)
@@ -433,6 +444,131 @@ func TestWiki_PageMeta_TrailingSlash_UsesThePage(t *testing.T) {
 			}
 			if strings.Contains(string(got.Head), `name="robots"`) {
 				t.Errorf("Head = %s, want no robots tag", got.Head)
+			}
+		})
+	}
+}
+
+// noindex is never added where a page exists: sections, deep nesting,
+// unicode titles and a base path all get the page meta and no robots tag.
+func TestWiki_PageMeta_ExistingPage_NeverNoindex(t *testing.T) {
+	w, public := newSEOTestWiki(t, "https://wiki.example.com/wiki")
+	setPublicAccess(t, public, true)
+	sectionKind := tree.NodeKindSection
+	section := createPageForTest(t, w, SYSTEM_USER_ID, nil, "Docs", "docs", &sectionKind)
+	createPageForTest(t, w, SYSTEM_USER_ID, &section.ID, "Größe & <Übersicht>", "groesse", pageNodeKind())
+	var parent *string
+	deep := ""
+	for i := range 20 {
+		slug := fmt.Sprintf("level-%d", i)
+		node := createPageForTest(t, w, SYSTEM_USER_ID, parent, slug, slug, &sectionKind)
+		parent = &node.ID
+		deep += "/" + slug
+	}
+	createPageForTest(t, w, SYSTEM_USER_ID, parent, "Leaf", "leaf", pageNodeKind())
+
+	tests := []struct {
+		name      string
+		basePath  string
+		routePath string
+	}{
+		{name: "welcome page", routePath: "/welcome-to-leafwiki"},
+		{name: "section", routePath: "/docs"},
+		{name: "page in a section, unicode title", routePath: "/docs/groesse"},
+		{name: "deep section", routePath: deep},
+		{name: "deep leaf", routePath: deep + "/leaf"},
+		{name: "base path", basePath: "/wiki", routePath: "/docs/groesse"},
+		{name: "permalink of a section", routePath: "/p/" + section.ID},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := contributeShell(t, w, tc.basePath, tc.routePath, nil)
+
+			if strings.Contains(string(got.Head), "robots") {
+				t.Errorf("Head has a robots tag: %s", got.Head)
+			}
+			if got.Title == "" || !strings.Contains(string(got.Head), `rel="canonical"`) {
+				t.Errorf("parts = %+v, want the page meta", got)
+			}
+		})
+	}
+}
+
+// Whether a route has a page is decided per request: creating the page
+// removes noindex on the next request, deleting it brings it back, a tree
+// reload changes nothing, and toggling public access applies at once. The
+// shell is never cached, so a stale noindex can't stick.
+func TestWiki_PageMeta_Noindex_FollowsTheTreeAndPublicAccess(t *testing.T) {
+	useEmbeddedFrontend(t)
+	const noindex = `<meta name="robots" content="noindex">`
+	w, public, router := newSEOTestRouterWithPublicURL(t, "/wiki", "https://wiki.example.com/wiki")
+	check := func(step string, wantNoindex, wantMeta bool) {
+		t.Helper()
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			rec := serveAccept(router, method, "/wiki/new-page", "", nil)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("%s %s: status = %d", step, method, rec.Code)
+			}
+			if !strings.Contains(rec.Header().Get("Cache-Control"), "no-cache") && (wantNoindex || wantMeta) {
+				t.Errorf("%s %s: Cache-Control = %q, want no-cache", step, method, rec.Header().Get("Cache-Control"))
+			}
+			if method == http.MethodHead {
+				continue
+			}
+			body := rec.Body.String()
+			if n := strings.Count(body, `name="robots"`); n != map[bool]int{true: 1, false: 0}[wantNoindex] {
+				t.Errorf("%s: %d robots tags, want noindex = %v", step, n, wantNoindex)
+			}
+			if wantNoindex && !strings.Contains(body, noindex) {
+				t.Errorf("%s: robots tag is not %s", step, noindex)
+			}
+			hasMeta := strings.Contains(body, `rel="canonical"`) || strings.Contains(body, `property="og:`) ||
+				strings.Contains(body, `name="description"`) || strings.Contains(body, "New Page - ")
+			if hasMeta != wantMeta {
+				t.Errorf("%s: page meta present = %v, want %v", step, hasMeta, wantMeta)
+			}
+		}
+	}
+
+	check("private wiki", false, false)
+	setPublicAccess(t, public, true)
+	check("public, no page", true, false)
+	page := createPageForTest(t, w, SYSTEM_USER_ID, nil, "New Page", "new-page", pageNodeKind())
+	check("page created", false, true)
+	if err := w.tree.LoadTree(); err != nil {
+		t.Fatalf("LoadTree: %v", err)
+	}
+	check("tree reloaded", false, true)
+	deletePageForTest(t, w, SYSTEM_USER_ID, page.ID, false)
+	check("page deleted", true, false)
+	setPublicAccess(t, public, false)
+	check("private again", false, false)
+}
+
+// A percent-encoded route is decoded before the read: an encoded existing
+// page is a page, an encoded unknown one is noindex.
+func TestWiki_PageMeta_Noindex_PercentEncodedPaths(t *testing.T) {
+	useEmbeddedFrontend(t)
+	_, public, router := newSEOTestRouter(t, "/wiki")
+	setPublicAccess(t, public, true)
+	tests := []struct {
+		name        string
+		path        string
+		wantNoindex bool
+	}{
+		{name: "encoded letters of a page", path: "/wiki/%77elcome-to-leafwiki"},
+		{name: "encoded unicode unknown", path: "/wiki/gr%C3%B6%C3%9Fe", wantNoindex: true},
+		{name: "encoded case variant", path: "/wiki/%57elcome-to-leafwiki", wantNoindex: true},
+		{name: "encoded space", path: "/wiki/welcome%20to%20leafwiki", wantNoindex: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := serveGET(router, tc.path, nil)
+			if rec.Code != http.StatusOK || !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/html") {
+				t.Fatalf("got %d %q, want the 200 shell", rec.Code, rec.Header().Get("Content-Type"))
+			}
+			if got := strings.Contains(rec.Body.String(), `name="robots" content="noindex"`); got != tc.wantNoindex {
+				t.Errorf("noindex = %v, want %v", got, tc.wantNoindex)
 			}
 		})
 	}
