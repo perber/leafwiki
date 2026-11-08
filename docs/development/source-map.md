@@ -399,8 +399,10 @@ light/dark mode application).
   `splitHighlightedLines.ts`), and the page side panel / table of contents
   (`extractTocEntries.ts`, `useTocScrollSpy.ts`, `tocVisibility.ts`). `TocSidePanel.tsx` and
   `TocDropdownButton.tsx` render a list of sections (`pagePanelSection.ts`) that
-  `features/viewer/PageViewer.tsx` composes from `useHeadingsSection.ts` and
-  `features/viewer/attachmentsSection.ts` ([ADR-0021](./adr/0021-page-side-panel-sections.md)).
+  `features/viewer/PageViewer.tsx` composes from `useHeadingsSection.ts`,
+  `features/viewer/useHighlightsSection.ts` and `features/viewer/attachmentsSection.ts`
+  ([ADR-0021](./adr/0021-page-side-panel-sections.md)); `collectHighlights.ts` reads the
+  `==text==` marks out of the rendered preview.
   Shared Markdown typography lives in `src/index.css`: screen prose is limited to 680px,
   with 16px text on phones and 17px from the `sm` breakpoint. Media, code and table
   blocks retain the available surface width in editor/history previews. The viewer centers
@@ -442,7 +444,8 @@ light/dark mode application).
   `ChangePasswordDialog.tsx`). A user's own TOTP setup lives in `features/settings/account`.
 - **`features/viewer`** — the read-only page view: `PageViewer.tsx`, `Breadcrumbs.tsx`,
   `PageMetadata.tsx`, `EmptySectionChildrenList.tsx` (section-index rendering), scroll-to-heading
-  handling, and the attachments section of the page side panel (`attachmentsSection.ts`).
+  handling, and the highlights and attachments sections of the page side panel
+  (`useHighlightsSection.ts`, `attachmentsSection.ts`).
 - **`features/wikilinks`** — `WikiLinkDisambiguationDialog.tsx`, shown when a `[[Title]]` wikilink
   resolves to more than one page — see [ADR-0002: Wikilink Sentinel Encoding](./adr/0002-wikilink-sentinel-encoding.md) for how these
   links are represented internally.

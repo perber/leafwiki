@@ -5,6 +5,7 @@ import * as assetSrcModule from '@/lib/assetSrc'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useDesignModeStore } from '@/features/designtoggle/designmode'
 import { useTreeStore } from '@/stores/tree'
+import { collectHighlights } from './collectHighlights'
 import MarkdownPreview from './MarkdownPreview'
 
 function renderPreview(content: string) {
@@ -231,6 +232,25 @@ echo two
 
     expect(container.querySelector('mark')).toBeNull()
     expect(container.querySelector('code')?.textContent).toContain('==')
+  })
+
+  it('exposes plain and coloured highlights to collectHighlights, not code or raw marks', () => {
+    const content = [
+      'A ==plain== and a =r=coloured== highlight, `==inline==` code.',
+      '',
+      '<mark>raw</mark>',
+      '',
+      '```',
+      '==fenced==',
+      '```',
+    ].join('\n')
+
+    const { container } = renderPreview(content)
+
+    expect(collectHighlights(container).map((h) => h.text)).toEqual([
+      'plain',
+      'coloured',
+    ])
   })
 
   it('resizes images using the width syntax', () => {

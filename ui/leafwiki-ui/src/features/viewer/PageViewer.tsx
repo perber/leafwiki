@@ -43,6 +43,7 @@ import { useHeadingsSection } from '../preview/useHeadingsSection'
 import Breadcrumbs from './Breadcrumbs'
 import EmptySectionChildrenList from './EmptySectionChildrenList'
 import { PageMetadata } from './PageMetadata'
+import { useHighlightsSection } from './useHighlightsSection'
 import { useScrollToHeadline } from './useScrollToHeadline'
 import { useScrollToSearchQuery } from './useScrollToSearchQuery'
 import { useSetPageTitle } from './useSetPageTitle'
@@ -180,9 +181,17 @@ export default function PageViewer() {
   // One headings section (and so one scroll spy) for both the dropdown and
   // the side panel. Sections render in this order; see ADR-0021.
   const headingsSection = useHeadingsSection(visibleTocEntries)
+  const highlightsSection = useHighlightsSection({
+    content: page?.content,
+    isLoading: loading,
+  })
   const panelSections = useMemo(
-    () => [headingsSection, buildAttachmentsSection(attachments)],
-    [headingsSection, attachments],
+    () => [
+      headingsSection,
+      highlightsSection,
+      buildAttachmentsSection(attachments),
+    ],
+    [headingsSection, highlightsSection, attachments],
   )
   const showRightPane = panelSections.some(
     (section) => section.items.length > 0,

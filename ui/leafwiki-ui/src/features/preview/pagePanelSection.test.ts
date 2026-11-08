@@ -22,10 +22,15 @@ function section(
   }
 }
 
-// Headings first, then attachments — the order PageViewer composes them in.
-function pageSections(headings: number, attachments: number) {
+// Headings, highlights, attachments — the order PageViewer composes them in.
+function pageSections(
+  headings: number,
+  highlights: number,
+  attachments: number,
+) {
   return [
     section('headings', 'toc.onThisPage', headings),
+    section('highlights', 'toc.highlights', highlights),
     section('attachments', 'toc.downloads', attachments),
   ]
 }
@@ -51,10 +56,33 @@ describe('panelTitleKey', () => {
       want: 'toc.downloads',
     },
     { name: 'neither', headings: 0, attachments: 0, want: 'toc.onThisPage' },
+    {
+      name: 'all three',
+      headings: 3,
+      highlights: 1,
+      attachments: 2,
+      want: 'toc.onThisPage',
+    },
+    {
+      name: 'highlights only',
+      headings: 0,
+      highlights: 1,
+      attachments: 0,
+      want: 'toc.highlights',
+    },
+    {
+      name: 'highlights and attachments',
+      headings: 0,
+      highlights: 1,
+      attachments: 2,
+      want: 'toc.highlights',
+    },
   ])(
     'titles the panel after the first non-empty section: $name',
-    ({ headings, attachments, want }) => {
-      expect(panelTitleKey(pageSections(headings, attachments))).toBe(want)
+    ({ headings, highlights = 0, attachments, want }) => {
+      expect(
+        panelTitleKey(pageSections(headings, highlights, attachments)),
+      ).toBe(want)
     },
   )
 
