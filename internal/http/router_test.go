@@ -682,6 +682,64 @@ func TestDisableRequestLog_DoesNotCrash(t *testing.T) {
 	}
 }
 
+// Invite and password-reset emails carry their secret in ?token=, and those
+// links land on the SPA shell, so the request log must never contain it.
+func TestRequestLogger_RedactsTokenQuery(t *testing.T) {
+	const secret = "tokid123.0123456789abcdef0123456789abcdef"
+	tests := []struct {
+		name       string
+		target     string
+		wantLogged string
+	}{
+		{name: "invite link", target: "/accept-invite?token=" + secret, wantLogged: "/accept-invite?token=REDACTED"},
+		{name: "reset link", target: "/reset-password?token=" + secret, wantLogged: "/reset-password?token=REDACTED"},
+		{name: "token next to other parameters", target: "/accept-invite?lang=de&token=" + secret, wantLogged: "/accept-invite?lang=de&token=REDACTED"},
+		{name: "repeated token", target: "/accept-invite?token=" + secret + "&token=" + secret, wantLogged: "/accept-invite?token=REDACTED"},
+		{name: "malformed query", target: "/accept-invite?token=" + secret + "&bad=%zz", wantLogged: "/accept-invite?token=REDACTED"},
+		{name: "query without token stays as sent", target: "/api/search?q=a+b&limit=5", wantLogged: "/api/search?q=a+b&limit=5"},
+		{name: "empty token value", target: "/accept-invite?token=", wantLogged: "/accept-invite?token=REDACTED"},
+		{name: "token key without equals sign", target: "/accept-invite?token", wantLogged: "/accept-invite?token=REDACTED"},
+		{name: "percent-encoded token key", target: "/accept-invite?%74oken=" + secret, wantLogged: "/accept-invite?token=REDACTED"},
+		{name: "malformed token value", target: "/accept-invite?lang=de&token=" + secret + "%zz", wantLogged: "/accept-invite?lang=de"},
+		{name: "semicolon separator", target: "/accept-invite?lang=de;token=" + secret, wantLogged: "/accept-invite?"},
+		{name: "very long query", target: "/accept-invite?pad=" + strings.Repeat("a", 16*1024) + "&token=" + secret, wantLogged: "/accept-invite?pad=" + strings.Repeat("a", 16*1024) + "&token=REDACTED"},
+		{name: "token-like key is not redacted", target: "/api/search?tokens=abc&Token=def", wantLogged: "/api/search?tokens=abc&Token=def"},
+	}
+
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	router := newTestRouter(w, func(o *httpinternal.RouterOptions) { o.DisableRequestLog = false })
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			prev := slog.Default()
+			slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, nil)))
+			defer slog.SetDefault(prev)
+
+			router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, tt.target, nil))
+
+			logged := buf.String()
+			if strings.Contains(logged, secret) {
+				t.Fatalf("request log contains the token: %s", logged)
+			}
+			var entry map[string]any
+			for _, line := range strings.Split(strings.TrimSpace(logged), "\n") {
+				if err := json.Unmarshal([]byte(line), &entry); err == nil && entry["msg"] == "http request" {
+					break
+				}
+				entry = nil
+			}
+			if entry == nil {
+				t.Fatalf("no request log entry found in: %s", logged)
+			}
+			if entry["path"] != tt.wantLogged {
+				t.Fatalf("expected logged path %q, got %q", tt.wantLogged, entry["path"])
+			}
+		})
+	}
+}
+
 func TestMetricsEndpoint_IsNotExposedOnAppRouterByDefault(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)

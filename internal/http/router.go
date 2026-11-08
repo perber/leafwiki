@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,9 +78,27 @@ func loggedPath(c *gin.Context, capabilities *capabilityPrefixes) string {
 	}
 	path := c.Request.URL.Path
 	if raw := c.Request.URL.RawQuery; raw != "" {
-		path += "?" + raw
+		path += "?" + redactLoggedQuery(raw)
 	}
 	return path
+}
+
+// redactLoggedQuery replaces the value of the token query parameter, which
+// carries the secret of invite and password-reset links (see
+// auth.EmailTokenService.buildLink), so the request log never holds a usable
+// link. A query without a token is logged exactly as sent. One with a token
+// is re-encoded with sorted keys. A query that doesn't parse is re-encoded
+// too, because a token may hide in the part that failed to parse.
+func redactLoggedQuery(raw string) string {
+	values, err := url.ParseQuery(raw)
+	_, hasToken := values["token"]
+	if !hasToken && err == nil {
+		return raw
+	}
+	if hasToken {
+		values.Set("token", "REDACTED")
+	}
+	return values.Encode()
 }
 
 func disableClientCache(c *gin.Context) {
