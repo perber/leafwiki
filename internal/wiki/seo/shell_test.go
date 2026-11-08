@@ -154,7 +154,12 @@ func TestRootRedirect_NoTarget_Declines(t *testing.T) {
 }
 
 func pageMeta(reader *fakePageReader, publicURL string) wikihttp.ShellContributor {
-	return seo.NewPageMeta(seo.NewGetPageMetaUseCase(reader, noPermalinks(), staticSiteName("Team Wiki"), publicURL), discardLogger())
+	return permalinkMeta(reader, noPermalinks(), publicURL)
+}
+
+// permalinkMeta is pageMeta with a permalink resolver.
+func permalinkMeta(reader *fakePageReader, permalinks *fakePermalinkResolver, publicURL string) wikihttp.ShellContributor {
+	return seo.NewPageMeta(seo.NewGetPageMetaUseCase(reader, permalinks, staticSiteName("Team Wiki"), publicURL), discardLogger())
 }
 
 func TestPublicOnly_Contributor_RunsOnlyWithPublicAccess(t *testing.T) {
@@ -294,7 +299,7 @@ func TestPageMeta_NoPage_ContributesNothing(t *testing.T) {
 func TestPageMeta_Permalink_AddsTargetPageMetaWithCanonical(t *testing.T) {
 	reader := pageAt("docs/setup", seo.Page{Title: "Setup"})
 	permalinks := &fakePermalinkResolver{targets: map[string]string{"abc123": "docs/setup"}}
-	contributor := seo.NewPageMeta(seo.NewGetPageMetaUseCase(reader, permalinks, staticSiteName("Team Wiki"), "https://wiki.example.com"), discardLogger())
+	contributor := permalinkMeta(reader, permalinks, "https://wiki.example.com")
 
 	got := contributor.ContributeShell(context.Background(), shellRequest("", "/p/abc123/old-slug"))
 
@@ -311,8 +316,7 @@ func TestPageMeta_Permalink_AddsTargetPageMetaWithCanonical(t *testing.T) {
 func TestPublicOnly_PermalinkMetaPublicAccessOff_ReadsNothing(t *testing.T) {
 	reader := pageAt("docs/setup", seo.Page{Title: "Setup"})
 	permalinks := &fakePermalinkResolver{targets: map[string]string{"abc123": "docs/setup"}}
-	contributor := seo.NewPublicOnly(publicaccess.Fixed(false)).Contributor(
-		seo.NewPageMeta(seo.NewGetPageMetaUseCase(reader, permalinks, staticSiteName(""), "https://wiki.example.com"), discardLogger()))
+	contributor := seo.NewPublicOnly(publicaccess.Fixed(false)).Contributor(permalinkMeta(reader, permalinks, "https://wiki.example.com"))
 
 	if got := contributor.ContributeShell(context.Background(), shellRequest("", "/p/abc123")); got != (wikihttp.ShellParts{}) {
 		t.Errorf("parts = %+v, want empty", got)
