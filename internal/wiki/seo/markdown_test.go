@@ -3,6 +3,7 @@ package seo_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/perber/wiki/internal/wiki/seo"
@@ -47,6 +48,33 @@ func TestGetPageMarkdownUseCase_Accept_DecidesWhetherToServeMarkdown(t *testing.
 		{name: "garbage", accept: ";;,,/;q=", want: false},
 		{name: "other markdown-like type", accept: "text/x-markdown", want: false},
 		{name: "duplicate ranges use the highest q", accept: "text/markdown;q=0,text/markdown;q=0.5,text/html;q=0.4", want: true},
+		{name: "variant parameter", accept: "text/markdown;variant=GFM", want: true},
+		{name: "charset and variant before a lower q", accept: "text/markdown;charset=utf-8;variant=CommonMark;q=0.5,text/html;q=0.6", want: false},
+		{name: "charset before q, html lower", accept: "text/markdown; charset=UTF-8; q=0.7, text/html; q=0.6", want: true},
+		{name: "smallest positive q is still asked for", accept: "text/markdown;q=0.001", want: true},
+		{name: "html refused explicitly", accept: "text/html;q=0,text/markdown;q=0.1", want: true},
+		{name: "*/* refused explicitly", accept: "text/markdown;q=0.001,*/*;q=0", want: true},
+		{name: "q=1.000 is valid", accept: "text/markdown;q=1.000", want: true},
+		{name: "q=1.001 is malformed", accept: "text/markdown;q=1.001", want: false},
+		{name: "q=0. is a refusal", accept: "text/markdown;q=0.", want: false},
+		{name: "empty q value is malformed", accept: "text/markdown;q=", want: false},
+		{name: "q=0 markdown with text/* is a refusal", accept: "text/markdown;q=0,text/*", want: false},
+		{name: "first q of two wins", accept: "text/markdown;q=0.5;q=0.1,text/html;q=0.4", want: true},
+		{name: "most specific html match wins over a higher */*", accept: "text/*;q=0.1,*/*,text/markdown;q=0.5", want: true},
+		{name: "duplicate html ranges use the highest q", accept: "text/html;q=0.1,text/html;q=0.9,text/markdown;q=0.5", want: false},
+		{name: "all upper case", accept: "TEXT/MARKDOWN", want: true},
+		{name: "application/markdown is not text/markdown", accept: "application/markdown", want: false},
+		{name: "non-ASCII type is not text/markdown", accept: "tëxt/markdown", want: false},
+		{name: "tab whitespace", accept: "\ttext/markdown\t;\tq=0.9 ,\ttext/html;q=0.8", want: true},
+		// Quoted values are not parsed (documented on prefersMarkdown): the
+		// quoted comma splits the list, so the hidden text/markdown counts.
+		{name: "quoted comma splits the list", accept: `text/html;q=0.5;ext="x,text/markdown;y=z"`, want: true},
+		{name: "quoted comma before a quote-ended range", accept: `text/html;q=0.5;ext="x,text/markdown"`, want: false},
+		{name: "quoted comma inside a markdown parameter still selects markdown", accept: `text/markdown;foo="a,b",text/html;q=0.5`, want: true},
+		{name: "many ranges, markdown last", accept: strings.Repeat("application/x-foo;q=0.1,", 5000) + "text/markdown", want: true},
+		{name: "many ranges, html last and higher", accept: "text/markdown;q=0.5," + strings.Repeat("image/png,", 5000) + "text/html", want: false},
+		{name: "very long parameter value", accept: "text/markdown;x=" + strings.Repeat("a", 100_000), want: true},
+		{name: "only commas", accept: strings.Repeat(",", 1000), want: false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
