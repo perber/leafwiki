@@ -501,6 +501,99 @@ describe('MarkdownPreview sanitizes raw HTML', () => {
     )
   }
 
+  describe('name attributes', () => {
+    it('drops the name of an image and keeps the image', () => {
+      const { container } = renderRouted(
+        '<img name="cookie" src="https://x.example/a.png">',
+      )
+
+      expect(container.querySelector('img')).not.toBeNull()
+      expect(container.querySelector('img')?.hasAttribute('name')).toBe(false)
+    })
+
+    // Only img is exposed on document by name among the allowed tags; the
+    // others keep it (for example exclusive `<details name>` groups).
+    it.each([
+      ['a', '<a name="usage" href="https://x.example/">Usage</a>', 'usage'],
+      [
+        'details',
+        '<details name="group"><summary>s</summary>x</details>',
+        'group',
+      ],
+      ['input', '<input name="done" type="checkbox">', 'done'],
+    ])('keeps the name of %s', (tag, content, name) => {
+      const { container } = renderRouted(content)
+
+      expect(container.querySelector(tag)?.getAttribute('name')).toBe(name)
+    })
+
+    it('leaves document.cookie readable when content names an image "cookie"', () => {
+      renderRouted('<img name="cookie" src="https://x.example/a.png">')
+
+      expect(typeof document.cookie).toBe('string')
+    })
+
+    it.each([['title'], ['body'], ['head']])(
+      'leaves document.%s intact when an image carries that name',
+      (prop) => {
+        const before = (document as unknown as Record<string, unknown>)[prop]
+        renderRouted(`<img name="${prop}" src="https://x.example/a.png">`)
+
+        expect((document as unknown as Record<string, unknown>)[prop]).toBe(
+          before,
+        )
+      },
+    )
+
+    // Document named access also exposes an img by its id when the img has
+    // a non-empty name, and ids are not prefixed (#869).
+    it.each([
+      ['a name', '<img id="cookie" name="pic" src="https://x.example/a.png">'],
+      ['an empty name', '<img id="cookie" name src="https://x.example/a.png">'],
+    ])(
+      'leaves document.cookie readable when an image with %s has the id "cookie"',
+      (_, content) => {
+        renderRouted(content)
+
+        expect(typeof document.cookie).toBe('string')
+      },
+    )
+
+    it('leaves document.cookie readable when an image without a name has the id "cookie"', () => {
+      renderRouted('<img id="cookie" src="https://x.example/a.png">')
+
+      expect(typeof document.cookie).toBe('string')
+    })
+
+    it('drops the name of an image inside a footnote definition and keeps the footnote ids intact', () => {
+      const { container } = renderRouted(
+        'Note[^cookie]\n\n[^cookie]: <img name="cookie" src="https://x.example/a.png">',
+      )
+
+      expect(
+        container.querySelector('li#user-content-fn-cookie'),
+      ).not.toBeNull()
+      expect(
+        container.querySelector('a[data-footnote-ref]')?.getAttribute('href'),
+      ).toBe('#user-content-fn-cookie')
+      expect(container.querySelector('img')?.hasAttribute('name')).toBe(false)
+      expect(typeof document.cookie).toBe('string')
+    })
+  })
+
+  it('keeps heading, raw HTML and footnote ids unprefixed', () => {
+    const { container } = renderRouted(
+      '# Intro\n\n<h2 id="explicit-id">Raw</h2>\n\nNote[^1]\n\n[^1]: Text',
+    )
+
+    expect(container.querySelector('h1')?.id).toBe('intro')
+    expect(container.querySelector('#explicit-id')?.tagName).toBe('H2')
+    expect(container.querySelector('li#user-content-fn-1')).not.toBeNull()
+    const footnoteRef = container.querySelector('a[data-footnote-ref]')
+    expect(footnoteRef?.getAttribute('href')).toBe('#user-content-fn-1')
+    expect(footnoteRef?.getAttribute('aria-describedby')).toBe('footnote-label')
+  })
+
   it.each([
     ['script tag', 'before <script>window.__xss = 1</script> after', 'script'],
     ['onerror attribute', '<img src="x" onerror="window.__xss = 1">', null],

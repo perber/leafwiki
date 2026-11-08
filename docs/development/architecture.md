@@ -232,6 +232,12 @@ Key facts:
 - Between `rehypeRaw` and `rehypeWhitelistStyles`, `rehypeLineNumber` and
   `rehypeCodeFenceLineNumbers` add source-line data attributes (used for editor ↔ preview scroll
   sync); `remarkImageSize` handles image size syntax.
+- The schema drops `name` on `img`: the browser exposes an `img` as a property of `document` under
+  its name, and under its id once it has a name, so `<img name="cookie">` or
+  `<img id="cookie" name="x">` would replace `document.cookie`. `img` is the only allowed tag with
+  that behaviour (`form`, `iframe`, `embed`, `object` are not allowed); `a`, `details` and `input`
+  keep `name`. Ids stay unprefixed, so heading and footnote anchors keep their classic `#intro`
+  form (#869).
 - `rehypeRaw` doesn't inject a raw string into the DOM — it parses via `hast-util-raw`/`parse5`,
   the same spec-compliant HTML5 tree-construction algorithm browsers use. Unclosed tags get
   auto-closed exactly like a browser would; the result is always a well-formed tree. No
