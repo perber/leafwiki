@@ -220,15 +220,6 @@ func TestGetPageMetaUseCase_NoPage_ReturnsNoMeta(t *testing.T) {
 	}
 }
 
-func TestGetPageMetaUseCase_ReaderError_IsReturned(t *testing.T) {
-	readErr := errors.New("disk on fire")
-	uc := seo.NewGetPageMetaUseCase(&fakePageReader{err: readErr}, noPermalinks(), staticSiteName(""), "")
-
-	if _, err := uc.Execute(context.Background(), seo.GetPageMetaInput{RoutePath: "/docs"}); !errors.Is(err, readErr) {
-		t.Fatalf("err = %v, want %v", err, readErr)
-	}
-}
-
 // A permalink route ("/p/<id>" or "/p/<id>/<slug>", the SPA route
 // "/p/:id/:slug?") gets the meta of the page the ID points at, with the page's
 // route path as canonical URL; the slug is decorative and may be stale.
@@ -310,16 +301,29 @@ func TestGetPageMetaUseCase_PermalinkNoPage_ReturnsNoMeta(t *testing.T) {
 	}
 }
 
-func TestGetPageMetaUseCase_PermalinkResolverError_IsReturned(t *testing.T) {
-	resolveErr := errors.New("disk on fire")
-	reader := &fakePageReader{}
-	uc := seo.NewGetPageMetaUseCase(reader, &fakePermalinkResolver{err: resolveErr}, staticSiteName(""), "")
-
-	if _, err := uc.Execute(context.Background(), seo.GetPageMetaInput{RoutePath: "/p/abc123"}); !errors.Is(err, resolveErr) {
-		t.Fatalf("err = %v, want %v", err, resolveErr)
+func TestGetPageMetaUseCase_ReadError_IsReturned(t *testing.T) {
+	readErr := errors.New("disk on fire")
+	tests := []struct {
+		name       string
+		reader     *fakePageReader
+		permalinks *fakePermalinkResolver
+		routePath  string
+		wantReads  int
+	}{
+		{name: "page reader error", reader: &fakePageReader{err: readErr}, permalinks: noPermalinks(), routePath: "/docs", wantReads: 1},
+		{name: "permalink resolver error, no page read", reader: &fakePageReader{}, permalinks: &fakePermalinkResolver{err: readErr}, routePath: "/p/abc123", wantReads: 0},
 	}
-	if reader.reads != 0 {
-		t.Errorf("reads = %d, want 0", reader.reads)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			uc := seo.NewGetPageMetaUseCase(tc.reader, tc.permalinks, staticSiteName(""), "")
+
+			if _, err := uc.Execute(context.Background(), seo.GetPageMetaInput{RoutePath: tc.routePath}); !errors.Is(err, readErr) {
+				t.Fatalf("err = %v, want %v", err, readErr)
+			}
+			if tc.reader.reads != tc.wantReads {
+				t.Errorf("reads = %d, want %d", tc.reader.reads, tc.wantReads)
+			}
+		})
 	}
 }
 
