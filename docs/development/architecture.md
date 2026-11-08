@@ -215,8 +215,8 @@ remarkMath, remarkGfm, remarkFlexibleMarkers, remarkImageSize
 → rehypeRaw               (parses embedded HTML strings into hast nodes)
 → rehypeLineNumber, rehypeCodeFenceLineNumbers
 → rehypeWhitelistStyles   (filters inline `style` to a property whitelist)
-→ rehypeKatex
 → rehypeSanitize          (custom schema in previewSanitizeSchema.ts, sanitizes the WHOLE tree incl. rehypeRaw's output)
+→ rehypeKatex             (renders math from its TeX source, trust off)
 → rehypeHighlight
 ```
 
@@ -238,6 +238,10 @@ Key facts:
   `dangerouslySetInnerHTML` anywhere in the frontend.
 - Sanitize order is correct: `rehypeSanitize` runs *after* `rehypeRaw`, so raw HTML is never left
   unsanitized (this is the safe order — reversed, it would be an XSS hole).
+- `rehypeKatex` and `rehypeHighlight` run *after* `rehypeSanitize`. They generate markup from
+  text (TeX source, code), not from author HTML, so the schema never has to allow their class
+  names or KaTeX's SVG. KaTeX keeps `trust` off, which refuses `\htmlClass`, `\htmlStyle`,
+  `\href`, `\includegraphics` and similar commands; `MarkdownPreview.test.tsx` pins that.
 - `rehypeWhitelistStyles.ts` allows layout/typography properties (margin, padding, width/height,
   color, border, display, …) but **not** `position`, `z-index`, or `top/left/right/bottom` — so
   inline styles can't be used to escape the content container via `position: fixed` etc.

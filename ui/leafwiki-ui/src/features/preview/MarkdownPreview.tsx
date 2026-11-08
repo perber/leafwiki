@@ -483,8 +483,12 @@ export default function MarkdownPreview({
               rehypeLineNumber,
               rehypeCodeFenceLineNumbers,
               rehypeWhitelistStyles,
-              [rehypeKatex, { output: 'html', strict: 'ignore' }],
               [rehypeSanitize, previewSanitizeSchema],
+              // KaTeX runs after sanitizing, like highlighting: its markup is
+              // generated from the TeX source (trust stays off, so \htmlClass,
+              // \href and friends are refused), and the sanitizer never has to
+              // allow KaTeX's class names or SVG for author-written HTML.
+              [rehypeKatex, { output: 'html', strict: 'ignore' }],
               [
                 rehypeHighlight,
                 {

@@ -608,6 +608,79 @@ describe('MarkdownPreview sanitizes raw HTML', () => {
   })
 })
 
+describe('MarkdownPreview math', () => {
+  beforeEach(() => {
+    localStorage.setItem('design-mode', 'light')
+    useDesignModeStore.setState({ mode: 'light' })
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(prefers-color-scheme: light)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+  })
+
+  it.each([
+    ['a $$ block', '$$\na^2\n$$'],
+    ['a math fence', '```math\na^2\n```'],
+  ])('renders %s as display math', (_name, content) => {
+    const { container } = renderPreview(content)
+
+    const display = container.querySelector('.katex-display .katex')
+    expect(display).not.toBeNull()
+    expect(display?.querySelector('.msupsub')).not.toBeNull()
+  })
+
+  it('renders $$ inside a paragraph as inline math', () => {
+    const { container } = renderPreview('Before $$a^2$$ after')
+
+    expect(container.querySelector('p .katex')).not.toBeNull()
+    expect(container.querySelector('.katex-display')).toBeNull()
+  })
+
+  it('renders the drawn parts of math, such as the square root sign', () => {
+    const { container } = renderPreview('$$\n\\sqrt{x}\n$$')
+
+    expect(container.querySelector('.katex .hide-tail svg path')).not.toBeNull()
+  })
+
+  it.each([
+    ['\\htmlClass', '$$\n\\htmlClass{fixed inset-0 z-50}{x}\n$$', '.fixed'],
+    ['\\htmlId', '$$\n\\htmlId{app-root}{x}\n$$', '#app-root'],
+    ['\\htmlData', '$$\n\\htmlData{foo=bar}{x}\n$$', '[data-foo]'],
+    [
+      '\\includegraphics',
+      '$$\n\\includegraphics{https://e.example/x.png}\n$$',
+      'img',
+    ],
+    ['\\href', '$$\n\\href{https://e.example/}{x}\n$$', 'a'],
+    ['\\url', '$$\n\\url{https://e.example/}\n$$', 'a'],
+  ])('does not trust %s in math', (_name, content, forbidden) => {
+    const { container } = renderPreview(content)
+
+    expect(container.querySelector('.katex, .katex-error')).not.toBeNull()
+    expect(container.querySelector(`.katex ${forbidden}`)).toBeNull()
+  })
+
+  it.each([
+    '$$\n\\htmlStyle{position:fixed;inset:0}{x}\n$$',
+    '$$\n\\color{red;position:fixed}{x}\n$$',
+    '$$\n\\textcolor{red;position:fixed}{x}\n$$',
+    '$$\n\\rule{1px}{1px;position:fixed}\n$$',
+  ])('keeps positioning out of math styles: %s', (content) => {
+    const { container } = renderPreview(content)
+
+    const styles = Array.from(container.querySelectorAll('[style]'))
+      .map((el) => el.getAttribute('style'))
+      .join(';')
+    expect(styles).not.toMatch(/position|inset/i)
+  })
+})
+
 describe('MarkdownPreview plain link tree refresh', () => {
   const target: PageNode = {
     id: 'target',
