@@ -90,6 +90,19 @@ func (m *Manager) TriggerRestore(id string) error {
 	return nil
 }
 
+// uploadExtractionLimits is what restore by upload extracts under: the
+// default caps for untrusted zips, except for a much higher entry cap. A
+// backup holds every page, section and asset of the wiki, so a large wiki
+// legitimately exceeds the import cap (10 000 pages with 40 000 assets is
+// about 51 000 entries). 200 000 keeps a fourfold margin over that while
+// still rejecting the millions of empty entries a few hundred MiB of zip
+// can declare.
+var uploadExtractionLimits = func() coreshared.ExtractionLimits {
+	limits := coreshared.DefaultZipExtractionLimits
+	limits.MaxEntries = 200_000
+	return limits
+}()
+
 // TriggerRestoreFromUpload starts a restore job asynchronously from an
 // uploaded ZIP, read in full from r. Returns the same errors as
 // TriggerRestore (ErrRestoreAlreadyRunning / ErrRestoreNeedsIntervention),
@@ -117,7 +130,7 @@ func (m *Manager) TriggerRestoreFromUpload(r io.Reader) error {
 
 	m.wg.Go(func() {
 		defer cleanup()
-		m.runGuarded(func() { m.runFromZipPath(zipPath, coreshared.DefaultZipExtractionLimits) })
+		m.runGuarded(func() { m.runFromZipPath(zipPath, uploadExtractionLimits) })
 	})
 	return nil
 }
@@ -231,7 +244,7 @@ func (m *Manager) runGuarded(fn func()) {
 // invalidate-sessions -> reload-branding -> commit -> resync sequence against
 // an already-resolved zip file on disk. Shared by the by-id and by-upload
 // restore entrypoints once each has produced a concrete zipPath; limits is
-// coreshared.DefaultZipExtractionLimits for the by-upload path (untrusted
+// uploadExtractionLimits for the by-upload path (untrusted
 // input) and coreshared.UnrestrictedExtractionLimits for the by-id path
 // (the server's own snapshot).
 func (m *Manager) runFromZipPath(zipPath string, limits coreshared.ExtractionLimits) {

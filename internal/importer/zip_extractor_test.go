@@ -3,6 +3,7 @@ package importer
 import (
 	"archive/zip"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -188,4 +189,115 @@ func TestZipExtractor_ExtractToDirWithLimits_AllowsLowRatioContentUnderFloor(t *
 		t.Fatalf("expected success for small under-floor content, got: %v", err)
 	}
 	defer func() { _ = ws.Cleanup() }()
+}
+
+func TestZipExtractor_ExtractToDirWithLimits_RejectsTooManyEntriesBeforeExtracting(t *testing.T) {
+	entries := map[string]string{}
+	for i := 0; i < 11; i++ {
+		entries[fmt.Sprintf("dir%d/page.md", i)] = ""
+	}
+	zipPath := writeRawZip(t, entries)
+	limits := shared.DefaultZipExtractionLimits
+	limits.MaxEntries = 10
+	baseDir := t.TempDir()
+
+	ws, err := NewZipExtractor().extractToDirWithLimits(zipPath, baseDir, limits)
+	if ws != nil {
+		defer func() { _ = ws.Cleanup() }()
+	}
+	if !errors.Is(err, shared.ErrTooManyEntries) {
+		t.Fatalf("expected ErrTooManyEntries, got: %v", err)
+	}
+	left, err := os.ReadDir(baseDir)
+	if err != nil {
+		t.Fatalf("ReadDir(baseDir) error: %v", err)
+	}
+	if len(left) != 0 {
+		t.Fatalf("rejected archive left %d entries in the base dir, want none", len(left))
+	}
+}
+
+// writeEmptyEntriesZip writes a zip whose entries are the given names, each
+// with no content, in order. Names ending in "/" become directory entries.
+func writeEmptyEntriesZip(t *testing.T, names []string) string {
+	t.Helper()
+	zipPath := filepath.Join(t.TempDir(), "entries.zip")
+	f, err := os.Create(zipPath)
+	if err != nil {
+		t.Fatalf("failed to create zip: %v", err)
+	}
+	w := zip.NewWriter(f)
+	for _, name := range names {
+		if _, err := w.Create(name); err != nil {
+			t.Fatalf("failed to create zip entry %s: %v", name, err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("failed to close zip writer: %v", err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatalf("failed to close zip file: %v", err)
+	}
+	return zipPath
+}
+
+func numberedNames(format string, n int) []string {
+	names := make([]string, n)
+	for i := range names {
+		names[i] = fmt.Sprintf(format, i)
+	}
+	return names
+}
+
+// TestZipExtractor_EntryCapBoundaries pins which entries count toward
+// MaxEntries (every central-directory entry, including directories and
+// every distinct parent directory an entry path implies, and
+// blank names the extractor skips) and that ExtractToDir applies the
+// production default of DefaultZipExtractionLimits.MaxEntries.
+func TestZipExtractor_EntryCapBoundaries(t *testing.T) {
+	defaultCap := shared.DefaultZipExtractionLimits.MaxEntries
+	tests := []struct {
+		name       string
+		names      []string
+		maxEntries int // 0 means: call ExtractToDir with the production defaults
+		wantReject bool
+	}{
+		{"exactly at the cap", numberedNames("page%d.md", 10), 10, false},
+		{"directory entries count toward the cap", append(numberedNames("dir%d/", 6), numberedNames("page%d.md", 5)...), 10, true},
+		{"only directory entries above the cap", numberedNames("dir%d/", 11), 10, true},
+		{"blank-named entries count toward the cap", append(numberedNames("page%d.md", 10), " "), 10, true},
+		{"parent directories of one deep entry count", []string{"a/b/c/d/e/f/g/h/i/j/page.md"}, 10, true},
+		{"a shared parent directory counts once", numberedNames("dir/page%d.md", 9), 10, false},
+		{"distinct deep parents count separately", []string{"x/d/d/d/page.md", "y/d/d/d/page.md", "z/d/d/d/page.md"}, 10, true},
+		{"default cap: exactly at the cap", numberedNames("dir%d/", defaultCap), 0, false},
+		{"default cap: one above the cap", numberedNames("dir%d/", defaultCap+1), 0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			zipPath := writeEmptyEntriesZip(t, tt.names)
+			baseDir := t.TempDir()
+
+			var ws *ZipWorkspace
+			var err error
+			if tt.maxEntries == 0 {
+				ws, err = NewZipExtractor().ExtractToDir(zipPath, baseDir)
+			} else {
+				limits := shared.DefaultZipExtractionLimits
+				limits.MaxEntries = tt.maxEntries
+				ws, err = NewZipExtractor().extractToDirWithLimits(zipPath, baseDir, limits)
+			}
+			if ws != nil {
+				defer func() { _ = ws.Cleanup() }()
+			}
+			if tt.wantReject {
+				if !errors.Is(err, shared.ErrTooManyEntries) {
+					t.Fatalf("expected ErrTooManyEntries, got: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("expected the archive to be accepted, got: %v", err)
+			}
+		})
+	}
 }

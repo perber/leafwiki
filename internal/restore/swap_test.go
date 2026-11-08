@@ -710,3 +710,40 @@ func TestSwapNames_StateDBsDerivedInOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestExtractAndValidateWithLimits_RejectsTooManyEntriesBeforeExtracting(t *testing.T) {
+	entries := map[string]string{
+		"backup-meta.json": `{"id":"x","version":"v1"}`,
+		"users.db":         "irrelevant here, the entry cap trips first",
+	}
+	for i := 0; i < 9; i++ {
+		entries[fmt.Sprintf("data/page%d.md", i)] = ""
+	}
+	zipPath := writeRawZip(t, entries)
+	limits := shared.DefaultZipExtractionLimits
+	limits.MaxEntries = 10
+	dataDir := t.TempDir()
+
+	if _, _, err := extractAndValidateWithLimits(zipPath, dataDir, limits); !errors.Is(err, shared.ErrTooManyEntries) {
+		t.Fatalf("expected ErrTooManyEntries, got: %v", err)
+	}
+	left, err := os.ReadDir(dataDir)
+	if err != nil {
+		t.Fatalf("ReadDir(dataDir) error: %v", err)
+	}
+	if len(left) != 0 {
+		t.Fatalf("rejected archive left %d entries in the data dir, want none", len(left))
+	}
+}
+
+func TestUploadExtractionLimits_RaisesOnlyTheEntryCap(t *testing.T) {
+	want := shared.DefaultZipExtractionLimits
+	want.MaxEntries = uploadExtractionLimits.MaxEntries
+	if uploadExtractionLimits != want {
+		t.Fatalf("uploadExtractionLimits = %+v, want DefaultZipExtractionLimits with only MaxEntries changed", uploadExtractionLimits)
+	}
+	if uploadExtractionLimits.MaxEntries <= shared.DefaultZipExtractionLimits.MaxEntries {
+		t.Fatalf("restore upload entry cap %d must exceed the import cap %d: a backup holds every asset of a wiki",
+			uploadExtractionLimits.MaxEntries, shared.DefaultZipExtractionLimits.MaxEntries)
+	}
+}

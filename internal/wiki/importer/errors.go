@@ -19,6 +19,7 @@ const (
 	ErrCodeImporterZipEntryTooLarge     = "importer_zip_entry_too_large"
 	ErrCodeImporterZipExtractedTooLarge = "importer_zip_extracted_too_large"
 	ErrCodeImporterZipRatioTooHigh      = "importer_zip_ratio_too_high"
+	ErrCodeImporterZipTooManyEntries    = "importer_zip_too_many_entries"
 )
 
 // ImporterErrorResponse is the structured JSON error body returned by importer endpoints.
@@ -63,7 +64,7 @@ func importerErrorStatus(code string) int {
 		return http.StatusConflict
 	case ErrCodeImporterStateUnavailable:
 		return http.StatusInternalServerError
-	case ErrCodeImporterUploadTooLarge, ErrCodeImporterZipEntryTooLarge, ErrCodeImporterZipExtractedTooLarge, ErrCodeImporterZipRatioTooHigh:
+	case ErrCodeImporterUploadTooLarge, ErrCodeImporterZipEntryTooLarge, ErrCodeImporterZipExtractedTooLarge, ErrCodeImporterZipRatioTooHigh, ErrCodeImporterZipTooManyEntries:
 		return http.StatusRequestEntityTooLarge
 	case ErrCodeImporterMissingFile, ErrCodeImporterFileOpenFailed:
 		return http.StatusBadRequest

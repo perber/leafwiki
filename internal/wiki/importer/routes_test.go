@@ -70,3 +70,19 @@ func TestHandleCreatePlan_LargeUploadIsSpooledToDisk(t *testing.T) {
 		t.Fatalf("%d MiB part is held in memory (%T), want it spooled to a temp file", partSize>>20, f)
 	}
 }
+
+// TestImporterErrorStatus_ZipLimitCodesAre413 pins that every zip extraction
+// limit, including the entry-count cap, answers 413 like the upload cap.
+func TestImporterErrorStatus_ZipLimitCodesAre413(t *testing.T) {
+	for _, code := range []string{
+		ErrCodeImporterUploadTooLarge,
+		ErrCodeImporterZipEntryTooLarge,
+		ErrCodeImporterZipExtractedTooLarge,
+		ErrCodeImporterZipRatioTooHigh,
+		ErrCodeImporterZipTooManyEntries,
+	} {
+		if got := importerErrorStatus(code); got != http.StatusRequestEntityTooLarge {
+			t.Errorf("importerErrorStatus(%q) = %d, want %d", code, got, http.StatusRequestEntityTooLarge)
+		}
+	}
+}

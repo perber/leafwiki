@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/perber/wiki/internal/core/markdown"
+	"github.com/perber/wiki/internal/core/shared"
 	"github.com/perber/wiki/internal/core/tree"
 )
 
@@ -100,6 +101,19 @@ func TestImporterService_SetAssetMaxUploadSizeBytes_DoesNotLowerZipEntryCap(t *t
 
 	if got := is.zipExtractionLimits.MaxEntryBytes; got != defaultCap {
 		t.Errorf("zipExtractionLimits.MaxEntryBytes = %d, want unchanged default %d", got, defaultCap)
+	}
+}
+
+// TestImporterService_KeepsDefaultEntryCountCap pins that raising the
+// per-file byte cap to the asset maximum leaves the entry-count cap of the
+// defaults in place, both at construction and after a later raise.
+func TestImporterService_KeepsDefaultEntryCountCap(t *testing.T) {
+	planner := NewPlanner(&fakeWiki{}, tree.NewSlugService(), "")
+	is := NewImporterService(planner, NewPlanStore(), t.TempDir(), 200*1024*1024)
+	is.SetAssetMaxUploadSizeBytes(400 * 1024 * 1024)
+
+	if got, want := is.zipExtractionLimits.MaxEntries, shared.DefaultZipExtractionLimits.MaxEntries; got != want || got <= 0 {
+		t.Errorf("zipExtractionLimits.MaxEntries = %d, want the default %d", got, want)
 	}
 }
 

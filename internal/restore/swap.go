@@ -47,6 +47,10 @@ func extractAndValidateWithLimits(zipPath, dataDir string, limits shared.Extract
 	}
 	defer func() { _ = r.Close() }()
 
+	if err := limits.CheckEntryCount(r.File); err != nil {
+		return "", backupMeta{}, fmt.Errorf("snapshot zip rejected: %w", err)
+	}
+
 	present := map[string]bool{}
 	for _, f := range r.File {
 		present[f.Name] = true

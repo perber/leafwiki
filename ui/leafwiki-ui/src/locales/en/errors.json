@@ -113,5 +113,6 @@
   "decompressed zip contents exceed the total size limit": "The uploaded archive is too large once decompressed",
   "zip entry's decompression ratio exceeds the allowed maximum": "The uploaded archive looks like a decompression bomb",
   "invalid page content width": "Invalid page width",
-  "failed to update page display setting": "Failed to update the display setting"
+  "failed to update page display setting": "Failed to update the display setting",
+  "zip archive contains more entries than allowed": "The uploaded archive contains too many files"
 }

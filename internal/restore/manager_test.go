@@ -852,6 +852,64 @@ func TestManager_RestoreFromUpload_InvalidZip_FailsCleanlyWithoutTouchingFiles(t
 	}
 }
 
+// TestManager_RestoreFromUpload_AppliesTheUploadEntryCap pins that restore
+// by upload runs under uploadExtractionLimits, not the lower import default:
+// a zip with more entries than DefaultZipExtractionLimits.MaxEntries passes
+// the entry-count check (and then fails on the missing required entries),
+// while one above uploadExtractionLimits.MaxEntries is rejected for its
+// entry count. Directory-only entries keep the fixtures small.
+func TestManager_RestoreFromUpload_AppliesTheUploadEntryCap(t *testing.T) {
+	tests := []struct {
+		name      string
+		entries   int
+		wantInErr string
+		notInErr  string
+	}{
+		{"above the import cap", coreshared.DefaultZipExtractionLimits.MaxEntries + 1, "missing required entry", coreshared.ErrTooManyEntries.Error()},
+		{"above the upload cap", uploadExtractionLimits.MaxEntries + 1, coreshared.ErrTooManyEntries.Error(), "missing required entry"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newManagerFixture(t, "v1.0.0")
+
+			zipPath := filepath.Join(t.TempDir(), "entries.zip")
+			zf, err := os.Create(zipPath)
+			if err != nil {
+				t.Fatalf("failed to create zip file: %v", err)
+			}
+			zw := zip.NewWriter(zf)
+			for i := 0; i < tt.entries; i++ {
+				if _, err := zw.Create(fmt.Sprintf("d%d/", i)); err != nil {
+					t.Fatalf("failed to create zip entry: %v", err)
+				}
+			}
+			if err := zw.Close(); err != nil {
+				t.Fatalf("failed to close zip writer: %v", err)
+			}
+			if err := zf.Close(); err != nil {
+				t.Fatalf("failed to close zip file: %v", err)
+			}
+
+			upload, err := os.Open(zipPath)
+			if err != nil {
+				t.Fatalf("failed to open zip: %v", err)
+			}
+			defer func() { _ = upload.Close() }()
+
+			if err := f.manager.TriggerRestoreFromUpload(upload); err != nil {
+				t.Fatalf("TriggerRestoreFromUpload failed: %v", err)
+			}
+			status := waitForRestoreDone(t, f.manager)
+			if !strings.Contains(status.Error, tt.wantInErr) || strings.Contains(status.Error, tt.notInErr) {
+				t.Fatalf("status.Error = %q, want it to contain %q and not %q", status.Error, tt.wantInErr, tt.notInErr)
+			}
+			if _, err := os.Stat(filepath.Join(f.dataDir, "root", "live-page.md")); err != nil {
+				t.Errorf("expected live content to be untouched: %v", err)
+			}
+		})
+	}
+}
+
 // TestManager_RestoreFromUpload_StageUploadFailure_ReturnsLocalizedError is
 // the regression test for a review finding: stageUpload used to return plain
 // fmt.Errorf, which respondWithRestoreError can't render specifically (it

@@ -1,8 +1,10 @@
 package shared
 
 import (
+	"archive/zip"
 	"bytes"
 	"errors"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -220,5 +222,58 @@ func TestCopyWithBudget_ClampsOverflowingDeclaredCompressedSize_KeepsRatioCheckF
 	err := CopyWithBudget(&bytes.Buffer{}, strings.NewReader(strings.Repeat("A", 5000)), declaredCompressedSize, limits, budget)
 	if !errors.Is(err, ErrDecompressionRatioTooHigh) {
 		t.Fatalf("expected the ratio check to stay active (fail-closed) for an overflowing declared compressed size, got: %v", err)
+	}
+}
+
+func zipFilesNamed(names ...string) []*zip.File {
+	files := make([]*zip.File, len(names))
+	for i, name := range names {
+		files[i] = &zip.File{FileHeader: zip.FileHeader{Name: name}}
+	}
+	return files
+}
+
+func numberedZipNames(format string, n int) []string {
+	names := make([]string, n)
+	for i := range names {
+		names[i] = fmt.Sprintf(format, i)
+	}
+	return names
+}
+
+func TestExtractionLimits_CheckEntryCount_RejectsMoreFilesAndDirectoriesThanMaxEntries(t *testing.T) {
+	tests := []struct {
+		name       string
+		maxEntries int
+		names      []string
+		wantErr    bool
+	}{
+		{"below the cap", 10, numberedZipNames("page%d.md", 9), false},
+		{"exactly at the cap", 10, numberedZipNames("page%d.md", 10), false},
+		{"one entry above the cap", 10, numberedZipNames("page%d.md", 11), true},
+		{"parents of one deep entry count", 10, []string{"a/b/c/d/e/f/g/h/i/j/page.md"}, true},
+		{"deep entry exactly at the cap", 10, []string{"a/b/c/d/e/f/g/h/i/page.md"}, false},
+		{"a shared parent counts once", 10, numberedZipNames("dir/page%d.md", 9), false},
+		{"a directory entry and its implied parent are one directory", 10, append([]string{"dir/"}, numberedZipNames("dir/page%d.md", 9)...), false},
+		{"backslash separators count as directories", 3, []string{`a\b\c\page.md`}, true},
+		{"duplicate names count as entries", 2, []string{"page.md", "page.md", "page.md"}, true},
+		{"zero disables the cap", 0, []string{"a/b/c/d/e/f/g/h/i/j/page.md"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ExtractionLimits{MaxEntries: tt.maxEntries}.CheckEntryCount(zipFilesNamed(tt.names...))
+			if tt.wantErr != errors.Is(err, ErrTooManyEntries) {
+				t.Fatalf("CheckEntryCount(%q) with MaxEntries %d = %v, wantErr %v", tt.names, tt.maxEntries, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestZipExtractionLimits_EntryCapOnlyForUntrustedSources(t *testing.T) {
+	if DefaultZipExtractionLimits.MaxEntries <= 0 {
+		t.Fatalf("DefaultZipExtractionLimits.MaxEntries = %d, want a positive cap", DefaultZipExtractionLimits.MaxEntries)
+	}
+	if UnrestrictedExtractionLimits.MaxEntries != 0 {
+		t.Fatalf("UnrestrictedExtractionLimits.MaxEntries = %d, want 0 (no cap)", UnrestrictedExtractionLimits.MaxEntries)
 	}
 }

@@ -101,6 +101,17 @@ func TestCreateImportPlanUseCase_Execute_MapsRatioTooHighError(t *testing.T) {
 	assertMessageDoesNotLeakInternalDetail(t, localized)
 }
 
+func TestCreateImportPlanUseCase_Execute_MapsTooManyEntriesError(t *testing.T) {
+	limits := coreshared.DefaultZipExtractionLimits
+	limits.MaxEntries = 2
+	uc := setupCreateImportPlanUseCase(t, limits)
+	upload := buildZipUpload(t, map[string]string{"a.md": "a", "b.md": "b", "c.md": "c"})
+
+	_, err := uc.Execute(context.Background(), CreateImportPlanInput{File: upload, TargetBasePath: ""})
+	localized := assertLocalizedZipError(t, err, ErrCodeImporterZipTooManyEntries)
+	assertMessageDoesNotLeakInternalDetail(t, localized)
+}
+
 func assertLocalizedZipError(t *testing.T, err error, wantCode string) *sharederrors.LocalizedError {
 	t.Helper()
 	if err == nil {

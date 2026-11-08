@@ -113,5 +113,6 @@
   "decompressed zip contents exceed the total size limit": "L'archive téléversée est trop volumineuse une fois décompressée",
   "zip entry's decompression ratio exceeds the allowed maximum": "L'archive téléversée ressemble à une bombe de décompression",
   "invalid page content width": "Largeur de page non valide",
-  "failed to update page display setting": "Impossible de mettre à jour le paramètre d'affichage"
+  "failed to update page display setting": "Impossible de mettre à jour le paramètre d'affichage",
+  "zip archive contains more entries than allowed": "L'archive téléversée contient trop de fichiers"
 }

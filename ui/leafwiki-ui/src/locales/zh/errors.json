@@ -113,5 +113,6 @@
   "decompressed zip contents exceed the total size limit": "上传压缩包解压后过大",
   "zip entry's decompression ratio exceeds the allowed maximum": "上传压缩包疑似解压炸弹",
   "invalid page content width": "无效的页面宽度",
-  "failed to update page display setting": "无法更新显示设置"
+  "failed to update page display setting": "无法更新显示设置",
+  "zip archive contains more entries than allowed": "上传压缩包包含的文件过多"
 }

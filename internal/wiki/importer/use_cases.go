@@ -49,6 +49,12 @@ func (uc *CreateImportPlanUseCase) Execute(_ context.Context, in CreateImportPla
 				"decompressed zip contents exceed the total size limit", err,
 			)
 		}
+		if errors.Is(err, coreshared.ErrTooManyEntries) {
+			return nil, sharederrors.NewLocalizedError(
+				ErrCodeImporterZipTooManyEntries, "The uploaded archive contains too many files",
+				"zip archive contains more entries than allowed", err,
+			)
+		}
 		if errors.Is(err, coreshared.ErrDecompressionRatioTooHigh) {
 			return nil, sharederrors.NewLocalizedError(
 				ErrCodeImporterZipRatioTooHigh, "The uploaded archive looks like a decompression bomb",

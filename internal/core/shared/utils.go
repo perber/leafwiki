@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"archive/zip"
 	"crypto/rand"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"log/slog"
 	"math/big"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -32,6 +34,7 @@ var (
 	ErrFileTooLarge              = errors.New("file too large")
 	ErrCumulativeSizeTooLarge    = errors.New("cumulative size too large")
 	ErrDecompressionRatioTooHigh = errors.New("decompression ratio too high")
+	ErrTooManyEntries            = errors.New("too many zip entries")
 )
 
 // ExtractionLimits bundles the size and decompression-ratio caps enforced
@@ -41,16 +44,23 @@ type ExtractionLimits struct {
 	MaxTotalBytes   int64 // hard cumulative cap across the whole archive -> ErrCumulativeSizeTooLarge
 	MaxRatio        int64 // decompressed:compressed ceiling -> ErrDecompressionRatioTooHigh
 	RatioFloorBytes int64 // ratio check only applies once decompressed output exceeds this
+	MaxEntries      int   // cap on the files and directories an archive creates (see CheckEntryCount) -> ErrTooManyEntries; 0 means no cap
 }
 
 // DefaultZipExtractionLimits is what production applies to zip extraction
 // from a source that crosses a trust boundary (an uploaded import/restore
-// zip): 50 MiB/file, 1 GiB/archive, 100:1 ratio past a 1 MiB floor.
+// zip): 50 MiB/file, 1 GiB/archive, 100:1 ratio past a 1 MiB floor, and
+// 50 000 entries. The byte caps alone do not bound the entry count: empty
+// entries cost nothing against them, yet each one becomes a file (plus its
+// parent directories) on the data filesystem. 50 000 leaves room for large
+// Markdown vaults with attachments; restore by upload raises it, since a
+// backup holds every asset of the wiki.
 var DefaultZipExtractionLimits = ExtractionLimits{
 	MaxEntryBytes:   50 * 1024 * 1024,
 	MaxTotalBytes:   1024 * 1024 * 1024,
 	MaxRatio:        100,
 	RatioFloorBytes: 1024 * 1024,
+	MaxEntries:      50_000,
 }
 
 // unrestrictedExtractionBytes is deliberately far below the int64 range's
@@ -60,9 +70,10 @@ var DefaultZipExtractionLimits = ExtractionLimits{
 // plausibly reach (a few exabytes of headroom).
 const unrestrictedExtractionBytes = int64(1) << 62
 
-// UnrestrictedExtractionLimits disables all three caps. Use it for a zip
-// source that doesn't cross a new trust boundary — a snapshot the server
-// itself already created via its own snapshot machinery, or a file path an
+// UnrestrictedExtractionLimits disables every cap (MaxEntries is left at 0,
+// meaning no cap). Use it for a zip source that doesn't cross a new trust
+// boundary — a snapshot the server itself already created via its own
+// snapshot machinery, or a file path an
 // operator with direct filesystem access chose (the offline CLI restore
 // path): DefaultZipExtractionLimits would only risk rejecting a legitimately
 // large restore there, not stop an attack, since nothing about that data is
@@ -74,6 +85,40 @@ var UnrestrictedExtractionLimits = ExtractionLimits{
 	MaxTotalBytes:   unrestrictedExtractionBytes,
 	MaxRatio:        unrestrictedExtractionBytes,
 	RatioFloorBytes: unrestrictedExtractionBytes,
+}
+
+// CheckEntryCount reports ErrTooManyEntries when extracting files would
+// create more than MaxEntries files and directories. Counting entries alone
+// is not enough: one entry named a/b/c/.../x.md creates a directory per path
+// segment, so the count covers every distinct path an entry implies, its
+// parent directories included. The number of entries itself is capped too,
+// for blank or duplicate names that add no new path. Callers run this before
+// extracting anything, so a rejected archive leaves nothing on disk.
+func (l ExtractionLimits) CheckEntryCount(files []*zip.File) error {
+	if l.MaxEntries <= 0 {
+		return nil
+	}
+	if len(files) > l.MaxEntries {
+		return fmt.Errorf("%w: %d entries (max %d)", ErrTooManyEntries, len(files), l.MaxEntries)
+	}
+	// The keys are substrings of the entry names, so the set shares their
+	// memory instead of copying it.
+	paths := make(map[string]struct{}, len(files))
+	for _, f := range files {
+		name := path.Clean(strings.ReplaceAll(f.Name, `\`, "/"))
+		for i := 0; i <= len(name); i++ {
+			if i < len(name) && name[i] != '/' {
+				continue
+			}
+			if prefix := strings.TrimLeft(name[:i], "/"); prefix != "" && prefix != "." {
+				paths[prefix] = struct{}{}
+			}
+		}
+		if len(paths) > l.MaxEntries {
+			return fmt.Errorf("%w: more than %d files and directories", ErrTooManyEntries, l.MaxEntries)
+		}
+	}
+	return nil
 }
 
 // SizeBudget tracks a cumulative byte budget shared across a sequence of

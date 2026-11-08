@@ -122,7 +122,7 @@ func logRejectedZipExtraction(log *slog.Logger, err error) {
 		return
 	}
 	switch loc.Code {
-	case ErrCodeImporterZipEntryTooLarge, ErrCodeImporterZipExtractedTooLarge, ErrCodeImporterZipRatioTooHigh:
+	case ErrCodeImporterZipEntryTooLarge, ErrCodeImporterZipExtractedTooLarge, ErrCodeImporterZipRatioTooHigh, ErrCodeImporterZipTooManyEntries:
 		log.Warn("rejected import upload: zip extraction limit exceeded", "code", loc.Code, "error", loc.Cause)
 	}
 }

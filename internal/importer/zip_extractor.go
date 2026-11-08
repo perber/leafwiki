@@ -42,6 +42,10 @@ func (x *ZipExtractor) extractToDirWithLimits(zipPath string, baseDir string, li
 		}
 	}()
 
+	if err := limits.CheckEntryCount(r.File); err != nil {
+		return nil, fmt.Errorf("extract zip: %w", err)
+	}
+
 	parentDir := baseDir
 	if parentDir == "" {
 		parentDir = ""
