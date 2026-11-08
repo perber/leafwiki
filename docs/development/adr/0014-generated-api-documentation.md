@@ -55,7 +55,7 @@ errors), which the documentation must show instead of hiding.
   `internal/core`.
 - **Deferred.** Serving the specification or a viewer from the running server, swag v2/OpenAPI
   3, an API stability promise (`info.version` is `0.x`), and documenting the packages beyond
-  health, tags and properties.
+  health, tags, properties, search and links.
 
 Contributor rules are in [docs/api/README.md](../../api/README.md).
 
@@ -98,7 +98,6 @@ Contributor rules are in [docs/api/README.md](../../api/README.md).
   may see `null`: `dto.Node.Children` is `null` for leaf nodes and must be normalized (or
   noted) when pages are documented.
 - Undocumented responses still expose core types, to be replaced when their packages are
-  documented: `dto.Node.Kind` and `pages.WikiLinkMatch.Kind` (`tree.NodeKind`), and
-  `links.GetBrokenLinksOutput.Links` (`[]corelinks.BrokenLink`).
+  documented: `dto.Node.Kind` and `pages.WikiLinkMatch.Kind` (`tree.NodeKind`).
 - Revisit when Swagger 2.0's limits block accurate documentation, when most routes are documented (serving the spec), or when
   the API gets a stability guarantee.

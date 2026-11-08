@@ -2,8 +2,9 @@
 
 [`swagger.json`](./swagger.json) and [`swagger.yaml`](./swagger.yaml) describe LeafWiki's HTTP
 API as **Swagger 2.0**, version `0.x`. They are **experimental and incomplete**: so far only
-`GET /api/health` and the tag and property reads (`/api/tags`, `/api/properties`) are
-documented, and anything may change before v1. Discussion, inconsistencies
+`GET /api/health`, the tag and property reads (`/api/tags`, `/api/properties`) and the search
+and link reads (`/api/search`, `/api/pages/{id}/links`, `/api/links/broken`) are documented,
+and anything may change before v1. Discussion, inconsistencies
 and deferred decisions are tracked in [#1661](https://github.com/perber/leafwiki/issues/1661).
 
 The files are generated from Go comments and committed. Never edit them by hand. There is no
@@ -56,8 +57,7 @@ above their handlers, for example `handleHealth` in
 - **No core types**: documented response types use `dto` types such as `dto.UserLabel`, not
   `internal/core` types; the test rejects any definition whose Go type is in
   `internal/core`. Some undocumented responses still carry core types (`tree.NodeKind` in
-  `dto.Node` and `pages.WikiLinkMatch`, `corelinks.BrokenLink` in the broken-links output);
-  replace them when documenting those packages.
+  `dto.Node` and `pages.WikiLinkMatch`); replace them when documenting those packages.
 - **Errors**: see below. Document a failure status only if a middleware or handler on that
   route can actually emit it.
 - Keep summaries short and say what is true for the route today, including configuration-
@@ -105,7 +105,7 @@ model that matches the code path, and report inconsistencies on #1661.
 | Flat (middleware and older handlers) | `{"error": "message"}` | `dto.LegacyError` |
 | Validation | `{"error": "validation_error", "fields": [...]}` | none yet (package-local; do not extend `ErrorDetail`) |
 
-Package helpers (for example in `internal/wiki/pages` and `internal/wiki/search`) still declare
+Package helpers (for example in `internal/wiki/pages`) still declare
 their own copies of the localized shape; migrating them to `dto` happens in each package's
 documentation PR with a wire-compatibility test.
 

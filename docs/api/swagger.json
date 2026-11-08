@@ -50,6 +50,125 @@
                 }
             }
         },
+        "/links/broken": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists every link in the wiki whose target page does not exist, with the page it appears on.\nAccess: admin only, also when public access is on. API keys act with the lesser of the owner's role and the key's role. With authentication disabled the route answers 403.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "links"
+                ],
+                "summary": "List broken links",
+                "responses": {
+                    "200": {
+                        "description": "Broken links; an empty list when there are none",
+                        "schema": {
+                            "$ref": "#/definitions/dto.BrokenLinks"
+                        }
+                    },
+                    "401": {
+                        "description": "No valid session, an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    },
+                    "403": {
+                        "description": "The caller is not an admin, or authentication is disabled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    },
+                    "429": {
+                        "description": "API-key attempts throttled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    },
+                    "500": {
+                        "description": "Link lookup failed: the body is an ErrorResponse (code link_internal_error). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object.",
+                        "schema": {
+                            "type": "object"
+                        }
+                    },
+                    "503": {
+                        "description": "API-key store unavailable during a live restore (when API-key management is enabled)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    }
+                }
+            }
+        },
+        "/pages/{id}/links": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists the links pointing at the given page (backlinks) and, separately, the links from other pages to this page's path that are broken (broken incoming links). The links starting on the page are split the same way into outgoing and broken outgoing links. The counters hold the length of each of the four lists.\nAccess: a signed-in user (session cookie, API key or reverse-proxy identity); anonymous callers only when public access is on. With public access on, a missing or invalid session cookie is treated as anonymous instead of 401.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "links"
+                ],
+                "summary": "Get link status of a page",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Page ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Link status of the page; empty lists for a page without links",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LinkStatus"
+                        }
+                    },
+                    "401": {
+                        "description": "No valid session while public access is off, an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    },
+                    "404": {
+                        "description": "No page with this ID (code link_page_not_found)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "API-key attempts throttled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    },
+                    "500": {
+                        "description": "Link lookup failed: the body is an ErrorResponse (code link_internal_error). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object.",
+                        "schema": {
+                            "type": "object"
+                        }
+                    },
+                    "503": {
+                        "description": "API-key store unavailable during a live restore (when API-key management is enabled)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    }
+                }
+            }
+        },
         "/properties": {
             "get": {
                 "security": [
@@ -186,6 +305,142 @@
                         "description": "Index lookup failed: the body is an ErrorResponse (code properties_internal_error). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object.",
                         "schema": {
                             "type": "object"
+                        }
+                    },
+                    "503": {
+                        "description": "API-key store unavailable during a live restore (when API-key management is enabled)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    }
+                }
+            }
+        },
+        "/search": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Full-text search over page titles and content, or a tag-only listing when `tags` is given without `q`. With both, the text hits are filtered to pages carrying every given tag. Each hit carries a rank and an excerpt; the result also lists the tags of the matching pages as facets. `limit` and `offset` are handed to the text index as they are (no upper bound, `-1` means all rows); a tag-only search turns a `limit` below 1 into 20 and clamps a negative `offset`.\nAccess: a signed-in user (session cookie, API key or reverse-proxy identity); anonymous callers only when public access is on. With public access on, a missing or invalid session cookie is treated as anonymous instead of 401.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "search"
+                ],
+                "summary": "Search pages",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search text; required unless `tags` is given",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Tags a page must all carry; repeat the parameter or separate tags with commas",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Number of hits to skip",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum number of hits",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Hits and tag facets; empty lists when nothing matches",
+                        "schema": {
+                            "$ref": "#/definitions/dto.SearchResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Neither `q` nor a tag given (code search_missing_query), or `offset` or `limit` is not an integer (codes search_invalid_offset, search_invalid_limit)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "No valid session while public access is off, an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    },
+                    "429": {
+                        "description": "API-key attempts throttled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    },
+                    "500": {
+                        "description": "Index lookup failed: the body is an ErrorResponse (code search_internal_error). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object.",
+                        "schema": {
+                            "type": "object"
+                        }
+                    },
+                    "503": {
+                        "description": "API-key store unavailable during a live restore (when API-key management is enabled)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    }
+                }
+            }
+        },
+        "/search/status": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Reports whether the search index is being (re)built, how many pages were indexed and how many failed in the current or last run, and when the last run finished. `finished_at` is `0001-01-01T00:00:00Z` until the first run has finished.\nAccess: a signed-in user (session cookie, API key or reverse-proxy identity); anonymous callers only when public access is on. With public access on, a missing or invalid session cookie is treated as anonymous instead of 401.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "search"
+                ],
+                "summary": "Get search indexing status",
+                "responses": {
+                    "200": {
+                        "description": "Current indexing status",
+                        "schema": {
+                            "$ref": "#/definitions/dto.IndexingStatus"
+                        }
+                    },
+                    "401": {
+                        "description": "No valid session while public access is off, an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    },
+                    "429": {
+                        "description": "API-key attempts throttled",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
+                        }
+                    },
+                    "500": {
+                        "description": "Authentication middleware failure; the handler itself cannot fail",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LegacyError"
                         }
                     },
                     "503": {
@@ -353,6 +608,70 @@
         }
     },
     "definitions": {
+        "dto.Backlink": {
+            "type": "object",
+            "required": [
+                "broken",
+                "from_page_id",
+                "from_path",
+                "from_title",
+                "to_page_id"
+            ],
+            "properties": {
+                "broken": {
+                    "type": "boolean"
+                },
+                "from_page_id": {
+                    "type": "string"
+                },
+                "from_path": {
+                    "type": "string"
+                },
+                "from_title": {
+                    "type": "string"
+                },
+                "to_page_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.BrokenLink": {
+            "type": "object",
+            "required": [
+                "from_page_id",
+                "from_path",
+                "from_title",
+                "to_path"
+            ],
+            "properties": {
+                "from_page_id": {
+                    "type": "string"
+                },
+                "from_path": {
+                    "type": "string"
+                },
+                "from_title": {
+                    "type": "string"
+                },
+                "to_path": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.BrokenLinks": {
+            "type": "object",
+            "required": [
+                "links"
+            ],
+            "properties": {
+                "links": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.BrokenLink"
+                    }
+                }
+            }
+        },
         "dto.ErrorDetail": {
             "type": "object",
             "required": [
@@ -398,6 +717,29 @@
                 }
             }
         },
+        "dto.IndexingStatus": {
+            "type": "object",
+            "required": [
+                "active",
+                "failed",
+                "finished_at",
+                "indexed"
+            ],
+            "properties": {
+                "active": {
+                    "type": "boolean"
+                },
+                "failed": {
+                    "type": "integer"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "indexed": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.LegacyError": {
             "type": "object",
             "required": [
@@ -406,6 +748,95 @@
             "properties": {
                 "error": {
                     "description": "Error is the human-readable error message.",
+                    "type": "string"
+                }
+            }
+        },
+        "dto.LinkStatus": {
+            "type": "object",
+            "required": [
+                "backlinks",
+                "broken_incoming",
+                "broken_outgoings",
+                "counts",
+                "outgoings"
+            ],
+            "properties": {
+                "backlinks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.Backlink"
+                    }
+                },
+                "broken_incoming": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.Backlink"
+                    }
+                },
+                "broken_outgoings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.OutgoingLink"
+                    }
+                },
+                "counts": {
+                    "$ref": "#/definitions/dto.LinkStatusCounts"
+                },
+                "outgoings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.OutgoingLink"
+                    }
+                }
+            }
+        },
+        "dto.LinkStatusCounts": {
+            "type": "object",
+            "required": [
+                "backlinks",
+                "broken_incoming",
+                "broken_outgoings",
+                "outgoings"
+            ],
+            "properties": {
+                "backlinks": {
+                    "type": "integer"
+                },
+                "broken_incoming": {
+                    "type": "integer"
+                },
+                "broken_outgoings": {
+                    "type": "integer"
+                },
+                "outgoings": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.OutgoingLink": {
+            "type": "object",
+            "required": [
+                "broken",
+                "from_page_id",
+                "to_page_id",
+                "to_page_title",
+                "to_path"
+            ],
+            "properties": {
+                "broken": {
+                    "type": "boolean"
+                },
+                "from_page_id": {
+                    "type": "string"
+                },
+                "to_page_id": {
+                    "type": "string"
+                },
+                "to_page_title": {
+                    "type": "string"
+                },
+                "to_path": {
                     "type": "string"
                 }
             }
@@ -478,6 +909,91 @@
                     "type": "string"
                 },
                 "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.SearchResult": {
+            "type": "object",
+            "required": [
+                "count",
+                "items",
+                "limit",
+                "offset",
+                "tag_facets"
+            ],
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.SearchResultItem"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "tag_facets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.SearchTagFacet"
+                    }
+                }
+            }
+        },
+        "dto.SearchResultItem": {
+            "type": "object",
+            "required": [
+                "excerpt",
+                "kind",
+                "page_id",
+                "path",
+                "rank",
+                "title"
+            ],
+            "properties": {
+                "excerpt": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "page_id": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "rank": {
+                    "type": "number"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.SearchTagFacet": {
+            "type": "object",
+            "required": [
+                "count",
+                "tag"
+            ],
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "tag": {
                     "type": "string"
                 }
             }

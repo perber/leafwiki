@@ -364,6 +364,32 @@ func TestSQLiteIndex_Search(t *testing.T) {
 	}
 }
 
+// A text query without a match returns an empty, non-nil Items so the API
+// serializes "items": [] and not "items": null.
+func TestSQLiteIndex_Search_NoMatch_ReturnsEmptyItems(t *testing.T) {
+	index, err := NewSQLiteIndex(t.TempDir())
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+	if err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "Some text about databases."); err != nil {
+		t.Fatalf("failed to index page: %v", err)
+	}
+
+	result, err := index.Search("zebra", nil, 0, 10)
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+
+	if result.Count != 0 {
+		t.Errorf("expected count 0, got %d", result.Count)
+	}
+	if result.Items == nil || len(result.Items) != 0 {
+		t.Errorf("expected non-nil empty Items, got %#v", result.Items)
+	}
+}
+
 func TestSQLiteIndex_Search_RanksTitleMatchHigherThanContent(t *testing.T) {
 	tmpDir := t.TempDir()
 
