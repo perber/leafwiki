@@ -114,6 +114,7 @@ func TestGetPageMarkdownUseCase_NoPage_ReturnsNil(t *testing.T) {
 		// The SPA shows the permalink's target there, not the page at this path.
 		{name: "permalink route", reader: pageAt("p/abc123", seo.Page{Title: "Shadowed"}), routePath: "/p/abc123", wantReads: 0},
 		{name: "permalink route with slug", reader: pageAt("p/abc123/setup", seo.Page{Title: "Shadowed"}), routePath: "/p/abc123/setup", wantReads: 0},
+		{name: "permalink route with upper-case P", reader: pageAt("P/abc123", seo.Page{Title: "Shadowed"}), routePath: "/P/abc123", wantReads: 0},
 		{name: "read error", reader: &fakePageReader{err: errors.New("boom")}, routePath: "/docs", wantReads: 1, wantErr: true},
 	}
 	for _, tc := range tests {
