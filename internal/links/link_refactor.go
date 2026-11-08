@@ -52,11 +52,6 @@ func (r RewriteResult) Count() int {
 	return len(r.Replacements)
 }
 
-func RewriteMarkdownLinks(content string, currentPath string, rules []RewriteRule) (string, int) {
-	result := NewMarkdownRefactorEngine().Rewrite(content, currentPath, rules)
-	return result.Content, result.Count()
-}
-
 // wikiRewrite pairs a compiled regex with the replacement target.
 type wikiRewrite struct {
 	re        *regexp.Regexp
