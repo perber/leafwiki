@@ -1,6 +1,7 @@
-import { APIRequestContext, expect, test } from '@playwright/test';
+import { APIRequestContext, Page, expect, test } from '@playwright/test';
 import { createPageViaApi, csrfHeader, loggedIn, setAlwaysShowToc } from '../helpers/apiContext';
 import LoginPage from '../pages/LoginPage';
+import EditPage from '../pages/EditPage';
 import ViewPage from '../pages/ViewPage';
 import { toAppPath } from '../pages/appPath';
 
@@ -175,4 +176,151 @@ test('the side panel lists headings, then highlights, then attachments', async (
     'Attached Media',
     fileName,
   ]);
+});
+
+const highlightLabels = (page: Page) => page.locator('[data-testid^="toc-highlight-"]');
+
+async function createPage(prefix: string, title: string, content: string) {
+  const api = await loggedIn();
+  const slug = `${prefix}-${Date.now()}`;
+  await createPageViaApi(api, { title, slug, content });
+  await api.dispose();
+  return slug;
+}
+
+test('the highlights follow in-app navigation between pages', async ({ page }) => {
+  const target = await createPage('panel-nav-target', 'Nav Target', 'Only ==target mark== here.');
+  const source = await createPage(
+    'panel-nav-source',
+    'Nav Source',
+    `==source one== and ==source two==, then [go](/${target}).`,
+  );
+  const plain = await createPage('panel-nav-plain', 'Nav Plain', 'No highlights.');
+
+  await new LoginPage(page).loginViaApi(user, password);
+  await new ViewPage(page).expectUserLoggedIn();
+  await page.goto(toAppPath(`/${source}`));
+  await expect(highlightLabels(page)).toHaveText(['source one', 'source two']);
+
+  await page.locator('article a', { hasText: 'go' }).click();
+  await expect(page).toHaveURL(new RegExp(`/${target}$`));
+  await expect(highlightLabels(page)).toHaveText(['target mark']);
+
+  await page.goBack();
+  await expect(highlightLabels(page)).toHaveText(['source one', 'source two']);
+
+  // A page without highlights (and too few headings) has no panel at all.
+  await page.evaluate(
+    (path) => {
+      window.history.pushState({}, '', path);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    },
+    toAppPath(`/${plain}`),
+  );
+  await expect(page.locator('article')).toContainText('No highlights.');
+  await expect(page.getByTestId('toc-side-panel')).toHaveCount(0);
+});
+
+test('a highlight added in the editor shows up after saving', async ({ page }) => {
+  const slug = await createPage('panel-edit', 'Edit Highlights', 'Start ==before==.');
+
+  await new LoginPage(page).loginViaApi(user, password);
+  const viewPage = new ViewPage(page);
+  await viewPage.expectUserLoggedIn();
+  await page.goto(toAppPath(`/${slug}`));
+  await expect(highlightLabels(page)).toHaveText(['before']);
+
+  await viewPage.clickEditPageButton();
+  const editPage = new EditPage(page);
+  await page.locator('.cm-editor').click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await editPage.writeContent('\n\nThen ==after==.');
+  await editPage.savePage();
+  await editPage.closeEditor();
+
+  await expect(highlightLabels(page)).toHaveText(['before', 'after']);
+});
+
+test('clicking highlights after async content (math, mermaid, image) hits the right mark', async ({
+  page,
+}) => {
+  const filler = Array.from({ length: 40 }, (_, i) => `Filler ${i}.`).join('\n\n');
+  const longText = 'very long highlight '.repeat(20).trim();
+  const slug = await createPage(
+    'panel-async',
+    'Async Highlights',
+    [
+      '==top mark==',
+      '$$\n\\int_0^1 x^2 \\, dx\n$$',
+      '```mermaid\ngraph TD; A-->B; B-->C; C-->D;\n```',
+      '![img](https://example.invalid/missing.png)',
+      filler,
+      `==${longText}==`,
+      filler,
+      ':::collapsed Closed block\nInside ==hidden mark==\n:::',
+      '==bottom mark==',
+    ].join('\n\n'),
+  );
+
+  await new LoginPage(page).loginViaApi(user, password);
+  await new ViewPage(page).expectUserLoggedIn();
+  await page.goto(toAppPath(`/${slug}`));
+  await expect(page.locator('article svg').first()).toBeVisible();
+  await expect(highlightLabels(page)).toHaveText([
+    'top mark',
+    longText,
+    'hidden mark',
+    'bottom mark',
+  ]);
+
+  // Long labels are truncated with the full text in the tooltip.
+  const longEntry = page.getByTestId('toc-highlight-1');
+  await expect(longEntry).toHaveAttribute('title', longText);
+  const box = await longEntry.boundingBox();
+  const panelBox = await page.getByTestId('toc-side-panel').boundingBox();
+  expect(box!.width).toBeLessThanOrEqual(panelBox!.width);
+
+  await page.getByTestId('toc-highlight-3').click();
+  await expect(page.locator('article mark', { hasText: 'bottom mark' })).toBeInViewport();
+
+  await page.getByTestId('toc-highlight-1').click();
+  await expect(page.locator('article mark', { hasText: 'very long' })).toBeInViewport();
+
+  // A mark inside a closed collapsible: the click opens it and scrolls the
+  // mark into view, without errors or a URL change.
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  const urlBefore = page.url();
+  const details = page.locator('article details', { hasText: 'hidden mark' });
+  await expect(details).not.toHaveAttribute('open');
+  await page.getByTestId('toc-highlight-2').click();
+  await expect(details).toHaveAttribute('open');
+  await expect(page.locator('article mark', { hasText: 'hidden mark' })).toBeInViewport();
+  expect(page.url()).toBe(urlBefore);
+  expect(errors).toEqual([]);
+});
+
+test('the dropdown below the panel breakpoint lists the highlights and scrolls to them', async ({
+  page,
+}) => {
+  const slug = await createHighlightsPage('panel-highlights-dropdown', { withHeading: false });
+
+  await page.setViewportSize({ width: 1024, height: 800 });
+  await new LoginPage(page).loginViaApi(user, password);
+  await new ViewPage(page).expectUserLoggedIn();
+  await page.goto(toAppPath(`/${slug}`));
+  await expect(page.locator('article mark', { hasText: 'first mark' })).toBeVisible();
+  await expect(page.getByTestId('toc-side-panel')).toBeHidden();
+
+  await page.getByRole('button', { name: 'Highlights' }).click();
+  const menu = page.getByRole('menu');
+  await expect(menu.locator('[data-testid^="toc-dropdown-highlight-"]')).toHaveText([
+    'first mark',
+    'second mark',
+  ]);
+
+  const mark = page.locator('article mark', { hasText: 'second mark' });
+  await expect(mark).not.toBeInViewport();
+  await menu.getByTestId('toc-dropdown-highlight-1').click();
+  await expect(mark).toBeInViewport();
 });

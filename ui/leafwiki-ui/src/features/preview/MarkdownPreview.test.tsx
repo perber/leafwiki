@@ -253,6 +253,47 @@ echo two
     ])
   })
 
+  it.each([
+    ['a heading', '## Title with ==mark==', ['mark']],
+    ['a table cell', '| a | b |\n|---|---|\n| ==cell== | x |', ['cell']],
+    ['nested list items', '- ==one==\n  - ==two==', ['one', 'two']],
+    ['a blockquote', '> quoted ==mark==', ['mark']],
+    ['an alert', '> [!NOTE]\n> alert ==mark==', ['mark']],
+    [
+      'a closed collapsible',
+      ':::collapsed Details\nhidden ==mark==\n:::',
+      ['mark'],
+    ],
+    ['a footnote', 'Text[^1]\n\n[^1]: note ==mark==', ['mark']],
+    [
+      'a wikilink inside a highlight',
+      '==see [[Missing Page|alias]]==',
+      ['see alias'],
+    ],
+    [
+      'a soft line break (multi-line)',
+      '==line one\nline two==',
+      ['line one line two'],
+    ],
+    [
+      'Unicode and special characters',
+      '==Ünïcödé 漢字 <&> "q"==',
+      ['Ünïcödé 漢字 <&> "q"'],
+    ],
+    ['an empty marker', 'a ==== b', []],
+  ])('collects highlights inside %s', (_name, content, expected) => {
+    // Links (footnotes, wikilinks) need a router.
+    const { container } = render(
+      <MemoryRouter>
+        <TooltipProvider>
+          <MarkdownPreview content={content} />
+        </TooltipProvider>
+      </MemoryRouter>,
+    )
+
+    expect(collectHighlights(container).map((h) => h.text)).toEqual(expected)
+  })
+
   it('resizes images using the width syntax', () => {
     const { container } = renderPreview(
       '![Resizable image](https://example.com/image.png){width=75%}',
