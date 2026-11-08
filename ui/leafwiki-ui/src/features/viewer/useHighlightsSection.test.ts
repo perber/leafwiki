@@ -137,4 +137,74 @@ describe('useHighlightsSection', () => {
     expect(other.open).toBe(false)
     expect(wrapper.open).toBe(false)
   })
+
+  it('ignores marks outside the page content, such as a history preview', () => {
+    // The history preview renders its own MarkdownPreview; put it first in
+    // the DOM so a document-wide query would pick it up.
+    const history = document.createElement('div')
+    history.className = 'page-history__detail-stack'
+    history.innerHTML = `<p>${marker('from history')}</p>`
+    document.body.appendChild(history)
+    const historyScroll = vi.fn()
+    history.querySelector('mark')!.scrollIntoView = historyScroll
+    const article = renderContent(`<p>${marker('on page')}</p>`)
+    const pageScroll = vi.fn()
+    article.querySelector('mark')!.scrollIntoView = pageScroll
+
+    const { result } = renderHook(() =>
+      useHighlightsSection({ content: 'page', isLoading: false }),
+    )
+    expect(result.current.items.map((item) => item.label)).toEqual(['on page'])
+
+    const item = result.current.items[0]
+    if (item.kind !== 'anchor') throw new Error('expected an anchor item')
+    item.onSelect?.()
+    expect(historyScroll).not.toHaveBeenCalled()
+    expect(pageScroll).toHaveBeenCalled()
+  })
+
+  it('lists many highlights, with distinct keys', () => {
+    renderContent(
+      Array.from({ length: 200 }, (_, i) => `<p>${marker(`h${i}`)}</p>`).join(
+        '',
+      ),
+    )
+    const { result } = renderHook(() =>
+      useHighlightsSection({ content: 'page', isLoading: false }),
+    )
+
+    expect(result.current.items).toHaveLength(200)
+    expect(new Set(result.current.items.map((item) => item.key)).size).toBe(200)
+    expect(result.current.items[199].label).toBe('h199')
+  })
+
+  it('empties the list when navigating to a page without highlights', () => {
+    const article = renderContent(`<p>${marker('a')}${marker('b')}</p>`)
+    const { result, rerender } = renderHook(
+      ({ content, isLoading }) => useHighlightsSection({ content, isLoading }),
+      { initialProps: { content: 'page a', isLoading: false } },
+    )
+    expect(result.current.items).toHaveLength(2)
+
+    // Route change: the store flips to loading, then shows page b.
+    rerender({ content: 'page a', isLoading: true })
+    expect(result.current.items).toEqual([])
+    article.innerHTML = '<p>Plain page.</p>'
+    rerender({ content: 'page b', isLoading: false })
+    expect(result.current.items).toEqual([])
+  })
+
+  it('does nothing on select when the mark is gone or the content root is missing', () => {
+    const article = renderContent(`<p>${marker('a')}${marker('b')}</p>`)
+    const { result } = renderHook(() =>
+      useHighlightsSection({ content: 'page', isLoading: false }),
+    )
+    const item = result.current.items[1]
+    if (item.kind !== 'anchor') throw new Error('expected an anchor item')
+
+    article.innerHTML = `<p>${marker('a')}</p>`
+    expect(() => item.onSelect?.()).not.toThrow()
+    article.remove()
+    expect(() => item.onSelect?.()).not.toThrow()
+  })
 })
