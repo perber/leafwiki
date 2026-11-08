@@ -1,6 +1,7 @@
 package render
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -100,6 +101,9 @@ func FuzzRenderHTML(f *testing.F) {
 	opt := testOptions(map[string]string{"Foo": "/foo", "Proto": "//evil.example"})
 	f.Fuzz(func(t *testing.T, content string) {
 		out, err := RenderHTML(content, opt)
+		if errors.Is(err, ErrTooComplex) {
+			return // refused on purpose (limits.go); nothing is rendered
+		}
 		if err != nil {
 			t.Fatalf("RenderHTML error: %v", err)
 		}

@@ -60,6 +60,25 @@ type Options struct { BasePath, RoutePath string; ResolveWikiLink func(target st
   `div` and serialized again (`balanceHTML`). The sanitizer drops tags but does not balance
   them, so a stray `</div>` would close `#root` and an unclosed element would swallow the shell.
   It has to run last, because dropping tags is what can leave the input unbalanced.
+  The parsed tree is then checked against the same element and attribute tables the
+  sanitizer is built from (`policy.go`); anything outside them (another element, a namespace,
+  a comment, a foreign attribute) is an error, so a later policy mistake means no rendered
+  body instead of XSS.
+- **Limits**: any client can claim to be a crawler, so one render is bounded. A linear
+  pre-pass with goldmark's block parser (no inline parsers, no table extension) gives the
+  inline containers without block quote or list prefixes; on it the renderer refuses more
+  than 60,000 blocks, nesting deeper than 64, more than 50,000 table cells (goldmark pads
+  every row to the header's width, so a 14 KB table can render 40 MB; counted from the first
+  delimiter row with the widest line), more than 64 KB or more than 400 ``[ < * _ ~ ` `` in one
+  paragraph, heading or table row (goldmark matches them in quadratic time per container), and
+  more than 15,000 `<` on the page, in raw HTML blocks (closing line included) and inline
+  (x/net/html appends text separated by ignored end tags such as `x</td>x</td>` to one growing
+  node, also across table rows). Before it: at most 256 KB of Markdown, 20,000 `*`/`_`, 64
+  nesting markers per line and 5,000 link reference definitions without a blank line between them (quadratic in
+  goldmark's definition parser, already in the pre-pass). After it: at most 4 MB of HTML before
+  sanitizing. Past a limit `RenderHTML` returns `ErrTooComplex`; the
+  caller then serves the plain shell, never a 500, and logs no page content. Caching per page
+  version and bounding concurrent renders belong to the PR that wires the renderer in.
 
 ## Alternatives considered
 

@@ -22,28 +22,74 @@ var notProtocolRelative = regexp.MustCompile(`^[\x00-\x20]*(?:[^/\\\x00-\x20]|[/
 // https, mailto or same-origin paths; "//host" is dropped.
 var policy = newPolicy()
 
+// allowedElements and attrRules are the policy's single source: newPolicy
+// builds the sanitizer from them and balanceHTML refuses anything outside them.
+var allowedElements = []string{
+	"b", "blockquote", "br", "code", "dd", "del", "details", "div", "dl", "dt", "em",
+	"h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "ins", "kbd", "li", "mark", "ol",
+	"p", "pre", "q", "s", "samp", "span", "strike", "strong", "sub", "summary", "sup",
+	"table", "tbody", "td", "tfoot", "th", "thead", "tr", "tt", "ul", "var",
+}
+
+// attrRule allows attr on elements, matching match when it is set. An element
+// that only appears here (a, img, input) is allowed together with the attribute.
+type attrRule struct {
+	attr     string
+	match    *regexp.Regexp
+	elements []string
+}
+
+var (
+	emptyValue = regexp.MustCompile(`^$`)
+	attrRules  = []attrRule{
+		{attr: "href", match: notProtocolRelative, elements: []string{"a"}},
+		{attr: "src", match: notProtocolRelative, elements: []string{"img"}},
+		{attr: "alt", elements: []string{"img"}},
+		{attr: "title", elements: []string{"a", "img"}},
+		{attr: "width", match: bluemonday.NumberOrPercent, elements: []string{"img"}},
+		{attr: "height", match: bluemonday.NumberOrPercent, elements: []string{"img"}},
+		// Task list checkboxes only; an <input> without a checkbox type is dropped.
+		{attr: "type", match: regexp.MustCompile(`^checkbox$`), elements: []string{"input"}},
+		{attr: "checked", match: emptyValue, elements: []string{"input"}},
+		{attr: "disabled", match: emptyValue, elements: []string{"input"}},
+		{attr: "align", match: regexp.MustCompile(`^(left|center|right)$`), elements: []string{"td", "th"}},
+		{attr: "colspan", match: bluemonday.Integer, elements: []string{"td", "th"}},
+		{attr: "rowspan", match: bluemonday.Integer, elements: []string{"td", "th"}},
+		{attr: "start", match: bluemonday.Integer, elements: []string{"ol"}},
+		{attr: "open", match: emptyValue, elements: []string{"details"}},
+	}
+)
+
 func newPolicy() *bluemonday.Policy {
 	p := bluemonday.NewPolicy()
-	p.AllowElements(
-		"b", "blockquote", "br", "code", "dd", "del", "details", "div", "dl", "dt", "em",
-		"h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "ins", "kbd", "li", "mark", "ol",
-		"p", "pre", "q", "s", "samp", "span", "strike", "strong", "sub", "summary", "sup",
-		"table", "tbody", "td", "tfoot", "th", "thead", "tr", "tt", "ul", "var",
-	)
-	p.AllowAttrs("href").Matching(notProtocolRelative).OnElements("a")
-	p.AllowAttrs("src").Matching(notProtocolRelative).OnElements("img")
-	p.AllowAttrs("alt").OnElements("img")
-	p.AllowAttrs("title").OnElements("a", "img")
-	p.AllowAttrs("width", "height").Matching(bluemonday.NumberOrPercent).OnElements("img")
-	// Task list checkboxes only; an <input> without a checkbox type is dropped.
-	p.AllowAttrs("type").Matching(regexp.MustCompile(`^checkbox$`)).OnElements("input")
-	p.AllowAttrs("checked", "disabled").Matching(regexp.MustCompile(`^$`)).OnElements("input")
-	p.AllowAttrs("align").Matching(regexp.MustCompile(`^(left|center|right)$`)).OnElements("td", "th")
-	p.AllowAttrs("colspan", "rowspan").Matching(bluemonday.Integer).OnElements("td", "th")
-	p.AllowAttrs("start").Matching(bluemonday.Integer).OnElements("ol")
-	p.AllowAttrs("open").Matching(regexp.MustCompile(`^$`)).OnElements("details")
+	p.AllowElements(allowedElements...)
+	for _, rule := range attrRules {
+		attrs := p.AllowAttrs(rule.attr)
+		if rule.match != nil {
+			attrs = attrs.Matching(rule.match)
+		}
+		attrs.OnElements(rule.elements...)
+	}
 	p.AllowURLSchemes("http", "https", "mailto")
 	p.AllowRelativeURLs(true)
 	p.RequireParseableURLs(true)
 	return p
 }
+
+// allowedMarkup is element -> allowed attribute names, built from the same
+// tables as the policy.
+var allowedMarkup = func() map[string]map[string]bool {
+	m := map[string]map[string]bool{}
+	for _, el := range allowedElements {
+		m[el] = map[string]bool{}
+	}
+	for _, rule := range attrRules {
+		for _, el := range rule.elements {
+			if m[el] == nil {
+				m[el] = map[string]bool{}
+			}
+			m[el][rule.attr] = true
+		}
+	}
+	return m
+}()
