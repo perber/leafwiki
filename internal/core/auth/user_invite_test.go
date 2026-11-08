@@ -123,3 +123,41 @@ func TestUserService_UpdateUser_NoPassword_KeepsInvitedUserPending(t *testing.T)
 		t.Fatalf("expected MustSetPassword to persist as true after a password-less edit")
 	}
 }
+
+// Once an invite is completed — by the invitee or by an admin setting a
+// password — a second CompleteInvite must not overwrite the password the
+// account now relies on.
+func TestUserService_CompleteInvite_AlreadyCompleted_ReturnsInvalidAndKeepsPassword(t *testing.T) {
+	service := setupTestUserService(t)
+
+	user, err := service.InviteUser("bob", "bob@example.com", RoleEditor)
+	if err != nil {
+		t.Fatalf("InviteUser returned error: %v", err)
+	}
+	if err := service.CompleteInvite(user.ID, "first-password"); err != nil {
+		t.Fatalf("first CompleteInvite returned error: %v", err)
+	}
+
+	if err := service.CompleteInvite(user.ID, "second-password"); err != ErrInviteAlreadyAccepted {
+		t.Fatalf("expected ErrInviteAlreadyAccepted for an already completed invite, got %v", err)
+	}
+	if _, err := service.DoesIDAndPasswordMatch(user.ID, "first-password"); err != nil {
+		t.Fatalf("expected the first password to still authenticate, got error: %v", err)
+	}
+}
+
+func TestUserService_CompleteInvite_UserNeverInvited_ReturnsInvalid(t *testing.T) {
+	service := setupTestUserService(t)
+
+	user, err := service.CreateUser("alice", "alice@example.com", "password123", RoleEditor)
+	if err != nil {
+		t.Fatalf("CreateUser returned error: %v", err)
+	}
+
+	if err := service.CompleteInvite(user.ID, "another-password"); err != ErrInviteAlreadyAccepted {
+		t.Fatalf("expected ErrInviteAlreadyAccepted for a user without a pending invite, got %v", err)
+	}
+	if _, err := service.DoesIDAndPasswordMatch(user.ID, "password123"); err != nil {
+		t.Fatalf("expected the original password to still authenticate, got error: %v", err)
+	}
+}

@@ -169,6 +169,18 @@ func (s *EmailTokenStore) Close() error {
 // URL-safe raw token ("id.secret") — only the SHA-256 hash of the secret is
 // ever persisted.
 func (s *EmailTokenStore) Issue(userID, purpose string, ttl time.Duration) (rawToken string, err error) {
+	return s.issue(userID, purpose, ttl, false)
+}
+
+// IssueReplacingOpen is Issue, but first marks every still-open token of
+// userID/purpose consumed, in the same transaction — so only the link in the
+// most recent email works (used for invites, where a resend must retire the
+// earlier email's link).
+func (s *EmailTokenStore) IssueReplacingOpen(userID, purpose string, ttl time.Duration) (rawToken string, err error) {
+	return s.issue(userID, purpose, ttl, true)
+}
+
+func (s *EmailTokenStore) issue(userID, purpose string, ttl time.Duration, replaceOpen bool) (rawToken string, err error) {
 	id, err := shared.GenerateUniqueID()
 	if err != nil {
 		return "", err
@@ -181,11 +193,27 @@ func (s *EmailTokenStore) Issue(userID, purpose string, ttl time.Duration) (rawT
 
 	now := time.Now()
 	err = s.withDB(func(db *sql.DB) error {
-		_, err := db.Exec(`
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer func() { _ = tx.Rollback() }()
+
+		if replaceOpen {
+			if _, err := tx.Exec(`
+				UPDATE email_tokens SET consumed_at = ?
+				WHERE user_id = ? AND purpose = ? AND consumed_at IS NULL;
+			`, now.Unix(), userID, purpose); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.Exec(`
 			INSERT INTO email_tokens (id, token_hash, user_id, purpose, created_at, expires_at, consumed_at)
 			VALUES (?, ?, ?, ?, ?, ?, NULL);
-		`, id, hash, userID, purpose, now.Unix(), now.Add(ttl).Unix())
-		return err
+		`, id, hash, userID, purpose, now.Unix(), now.Add(ttl).Unix()); err != nil {
+			return err
+		}
+		return tx.Commit()
 	})
 	if err != nil {
 		return "", err

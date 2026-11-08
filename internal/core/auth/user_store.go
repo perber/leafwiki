@@ -558,10 +558,13 @@ func (f *UserStore) UpdatePassword(userID string, newPassword string) error {
 		return err
 	}
 
-	// Update the user's password in the database
+	// Storing a password the user chose (reset link, own password change)
+	// completes a pending invite too, so an invite link that is still open
+	// can't overwrite it later — CompleteInvite only matches
+	// must_set_password = 1.
 	_, err = f.db.Exec(`
 		UPDATE users
-		SET password = ?
+		SET password = ?, must_set_password = 0
 		WHERE id = ?;
 	`, newPassword, userID)
 	if err != nil {
@@ -678,8 +681,9 @@ func (f *UserStore) ConsumeRecoveryCodeHash(userID string, oldHashes, newHashes 
 }
 
 // SetMustSetPassword flips the must_set_password flag for userID — set to
-// true by InviteUser at creation, cleared by CompleteInvite once the invite
-// is accepted.
+// true by InviteUser at creation, cleared by UserService.UpdateUser when an
+// admin sets the invited user's password (CompleteInvite and UpdatePassword
+// clear it in the same statement as the password write instead).
 func (f *UserStore) SetMustSetPassword(userID string, value bool) error {
 	if err := f.Connect(); err != nil {
 		return err
@@ -698,4 +702,33 @@ func (f *UserStore) SetMustSetPassword(userID string, value bool) error {
 		WHERE id = ?;
 	`, v, userID)
 	return err
+}
+
+// CompleteInvite sets hashedPassword and clears must_set_password in one
+// compare-and-swap (UPDATE ... WHERE must_set_password = 1 + RowsAffected),
+// mirroring ConsumeRecoveryCodeHash: only a user whose invite is still
+// pending is updated, so of two invite tokens confirmed for the same user
+// only the first can set a password. Password and flag change in the same
+// statement so a failure can't leave the flag cleared with the random
+// invite password still in place. Returns completed=false (with no error)
+// when the invite was already completed, never existed, or the user is gone.
+func (f *UserStore) CompleteInvite(userID, hashedPassword string) (completed bool, err error) {
+	if err := f.Connect(); err != nil {
+		return false, err
+	}
+
+	result, err := f.db.Exec(`
+		UPDATE users
+		SET password = ?, must_set_password = 0
+		WHERE id = ? AND must_set_password = 1;
+	`, hashedPassword, userID)
+	if err != nil {
+		return false, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return rowsAffected == 1, nil
 }

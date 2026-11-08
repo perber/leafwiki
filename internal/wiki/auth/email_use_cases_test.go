@@ -326,3 +326,51 @@ func TestConfirmInviteUseCase_Execute_InvalidToken_ReturnsError(t *testing.T) {
 		t.Fatalf("expected ErrEmailTokenInvalid, got %v", err)
 	}
 }
+
+// A resent invite leaves the first email in the inbox. Once the invitee has
+// accepted with one of the two links, the other one must be rejected like any
+// invalid link instead of setting a new password and issuing a session.
+func TestConfirmInviteUseCase_Execute_StaleTokenAfterAccept_ReturnsInvalid(t *testing.T) {
+	srv := startFakeInviteSMTPServer(t)
+	svc, users, resolver, authSvc := setupEmailUseCases(t, srv.addr)
+	usersFn := func() *coreauth.UserService { return users }
+	tokensFn := func() *coreauth.EmailTokenService { return svc }
+	nextToken := func() string {
+		t.Helper()
+		select {
+		case emailData := <-srv.data:
+			return extractToken(t, emailData)
+		case <-time.After(2 * time.Second):
+			t.Fatal("timed out waiting for the invite email to be sent")
+			return ""
+		}
+	}
+
+	invited, err := NewInviteUserUseCase(usersFn, tokensFn, resolver, slog.Default()).Execute(context.Background(),
+		InviteUserInput{Username: "bob", Email: "bob@example.com", Role: coreauth.RoleViewer})
+	if err != nil {
+		t.Fatalf("InviteUser Execute returned error: %v", err)
+	}
+	first := nextToken()
+	if err := NewResendInviteUseCase(usersFn, tokensFn).Execute(context.Background(), ResendInviteInput{UserID: invited.User.ID}); err != nil {
+		t.Fatalf("ResendInvite Execute returned error: %v", err)
+	}
+	second := nextToken()
+
+	confirmUC := NewConfirmInviteUseCase(tokensFn, authSvc)
+	// The resend already retired the first link, before anyone accepted.
+	if _, err := confirmUC.Execute(context.Background(), ConfirmInviteInput{Token: first, NewPassword: "early-password"}); err != coreauth.ErrEmailTokenInvalid {
+		t.Fatalf("expected ErrEmailTokenInvalid for the link the resend replaced, got %v", err)
+	}
+	if _, err := confirmUC.Execute(context.Background(), ConfirmInviteInput{Token: second, NewPassword: "invitee-password"}); err != nil {
+		t.Fatalf("ConfirmInvite with the latest link returned error: %v", err)
+	}
+
+	out, err := confirmUC.Execute(context.Background(), ConfirmInviteInput{Token: first, NewPassword: "later-password"})
+	if err != coreauth.ErrEmailTokenInvalid {
+		t.Fatalf("expected ErrEmailTokenInvalid for the stale link, got out=%v err=%v", out, err)
+	}
+	if _, err := users.DoesIDAndPasswordMatch(invited.User.ID, "invitee-password"); err != nil {
+		t.Fatalf("expected the invitee's password to still authenticate, got error: %v", err)
+	}
+}

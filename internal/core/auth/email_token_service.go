@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -118,9 +119,10 @@ func (s *EmailTokenService) ConfirmPasswordReset(rawToken, newPassword string) (
 // IssueInvite mints an invite token for an already-created user and emails
 // it. Unlike RequestPasswordReset, the caller (InviteUserUseCase) already
 // knows the user exists — it just created them — so no enumeration concern
-// applies here.
+// applies here. A resend retires the earlier invite link, so only the link in
+// the most recent invite email works.
 func (s *EmailTokenService) IssueInvite(ctx context.Context, user *User) error {
-	rawToken, err := s.tokens.Issue(user.ID, PurposeInvite, InviteTokenTTL)
+	rawToken, err := s.tokens.IssueReplacingOpen(user.ID, PurposeInvite, InviteTokenTTL)
 	if err != nil {
 		return fmt.Errorf("issue invite token: %w", err)
 	}
@@ -131,8 +133,12 @@ func (s *EmailTokenService) IssueInvite(ctx context.Context, user *User) error {
 
 // ConfirmInvite consumes rawToken, sets the user's real password, clears
 // MustSetPassword, and returns the user so the caller can auto-issue a
-// session (a freshly invited user has no prior sessions to worry about,
-// unlike ConfirmPasswordReset).
+// session. Unlike ConfirmPasswordReset it revokes no sessions: CompleteInvite
+// only succeeds while the invite is still pending, and every path that stores
+// a usable password ends the pending state, so the account cannot have had a
+// session yet. A token for an invite that is no longer pending fails with
+// ErrEmailTokenInvalid, the same answer as an unknown or expired link, so the
+// response does not tell a caller whether the invite was accepted.
 func (s *EmailTokenService) ConfirmInvite(rawToken, newPassword string) (*User, error) {
 	tok, err := s.tokens.Resolve(rawToken, PurposeInvite)
 	if err != nil {
@@ -143,6 +149,9 @@ func (s *EmailTokenService) ConfirmInvite(rawToken, newPassword string) (*User, 
 	}
 
 	if err := s.users.CompleteInvite(tok.UserID, newPassword); err != nil {
+		if errors.Is(err, ErrInviteAlreadyAccepted) {
+			return nil, ErrEmailTokenInvalid
+		}
 		return nil, err
 	}
 

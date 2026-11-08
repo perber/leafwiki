@@ -198,3 +198,41 @@ func TestEmailTokenStore_CleanupExpired_RemovesOnlyExpiredRows(t *testing.T) {
 		t.Fatalf("expected active token to survive cleanup, Resolve returned: %v", err)
 	}
 }
+
+// IssueReplacingOpen keeps at most one open token per user and purpose:
+// the earlier open token of the same user and purpose stops resolving, while
+// tokens of another purpose or another user are left alone.
+func TestEmailTokenStore_IssueReplacingOpen_RevokesEarlierOpenTokens(t *testing.T) {
+	store := newTestEmailTokenStore(t)
+
+	earlier, err := store.Issue("user-1", PurposeInvite, InviteTokenTTL)
+	if err != nil {
+		t.Fatalf("Issue returned error: %v", err)
+	}
+	otherPurpose, err := store.Issue("user-1", PurposePasswordReset, time.Hour)
+	if err != nil {
+		t.Fatalf("Issue returned error: %v", err)
+	}
+	otherUser, err := store.Issue("user-2", PurposeInvite, InviteTokenTTL)
+	if err != nil {
+		t.Fatalf("Issue returned error: %v", err)
+	}
+
+	latest, err := store.IssueReplacingOpen("user-1", PurposeInvite, InviteTokenTTL)
+	if err != nil {
+		t.Fatalf("IssueReplacingOpen returned error: %v", err)
+	}
+
+	if _, err := store.Resolve(earlier, PurposeInvite); err != ErrEmailTokenInvalid {
+		t.Fatalf("expected the earlier invite token to be revoked, got %v", err)
+	}
+	if _, err := store.Resolve(latest, PurposeInvite); err != nil {
+		t.Fatalf("expected the new invite token to resolve, got %v", err)
+	}
+	if _, err := store.Resolve(otherPurpose, PurposePasswordReset); err != nil {
+		t.Fatalf("expected the reset token of the same user to stay valid, got %v", err)
+	}
+	if _, err := store.Resolve(otherUser, PurposeInvite); err != nil {
+		t.Fatalf("expected the invite token of another user to stay valid, got %v", err)
+	}
+}

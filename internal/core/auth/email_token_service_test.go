@@ -7,6 +7,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -271,5 +272,174 @@ func TestEmailTokenService_ConfirmInvite_RejectsPasswordResetToken(t *testing.T)
 
 	if _, err := svc.ConfirmInvite(rawToken, "a-real-password"); err != ErrEmailTokenInvalid {
 		t.Fatalf("expected ErrEmailTokenInvalid for a purpose-mismatched token, got %v", err)
+	}
+}
+
+// An invite token that was issued but not used must stop working once the
+// invite is completed some other way, otherwise it can overwrite the
+// password of an account that is already in use. Tokens are minted with
+// tokens.Issue directly so this pins ConfirmInvite's own check, independent
+// of IssueInvite revoking earlier tokens.
+func TestEmailTokenService_ConfirmInvite_RejectsTokenAfterPasswordSet(t *testing.T) {
+	tests := []struct {
+		name     string
+		complete func(t *testing.T, svc *EmailTokenService, users *UserService, userID string) string
+	}{
+		{
+			name: "accepted with another invite token",
+			complete: func(t *testing.T, svc *EmailTokenService, _ *UserService, userID string) string {
+				t.Helper()
+				other, err := svc.tokens.Issue(userID, PurposeInvite, InviteTokenTTL)
+				if err != nil {
+					t.Fatalf("Issue returned error: %v", err)
+				}
+				if _, err := svc.ConfirmInvite(other, "invitee-password"); err != nil {
+					t.Fatalf("ConfirmInvite with the other token returned error: %v", err)
+				}
+				return "invitee-password"
+			},
+		},
+		{
+			name: "password set by an admin",
+			complete: func(t *testing.T, _ *EmailTokenService, users *UserService, userID string) string {
+				t.Helper()
+				if _, err := users.UpdateUser(userID, "bob", "bob@example.com", "admin-set-password", ""); err != nil {
+					t.Fatalf("UpdateUser returned error: %v", err)
+				}
+				return "admin-set-password"
+			},
+		},
+		{
+			name: "password set through a reset link",
+			complete: func(t *testing.T, svc *EmailTokenService, _ *UserService, userID string) string {
+				t.Helper()
+				reset, err := svc.tokens.Issue(userID, PurposePasswordReset, PasswordResetTokenTTL)
+				if err != nil {
+					t.Fatalf("Issue returned error: %v", err)
+				}
+				if _, err := svc.ConfirmPasswordReset(reset, "reset-password"); err != nil {
+					t.Fatalf("ConfirmPasswordReset returned error: %v", err)
+				}
+				return "reset-password"
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, users, _ := newTestEmailTokenService(t, "127.0.0.1:1")
+
+			invited, err := users.InviteUser("bob", "bob@example.com", RoleEditor)
+			if err != nil {
+				t.Fatalf("InviteUser returned error: %v", err)
+			}
+			unused, err := svc.tokens.Issue(invited.ID, PurposeInvite, InviteTokenTTL)
+			if err != nil {
+				t.Fatalf("Issue returned error: %v", err)
+			}
+
+			current := tt.complete(t, svc, users, invited.ID)
+
+			if _, err := svc.ConfirmInvite(unused, "later-password"); err != ErrEmailTokenInvalid {
+				t.Fatalf("expected ErrEmailTokenInvalid for an invite that is already completed, got %v", err)
+			}
+			if _, err := users.DoesIDAndPasswordMatch(invited.ID, current); err != nil {
+				t.Fatalf("expected the current password to still authenticate, got error: %v", err)
+			}
+		})
+	}
+}
+
+// An invite token that outlives its user (the admin deleted the pending
+// account) must be rejected like any invalid link, not surface a lookup error.
+func TestEmailTokenService_ConfirmInvite_DeletedUser_ReturnsInvalid(t *testing.T) {
+	svc, users, _ := newTestEmailTokenService(t, "127.0.0.1:1")
+
+	invited, err := users.InviteUser("bob", "bob@example.com", RoleEditor)
+	if err != nil {
+		t.Fatalf("InviteUser returned error: %v", err)
+	}
+	rawToken, err := svc.tokens.Issue(invited.ID, PurposeInvite, InviteTokenTTL)
+	if err != nil {
+		t.Fatalf("Issue returned error: %v", err)
+	}
+	if err := users.DeleteUser(invited.ID); err != nil {
+		t.Fatalf("DeleteUser returned error: %v", err)
+	}
+
+	if out, err := svc.ConfirmInvite(rawToken, "invitee-password"); err != ErrEmailTokenInvalid {
+		t.Fatalf("expected ErrEmailTokenInvalid for a deleted user, got out=%v err=%v", out, err)
+	}
+}
+
+// A resent invite retires the earlier invite link but must leave an open
+// password-reset link of the same user working.
+func TestEmailTokenService_IssueInvite_KeepsOpenPasswordResetToken(t *testing.T) {
+	srv := startFakeSMTPServer(t)
+	svc, users, _ := newTestEmailTokenService(t, srv.addr)
+
+	invited, err := users.InviteUser("bob", "bob@example.com", RoleEditor)
+	if err != nil {
+		t.Fatalf("InviteUser returned error: %v", err)
+	}
+	earlierInvite, err := svc.tokens.Issue(invited.ID, PurposeInvite, InviteTokenTTL)
+	if err != nil {
+		t.Fatalf("Issue returned error: %v", err)
+	}
+	reset, err := svc.tokens.Issue(invited.ID, PurposePasswordReset, PasswordResetTokenTTL)
+	if err != nil {
+		t.Fatalf("Issue returned error: %v", err)
+	}
+
+	if err := svc.IssueInvite(context.Background(), invited); err != nil {
+		t.Fatalf("IssueInvite returned error: %v", err)
+	}
+
+	if _, err := svc.tokens.Resolve(earlierInvite, PurposeInvite); err != ErrEmailTokenInvalid {
+		t.Fatalf("expected the earlier invite token to be retired, got %v", err)
+	}
+	if _, err := svc.tokens.Resolve(reset, PurposePasswordReset); err != nil {
+		t.Fatalf("expected the password-reset token to stay valid, got %v", err)
+	}
+}
+
+// Two different open invite tokens of the same user, confirmed at the same
+// time, must not both set a password.
+func TestEmailTokenService_ConfirmInvite_ConcurrentTokens_OnlyOneWinner(t *testing.T) {
+	svc, users, _ := newTestEmailTokenService(t, "127.0.0.1:1")
+
+	invited, err := users.InviteUser("bob", "bob@example.com", RoleEditor)
+	if err != nil {
+		t.Fatalf("InviteUser returned error: %v", err)
+	}
+
+	const attempts = 5
+	rawTokens := make([]string, attempts)
+	for i := range rawTokens {
+		if rawTokens[i], err = svc.tokens.Issue(invited.ID, PurposeInvite, InviteTokenTTL); err != nil {
+			t.Fatalf("Issue returned error: %v", err)
+		}
+	}
+
+	var wg sync.WaitGroup
+	successes := make([]bool, attempts)
+	for i := range rawTokens {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, err := svc.ConfirmInvite(rawTokens[i], fmt.Sprintf("password-number-%d", i))
+			successes[i] = err == nil
+		}(i)
+	}
+	wg.Wait()
+
+	wins := 0
+	for _, ok := range successes {
+		if ok {
+			wins++
+		}
+	}
+	if wins != 1 {
+		t.Fatalf("expected exactly 1 successful ConfirmInvite out of %d concurrent attempts, got %d", attempts, wins)
 	}
 }

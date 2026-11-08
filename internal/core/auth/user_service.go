@@ -515,12 +515,20 @@ func (s *UserService) InviteUser(username, email, role string) (*User, error) {
 
 // CompleteInvite sets id's real password and clears MustSetPassword. Called
 // once an invite token is confirmed (see auth.EmailTokenService.ConfirmInvite).
+// It only succeeds while the invite is still pending and returns
+// ErrInviteAlreadyAccepted once any password has been set (another invite
+// link, a reset link, an admin), or when id has no pending invite at all.
 func (s *UserService) CompleteInvite(id, password string) error {
-	if err := s.UpdatePassword(id, password); err != nil {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
 		return err
 	}
-	if err := s.store.SetMustSetPassword(id, false); err != nil {
+	completed, err := s.store.CompleteInvite(id, string(hashedPassword))
+	if err != nil {
 		return err
+	}
+	if !completed {
+		return ErrInviteAlreadyAccepted
 	}
 
 	s.log.Info("invite accepted", "userID", id)
