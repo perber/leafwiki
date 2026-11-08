@@ -328,11 +328,12 @@ shape for that domain.
   the page meta contributor; `routes.go`: `Routes` (`robots.txt`, `sitemap.xml`, GET and
   HEAD); `root_target.go`: `GetRootTargetUseCase` behind the narrow `FirstPageReader`;
   `urls.go`: the URL helpers the features share (escaped wiki path, absolute URL from
-  `--public-url`); `page.go`: `Page` and `PageReader`, the single-page read shared by
-  `page_meta.go` (`GetPageMetaUseCase`: title, description, canonical URL) and `markdown.go`
-  (`GetPageMarkdownUseCase` and the `Accept` negotiation); `robots.go`: `GetRobotsUseCase` and
-  `PrivateRobots`; `sitemap.go`: `BuildSitemapUseCase` behind `PageRouteLister`, streamed by
-  `WriteXML`. The readers are implemented in `internal/wiki/seo_adapter.go` with the pages
+  `--public-url`, the `/p/:id/:slug?` permalink locator, the only SPA route the slice knows);
+  `page.go`: `Page` and `PageReader`, the single-page read shared by `page_meta.go`
+  (`GetPageMetaUseCase`: title, description, canonical URL; `PermalinkResolver` for
+  permalinks) and `markdown.go` (`GetPageMarkdownUseCase` and the `Accept` negotiation);
+  `robots.go`: `GetRobotsUseCase` and `PrivateRobots`; `sitemap.go`: `BuildSitemapUseCase`
+  behind `PageRouteLister`, streamed by `WriteXML`. The readers are implemented in `internal/wiki/seo_adapter.go` with the pages
   slice's read use cases.
 
 ## Frontend — `ui/leafwiki-ui/src/`

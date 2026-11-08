@@ -33,6 +33,29 @@ func pageAt(routePath string, page seo.Page) *fakePageReader {
 
 func staticSiteName(name string) func() string { return func() string { return name } }
 
+// fakePermalinkResolver resolves page IDs to route paths (missing = no page)
+// or returns a fixed error, and records the IDs it was asked for.
+type fakePermalinkResolver struct {
+	targets map[string]string
+	err     error
+	asked   []string
+}
+
+func (f *fakePermalinkResolver) ResolvePermalink(_ context.Context, id string) (*seo.PermalinkTarget, error) {
+	f.asked = append(f.asked, id)
+	if f.err != nil {
+		return nil, f.err
+	}
+	routePath, ok := f.targets[id]
+	if !ok {
+		return nil, nil
+	}
+	return &seo.PermalinkTarget{RoutePath: routePath}, nil
+}
+
+// noPermalinks resolves no ID, for tests of page routes.
+func noPermalinks() *fakePermalinkResolver { return &fakePermalinkResolver{} }
+
 func TestGetPageMetaUseCase_Page_BuildsMeta(t *testing.T) {
 	longBody := strings.Repeat("word ", 100)
 	tests := []struct {
@@ -156,7 +179,7 @@ func TestGetPageMetaUseCase_Page_BuildsMeta(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			reader := pageAt(strings.TrimPrefix(tc.routePath, "/"), tc.page)
-			uc := seo.NewGetPageMetaUseCase(reader, staticSiteName(tc.siteName), tc.publicURL)
+			uc := seo.NewGetPageMetaUseCase(reader, noPermalinks(), staticSiteName(tc.siteName), tc.publicURL)
 
 			out, err := uc.Execute(context.Background(), seo.GetPageMetaInput{RoutePath: tc.routePath, BasePath: tc.basePath})
 			if err != nil {
@@ -184,7 +207,7 @@ func TestGetPageMetaUseCase_NoPage_ReturnsNoMeta(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			uc := seo.NewGetPageMetaUseCase(tc.reader, staticSiteName(""), "https://wiki.example.com")
+			uc := seo.NewGetPageMetaUseCase(tc.reader, noPermalinks(), staticSiteName(""), "https://wiki.example.com")
 
 			out, err := uc.Execute(context.Background(), seo.GetPageMetaInput{RoutePath: tc.routePath})
 			if err != nil || out != nil {
@@ -199,10 +222,104 @@ func TestGetPageMetaUseCase_NoPage_ReturnsNoMeta(t *testing.T) {
 
 func TestGetPageMetaUseCase_ReaderError_IsReturned(t *testing.T) {
 	readErr := errors.New("disk on fire")
-	uc := seo.NewGetPageMetaUseCase(&fakePageReader{err: readErr}, staticSiteName(""), "")
+	uc := seo.NewGetPageMetaUseCase(&fakePageReader{err: readErr}, noPermalinks(), staticSiteName(""), "")
 
 	if _, err := uc.Execute(context.Background(), seo.GetPageMetaInput{RoutePath: "/docs"}); !errors.Is(err, readErr) {
 		t.Fatalf("err = %v, want %v", err, readErr)
+	}
+}
+
+// A permalink route ("/p/<id>" or "/p/<id>/<slug>", the SPA route
+// "/p/:id/:slug?") gets the meta of the page the ID points at, with the page's
+// route path as canonical URL; the slug is decorative and may be stale.
+func TestGetPageMetaUseCase_Permalink_UsesTargetPage(t *testing.T) {
+	setup := seo.Page{Title: "Setup", Body: "Install it."}
+	tests := []struct {
+		name      string
+		routePath string
+		basePath  string
+		wantURL   string
+	}{
+		{name: "id alone", routePath: "/p/abc123", wantURL: "https://wiki.example.com/docs/setup"},
+		{name: "id and current slug", routePath: "/p/abc123/setup", wantURL: "https://wiki.example.com/docs/setup"},
+		{name: "id and wrong slug", routePath: "/p/abc123/old-name", wantURL: "https://wiki.example.com/docs/setup"},
+		{name: "trailing slash", routePath: "/p/abc123/", wantURL: "https://wiki.example.com/docs/setup"},
+		{name: "with base path", routePath: "/p/abc123/setup", basePath: "/wiki", wantURL: "https://wiki.example.com/wiki/docs/setup"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// A page at the literal path "p/abc123" is not what the SPA shows there.
+			reader := &fakePageReader{pages: map[string]*seo.Page{"docs/setup": &setup, "p/abc123": {Title: "Shadowed"}}}
+			permalinks := &fakePermalinkResolver{targets: map[string]string{"abc123": "docs/setup"}}
+			uc := seo.NewGetPageMetaUseCase(reader, permalinks, staticSiteName(""), "https://wiki.example.com")
+
+			out, err := uc.Execute(context.Background(), seo.GetPageMetaInput{RoutePath: tc.routePath, BasePath: tc.basePath})
+			if err != nil {
+				t.Fatalf("Execute failed: %v", err)
+			}
+			want := seo.GetPageMetaOutput{Title: "Setup - LeafWiki", PageTitle: "Setup", SiteName: "LeafWiki", Description: "Install it.", CanonicalURL: tc.wantURL}
+			if out == nil || *out != want {
+				t.Fatalf("meta = %+v\nwant   %+v", out, want)
+			}
+			if len(permalinks.asked) != 1 || permalinks.asked[0] != "abc123" {
+				t.Errorf("resolver asked %q, want [abc123]", permalinks.asked)
+			}
+			if len(reader.asked) != 1 || reader.asked[0] != "docs/setup" {
+				t.Errorf("reader asked %q, want [docs/setup]", reader.asked)
+			}
+		})
+	}
+}
+
+// Routes that are no permalink in the SPA ("/p/" alone, an empty ID, extra
+// segments) stay ordinary page routes; a permalink without a page gets no meta.
+func TestGetPageMetaUseCase_PermalinkNoPage_ReturnsNoMeta(t *testing.T) {
+	tests := []struct {
+		name          string
+		routePath     string
+		targets       map[string]string
+		wantResolved  []string
+		wantPageReads []string
+	}{
+		{name: "unknown id", routePath: "/p/unknown", wantResolved: []string{"unknown"}},
+		{name: "id of the root", routePath: "/p/root", targets: map[string]string{"root": ""}, wantResolved: []string{"root"}},
+		{name: "target gone before the page read", routePath: "/p/abc123", targets: map[string]string{"abc123": "gone"}, wantResolved: []string{"abc123"}, wantPageReads: []string{"gone"}},
+		{name: "p alone is a page route", routePath: "/p", wantPageReads: []string{"p"}},
+		{name: "p with slash is a page route", routePath: "/p/", wantPageReads: []string{"p/"}},
+		{name: "empty id is a page route", routePath: "/p//setup", wantPageReads: []string{"p//setup"}},
+		{name: "extra segments are a page route", routePath: "/p/abc123/setup/more", wantPageReads: []string{"p/abc123/setup/more"}},
+		{name: "prefix without separator is a page route", routePath: "/pabc123", wantPageReads: []string{"pabc123"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			reader := &fakePageReader{}
+			permalinks := &fakePermalinkResolver{targets: tc.targets}
+			uc := seo.NewGetPageMetaUseCase(reader, permalinks, staticSiteName(""), "https://wiki.example.com")
+
+			out, err := uc.Execute(context.Background(), seo.GetPageMetaInput{RoutePath: tc.routePath})
+			if err != nil || out != nil {
+				t.Fatalf("Execute = %+v, %v; want nil, nil", out, err)
+			}
+			if strings.Join(permalinks.asked, ",") != strings.Join(tc.wantResolved, ",") {
+				t.Errorf("resolver asked %q, want %q", permalinks.asked, tc.wantResolved)
+			}
+			if strings.Join(reader.asked, ",") != strings.Join(tc.wantPageReads, ",") {
+				t.Errorf("reader asked %q, want %q", reader.asked, tc.wantPageReads)
+			}
+		})
+	}
+}
+
+func TestGetPageMetaUseCase_PermalinkResolverError_IsReturned(t *testing.T) {
+	resolveErr := errors.New("disk on fire")
+	reader := &fakePageReader{}
+	uc := seo.NewGetPageMetaUseCase(reader, &fakePermalinkResolver{err: resolveErr}, staticSiteName(""), "")
+
+	if _, err := uc.Execute(context.Background(), seo.GetPageMetaInput{RoutePath: "/p/abc123"}); !errors.Is(err, resolveErr) {
+		t.Fatalf("err = %v, want %v", err, resolveErr)
+	}
+	if reader.reads != 0 {
+		t.Errorf("reads = %d, want 0", reader.reads)
 	}
 }
 
