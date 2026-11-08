@@ -9,6 +9,7 @@ package render
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -62,11 +63,49 @@ func RenderHTML(content string, opt Options) (string, error) {
 	pc := parser.NewContext()
 	pc.Set(optionsKey, &opt)
 
-	var buf bytes.Buffer
-	if err := markdownRenderer.Convert([]byte(content), &buf, parser.WithContext(pc)); err != nil {
+	if err := checkComplexity(content); err != nil {
+		return "", err
+	}
+	out := &cappedWriter{limit: maxOutputBytes}
+	if err := markdownRenderer.Convert([]byte(content), out, parser.WithContext(pc)); err != nil {
+		if out.exceeded {
+			return "", ErrTooComplex
+		}
 		return "", fmt.Errorf("render markdown: %w", err)
 	}
-	return balanceHTML(policy.SanitizeBytes(buf.Bytes()))
+	return balanceHTML(policy.SanitizeBytes(out.buf.Bytes()))
+}
+
+// errDisallowedMarkup means balanceHTML found markup outside the policy. The
+// sanitizer runs first, so it only happens when the policy and the sanitizer
+// disagree; failing closed turns such a mistake into "no rendered body".
+var errDisallowedMarkup = errors.New("render: sanitized HTML contains markup outside the policy")
+
+// checkAllowed walks the parsed tree: only allowed elements without a
+// namespace, only their allowed attributes, and no comments or doctypes.
+func checkAllowed(n *html.Node) error {
+	switch n.Type {
+	case html.TextNode:
+		return nil
+	case html.ElementNode:
+		attrs, ok := allowedMarkup[n.Data]
+		if !ok || n.Namespace != "" {
+			return fmt.Errorf("%w: element %q", errDisallowedMarkup, n.Data)
+		}
+		for _, a := range n.Attr {
+			if a.Namespace != "" || !attrs[a.Key] {
+				return fmt.Errorf("%w: attribute %q on %q", errDisallowedMarkup, a.Key, n.Data)
+			}
+		}
+	default:
+		return fmt.Errorf("%w: node type %d", errDisallowedMarkup, n.Type)
+	}
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if err := checkAllowed(c); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // balanceHTML parses sanitized HTML the way a browser does inside #root and
@@ -79,7 +118,13 @@ func balanceHTML(sanitized []byte) (string, error) {
 		Type: html.ElementNode, Data: "div", DataAtom: atom.Div,
 	})
 	if err != nil {
-		return "", fmt.Errorf("balance html: %w", err)
+		// x/net/html refuses more than 512 open elements.
+		return "", fmt.Errorf("%w: %v", ErrTooComplex, err)
+	}
+	for _, node := range nodes {
+		if err := checkAllowed(node); err != nil {
+			return "", err
+		}
 	}
 	var out strings.Builder
 	for _, node := range nodes {
