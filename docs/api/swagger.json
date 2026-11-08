@@ -323,7 +323,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Full-text search over page titles and content, or a tag-only listing when `tags` is given without `q`. With both, the text hits are filtered to pages carrying every given tag. Each hit carries a rank and an excerpt; the result also lists the tags of the matching pages as facets. `limit` and `offset` are handed to the text index as they are (no upper bound, `-1` means all rows); a tag-only search turns a `limit` below 1 into 20 and clamps a negative `offset`.\nAccess: a signed-in user (session cookie, API key or reverse-proxy identity); anonymous callers only when public access is on. With public access on, a missing or invalid session cookie is treated as anonymous instead of 401.",
+                "description": "Full-text search over page titles and content, or a tag-only listing when `tags` is given without `q`. With both, the text hits are filtered to pages carrying every given tag. Each hit carries a rank and an excerpt; the result also lists the tags of the matching pages as facets. A `limit` below 1 means 20 and a `limit` above 100 means 100; a negative `offset` means 0 and an `offset` above 10000 means 10000, for text and tag-only searches alike. The result echoes the values that were applied; a tag-only search also lowers an `offset` beyond the hit count to that count.\nAccess: a signed-in user (session cookie, API key or reverse-proxy identity); anonymous callers only when public access is on. With public access on, a missing or invalid session cookie is treated as anonymous instead of 401.",
                 "produces": [
                     "application/json"
                 ],
@@ -351,14 +351,14 @@
                     {
                         "type": "integer",
                         "default": 0,
-                        "description": "Number of hits to skip",
+                        "description": "Number of hits to skip; negative values mean 0, values above 10000 mean 10000",
                         "name": "offset",
                         "in": "query"
                     },
                     {
                         "type": "integer",
                         "default": 20,
-                        "description": "Maximum number of hits",
+                        "description": "Maximum number of hits; values below 1 mean 20, values above 100 mean 100",
                         "name": "limit",
                         "in": "query"
                     }

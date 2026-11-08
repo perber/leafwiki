@@ -48,15 +48,15 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 // handleSearch handles GET /api/search?q=&tags=&offset=&limit=
 //
 //	@Summary		Search pages
-//	@Description	Full-text search over page titles and content, or a tag-only listing when `tags` is given without `q`. With both, the text hits are filtered to pages carrying every given tag. Each hit carries a rank and an excerpt; the result also lists the tags of the matching pages as facets. `limit` and `offset` are handed to the text index as they are (no upper bound, `-1` means all rows); a tag-only search turns a `limit` below 1 into 20 and clamps a negative `offset`.
+//	@Description	Full-text search over page titles and content, or a tag-only listing when `tags` is given without `q`. With both, the text hits are filtered to pages carrying every given tag. Each hit carries a rank and an excerpt; the result also lists the tags of the matching pages as facets. A `limit` below 1 means 20 and a `limit` above 100 means 100; a negative `offset` means 0 and an `offset` above 10000 means 10000, for text and tag-only searches alike. The result echoes the values that were applied; a tag-only search also lowers an `offset` beyond the hit count to that count.
 //	@Description	Access: a signed-in user (session cookie, API key or reverse-proxy identity); anonymous callers only when public access is on. With public access on, a missing or invalid session cookie is treated as anonymous instead of 401.
 //	@Tags			search
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Param			q		query		string				false	"Search text; required unless `tags` is given. At most 256 characters (after trimming surrounding whitespace) and 12 search terms; AND, OR and NOT don't count as terms"
 //	@Param			tags	query		[]string			false	"Tags a page must all carry; repeat the parameter or separate tags with commas"	collectionFormat(multi)
-//	@Param			offset	query		integer				false	"Number of hits to skip"	default(0)
-//	@Param			limit	query		integer				false	"Maximum number of hits"	default(20)
+//	@Param			offset	query		integer				false	"Number of hits to skip; negative values mean 0, values above 10000 mean 10000"	default(0)
+//	@Param			limit	query		integer				false	"Maximum number of hits; values below 1 mean 20, values above 100 mean 100"	default(20)
 //	@Success		200		{object}	dto.SearchResult	"Hits and tag facets; empty lists when nothing matches"
 //	@Failure		400		{object}	dto.ErrorResponse	"Neither `q` nor a tag given (code search_missing_query), `q` longer than 256 characters or 12 terms (code search_query_too_long), or `offset` or `limit` is not an integer (codes search_invalid_offset, search_invalid_limit)"
 //	@Failure		401		{object}	dto.LegacyError		"No valid session while public access is off, an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)"

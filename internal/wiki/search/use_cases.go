@@ -78,6 +78,36 @@ func NewSearchUseCase(idx *coresearch.SQLiteIndex, tags *coretags.TagsService, t
 	return &SearchUseCase{index: idx, tags: tags, tree: tree, log: log.With("component", "SearchUseCase")}
 }
 
+// Paging bounds for a search. The text index treats a negative limit as "all
+// rows", so without an upper bound one request could rank, excerpt and
+// serialize every page of the wiki. A huge offset is capped as well: SQLite
+// can only keep the top offset+limit rows while sorting, so an unbounded
+// offset makes it hold every matching row, content included.
+const (
+	searchDefaultLimit = 20
+	searchMaxLimit     = 100
+	searchMaxOffset    = 10_000
+)
+
+// boundPaging turns a limit below 1 into the default, caps it at
+// searchMaxLimit, turns a negative offset into 0 and caps the offset at
+// searchMaxOffset, the same substitute-don't-reject shape GET /api/tags uses.
+func boundPaging(offset, limit int) (int, int) {
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > searchMaxOffset {
+		offset = searchMaxOffset
+	}
+	if limit < 1 {
+		limit = searchDefaultLimit
+	}
+	if limit > searchMaxLimit {
+		limit = searchMaxLimit
+	}
+	return offset, limit
+}
+
 func (uc *SearchUseCase) Execute(ctx context.Context, in SearchInput) (*SearchOutput, error) {
 	query := strings.TrimSpace(in.Query)
 	if utf8.RuneCountInString(query) > maxQueryRunes || coresearch.QueryTermCount(query) > maxQueryTerms {
@@ -87,6 +117,7 @@ func (uc *SearchUseCase) Execute(ctx context.Context, in SearchInput) (*SearchOu
 	if uc.index == nil {
 		return nil, ErrSearchUnavailable
 	}
+	in.Offset, in.Limit = boundPaging(in.Offset, in.Limit)
 
 	var pageIDs []string
 	if len(in.Tags) > 0 {
@@ -178,13 +209,9 @@ func (uc *SearchUseCase) searchByTags(pageIDs []string, offset, limit int) (*Sea
 		return items[i].Title < items[j].Title
 	})
 
-	if offset < 0 {
-		offset = 0
-	}
-	if limit <= 0 {
-		limit = 20
-	}
-
+	// Execute already bounds the paging; this keeps direct callers safe too,
+	// since items[offset:end] below panics on a negative offset.
+	offset, limit = boundPaging(offset, limit)
 	count := len(items)
 	if offset > count {
 		offset = count

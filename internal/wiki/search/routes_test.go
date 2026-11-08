@@ -222,6 +222,11 @@ func TestSearchRoutes_Search_ErrorBodies(t *testing.T) {
 		{"invalid offset", "/api/search?q=components&offset=x", `{"error":{"code":"search_invalid_offset","message":"Invalid offset value","template":"invalid offset value"}}`},
 		{"invalid limit", "/api/search?q=components&limit=x", `{"error":{"code":"search_invalid_limit","message":"Invalid limit value","template":"invalid limit value"}}`},
 		{"query with too many terms", "/api/search?q=" + strings.TrimSuffix(strings.Repeat("pi+", 13), "+"), `{"error":{"code":"search_query_too_long","message":"Search query is too long: at most 256 characters and 12 terms","template":"search query is too long: at most %s characters and %s terms","args":["256","12"]}}`},
+		{"offset beyond the int64 range", "/api/search?q=components&offset=99999999999999999999", `{"error":{"code":"search_invalid_offset","message":"Invalid offset value","template":"invalid offset value"}}`},
+		{"limit beyond the int64 range", "/api/search?q=components&limit=-99999999999999999999", `{"error":{"code":"search_invalid_limit","message":"Invalid limit value","template":"invalid limit value"}}`},
+		{"fractional limit", "/api/search?q=components&limit=1.5", `{"error":{"code":"search_invalid_limit","message":"Invalid limit value","template":"invalid limit value"}}`},
+		{"empty limit", "/api/search?q=components&limit=", `{"error":{"code":"search_invalid_limit","message":"Invalid limit value","template":"invalid limit value"}}`},
+		{"tag-only search with invalid offset", "/api/search?tags=frontend&offset=x", `{"error":{"code":"search_invalid_offset","message":"Invalid offset value","template":"invalid offset value"}}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -428,4 +433,67 @@ func grepLines(s, sub string) string {
 		}
 	}
 	return strings.Join(out, "\n")
+}
+
+// TestSearchRoutes_Search_BoundsLimitAndOffset pins the paging bounds for
+// both the text path and the tag-only path: a limit below 1 means the default
+// of 20, a limit above 100 means 100, a negative offset means 0 and an
+// offset above 10 000 means 10 000. The
+// response echoes the values that were actually applied.
+func TestSearchRoutes_Search_BoundsLimitAndOffset(t *testing.T) {
+	router, _ := newSearchRouter(t, signedIn, searchPages...)
+
+	tests := []struct {
+		name        string
+		query       string
+		wantLimit   int
+		wantOffset  int
+		wantNoItems bool
+	}{
+		{"text: limit -1 means the default", "q=components&limit=-1", 20, 0, false},
+		{"text: limit 0 means the default", "q=components&limit=0", 20, 0, false},
+		{"text: limit above the maximum is capped", "q=components&limit=100000", 100, 0, false},
+		{"text: limit at the maximum is kept", "q=components&limit=100", 100, 0, false},
+		{"text: limit 1 is kept", "q=components&limit=1", 1, 0, false},
+		{"text: negative offset means 0", "q=components&offset=-5", 20, 0, false},
+		{"tags: limit above the maximum is capped", "tags=frontend&limit=100000", 100, 0, false},
+		{"tags: limit -1 means the default", "tags=frontend&limit=-1", 20, 0, false},
+		{"tags: negative offset means 0", "tags=frontend&offset=-5", 20, 0, false},
+		// Values up to the 32-bit int range, so the rows hold on 386 too.
+		{"text: largest 32-bit limit is capped", "q=components&limit=2147483647", 100, 0, false},
+		{"text: offset beyond the hit count is echoed, no items", "q=components&offset=50", 20, 50, true},
+		{"text: offset above the maximum is capped, no items", "q=components&offset=2147483647", 20, 10000, true},
+		{"text: offset at the maximum is kept", "q=components&offset=10000", 20, 10000, true},
+		{"text: limit and offset both out of range", "q=components&limit=-7&offset=-7", 20, 0, false},
+		{"tags: limit 0 means the default", "tags=frontend&limit=0", 20, 0, false},
+		{"tags: offset beyond the hit count is clamped to the count", "tags=frontend&offset=50", 20, 2, true},
+		{"tags: largest 32-bit offset is clamped to the count", "tags=frontend&offset=2147483647", 20, 2, true},
+		{"tags: largest 32-bit limit is capped", "tags=frontend&limit=2147483647", 100, 0, false},
+		{"text and tags: limit above the maximum is capped", "q=components&tags=frontend&limit=100000", 100, 0, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := get(router, "/api/search?"+tt.query)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status code = %d, want 200; body=%s", rec.Code, rec.Body.String())
+			}
+			var body struct {
+				Limit  int               `json:"limit"`
+				Offset int               `json:"offset"`
+				Items  []json.RawMessage `json:"items"`
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+				t.Fatalf("decode body: %v; body=%s", err, rec.Body.String())
+			}
+			if body.Limit != tt.wantLimit || body.Offset != tt.wantOffset {
+				t.Fatalf("limit, offset = %d, %d; want %d, %d", body.Limit, body.Offset, tt.wantLimit, tt.wantOffset)
+			}
+			if len(body.Items) > tt.wantLimit {
+				t.Fatalf("got %d items, want at most %d", len(body.Items), tt.wantLimit)
+			}
+			if tt.wantNoItems != (len(body.Items) == 0) {
+				t.Fatalf("got %d items, wantNoItems %v", len(body.Items), tt.wantNoItems)
+			}
+		})
+	}
 }
