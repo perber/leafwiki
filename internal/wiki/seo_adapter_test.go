@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -819,5 +820,181 @@ func TestWiki_PageMarkdown_FollowsPublicAccessAtRuntime(t *testing.T) {
 	setPublicAccess(t, public, false)
 	if isMarkdown() {
 		t.Fatal("after disabling public access: got markdown")
+	}
+}
+
+// useEmbeddedFrontend serves the real shell, so tests can tell the shell
+// from the Markdown variant; it skips without a built frontend.
+func useEmbeddedFrontend(t *testing.T) {
+	t.Helper()
+	old := httpinternal.EmbedFrontend
+	httpinternal.EmbedFrontend = "true"
+	t.Cleanup(func() { httpinternal.EmbedFrontend = old })
+	_, _, router := newSEOTestRouter(t, "")
+	if rec := serveGET(router, "/welcome-to-leafwiki", nil); !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/html") {
+		t.Skip("requires built frontend (make ui)")
+	}
+}
+
+func serveAccept(router http.Handler, method, path, accept string, headers map[string]string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, path, nil)
+	if accept != "" {
+		req.Header.Set("Accept", accept)
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	return rec
+}
+
+// The Markdown variant on the real router: GET and HEAD agree on every
+// header, the body is the page content only (no shell, no meta tags) and
+// Vary: Accept appears exactly once.
+func TestWiki_PageMarkdown_MarkdownRequested_GetAndHeadServePageBody(t *testing.T) {
+	useEmbeddedFrontend(t)
+	type page struct{ title, slug, body string }
+	tests := []struct {
+		name     string
+		basePath string
+		pages    []page
+		section  *page // created as a section, pages go below it
+		path     string
+		headers  map[string]string
+		want     string
+	}{
+		{name: "page without base path", pages: []page{{"Setup", "setup", "# Setup\n\nInstall it."}}, path: "/setup", want: "# Setup\n\nInstall it."},
+		{name: "page with base path", basePath: "/wiki", pages: []page{{"Setup", "setup", "x"}}, path: "/wiki/setup", want: "x"},
+		{name: "nested base path", basePath: "/a/b", pages: []page{{"Setup", "setup", "x"}}, path: "/a/b/setup", want: "x"},
+		{name: "empty body", pages: []page{{"Empty", "empty", ""}}, path: "/empty", want: ""},
+		{name: "CRLF body is served with the LF endings LeafWiki stores", pages: []page{{"Crlf", "crlf", "a\r\nb\r\n"}}, path: "/crlf", want: "a\nb\n"},
+		{name: "unicode body", pages: []page{{"Grüße", "gruesse", "# Grüße 🌿\n\n日本語"}}, path: "/gruesse", want: "# Grüße 🌿\n\n日本語"},
+		{name: "underscore slug", pages: []page{{"Snake", "snake_case", "s"}}, path: "/snake_case", want: "s"},
+		{name: "percent-encoded path resolves like the decoded one", pages: []page{{"Setup", "setup", "x"}}, path: "/set%75p", want: "x"},
+		{name: "shell placeholders in the body stay raw", pages: []page{{"Raw", "raw", "{{__BODY__}}</head><script>x</script>"}}, path: "/raw", want: "{{__BODY__}}</head><script>x</script>"},
+		{name: "section with children serves its own content", section: &page{"Docs", "docs", "# Docs index"}, pages: []page{{"Setup", "setup", "child"}}, path: "/docs", want: "# Docs index"},
+		{name: "child of a section", section: &page{"Docs", "docs", "# Docs index"}, pages: []page{{"Setup", "setup", "child"}}, path: "/docs/setup", want: "child"},
+		{name: "forwarded headers have no effect", pages: []page{{"Setup", "setup", "x"}}, path: "/setup", headers: map[string]string{"X-Forwarded-Host": "evil.example", "X-Forwarded-Prefix": "/evil"}, want: "x"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w, public, router := newSEOTestRouter(t, tc.basePath)
+			setPublicAccess(t, public, true)
+			var parentID *string
+			if tc.section != nil {
+				sectionKind := tree.NodeKindSection
+				s := createPageForTest(t, w, SYSTEM_USER_ID, nil, tc.section.title, tc.section.slug, &sectionKind)
+				updatePageForTest(t, w, SYSTEM_USER_ID, s.ID, tc.section.title, tc.section.slug, &tc.section.body, &sectionKind)
+				parentID = &s.ID
+			}
+			for _, p := range tc.pages {
+				created := createPageForTest(t, w, SYSTEM_USER_ID, parentID, p.title, p.slug, pageNodeKind())
+				body := p.body
+				updatePageForTest(t, w, SYSTEM_USER_ID, created.ID, p.title, p.slug, &body, pageNodeKind())
+			}
+
+			get := serveAccept(router, http.MethodGet, tc.path, "text/markdown", tc.headers)
+			head := serveAccept(router, http.MethodHead, tc.path, "text/markdown", tc.headers)
+
+			if get.Code != http.StatusOK || get.Header().Get("Content-Type") != "text/markdown; charset=utf-8" {
+				t.Fatalf("GET = %d %q, want 200 text/markdown", get.Code, get.Header().Get("Content-Type"))
+			}
+			if got := get.Body.String(); got != tc.want {
+				t.Fatalf("body = %q, want %q", got, tc.want)
+			}
+			for _, leak := range []string{"<!doctype", "<html", "<meta", "og:title", "{{__PAGE_TITLE__}}"} {
+				if !strings.Contains(tc.want, leak) && strings.Contains(strings.ToLower(get.Body.String()), strings.ToLower(leak)) {
+					t.Errorf("markdown body contains shell markup %q", leak)
+				}
+			}
+			if got := get.Header().Get("Content-Length"); got != strconv.Itoa(len(tc.want)) {
+				t.Errorf("Content-Length = %q, want %d", got, len(tc.want))
+			}
+			if got := get.Header().Values("Vary"); len(got) != 1 || got[0] != "Accept" {
+				t.Errorf("Vary = %q, want [Accept]", got)
+			}
+			if head.Code != get.Code || head.Body.Len() != 0 {
+				t.Errorf("HEAD = %d with %d body bytes, want %d and no body", head.Code, head.Body.Len(), get.Code)
+			}
+			for _, h := range []string{"Content-Type", "Content-Length", "X-Content-Type-Options", "Cache-Control", "Vary"} {
+				if got, want := head.Header().Values(h), get.Header().Values(h); strings.Join(got, ",") != strings.Join(want, ",") {
+					t.Errorf("%s: HEAD %q, GET %q", h, got, want)
+				}
+			}
+		})
+	}
+}
+
+// Requests that must get the shell (or no SPA answer at all) even though
+// they ask for Markdown; none may be a 5xx or a Markdown body.
+func TestWiki_PageMarkdown_NotAPageOrNotPreferred_ServesTheShell(t *testing.T) {
+	useEmbeddedFrontend(t)
+	tests := []struct {
+		name      string
+		basePath  string
+		public    bool
+		path      string
+		accept    string
+		wantShell bool // 200 text/html; otherwise only "not markdown"
+		wantVary  bool
+	}{
+		{name: "browser Accept on a page", public: true, path: "/wiki/welcome-to-leafwiki", accept: "text/html,application/xhtml+xml,*/*;q=0.8", wantShell: true, wantVary: true},
+		{name: "html weighted higher", public: true, path: "/wiki/welcome-to-leafwiki", accept: "text/html,text/markdown;q=0.9", wantShell: true, wantVary: true},
+		{name: "no Accept header", public: true, path: "/wiki/welcome-to-leafwiki", wantShell: true, wantVary: true},
+		{name: "trailing slash on a page", public: true, path: "/wiki/welcome-to-leafwiki/", accept: "text/markdown", wantShell: true, wantVary: true},
+		{name: "double slash", public: true, path: "/wiki//welcome-to-leafwiki", accept: "text/markdown"},
+		{name: "dot-dot segment", public: true, path: "/wiki/x/../welcome-to-leafwiki", accept: "text/markdown"},
+		{name: "percent-encoded dot-dot", public: true, path: "/wiki/%2e%2e/welcome-to-leafwiki", accept: "text/markdown"},
+		{name: "backslash", public: true, path: `/wiki/x\welcome-to-leafwiki`, accept: "text/markdown"},
+		{name: "upper-case slug is a different route", public: true, path: "/wiki/Welcome-To-Leafwiki", accept: "text/markdown", wantShell: true, wantVary: true},
+		{name: "outside the base path", public: true, path: "/welcome-to-leafwiki", accept: "text/markdown"},
+		{name: "base path prefix without separator", public: true, path: "/wikiwelcome-to-leafwiki", accept: "text/markdown"},
+		{name: "login route", public: true, path: "/wiki/login", accept: "text/markdown", wantShell: true, wantVary: true},
+		{name: "private wiki", public: false, path: "/wiki/welcome-to-leafwiki", accept: "text/markdown", wantShell: true},
+		{name: "private wiki, unknown route", public: false, path: "/wiki/missing", accept: "text/markdown", wantShell: true},
+	}
+	_, public, router := newSEOTestRouter(t, "/wiki")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			setPublicAccess(t, public, tc.public)
+
+			rec := serveAccept(router, http.MethodGet, tc.path, tc.accept, nil)
+
+			if rec.Code >= 500 {
+				t.Fatalf("status = %d", rec.Code)
+			}
+			if ct := rec.Header().Get("Content-Type"); strings.HasPrefix(ct, "text/markdown") {
+				t.Fatalf("got markdown (%d %q), want the shell", rec.Code, rec.Body.String())
+			}
+			if tc.wantShell && (rec.Code != http.StatusOK || !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/html")) {
+				t.Fatalf("got %d %q, want the 200 shell", rec.Code, rec.Header().Get("Content-Type"))
+			}
+			if !tc.wantShell {
+				return
+			}
+			vary := rec.Header().Values("Vary")
+			if tc.wantVary && (len(vary) != 1 || vary[0] != "Accept") {
+				t.Errorf("Vary = %q, want [Accept]", vary)
+			}
+			if !tc.wantVary && len(vary) != 0 {
+				t.Errorf("Vary = %q, want none", vary)
+			}
+		})
+	}
+}
+
+// An empty wiki: "/" has no redirect target and is no page, so a Markdown
+// client gets the shell.
+func TestWiki_PageMarkdown_EmptyWikiRoot_ServesTheShell(t *testing.T) {
+	useEmbeddedFrontend(t)
+	w, public, router := newSEOTestRouter(t, "")
+	setPublicAccess(t, public, true)
+	deletePageForTest(t, w, SYSTEM_USER_ID, w.tree.GetTree().Children[0].ID, true)
+
+	rec := serveAccept(router, http.MethodGet, "/", "text/markdown", nil)
+
+	if rec.Code != http.StatusOK || !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/html") {
+		t.Fatalf("got %d %q, want the 200 shell", rec.Code, rec.Header().Get("Content-Type"))
 	}
 }

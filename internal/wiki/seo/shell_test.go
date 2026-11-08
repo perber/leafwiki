@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -371,6 +372,9 @@ func TestPageMarkdown_NotServed_DeclinesWithVaryOnly(t *testing.T) {
 		{name: "unknown page", reader: &fakePageReader{}, routePath: "/missing", accept: "text/markdown"},
 		{name: "root", reader: pageAt("docs", seo.Page{Title: "Docs"}), routePath: "/", accept: "text/markdown"},
 		{name: "read error", reader: &fakePageReader{err: errors.New("boom")}, routePath: "/docs", accept: "text/markdown"},
+		{name: "browser Accept header", reader: pageAt("docs", seo.Page{Title: "Docs", Body: "x"}), routePath: "/docs", accept: "text/html,application/xhtml+xml,*/*;q=0.8"},
+		{name: "markdown refused with q=0", reader: pageAt("docs", seo.Page{Title: "Docs", Body: "x"}), routePath: "/docs", accept: "text/markdown;q=0"},
+		{name: "empty route path", reader: pageAt("docs", seo.Page{Title: "Docs", Body: "x"}), routePath: "", accept: "text/markdown"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -438,5 +442,38 @@ func TestPublicOnly_PageMarkdownPublicAccessOff_AddsNoVaryAndReadsNothing(t *tes
 	}
 	if reader.reads != 0 {
 		t.Errorf("reads = %d, want 0", reader.reads)
+	}
+}
+
+// The body is written byte for byte: no trimming, no line-ending rewrite,
+// and Content-Length counts bytes, not runes.
+func TestPageMarkdown_Body_ServedVerbatim(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "empty body", body: ""},
+		{name: "CRLF line endings", body: "# Title\r\n\r\nLine\r\n"},
+		{name: "lone CR", body: "a\rb"},
+		{name: "unicode", body: "# Grüße 🌿\n\nÄÖÜ – 日本語"},
+		{name: "leading and trailing whitespace", body: "\n\n  text  \n\n"},
+		{name: "shell placeholders and HTML stay raw", body: "{{__BODY__}} </head><script>alert(1)</script>"},
+		{name: "frontmatter-looking text in the body", body: "---\ntitle: x\n---\n"},
+		{name: "large body", body: strings.Repeat("0123456789abcdef", 64*1024)},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+
+			if !pageMarkdown(pageAt("docs", seo.Page{Title: "Docs", Body: tc.body})).RespondShell(rec, markdownRequest("/docs", "text/markdown")) {
+				t.Fatal("markdown request was not handled")
+			}
+			if rec.Code != http.StatusOK || rec.Body.String() != tc.body {
+				t.Fatalf("got %d %q, want 200 with the body verbatim", rec.Code, rec.Body.String())
+			}
+			if got, want := rec.Header().Get("Content-Length"), strconv.Itoa(len(tc.body)); got != want {
+				t.Errorf("Content-Length = %q, want %q", got, want)
+			}
+		})
 	}
 }
