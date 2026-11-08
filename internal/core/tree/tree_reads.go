@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 )
 
 // GetTree returns the tree
@@ -45,6 +46,61 @@ func (t *TreeService) FirstRootChildPath() (string, error) {
 		return nil
 	})
 	return routePath, err
+}
+
+// RouteEntry is one node of the tree as a list of routes needs it.
+type RouteEntry struct {
+	ID    string
+	Title string
+	// RoutePath is the node's route path without a leading slash (e.g. "docs/setup").
+	RoutePath string
+	Kind      NodeKind
+	UpdatedAt time.Time
+}
+
+// PageRoutes returns every non-root node, pages and sections, depth-first in
+// the order the navigation shows. With limit > 0 it stops after limit entries
+// and reports truncated when more nodes exist. The walk holds the read lock
+// and reads no files, so it costs one pass over the in-memory tree. It returns
+// ErrTreeNotLoaded before the tree is loaded.
+func (t *TreeService) PageRoutes(limit int) (entries []RouteEntry, truncated bool, err error) {
+	err = t.withRLockedTree(func() error {
+		if t.tree == nil {
+			return ErrTreeNotLoaded
+		}
+		capacity := len(t.nodesByID)
+		if limit > 0 && limit < capacity {
+			capacity = limit
+		}
+		entries = make([]RouteEntry, 0, capacity)
+		var walk func(node *PageNode, parentPath string) bool
+		walk = func(node *PageNode, parentPath string) bool {
+			for _, child := range node.Children {
+				if limit > 0 && len(entries) == limit {
+					truncated = true
+					return false
+				}
+				routePath := child.Slug
+				if parentPath != "" {
+					routePath = parentPath + "/" + child.Slug
+				}
+				entries = append(entries, RouteEntry{
+					ID:        child.ID,
+					Title:     child.Title,
+					RoutePath: routePath,
+					Kind:      child.Kind,
+					UpdatedAt: child.Metadata.UpdatedAt,
+				})
+				if !walk(child, routePath) {
+					return false
+				}
+			}
+			return true
+		}
+		walk(t.tree, "")
+		return nil
+	})
+	return entries, truncated, err
 }
 
 // NodeCounts returns how many page and section nodes the tree currently holds,
