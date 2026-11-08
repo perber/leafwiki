@@ -12,15 +12,6 @@ import (
 	"github.com/perber/wiki/internal/restore"
 )
 
-// uploadParseMaxMemory bounds how much of an uploaded restore ZIP
-// ParseMultipartForm is allowed to buffer in memory before mime/multipart
-// spills the rest to its own temp file on disk. Deliberately independent of
-// the (much larger) MaxUploadSizeBytes limit: reusing that limit here would
-// let ParseMultipartForm hold an entire near-max-size upload in RAM, which on
-// a resource-constrained deployment (e.g. a Raspberry Pi, an explicit
-// LeafWiki deployment target) risks OOM.
-const uploadParseMaxMemory = 32 << 20 // 32 MiB, matching net/http's own default
-
 // Routes is the RouteRegistrar for the live restore admin endpoints.
 type Routes struct {
 	manager     *restore.Manager
@@ -87,7 +78,7 @@ func (r *Routes) handleTriggerUpload(c *gin.Context) {
 
 	maxSize := r.manager.MaxUploadSizeBytes()
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxSize)
-	if err := c.Request.ParseMultipartForm(uploadParseMaxMemory); err != nil {
+	if err := c.Request.ParseMultipartForm(httpinternal.MultipartMaxMemory); err != nil {
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
 			respondWithRestoreStatusError(c, http.StatusRequestEntityTooLarge, ErrCodeRestoreUploadTooLarge, "Upload exceeds the maximum allowed size", "upload exceeds the maximum allowed size")

@@ -10,8 +10,6 @@ import (
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
 )
 
-const maxMultipartMemory = 32 << 20 // 32 MiB
-
 // Routes is the RouteRegistrar for the assets domain.
 type Routes struct {
 	upload      *UploadAssetUseCase
@@ -82,7 +80,7 @@ func (r *Routes) handleUpload(maxUploadSize int64) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadSize)
 
-		if err := c.Request.ParseMultipartForm(maxMultipartMemory); err != nil {
+		if err := c.Request.ParseMultipartForm(httpinternal.MultipartMaxMemory); err != nil {
 			respondWithAssetStatusError(c, http.StatusRequestEntityTooLarge, ErrCodeAssetFileTooLarge, "File too large", "file too large")
 			return
 		}
