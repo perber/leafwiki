@@ -64,4 +64,3 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Deprecated`, `Superseded by 
 | [0017](./0017-spa-shell-contributors.md) | The SPA shell is rendered through registered responders and contributors | Proposed |
 | [0018](./0018-search-engine-rendering-for-public-wikis.md) | Public wikis are rendered for search engines through the `seo` slice, gated on public access | Accepted |
 | [0019](./0019-capability-routes-without-identity.md) | Capability-URL routes run without identity, in their own route group | Proposed |
-)
