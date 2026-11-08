@@ -44,3 +44,14 @@ export async function createPageViaApi(
   expect(updated.ok(), `update page ${input.slug}`).toBeTruthy();
   return id as string;
 }
+
+// setAlwaysShowToc sets the instance-wide "always show TOC" setting as admin.
+export async function setAlwaysShowToc(alwaysShow: boolean) {
+  const api = await loggedIn();
+  const resp = await api.put('/api/admin/settings/toc-display', {
+    headers: await csrfHeader(api),
+    data: { alwaysShow },
+  });
+  expect(resp.status(), `set alwaysShowToc=${alwaysShow}`).toBe(200);
+  await api.dispose();
+}

@@ -243,3 +243,18 @@ describe('TocDropdownButton — downloads', () => {
     },
   )
 })
+
+describe('TocDropdownButton — non-clickable entries', () => {
+  it.each([
+    { name: 'clickable', clickable: true, pointer: true },
+    { name: 'not clickable', clickable: false, pointer: false },
+  ])(
+    'shows the pointer cursor only when $name entries scroll',
+    async ({ clickable, pointer }) => {
+      render(<Dropdown entries={entries} clickable={clickable} />)
+      await openDropdown()
+      const item = await screen.findByTestId('toc-dropdown-entry-background')
+      expect(item.className.includes('cursor-pointer')).toBe(pointer)
+    },
+  )
+})
