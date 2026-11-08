@@ -117,7 +117,7 @@ Standard failures, and where they apply:
 | 401 | `RequireAuth`: missing or invalid access token | flat | routes behind the auth groups |
 | 401 | reverse-proxy auth: unknown user | flat | every route, only when reverse-proxy auth is enabled |
 | 403 | `CSRFMiddleware`: missing or mismatching token | flat | methods other than GET, HEAD and OPTIONS on routes behind the CSRF middleware (not login/refresh); skipped for requests authenticated by a resolved API key |
-| 403 | `RequireCookieSession`, `RequireAdmin`, `RequireEditorOrAdmin`, `RequireSelf` | flat | only routes carrying that guard |
+| 403 | `RequireCookieSession`, `RequireAdmin`, `RequireEditorOrAdmin` | flat | only routes carrying that guard |
 | 429 | `InjectAPIKeyUser`: too many failed key attempts | flat | every route, only when key management is enabled and a key-shaped Bearer token reaches the rate limiter (same bypasses as the 401 row) |
 | 503 | `InjectAPIKeyUser`: key store suspended during a live restore | flat | every route, only when key management is enabled and a key-shaped Bearer token reaches key resolution (same bypasses as the 401 row) |
 | 503 | write gate while a live restore runs | localized | methods other than GET, HEAD and OPTIONS, except the restore endpoints and login (including TOTP login), logout and refresh-token; never GET routes such as health |

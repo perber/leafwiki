@@ -141,11 +141,3 @@ func ToAPINodeWithDepth(node *tree.PageNode, parentPath string, userResolver *au
 	pruneNodeDepth(apiNode, depth)
 	return apiNode
 }
-
-// FormatAPITime formats a time.Time to RFC3339 or empty string for zero time.
-func FormatAPITime(ts time.Time) string {
-	if ts.IsZero() {
-		return ""
-	}
-	return ts.Format(time.RFC3339)
-}

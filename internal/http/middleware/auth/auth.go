@@ -156,21 +156,3 @@ func RequireEditorOrAdmin() gin.HandlerFunc {
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Editor or Admin role required"})
 	}
 }
-
-func RequireSelf() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userValue, exists := c.Get("user")
-		if !exists {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": errUserNotAuthenticated})
-			return
-		}
-
-		user, ok := userValue.(*auth.User)
-		if !ok || user.ID != c.Param("id") {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "You can only access your own account"})
-			return
-		}
-
-		c.Next()
-	}
-}
