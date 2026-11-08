@@ -152,7 +152,8 @@ func addVary(h http.Header, field string) {
 
 // pageMeta adds the page title, description, Open Graph tags and (with
 // --public-url) the canonical link to the shell of a page route, so search
-// engines and link previews see what the page is about.
+// engines and link previews see what the page is about. A route without a
+// page gets only a robots noindex tag.
 type pageMeta struct {
 	meta *GetPageMetaUseCase
 	log  *slog.Logger
@@ -172,6 +173,13 @@ func (p *pageMeta) ContributeShell(ctx context.Context, req httpinternal.ShellRe
 	}
 	if out == nil {
 		return httpinternal.ShellParts{}
+	}
+	if out.NoIndex {
+		return httpinternal.ShellParts{
+			Head: httpinternal.MetaTag("robots", "noindex"),
+			// Whether a page exists there changes with every edit.
+			NoCache: true,
+		}
 	}
 	var head strings.Builder
 	write := func(tag template.HTML) { head.WriteString(string(tag)) }

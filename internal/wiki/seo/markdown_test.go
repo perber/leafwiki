@@ -110,7 +110,9 @@ func TestGetPageMarkdownUseCase_NoPage_ReturnsNil(t *testing.T) {
 	}{
 		{name: "root", reader: pageAt("docs", seo.Page{Title: "Docs"}), routePath: "/", wantReads: 0},
 		{name: "empty route path", reader: pageAt("docs", seo.Page{Title: "Docs"}), routePath: "", wantReads: 0},
+		// No error: the shell is served, and it marks the route noindex itself.
 		{name: "unknown page", reader: &fakePageReader{}, routePath: "/missing", wantReads: 1},
+		{name: "tree not loaded", reader: &fakePageReader{notLoaded: true}, routePath: "/missing", wantReads: 1},
 		// The SPA shows the permalink's target there, not the page at this path.
 		{name: "permalink route", reader: pageAt("p/abc123", seo.Page{Title: "Shadowed"}), routePath: "/p/abc123", wantReads: 0},
 		{name: "permalink route with slug", reader: pageAt("p/abc123/setup", seo.Page{Title: "Shadowed"}), routePath: "/p/abc123/setup", wantReads: 0},
@@ -136,16 +138,33 @@ func TestGetPageMarkdownUseCase_NoPage_ReturnsNil(t *testing.T) {
 	}
 }
 
-func TestGetPageMarkdownUseCase_RoutePathWithLeadingSlash_ReadsItWithout(t *testing.T) {
-	reader := pageAt("docs/setup", seo.Page{Title: "Setup", Body: "x"})
-
-	if _, err := seo.NewGetPageMarkdownUseCase(reader).Execute(context.Background(), seo.GetPageMarkdownInput{
-		RoutePath: "/docs/setup",
-		Accept:    "text/markdown",
-	}); err != nil {
-		t.Fatalf("Execute failed: %v", err)
+// The page read drops the leading slash and every trailing slash, like the
+// page meta's (and the SPA's) page read.
+func TestGetPageMarkdownUseCase_RoutePath_ReadsItNormalized(t *testing.T) {
+	tests := []struct {
+		name      string
+		routePath string
+		wantReads []string
+	}{
+		{name: "leading slash", routePath: "/docs/setup", wantReads: []string{"docs/setup"}},
+		{name: "trailing slash", routePath: "/docs/setup/", wantReads: []string{"docs/setup"}},
+		{name: "several trailing slashes", routePath: "/docs/setup//", wantReads: []string{"docs/setup"}},
+		{name: "empty segment inside stays", routePath: "/docs//setup", wantReads: []string{"docs//setup"}},
+		{name: "slashes only are the root", routePath: "//"},
 	}
-	if len(reader.asked) != 1 || reader.asked[0] != "docs/setup" {
-		t.Fatalf("asked = %q, want [docs/setup]", reader.asked)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			reader := pageAt("docs/setup", seo.Page{Title: "Setup", Body: "x"})
+
+			if _, err := seo.NewGetPageMarkdownUseCase(reader).Execute(context.Background(), seo.GetPageMarkdownInput{
+				RoutePath: tc.routePath,
+				Accept:    "text/markdown",
+			}); err != nil {
+				t.Fatalf("Execute failed: %v", err)
+			}
+			if strings.Join(reader.asked, ",") != strings.Join(tc.wantReads, ",") {
+				t.Fatalf("asked = %q, want %q", reader.asked, tc.wantReads)
+			}
+		})
 	}
 }

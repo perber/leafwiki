@@ -283,7 +283,7 @@ func TestPageMeta_NoPage_ContributesNothing(t *testing.T) {
 		routePath string
 	}{
 		{name: "root", reader: pageAt("docs", seo.Page{Title: "Docs"}), routePath: "/"},
-		{name: "unknown page", reader: &fakePageReader{}, routePath: "/missing"},
+		{name: "tree not loaded", reader: &fakePageReader{notLoaded: true}, routePath: "/missing"},
 		{name: "read error", reader: &fakePageReader{err: errors.New("boom")}, routePath: "/docs"},
 	}
 	for _, tc := range tests {
@@ -291,6 +291,32 @@ func TestPageMeta_NoPage_ContributesNothing(t *testing.T) {
 			got := pageMeta(tc.reader, "https://wiki.example.com").ContributeShell(context.Background(), shellRequest("", tc.routePath))
 			if got != (wikihttp.ShellParts{}) {
 				t.Errorf("parts = %+v, want empty", got)
+			}
+		})
+	}
+}
+
+// A route without a page (unknown page, app screen, unknown permalink) gets
+// only the noindex tag: no title, no description, no canonical link.
+func TestPageMeta_UnknownRoute_AddsOnlyNoindex(t *testing.T) {
+	tests := []struct {
+		name      string
+		routePath string
+	}{
+		{name: "unknown page", routePath: "/missing"},
+		{name: "SPA route", routePath: "/settings/branding"},
+		{name: "unknown permalink", routePath: "/p/unknown"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			contributor := permalinkMeta(&fakePageReader{}, noPermalinks(), "https://wiki.example.com")
+
+			got := contributor.ContributeShell(context.Background(), shellRequest("", tc.routePath))
+
+			// Whether a page exists changes with every edit; caches must revalidate.
+			want := wikihttp.ShellParts{Head: `<meta name="robots" content="noindex">`, NoCache: true}
+			if got != want {
+				t.Errorf("parts = %+v, want %+v", got, want)
 			}
 		})
 	}

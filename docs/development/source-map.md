@@ -325,16 +325,18 @@ shape for that domain.
   file. `shell.go`: `PublicOnly` (every registration and route of the slice runs only while
   public access is on; `Handler(on, off)` for routes), the root redirect (`GET /` → 302 to the
   first page), the page Markdown responder (`Accept: text/markdown` → the page's Markdown) and
-  the page meta contributor; `routes.go`: `Routes` (`robots.txt`, `sitemap.xml`, GET and
-  HEAD); `root_target.go`: `GetRootTargetUseCase` behind the narrow `FirstPageReader`;
-  `urls.go`: the URL helpers the features share (escaped wiki path, absolute URL from
-  `--public-url`, the `/p/:id/:slug?` permalink locator, the only SPA route the slice knows);
-  `page.go`: `Page` and `PageReader`, the single-page read shared by `page_meta.go`
-  (`GetPageMetaUseCase`: title, description, canonical URL; `PermalinkResolver` for
-  permalinks) and `markdown.go` (`GetPageMarkdownUseCase` and the `Accept` negotiation);
-  `robots.go`: `GetRobotsUseCase` and `PrivateRobots`; `sitemap.go`: `BuildSitemapUseCase`
-  behind `PageRouteLister`, streamed by `WriteXML`. The readers are implemented in `internal/wiki/seo_adapter.go` with the pages
-  slice's read use cases.
+  the page meta contributor (robots `noindex` for routes without a page); `routes.go`:
+  `Routes` (`robots.txt`, `sitemap.xml`, GET and HEAD); `root_target.go`:
+  `GetRootTargetUseCase` behind the narrow `FirstPageReader`; `urls.go`: the URL helpers the
+  features share (escaped wiki path, absolute URL from `--public-url`, the page read's route
+  path without trailing slashes, the `/p/:id/:slug?` permalink locator, the only SPA route the
+  slice knows); `page.go`: `Page`, `PageReader` and `ErrPageNotFound`, the single-page read
+  shared by `page_meta.go` (`GetPageMetaUseCase`: title, description, canonical URL, or only
+  `NoIndex` when no page is at the route; `PermalinkResolver` for permalinks) and
+  `markdown.go` (`GetPageMarkdownUseCase` and the `Accept` negotiation); `robots.go`:
+  `GetRobotsUseCase` and `PrivateRobots`; `sitemap.go`: `BuildSitemapUseCase` behind
+  `PageRouteLister`, streamed by `WriteXML`. The readers are implemented in
+  `internal/wiki/seo_adapter.go` with the pages slice's read use cases.
 
 ## Frontend — `ui/leafwiki-ui/src/`
 
