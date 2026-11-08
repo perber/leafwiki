@@ -35,10 +35,11 @@ import { useLocation, useNavigate } from 'react-router'
 import { BacklinkInfo } from '../links/LinkInfo'
 import { extractTocEntries } from '../preview/extractTocEntries'
 import MarkdownPreview from '../preview/MarkdownPreview'
+import { buildAttachmentsSection } from './attachmentsSection'
 import { TocDropdownButton } from '../preview/TocDropdownButton'
 import { TocSidePanel } from '../preview/TocSidePanel'
 import { shouldShowToc } from '../preview/tocVisibility'
-import { useTocScrollSpy } from '../preview/useTocScrollSpy'
+import { useHeadingsSection } from '../preview/useHeadingsSection'
 import Breadcrumbs from './Breadcrumbs'
 import EmptySectionChildrenList from './EmptySectionChildrenList'
 import { PageMetadata } from './PageMetadata'
@@ -172,9 +173,20 @@ export default function PageViewer() {
 
   const alwaysShowToc = useConfigStore((s) => s.alwaysShowToc)
   const showToc = shouldShowToc(tocEntries.length, alwaysShowToc)
-  const showRightPane = showToc || attachments.length > 0
-  // Single scroll spy for both the dropdown and the side panel.
-  const tocActiveId = useTocScrollSpy(showToc ? tocEntries : [])
+  const visibleTocEntries = useMemo(
+    () => (showToc ? tocEntries : []),
+    [showToc, tocEntries],
+  )
+  // One headings section (and so one scroll spy) for both the dropdown and
+  // the side panel. Sections render in this order; see ADR-0021.
+  const headingsSection = useHeadingsSection(visibleTocEntries)
+  const panelSections = useMemo(
+    () => [headingsSection, buildAttachmentsSection(attachments)],
+    [headingsSection, attachments],
+  )
+  const showRightPane = panelSections.some(
+    (section) => section.items.length > 0,
+  )
 
   const toggleTocCollapsed = useTocPanelStore((state) => state.toggleCollapsed)
   const tocCollapsed = useTocPanelStore((state) => state.collapsed)
@@ -238,12 +250,7 @@ export default function PageViewer() {
               </div>
               {showRightPane && (
                 <div className="page-viewer__toc-button">
-                  <TocDropdownButton
-                    entries={showToc ? tocEntries : []}
-                    clickable
-                    activeId={tocActiveId}
-                    downloads={attachments}
-                  />
+                  <TocDropdownButton sections={panelSections} />
                 </div>
               )}
             </div>
@@ -254,14 +261,7 @@ export default function PageViewer() {
 
   const tocPane =
     showRightPane && page && !error && tocPaneRoot
-      ? createPortal(
-          <TocSidePanel
-            entries={showToc ? tocEntries : []}
-            activeId={tocActiveId}
-            downloads={attachments}
-          />,
-          tocPaneRoot,
-        )
+      ? createPortal(<TocSidePanel sections={panelSections} />, tocPaneRoot)
       : null
 
   return (

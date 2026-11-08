@@ -48,6 +48,7 @@ import { rehypeLineNumber } from './rehypeLineNumber'
 import { rehypeWhitelistStyles } from './rehypeWhitelistStyles'
 import { syntaxHighlightLanguages } from './syntaxHighlightLanguages'
 import { TocDropdownButton } from './TocDropdownButton'
+import { useHeadingsSection } from './useHeadingsSection'
 import { remarkImageSize } from './remarkImageSize'
 import { MarkdownPreviewErrorBoundary } from './MarkdownPreviewErrorBoundary'
 import {
@@ -428,6 +429,20 @@ export default function MarkdownPreview({
 
   const inFlowRef = useRef<HTMLDivElement>(null)
   const [showStickyToc, setShowStickyToc] = useState(false)
+  const showInlineToc = showToc && tocEntries.length > 3 && !showStickyToc
+  // Feed the headings only while the inline dropdown is mounted, so its
+  // scroll spy listens exactly as long as the dropdown is visible.
+  const inlineTocEntries = useMemo(
+    () => (showInlineToc ? tocEntries : []),
+    [showInlineToc, tocEntries],
+  )
+  const inlineTocSection = useHeadingsSection(inlineTocEntries, {
+    clickable: tocClickable,
+  })
+  const inlineTocSections = useMemo(
+    () => [inlineTocSection],
+    [inlineTocSection],
+  )
 
   useEffect(() => {
     if (!showToc || tocEntries.length <= 3) return
@@ -498,7 +513,7 @@ export default function MarkdownPreview({
       <div ref={inFlowRef} className="print:hidden">
         {!showStickyToc && (
           <div className="markdown-preview__toc-inline mb-2 flex sm:mb-4">
-            <TocDropdownButton entries={tocEntries} clickable={tocClickable} />
+            <TocDropdownButton sections={inlineTocSections} />
           </div>
         )}
       </div>
