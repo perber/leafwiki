@@ -10,21 +10,6 @@ import (
 	httpinternal "github.com/perber/wiki/internal/http"
 )
 
-// Page is a page as its meta tags need it.
-type Page struct {
-	Title string
-	// Body is the page's Markdown without frontmatter.
-	Body string
-	// Properties are the page's frontmatter properties (trimmed keys, case kept).
-	Properties map[string]string
-}
-
-// PageReader reads a page by its route path. It returns nil and no error when
-// there is no such page (unknown path, tree not loaded yet).
-type PageReader interface {
-	PageByRoutePath(ctx context.Context, routePath string) (*Page, error)
-}
-
 // ─── GetPageMetaUseCase ──────────────────────────────────────────────────────
 
 // GetPageMetaInput is the input for GetPageMetaUseCase.

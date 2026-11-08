@@ -161,3 +161,26 @@ fixing that is a separate change.
     entry, mostly the URL strings and the encoder's reflection). Time was 0.27 s and 0.83 s
     on a heavily loaded laptop, so treat it as an upper bound; rerun it on a Raspberry Pi
     before raising the limit or adding fields per entry.
+- **2026-11 (#1292, Markdown representation):** details fixed while implementing it:
+  - A page route is answered with the page's Markdown (its content without frontmatter, as
+    the page-view read returns it) when the `Accept` header lists `text/markdown` explicitly
+    with `q > 0` and gives `text/html` no higher `q`. `text/html` takes the `q` of its most
+    specific match (`text/html`, then `text/*`, then `*/*`); `*/*` or `text/*` alone never
+    select Markdown. A tie goes to Markdown. Ranges with a malformed `q` (outside the RFC 9110
+    qvalue grammar) are ignored; several `Accept` lines are read as one list.
+  - The response is `200` with `Content-Type: text/markdown; charset=utf-8`,
+    `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox` (the body is raw user
+    content; no `Content-Disposition`, it stays readable inline), `Cache-Control: no-cache` and
+    `Content-Length`; HEAD gets the same headers without a body.
+  - Quoted parameter values in `Accept` are not parsed: a quoted `,` splits the list there. A
+    client can only pick a representation it could ask for directly that way.
+  - Unknown pages, non-page routes (including `/p/:id` permalinks) and a tree that is not
+    loaded decline, so the shell is served. `/` stays the root redirect, which is registered
+    before the Markdown responder.
+  - `Vary: Accept` is added (not set, and not twice when a `Vary` line already lists
+    `Accept` or `*`) on every shell request of a public wiki, handled or declined. While
+    public access is off `PublicOnly` declines first, so a private wiki's shell carries no
+    `Vary: Accept`: it is the same for every `Accept` value, and the `no-cache` on the
+    Markdown variant keeps an on→off toggle from serving a cached one.
+  - Reader interfaces are one per read; use cases that need the same read share its interface
+    (page meta and Markdown share `seo.PageReader`, which lives in `page.go`).
