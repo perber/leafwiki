@@ -1,5 +1,4 @@
 {
-  "account locked": "Demasiados intentos fallidos de inicio de sesión. Inténtalo de nuevo en 15 minutos.",
   "admin user cannot be deleted": "No se puede eliminar al usuario administrador",
   "api key not found": "No se encontró la clave de API",
   "api key request failed": "La solicitud de la clave de API ha fallado",

@@ -26,7 +26,6 @@ const (
 	ErrCodeAuthCsrfFailed               = "auth_csrf_failed"
 	ErrCodeAuthInvalidRefreshToken      = "auth_invalid_refresh_token"
 	ErrCodeAuthInvalidRequest           = "auth_invalid_request"
-	ErrCodeAuthAccountLocked            = "auth_account_locked"
 	ErrCodeAuthTOTPInvalidCode          = "auth_totp_invalid_code"
 	ErrCodeAuthTOTPChallengeInvalid     = "auth_totp_challenge_invalid"
 	ErrCodeAuthTOTPNotConfigured        = "auth_totp_not_configured"
@@ -93,9 +92,11 @@ func respondWithAuthError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, coreauth.ErrInvalidToken):
 		respondWithAuthStatusError(c, http.StatusUnprocessableEntity, ErrCodeAuthInvalidRefreshToken, "Missing or invalid refresh token", "missing or invalid refresh token")
-	case errors.Is(err, coreauth.ErrUserAccountLocked):
-		respondWithAuthStatusError(c, http.StatusUnauthorized, ErrCodeAuthAccountLocked, "Account temporarily locked due to too many failed login attempts", "account locked")
-	case errors.Is(err, coreauth.ErrUserInvalidCredentials):
+	// A locked account answers exactly like a wrong password, so the lock
+	// cannot be used to confirm that an account exists. This covers the TOTP
+	// step too. Metrics still count the lock separately (see LoginUseCase and
+	// CompleteTOTPLoginUseCase).
+	case errors.Is(err, coreauth.ErrUserAccountLocked), errors.Is(err, coreauth.ErrUserInvalidCredentials):
 		respondWithAuthStatusError(c, http.StatusUnauthorized, ErrCodeAuthInvalidCredentials, "Invalid credentials", "invalid credentials")
 	case errors.Is(err, coreauth.ErrUserNotFound):
 		respondWithAuthStatusError(c, http.StatusNotFound, ErrCodeAuthUserNotFound, "User not found", "user not found")
@@ -137,8 +138,6 @@ func authErrorStatus(code string) int {
 		ErrCodeAuthInvalidPayload, ErrCodeAuthCookieFailed, ErrCodeAuthCsrfFailed,
 		ErrCodeAuthInvalidRequest:
 		return http.StatusBadRequest
-	case ErrCodeAuthAccountLocked:
-		return http.StatusUnauthorized
 	case ErrCodeAuthDisabled, ErrCodeAuthForbidden:
 		return http.StatusForbidden
 	case ErrCodeAuthTOTPInvalidCode:

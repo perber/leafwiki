@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/pquerna/otp/totp"
 
 	coreauth "github.com/perber/wiki/internal/core/auth"
@@ -407,6 +409,70 @@ func TestCompleteTOTPLoginUseCase_EmitsVerificationMetric(t *testing.T) {
 	}
 	if !strings.Contains(body, `leafwiki_auth_sessions_total{event="issued"} 1`) {
 		t.Fatalf("expected session issued metric, got: %s", body)
+	}
+}
+
+// TestCompleteTOTPLoginUseCase_EmitsLockedMetric verifies that once wrong
+// codes trip the per-user lock, even a valid code is refused, the attempt is
+// counted under result="locked", and the client gets the same answer as for
+// wrong credentials. The password login that opened the challenge already
+// counts as one attempt (see AuthService.Login), so the lock trips on the
+// fourth wrong code.
+func TestCompleteTOTPLoginUseCase_EmitsLockedMetric(t *testing.T) {
+	authSvc, userSvc, metrics := setupAuthUseCases(t, true)
+	user, err := userSvc.CreateUser("alice", "alice@example.com", "securepass", coreauth.RoleViewer)
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	generated, err := authSvc.StartTOTPSetup(user.ID, "securepass")
+	if err != nil {
+		t.Fatalf("StartTOTPSetup: %v", err)
+	}
+	setupCode, err := totp.GenerateCode(generated.Secret, time.Now())
+	if err != nil {
+		t.Fatalf("GenerateCode: %v", err)
+	}
+	if _, err := authSvc.ConfirmTOTPSetup(user.ID, setupCode, ""); err != nil {
+		t.Fatalf("ConfirmTOTPSetup: %v", err)
+	}
+
+	loginOut, err := NewLoginUseCase(authSvc, metrics).Execute(context.Background(), LoginInput{Identifier: "alice", Password: "securepass"})
+	if err != nil {
+		t.Fatalf("Login Execute: %v", err)
+	}
+	challenge := loginOut.Token.LoginChallengeToken
+
+	completeUC := NewCompleteTOTPLoginUseCase(authSvc, metrics)
+	const wrongCodes = 4
+	for i := 0; i < wrongCodes; i++ {
+		if _, err := completeUC.Execute(context.Background(), CompleteTOTPLoginInput{LoginChallengeToken: challenge, Code: "000000"}); err == nil {
+			t.Fatalf("wrong code %d: expected an error", i)
+		}
+	}
+
+	validCode, err := totp.GenerateCode(generated.Secret, time.Now())
+	if err != nil {
+		t.Fatalf("GenerateCode: %v", err)
+	}
+	_, err = completeUC.Execute(context.Background(), CompleteTOTPLoginInput{LoginChallengeToken: challenge, Code: validCode})
+	if !errors.Is(err, coreauth.ErrUserAccountLocked) {
+		t.Fatalf("expected ErrUserAccountLocked for a valid code once locked, got: %v", err)
+	}
+
+	body := metricsBody(t, metrics)
+	if !strings.Contains(body, `leafwiki_auth_totp_verifications_total{result="locked"} 1`) {
+		t.Fatalf("expected totp locked metric, got: %s", body)
+	}
+	if !strings.Contains(body, fmt.Sprintf(`leafwiki_auth_totp_verifications_total{result="invalid"} %d`, wrongCodes)) {
+		t.Fatalf("expected %d invalid totp verifications before the lock, got: %s", wrongCodes, body)
+	}
+
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	respondWithAuthError(c, err)
+	if got, want := rec.Body.String(), `{"error":{"code":"auth_invalid_credentials","message":"Invalid credentials","template":"invalid credentials"}}`; rec.Code != http.StatusUnauthorized || got != want {
+		t.Fatalf("wire answer = %d %s, want 401 %s", rec.Code, got, want)
 	}
 }
 

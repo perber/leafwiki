@@ -320,7 +320,10 @@ Full auth *model* (JWT structure, cookie strategy, role model) is covered in
    anyway (constant-time-ish defense against username enumeration via timing) before
    returning `ErrUserInvalidCredentials`.
 2. `a.attempts.recordAttempt(user.ID)` — per-user lockout counter; returns
-   `ErrUserAccountLocked` if tripped.
+   `ErrUserAccountLocked` if tripped. The HTTP layer answers it exactly like
+   `ErrUserInvalidCredentials` (`401 auth_invalid_credentials`, see
+   `internal/wiki/auth/errors.go`), so the lock does not reveal that an account exists;
+   only the metrics (`"locked"`) and the server log tell the two apart.
 3. Verifies the password hash. On success, if `user.TOTPEnabled`: does **not** reset the
    attempt counter (TOTP brute-forcing shares the same counter as password brute-forcing —
    see the comment at `auth_service.go`) and returns a **TOTP challenge** instead of a
@@ -337,7 +340,10 @@ Full auth *model* (JWT structure, cookie strategy, role model) is covered in
 `loginChallengeToken` (session-store lookup by `jti`), records another lockout attempt against
 the *same* per-user counter as the password step, verifies the code as either a live TOTP code
 or an unused recovery code, resets the counter and revokes the challenge token on success, then
-issues the session exactly as a non-TOTP login would. Only at this point are cookies set.
+issues the session exactly as a non-TOTP login would. Only at this point are cookies set. A
+tripped lock here gets the same `401 auth_invalid_credentials` answer as in the password step:
+the auth slice maps the lock once, for every route, and does not tell a caller when guessing
+codes becomes worthwhile again.
 
 **Token refresh** — `POST /api/auth/refresh-token` → `RefreshTokenUseCase.Execute` →
 `AuthService.RefreshToken` → `sessions.RefreshToken`. Frontend drives this from

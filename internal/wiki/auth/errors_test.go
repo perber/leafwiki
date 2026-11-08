@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -179,5 +180,43 @@ func TestRespondWithAuthError_EditorLimitReached(t *testing.T) {
 	}
 	if got, want := rec.Body.String(), `{"error":{"code":"auth_editor_limit_reached","message":"Editor limit reached for this plan","template":"editor limit reached for this plan"}}`; got != want {
 		t.Fatalf("body = %s, want %s", got, want)
+	}
+}
+
+// A locked account, also when the error arrives wrapped, answers with the very
+// same status and body as a wrong password, so the response cannot tell the
+// two apart.
+func TestRespondWithAuthError_LockedAccountMatchesInvalidCredentials(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	respond := func(err error) (int, string) {
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		respondWithAuthError(c, err)
+		return rec.Code, rec.Body.String()
+	}
+
+	wantStatus, wantBody := respond(coreauth.ErrUserInvalidCredentials)
+	if wantStatus != http.StatusUnauthorized {
+		t.Fatalf("invalid credentials status = %d, want %d", wantStatus, http.StatusUnauthorized)
+	}
+
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{name: "locked", err: coreauth.ErrUserAccountLocked},
+		{name: "locked, wrapped", err: fmt.Errorf("login: %w", coreauth.ErrUserAccountLocked)},
+		{name: "invalid credentials, wrapped", err: fmt.Errorf("login: %w", coreauth.ErrUserInvalidCredentials)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			status, body := respond(tt.err)
+			if status != wantStatus || body != wantBody {
+				t.Fatalf("got %d %s, want %d %s", status, body, wantStatus, wantBody)
+			}
+		})
 	}
 }

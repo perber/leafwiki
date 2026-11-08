@@ -1,5 +1,4 @@
 {
-  "account locked": "Trop de tentatives de connexion échouées. Veuillez réessayer dans 15 minutes.",
   "admin user cannot be deleted": "L'utilisateur administrateur ne peut pas être supprimé",
   "api key not found": "Clé API introuvable",
   "api key request failed": "Échec de la requête de clé API",

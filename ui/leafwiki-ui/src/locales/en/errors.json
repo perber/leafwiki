@@ -1,5 +1,4 @@
 {
-  "account locked": "Too many failed login attempts. Please try again in 15 minutes.",
   "admin user cannot be deleted": "Admin user cannot be deleted",
   "api key not found": "API key not found",
   "api key request failed": "API key request failed",

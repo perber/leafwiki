@@ -1,5 +1,4 @@
 {
-  "account locked": "Zu viele fehlgeschlagene Anmeldeversuche. Bitte versuchen Sie es in 15 Minuten erneut.",
   "admin user cannot be deleted": "Der Administrator-Benutzer kann nicht gelöscht werden",
   "api key not found": "API-Schlüssel nicht gefunden",
   "api key request failed": "API-Schlüssel-Anfrage fehlgeschlagen",

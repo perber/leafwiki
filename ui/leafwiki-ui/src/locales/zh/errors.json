@@ -1,5 +1,4 @@
 {
-  "account locked": "登录失败次数过多，请 15 分钟后再试。",
   "admin user cannot be deleted": "管理员账户不能被删除",
   "api key not found": "未找到 API 密钥",
   "api key request failed": "API 密钥请求失败",
