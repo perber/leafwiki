@@ -8,6 +8,8 @@ HTTP_DIST := internal/http/dist
 # Single source for the golangci-lint version; the lint-go job in
 # .github/workflows/backend.yml reads the same file.
 GOLANGCI_LINT_VERSION ?= $(shell cat .golangci-lint-version)
+# golang.org/x/tools release for `make deadcode` (not a go.mod dependency).
+DEADCODE_VERSION ?= v0.52.0
 EMBED_LDFLAGS := -X github.com/perber/wiki/internal/http.EmbedFrontend=true -X github.com/perber/wiki/internal/http.Environment=production
 LDFLAGS := -X main.Version=$(VERSION) $(EMBED_LDFLAGS)
 
@@ -82,6 +84,14 @@ test:
 lint:
 	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run
 
+# Functions no main or test can reach (#1766). deadcode exits 0 even when it
+# finds something, so any output fails the target. -test counts test-only
+# helpers as used. It analyses the host platform only: a function called
+# solely from another GOOS's files would be reported here.
+deadcode:
+	@out=$$(go run golang.org/x/tools/cmd/deadcode@$(DEADCODE_VERSION) -test ./...) || exit 1; \
+	if [ -n "$$out" ]; then echo "$$out"; echo "Unreachable functions found; remove them."; exit 1; fi
+
 # Frontend checks, in two halves so CI can run them as parallel jobs
 # (.github/workflows/frontend.yml); ui-check runs both.
 ui-deps:
@@ -104,7 +114,7 @@ ui-check: ui-lint ui-test
 # CI jobs that keep their own command: test-go (go test with coverage for the
 # report artifact), lint-go (golangci-lint-action, for PR annotations and its
 # cache) and the e2e lint (npm in e2e/, which has no Make target).
-ci: verify lint test cross ui-check
+ci: verify lint deadcode test cross ui-check
 
 bench:
 	go test -bench=. -benchmem -benchtime=3s ./internal/links/... ./internal/core/revision/...
@@ -253,7 +263,8 @@ help:
 	@echo "  make lint                 – Run golangci-lint (version from .golangci-lint-version)"
 	@echo "  make ui-check             – Frontend install, lint, format check, tests and build"
 	@echo "                              (ui-lint and ui-test run the two halves)"
-	@echo "  make ci                   – verify, lint, test, cross and ui-check, like CI"
+	@echo "  make ci                   – verify, lint, deadcode, test, cross and ui-check, like CI"
+	@echo "  make deadcode             – Fail on Go functions no main or test reaches"
 	@echo "  make verify               – Run small repository checks (private references, toolchain versions)"
 	@echo "  make verify-commits       – Check commit subjects since BASE (default origin/main)"
 	@echo "  make bench                – Run Go benchmarks for links and revision"
@@ -272,4 +283,4 @@ help:
 	@echo "                              Optional: SCAN_PLATFORM, TRIVY_EXIT_CODE, TRIVY_EXTRA_FLAGS"
 	@echo "  make changelog            – Generate changelog"
 
-.PHONY: all build build-api ui setup setup-e2e doctor dev run api-docs clean test lint ui-deps ui-lint ui-test ui-check ci bench cross verify verify-commits help docker-build-publish require-trivy scan-image scan-published-image changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e
+.PHONY: all build build-api ui setup setup-e2e doctor dev run api-docs clean test lint deadcode ui-deps ui-lint ui-test ui-check ci bench cross verify verify-commits help docker-build-publish require-trivy scan-image scan-published-image changelog run-e2e run-e2e-local run-e2e-local-fast run-proxy-e2e

@@ -30,6 +30,23 @@ jobs:
         with:
           version-file: .golangci-lint-version
           args: --timeout=5m
+
+  # Unreachable functions (#1766); see the deadcode target in the Makefile.
+  deadcode:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Find unreachable functions
+        run: make deadcode
     
   # linux/386 is a release target. Building alone isn't enough: 32-bit-only
   # runtime bugs (e.g. unaligned 64-bit atomics) compile fine and only panic
