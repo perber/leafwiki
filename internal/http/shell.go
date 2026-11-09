@@ -4,6 +4,7 @@ import (
 	"context"
 	"html"
 	"html/template"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -132,6 +133,11 @@ type shellHandler struct {
 }
 
 func newShellHandler(cfg FrontendConfig, opts RouterOptions, customStylesheetPath string) *shellHandler {
+	csp := shellCSP(opts)
+	if csp != "" && !strings.Contains(csp, "script-src") {
+		slog.Default().Warn("inject-code-in-header contains script; the page policy does not restrict scripts to the wiki's origin",
+			"component", "http")
+	}
 	contributors := append([]ShellContributor{}, cfg.ShellContributors...)
 	contributors = append(contributors,
 		headContributor(template.HTML(buildCustomStylesheetTag(opts.BasePath, customStylesheetPath))), // basePath unescaped here, behaviour predates the seam
@@ -143,7 +149,7 @@ func newShellHandler(cfg FrontendConfig, opts RouterOptions, customStylesheetPat
 		getFaviconFile: cfg.GetFaviconFile,
 		responders:     cfg.ShellResponders,
 		contributors:   contributors,
-		csp:            shellCSP(opts),
+		csp:            csp,
 	}
 }
 

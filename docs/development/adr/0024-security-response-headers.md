@@ -44,8 +44,15 @@ panics. The middleware knows nothing about routes or CSP.
 `isShellRequest` has accepted the request and before the responders run:
 
 ```
-object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'
+script-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'
 ```
+
+`script-src 'self'` adds defense in depth: no inline script, handler or `javascript:` URL runs on
+the page. It is left out while `InjectCodeInHeader` contains active script
+(`containsActiveScript`: `<script`, `javascript:` or an inline `on…=` handler, case-insensitive),
+and a startup warning says so. A `<meta>` or `<link>` snippet keeps it. The check errs toward
+leaving it out: a false positive only costs the backstop for that install, a false negative
+breaks the header code visibly and is fixed with the kill switch.
 
 API responses, assets and every request the shell rejects carry no page policy. The knowledge
 of which built-in contributor adds script stays next to `headContributor` in `shell.go`; there
@@ -90,6 +97,8 @@ policy. It is permanent; finer options (an embedding allow-list) would be added 
   `--disable-security-headers` (and, if needed, its own headers in the proxy). Release notes
   must say so.
 - `/static` deliberately has no `nosniff`, so a Windows registry entry cannot block the app.
+- Installs whose `InjectCodeInHeader` runs script get no script backstop until a nonce mode
+  exists.
 - Headers are fixed strings; no per-request allocation.
 - Revisit when a second script source or a nonce mode is needed (add the seam first), or when
   an embedding allow-list is requested.

@@ -43,3 +43,4 @@ func ServeShell(indexTemplate string, cfg FrontendConfig, opts RouterOptions, pa
 var ConfigureClientAddress = configureClientAddress
 var WarnOnUntrustedForwarding = warnOnUntrustedForwarding
 var ShellCSP = shellCSP
+var ContainsActiveScript = containsActiveScript

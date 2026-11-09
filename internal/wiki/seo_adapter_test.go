@@ -1896,7 +1896,7 @@ func TestSEORootRedirect_SecurityHeaders_MatchTheShell(t *testing.T) {
 		if rec.Code != http.StatusFound {
 			t.Fatalf("GET %s: status = %d, want 302", tc.path, rec.Code)
 		}
-		if csp := rec.Header().Values("Content-Security-Policy"); len(csp) != 1 || !strings.Contains(csp[0], "frame-ancestors 'self'") {
+		if csp := rec.Header().Values("Content-Security-Policy"); len(csp) != 1 || !strings.Contains(csp[0], "frame-ancestors 'self'") || !strings.Contains(csp[0], "script-src 'self'") {
 			t.Errorf("GET %s: Content-Security-Policy = %q, want the shell policy", tc.path, csp)
 		}
 		for name, want := range map[string]string{"X-Frame-Options": "SAMEORIGIN", "Referrer-Policy": "strict-origin-when-cross-origin", "X-Content-Type-Options": "nosniff"} {

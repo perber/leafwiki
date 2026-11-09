@@ -261,3 +261,28 @@ func TestSecurityHeaders_BasePathBoundaries_PolicyAndNosniffFollowThePrefix(t *t
 		}
 	}
 }
+
+func TestSecurityHeaders_ShellPolicy_RestrictsScriptsUnlessHeaderCodeRunsScript(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+
+	for _, tc := range []struct {
+		name       string
+		headerCode string
+		wantScript bool
+	}{
+		{"no header code", "", true},
+		{"meta-only header code", `<meta name="google-site-verification" content="x">`, true},
+		{"script in header code", `<script src="https://stats.example/a.js"></script>`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			router := newTestRouter(w, func(o *httpinternal.RouterOptions) { o.InjectCodeInHeader = tc.headerCode })
+			rec := serveRouter(router, http.MethodGet, "/some/wiki/page")
+			assertShellCSP(t, "GET /some/wiki/page", rec.Header())
+			got := strings.Contains(rec.Header().Get("Content-Security-Policy"), "script-src 'self'")
+			if got != tc.wantScript {
+				t.Errorf("script-src 'self' present = %v, want %v (policy %q)", got, tc.wantScript, rec.Header().Get("Content-Security-Policy"))
+			}
+		})
+	}
+}

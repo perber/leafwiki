@@ -685,9 +685,13 @@ Since v0.15.0, responses carry `X-Frame-Options: SAMEORIGIN`,
 `Referrer-Policy: strict-origin-when-cross-origin` and `X-Content-Type-Options: nosniff` (the
 last one not on the app's own `/static/` files), and the wiki page carries a
 Content-Security-Policy
-(`object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'`).
+(`script-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'`).
 A page on another origin can therefore no longer embed the wiki in an `<iframe>`. If you need
 that, set **`--disable-security-headers`** and send the headers you want from your reverse proxy.
+
+If `--inject-code-in-header` contains script (`<script>`, `javascript:` or an `on…=` handler),
+`script-src 'self'` is left out so that code keeps running, and the server logs a warning at
+startup. Snippets with only `<meta>` or `<link>` tags keep it.
 
 **`--disable-auth`** removes all authentication. Only use for local development, trusted internal networks, or isolated environments.
 
