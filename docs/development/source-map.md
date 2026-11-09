@@ -531,7 +531,8 @@ building new ones.
   `pageSearch.ts` (flattened tree search index used by the quick switcher), `hotkeys.ts`
   (combo normalization), `useDebounce.ts`, `useIsMobile.ts`, `useAppMode.ts`,
   `useIsReadOnly.ts`, `bootstrapAuth.ts`, `handleFieldErrors.ts`, `deferState.ts`,
-  `scrollToHeadline.ts`, `useScrollRestoration.ts`, `useAutoCloseSidebarOnMobile.ts`,
+  `scrollToHeadline.ts`, `pageContentRoot.ts` (selector of the viewer's rendered page),
+  `useScrollRestoration.ts`, `useAutoCloseSidebarOnMobile.ts`,
   `redirectToExternal.ts`, `navigationVisit.ts`, `dateLocale.ts`/`useDateTimeFormat.ts` (date
   formatting per user setting), `roles.ts`, `assetSrc.ts`, `dynamicImportError.ts` (recovery
   from stale lazy chunks after a deploy), `config.ts` (frontend-side constant defaults, e.g.
