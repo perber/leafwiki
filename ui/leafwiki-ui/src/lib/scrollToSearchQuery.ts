@@ -1,5 +1,6 @@
+import { PAGE_CONTENT_SELECTOR } from './pageContentRoot'
+
 const HIGHLIGHT_CLASS = 'search-query-highlight'
-const CONTENT_SELECTOR = '.page-viewer__content'
 const SCROLL_CONTAINER_ID = 'scroll-container'
 
 export type ScrollToSearchQueryOptions = {
@@ -117,7 +118,7 @@ export function scrollToSearchQuery(
   {
     behavior = 'smooth',
     waitForStableLayout = true,
-    rootSelector = CONTENT_SELECTOR,
+    rootSelector = PAGE_CONTENT_SELECTOR,
   }: ScrollToSearchQueryOptions = {},
 ): () => void {
   const trimmed = query.trim()
