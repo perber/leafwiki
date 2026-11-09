@@ -106,7 +106,7 @@ func NewPageMarkdown(markdown *GetPageMarkdownUseCase, log *slog.Logger) httpint
 func (p *pageMarkdown) RespondShell(w http.ResponseWriter, req httpinternal.ShellRequest) bool {
 	// The response depends on Accept whether this handles it or the shell is
 	// served, so caches must keep the variants apart (ADR-0017 contract).
-	addVary(w.Header(), "Accept")
+	httpinternal.AddVary(w.Header(), "Accept")
 	out, err := p.markdown.Execute(req.Request.Context(), GetPageMarkdownInput{
 		RoutePath: req.RoutePath,
 		Accept:    strings.Join(req.Request.Header.Values("Accept"), ","),
@@ -134,20 +134,6 @@ func (p *pageMarkdown) RespondShell(w http.ResponseWriter, req httpinternal.Shel
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.WriteString(w, out.Markdown)
 	return true
-}
-
-// addVary adds field to the Vary header unless a Vary line already lists it
-// (case-insensitive, also inside a comma list) or lists "*".
-func addVary(h http.Header, field string) {
-	for _, line := range h.Values("Vary") {
-		for listed := range strings.SplitSeq(line, ",") {
-			listed = strings.TrimSpace(listed)
-			if listed == "*" || strings.EqualFold(listed, field) {
-				return
-			}
-		}
-	}
-	h.Add("Vary", field)
 }
 
 // pageMeta adds the page title, description, Open Graph tags and (with

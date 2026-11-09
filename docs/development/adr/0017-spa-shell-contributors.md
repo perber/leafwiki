@@ -142,3 +142,10 @@ Contract for responders and contributors:
   register HEAD themselves (`httpinternal.GetAndHead`), so it no longer falls through to the
   shell (text/html); `/api` keeps its 404. A new non-API GET route outside the reserved
   prefixes needs the same.
+- **2026-11 (#1292, `ShellParts.Vary`):** the `Vary` field planned above. A contributor
+  names the request headers its parts depend on; the router adds each to the shell's `Vary`
+  header once (case-insensitive, also when a responder's line already lists it in a comma
+  list, never after `*`), keeping what a declining responder set (`Vary: Accept` from the
+  Markdown responder survives). `httpinternal.AddVary` is that rule, shared by responders and
+  the router. HEAD gets the same header. `ShellParts` is no longer comparable with `==`.
+  No output changes until a contributor sets the field.

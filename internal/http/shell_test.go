@@ -541,6 +541,104 @@ func TestServeShell_NoCacheRequested_SetsCacheControl(t *testing.T) {
 	}
 }
 
+// Contributors name the request headers their parts depend on; the router
+// merges them into the Vary header a declining responder may have set, each
+// field once (case-insensitive, also inside a comma list) and none after "*".
+func TestServeShell_ContributorVary_MergedIntoResponderVary(t *testing.T) {
+	tests := []struct {
+		name          string
+		responderVary []string
+		contributors  []wikihttp.ShellContributor
+		want          []string
+	}{
+		{name: "nobody varies", want: nil},
+		{name: "responder only", responderVary: []string{"Accept"}, want: []string{"Accept"}},
+		{
+			name:         "one contributor",
+			contributors: []wikihttp.ShellContributor{parts(wikihttp.ShellParts{Vary: []string{"User-Agent"}})},
+			want:         []string{"User-Agent"},
+		},
+		{
+			name:          "responder's Accept kept, contributor's field added",
+			responderVary: []string{"Accept"},
+			contributors:  []wikihttp.ShellContributor{parts(wikihttp.ShellParts{Vary: []string{"User-Agent"}})},
+			want:          []string{"Accept", "User-Agent"},
+		},
+		{
+			name: "overlapping contributors, case-insensitive",
+			contributors: []wikihttp.ShellContributor{
+				parts(wikihttp.ShellParts{Vary: []string{"User-Agent", "user-agent"}}),
+				parts(wikihttp.ShellParts{Vary: []string{"USER-AGENT", "Accept-Language"}}),
+			},
+			want: []string{"User-Agent", "Accept-Language"},
+		},
+		{
+			name:          "field already in the responder's comma list",
+			responderVary: []string{"Accept, User-Agent"},
+			contributors:  []wikihttp.ShellContributor{parts(wikihttp.ShellParts{Vary: []string{"user-agent"}})},
+			want:          []string{"Accept, User-Agent"},
+		},
+		{
+			name:          "responder's * covers every field",
+			responderVary: []string{"*"},
+			contributors:  []wikihttp.ShellContributor{parts(wikihttp.ShellParts{Vary: []string{"User-Agent"}})},
+			want:          []string{"*"},
+		},
+		{
+			name:         "empty and blank fields are ignored",
+			contributors: []wikihttp.ShellContributor{parts(wikihttp.ShellParts{Vary: []string{"", " ", " User-Agent "}})},
+			want:         []string{"User-Agent"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := wikihttp.FrontendConfig{ShellContributors: tt.contributors}
+			if tt.responderVary != nil {
+				cfg.ShellResponders = []wikihttp.ShellResponder{wikihttp.ShellResponderFunc(func(w http.ResponseWriter, _ wikihttp.ShellRequest) bool {
+					for _, v := range tt.responderVary {
+						w.Header().Add("Vary", v)
+					}
+					return false
+				})}
+			}
+			rec := wikihttp.ServeShell(seamTestTemplate, cfg, wikihttp.RouterOptions{}, "/deep/page")
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200", rec.Code)
+			}
+			if got := rec.Header().Values("Vary"); !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("Vary = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAddVary_AddsFieldOnce(t *testing.T) {
+	tests := []struct {
+		name     string
+		existing []string
+		field    string
+		want     []string
+	}{
+		{name: "no Vary yet", field: "Accept", want: []string{"Accept"}},
+		{name: "other field kept", existing: []string{"Origin"}, field: "Accept", want: []string{"Origin", "Accept"}},
+		{name: "same field, other case", existing: []string{"accept"}, field: "Accept", want: []string{"accept"}},
+		{name: "inside a comma list", existing: []string{"Origin , Accept"}, field: "Accept", want: []string{"Origin , Accept"}},
+		{name: "star covers it", existing: []string{"*"}, field: "Accept", want: []string{"*"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := http.Header{}
+			for _, v := range tt.existing {
+				h.Add("Vary", v)
+			}
+			wikihttp.AddVary(h, tt.field)
+			if got := h.Values("Vary"); !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("Vary = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 // redirectRoot redirects the route root like the seo root redirect does.
 var redirectRoot = wikihttp.ShellResponderFunc(func(w http.ResponseWriter, req wikihttp.ShellRequest) bool {
 	if req.RoutePath != "/" {
@@ -583,6 +681,19 @@ func TestServeShell_Head_MatchesGetWithoutBody(t *testing.T) {
 			name: "declining responder's headers are kept",
 			cfg: func() wikihttp.FrontendConfig {
 				return wikihttp.FrontendConfig{ShellResponders: []wikihttp.ShellResponder{&recordingResponder{header: "Accept"}}}
+			},
+			path:       "/wiki/deep/page",
+			wantStatus: http.StatusOK,
+			wantHeader: map[string]string{"Vary": "Accept"},
+			shell:      true,
+		},
+		{
+			name: "contributor's Vary merged with the responder's",
+			cfg: func() wikihttp.FrontendConfig {
+				return wikihttp.FrontendConfig{
+					ShellResponders:   []wikihttp.ShellResponder{&recordingResponder{header: "Accept"}},
+					ShellContributors: []wikihttp.ShellContributor{parts(wikihttp.ShellParts{Vary: []string{"User-Agent", "accept"}})},
+				}
 			},
 			path:       "/wiki/deep/page",
 			wantStatus: http.StatusOK,

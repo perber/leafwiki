@@ -18,7 +18,7 @@ func RenderShell(indexTemplate string, cfg FrontendConfig, opts RouterOptions, c
 	h := newShellHandler(cfg, opts, customStylesheetPath)
 	h.setIndex([]byte(indexTemplate), nil)
 	routePath, _ := shellRoutePath(path, opts.BasePath)
-	doc, _ := h.render(ShellRequest{Request: httptest.NewRequest(http.MethodGet, path, nil), RoutePath: routePath, BasePath: opts.BasePath})
+	doc, _, _ := h.render(ShellRequest{Request: httptest.NewRequest(http.MethodGet, path, nil), RoutePath: routePath, BasePath: opts.BasePath})
 	return doc
 }
 

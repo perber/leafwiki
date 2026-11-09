@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -183,7 +184,7 @@ func TestPublicOnly_Contributor_RunsOnlyWithPublicAccess(t *testing.T) {
 			if got.Title != tc.wantTitle {
 				t.Errorf("Title = %q, want %q", got.Title, tc.wantTitle)
 			}
-			if tc.wantReads == 0 && got != (wikihttp.ShellParts{}) {
+			if tc.wantReads == 0 && !reflect.DeepEqual(got, wikihttp.ShellParts{}) {
 				t.Errorf("declining contributor returned %+v, want empty parts", got)
 			}
 			if reader.reads != tc.wantReads {
@@ -289,7 +290,7 @@ func TestPageMeta_NoPage_ContributesNothing(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			got := pageMeta(tc.reader, "https://wiki.example.com").ContributeShell(context.Background(), shellRequest("", tc.routePath))
-			if got != (wikihttp.ShellParts{}) {
+			if !reflect.DeepEqual(got, wikihttp.ShellParts{}) {
 				t.Errorf("parts = %+v, want empty", got)
 			}
 		})
@@ -315,7 +316,7 @@ func TestPageMeta_UnknownRoute_AddsOnlyNoindex(t *testing.T) {
 
 			// Whether a page exists changes with every edit; caches must revalidate.
 			want := wikihttp.ShellParts{Head: `<meta name="robots" content="noindex">`, NoCache: true}
-			if got != want {
+			if !reflect.DeepEqual(got, want) {
 				t.Errorf("parts = %+v, want %+v", got, want)
 			}
 		})
@@ -344,7 +345,7 @@ func TestPublicOnly_PermalinkMetaPublicAccessOff_ReadsNothing(t *testing.T) {
 	permalinks := &fakePermalinkResolver{targets: map[string]string{"abc123": "docs/setup"}}
 	contributor := seo.NewPublicOnly(publicaccess.Fixed(false)).Contributor(permalinkMeta(reader, permalinks, "https://wiki.example.com"))
 
-	if got := contributor.ContributeShell(context.Background(), shellRequest("", "/p/abc123")); got != (wikihttp.ShellParts{}) {
+	if got := contributor.ContributeShell(context.Background(), shellRequest("", "/p/abc123")); !reflect.DeepEqual(got, wikihttp.ShellParts{}) {
 		t.Errorf("parts = %+v, want empty", got)
 	}
 	if len(permalinks.asked) != 0 || reader.reads != 0 {

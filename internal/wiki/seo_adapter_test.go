@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -334,7 +335,7 @@ func TestWiki_PageMeta_ExcerptFallback_UsesPageBody(t *testing.T) {
 func TestWiki_PageMeta_FollowsPublicAccessAtRuntime(t *testing.T) {
 	w, public := newSEOTestWiki(t, "https://wiki.example.com")
 
-	if got := contributeShell(t, w, "", "/welcome-to-leafwiki", nil); got != (httpinternal.ShellParts{}) {
+	if got := contributeShell(t, w, "", "/welcome-to-leafwiki", nil); !reflect.DeepEqual(got, httpinternal.ShellParts{}) {
 		t.Fatalf("public access off: parts = %+v, want none", got)
 	}
 
@@ -344,7 +345,7 @@ func TestWiki_PageMeta_FollowsPublicAccessAtRuntime(t *testing.T) {
 	}
 
 	setPublicAccess(t, public, false)
-	if got := contributeShell(t, w, "", "/welcome-to-leafwiki", nil); got != (httpinternal.ShellParts{}) {
+	if got := contributeShell(t, w, "", "/welcome-to-leafwiki", nil); !reflect.DeepEqual(got, httpinternal.ShellParts{}) {
 		t.Fatalf("after disabling public access: parts = %+v, want none", got)
 	}
 }
@@ -366,7 +367,7 @@ func TestWiki_PageMeta_NotAPageRoute_ContributesNothing(t *testing.T) {
 	setPublicAccess(t, public, true)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := contributeShell(t, w, "", tc.routePath, nil); got != (httpinternal.ShellParts{}) {
+			if got := contributeShell(t, w, "", tc.routePath, nil); !reflect.DeepEqual(got, httpinternal.ShellParts{}) {
 				t.Fatalf("parts = %+v, want none", got)
 			}
 		})
@@ -405,7 +406,7 @@ func TestWiki_PageMeta_NoPage_AddsOnlyNoindex(t *testing.T) {
 	setPublicAccess(t, public, true)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := contributeShell(t, w, "", tc.routePath, nil); got != noindexParts {
+			if got := contributeShell(t, w, "", tc.routePath, nil); !reflect.DeepEqual(got, noindexParts) {
 				t.Fatalf("parts = %+v, want %+v", got, noindexParts)
 			}
 		})
@@ -578,7 +579,7 @@ func TestWiki_PageMeta_NoPage_PublicAccessOff_ContributesNothing(t *testing.T) {
 	w, _ := newSEOTestWiki(t, "https://wiki.example.com")
 
 	for _, routePath := range []string{"/missing", "/login", "/p/unknownid"} {
-		if got := contributeShell(t, w, "", routePath, nil); got != (httpinternal.ShellParts{}) {
+		if got := contributeShell(t, w, "", routePath, nil); !reflect.DeepEqual(got, httpinternal.ShellParts{}) {
 			t.Errorf("%s: parts = %+v, want none", routePath, got)
 		}
 	}
@@ -637,7 +638,7 @@ func TestWiki_PageMeta_Permalink_CanonicalFollowsThePage(t *testing.T) {
 		return href
 	}
 
-	if got := contributeShell(t, w, "", "/p/"+page.ID, nil); got != (httpinternal.ShellParts{}) {
+	if got := contributeShell(t, w, "", "/p/"+page.ID, nil); !reflect.DeepEqual(got, httpinternal.ShellParts{}) {
 		t.Fatalf("public access off: parts = %+v, want none", got)
 	}
 	setPublicAccess(t, public, true)
@@ -646,7 +647,7 @@ func TestWiki_PageMeta_Permalink_CanonicalFollowsThePage(t *testing.T) {
 			t.Errorf("%s: canonical = %q, want https://wiki.example.com/setup", routePath, got)
 		}
 	}
-	if got := contributeShell(t, w, "", "/p/"+page.ID+"/setup/more", nil); got != noindexParts {
+	if got := contributeShell(t, w, "", "/p/"+page.ID+"/setup/more", nil); !reflect.DeepEqual(got, noindexParts) {
 		t.Errorf("extra segments: parts = %+v, want only noindex", got)
 	}
 
@@ -779,7 +780,7 @@ func TestWiki_PageMeta_Permalink_TargetNode(t *testing.T) {
 			got := contributeShell(t, w, "", routePath, nil)
 
 			if tc.wantTitle == "" {
-				if got != noindexParts {
+				if !reflect.DeepEqual(got, noindexParts) {
 					t.Fatalf("parts = %+v, want %+v", got, noindexParts)
 				}
 				return
@@ -804,7 +805,7 @@ func TestWiki_PageMeta_Permalink_EscapesTheTargetTitle(t *testing.T) {
 	viaPermalink := contributeShell(t, w, "", "/p/"+page.ID, nil)
 	viaPath := contributeShell(t, w, "", "/fish", nil)
 
-	if viaPermalink != viaPath {
+	if !reflect.DeepEqual(viaPermalink, viaPath) {
 		t.Fatalf("permalink parts = %+v\npath parts      = %+v", viaPermalink, viaPath)
 	}
 	if strings.Contains(string(viaPermalink.Head), "<Chips>") {
