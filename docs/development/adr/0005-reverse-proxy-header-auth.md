@@ -18,3 +18,7 @@ Add `InjectRemoteUser` middleware (`internal/http/middleware/auth/reverse_proxy.
 - Self-hosters get SSO integration for free, without LeafWiki needing to speak any federation protocol.
 - Security depends entirely on the trusted-proxy-IP configuration being correct: if LeafWiki is ever reachable directly (bypassing the proxy), an attacker can forge the trusted header and impersonate any user. This is a sharp edge that must be called out explicitly in setup docs and in any code review touching this middleware or the deployment/networking docs.
 - Because it reuses `UserService`, this feature can't be used to auto-provision unknown users — the proxy-asserted username must already exist as a LeafWiki user. That's a deliberate scope limit, not an oversight.
+
+## Later changes
+
+- 2026-11-09: `--trusted-proxy-ips` now also decides where `X-Forwarded-For` is believed, which gives the client address used by the access log and the per-client login throttle, not only who may assert a remote user. The decision above holds; its scope moved. See [ADR-0023](./0023-throttle-failed-logins-per-user-and-client.md).

@@ -50,6 +50,8 @@ func (uc *LoginUseCase) Execute(_ context.Context, in LoginInput) (*LoginOutput,
 	if err != nil {
 		switch {
 		case errors.Is(err, coreauth.ErrLoginThrottled):
+			// The label value predates the backoff and stays so existing
+			// dashboards keep working; it counts throttled attempts.
 			uc.metrics.IncAuthLoginAttempt("locked")
 		case errors.Is(err, coreauth.ErrUserInvalidCredentials):
 			uc.metrics.IncAuthLoginAttempt("invalid_credentials")

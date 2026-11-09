@@ -22,13 +22,14 @@ type AuthService struct {
 	// mu guards only userService — it's the one field ReplaceUserStore swaps
 	// after a restore (users.db is part of the snapshot ZIP). sessions'
 	// underlying session store is never swapped, so it needs no lock.
-	mu          sync.RWMutex
-	userService *UserService
-	sessions    *SessionManager
-	totp        *TOTPService
-	attempts    *loginAttemptTracker
-	dummyHash   []byte
-	log         *slog.Logger
+	mu           sync.RWMutex
+	userService  *UserService
+	sessions     *SessionManager
+	totp         *TOTPService
+	attempts     *loginAttemptTracker // password step, per (user, client)
+	totpAttempts *totpAttemptTracker  // code step, per user
+	dummyHash    []byte
+	log          *slog.Logger
 }
 
 // users returns the current *UserService under a read lock. Callers use the
@@ -108,12 +109,13 @@ func NewAuthService(userService *UserService, sessions *SessionManager, totpServ
 	// preventing username enumeration via response-time differences.
 	dummyHash, _ := bcrypt.GenerateFromPassword([]byte("leafwiki-dummy-password"), bcrypt.DefaultCost)
 	a := &AuthService{
-		userService: userService,
-		sessions:    sessions,
-		totp:        totpService,
-		attempts:    newLoginAttemptTracker(),
-		dummyHash:   dummyHash,
-		log:         slog.Default().With("component", "AuthService"),
+		userService:  userService,
+		sessions:     sessions,
+		totp:         totpService,
+		attempts:     newLoginAttemptTracker(),
+		totpAttempts: newTOTPAttemptTracker(),
+		dummyHash:    dummyHash,
+		log:          slog.Default().With("component", "AuthService"),
 	}
 	// Wired here rather than passed into NewSessionManager: a.users() reads
 	// through the mutex ReplaceUserStore swaps, so RefreshToken/ValidateToken
@@ -165,8 +167,9 @@ type AuthToken struct {
 // instead a short-lived login challenge is returned, and CompleteTOTPLogin
 // must be called with the resulting LoginChallengeToken and a valid TOTP or
 // recovery code before cookies may be set.
-// client is the already grouped identity of the caller, recorded in the log lines
-// of rejected logins; the empty value means unknown.
+// client is the already grouped identity of the caller; the empty value means
+// unknown. The password step waits per (account, client), so one client's wrong
+// passwords never keep another client from logging in.
 func (a *AuthService) Login(identifier, password string, client Client) (*AuthToken, error) {
 	user, err := a.users().GetUserByIdentifier(identifier)
 	if err != nil {
@@ -175,12 +178,14 @@ func (a *AuthService) Login(identifier, password string, client Client) (*AuthTo
 		return nil, ErrUserInvalidCredentials
 	}
 
-	if !a.attempts.recordAttempt(user.ID) {
-		// Pay for the same bcrypt comparison a wrong password costs, so the
-		// lock is not visible by response time. The result is discarded: a
-		// locked account is rejected whether or not the password matches.
+	if !a.attempts.attempt(user.ID, client) {
+		// Refused before the password is looked at: during a wait even the
+		// right password has to be refused, or the wait would not slow
+		// guessing down. Pay for the same bcrypt comparison a wrong password
+		// costs, so the wait is not visible by response time. The result is
+		// discarded.
 		_ = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
-		a.log.Warn("login rejected: account locked", "userID", user.ID, "client", client)
+		a.log.Warn("login throttled", "userID", user.ID, "client", client)
 		return nil, ErrLoginThrottled
 	}
 
@@ -190,6 +195,11 @@ func (a *AuthService) Login(identifier, password string, client Client) (*AuthTo
 	}
 
 	user.Password = ""
+
+	// The right password ends this client's wait whether or not a code is still
+	// due. The code step has its own counter, which this never touches: someone
+	// who holds the password gains nothing from a fresh password budget.
+	a.attempts.reset(user.ID, client)
 
 	if user.TOTPEnabled {
 		if a.totp == nil {
@@ -201,17 +211,9 @@ func (a *AuthService) Login(identifier, password string, client Client) (*AuthTo
 			// prompt with no valid code to enter.
 			return nil, errTOTPNotConfigured()
 		}
-		// Do not reset the attempt counter yet: a correct password is not a
-		// complete login while TOTP is still required. CompleteTOTPLogin
-		// shares this same per-user counter to rate-limit TOTP/recovery-code
-		// guesses; resetting it here would let anyone who already knows the
-		// password wipe out failed TOTP attempts by simply resubmitting the
-		// password, defeating the lockout on TOTP code brute-forcing. The
-		// counter is only reset once CompleteTOTPLogin fully succeeds.
 		return a.beginTOTPChallenge(user)
 	}
 
-	a.attempts.reset(user.ID)
 	a.log.Info("login succeeded", "userID", user.ID)
 	return a.sessions.IssueSession(user)
 }
@@ -256,7 +258,7 @@ func (a *AuthService) CompleteTOTPLogin(challengeToken, code string) (*AuthToken
 		return nil, errInvalidLoginChallenge()
 	}
 
-	if !a.attempts.recordAttempt(userID) {
+	if !a.totpAttempts.recordAttempt(userID) {
 		a.log.Warn("totp login rejected: account locked", "userID", userID)
 		return nil, ErrLoginThrottled
 	}
@@ -286,7 +288,7 @@ func (a *AuthService) CompleteTOTPLogin(challengeToken, code string) (*AuthToken
 		return nil, errTOTPInvalidCode()
 	}
 
-	a.attempts.reset(userID)
+	a.totpAttempts.reset(userID)
 
 	// Single-use: revoke the challenge now that it has been consumed successfully.
 	if err := a.sessions.sessionStore.RevokeSession(jti); err != nil {

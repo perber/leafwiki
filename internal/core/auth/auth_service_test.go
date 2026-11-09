@@ -278,36 +278,35 @@ func TestAuthService_CompleteTOTPLogin_RecoveryCodeWorksOnceAndOnlyOnce(t *testi
 }
 
 // TestAuthService_TOTPGuessing_CannotBypassLockoutViaRepeatedCorrectPasswordLogin
-// is the regression test for the login-lockout bypass: Login() must not reset
-// the shared per-user attempt counter while TOTP is still required, or an
-// attacker who already knows the password could keep resetting the guess
-// budget by resubmitting it, turning the 6-digit TOTP code into an
-// unlimited-attempt guessing target. Alternating a correct-password login
-// with a wrong TOTP guess must still hit the account lock within
-// loginMaxFailures combined attempts.
+// pins that a correct password does not give the code step a fresh guess
+// budget: whoever knows the password could otherwise alternate a login with a
+// wrong code and turn the 6-digit code into an unlimited-attempt guessing
+// target. The code step keeps its own per-user lock, which a password login
+// never touches, so the lock must trip within totpMaxAttempts wrong codes
+// while every one of those password logins is still accepted.
 func TestAuthService_TOTPGuessing_CannotBypassLockoutViaRepeatedCorrectPasswordLogin(t *testing.T) {
 	f := setupTOTPTestFixture(t)
+	freezeLoginClocks(f.authService)
 
 	locked := false
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 2*totpMaxAttempts; i++ {
 		challenge, err := f.authService.Login("testuser", "securepass", testClient)
 		if err != nil {
-			if err == ErrLoginThrottled {
-				locked = true
-				break
-			}
-			t.Fatalf("Login failed unexpectedly on iteration %d: %v", i, err)
+			t.Fatalf("a correct password login was refused on iteration %d: %v", i, err)
 		}
 
 		_, err = f.authService.CompleteTOTPLogin(challenge.LoginChallengeToken, "000000")
 		if err == ErrLoginThrottled {
 			locked = true
+			if i != totpMaxAttempts {
+				t.Fatalf("locked after %d wrong codes, want %d", i, totpMaxAttempts)
+			}
 			break
 		}
 	}
 
 	if !locked {
-		t.Fatal("expected repeated correct-password logins interleaved with wrong TOTP guesses to eventually lock the account")
+		t.Fatal("expected repeated correct-password logins interleaved with wrong TOTP guesses to lock the code step")
 	}
 }
 
@@ -316,11 +315,7 @@ func TestAuthService_TOTPGuessing_CannotBypassLockoutViaRepeatedCorrectPasswordL
 // concurrent login attempts presenting the same still-valid recovery code
 // must not all succeed — the code must be consumable exactly once even under
 // concurrency, not just when used sequentially. Reuses a single challenge
-// token across all attempts (rather than one per attempt) since Login() no
-// longer resets the shared lockout counter for TOTP-enabled accounts —
-// several sequential Login() calls would otherwise trip the account lock
-// before any CompleteTOTPLogin call runs, which is exactly the bypass that
-// change closed.
+// token across all attempts, since one challenge is all the race needs.
 func TestAuthService_CompleteTOTPLogin_ConcurrentRecoveryCodeUseOnlyOneSucceeds(t *testing.T) {
 	f := setupTOTPTestFixture(t)
 
@@ -329,8 +324,8 @@ func TestAuthService_CompleteTOTPLogin_ConcurrentRecoveryCodeUseOnlyOneSucceeds(
 		t.Fatalf("Login failed: %v", err)
 	}
 
-	// Stay safely under loginMaxFailures so this test only exercises the
-	// recovery-code race, not the (separately tested) account lockout.
+	// Stay safely under totpMaxAttempts so this test only exercises the
+	// recovery-code race, not the (separately tested) code lock.
 	const attempts = 3
 	results := make(chan error, attempts)
 	var wg sync.WaitGroup
@@ -848,14 +843,16 @@ func TestAuthService_LoginAndValidateToken(t *testing.T) {
 	}
 }
 
-// A locked account must take as long to reject as an unknown identifier, which
-// already pays for a dummy bcrypt comparison; a lock that answers without one
-// tells the two apart by response time alone. The minimum over several runs
-// keeps scheduler noise out: the gap being closed is a whole bcrypt run.
-func TestAuthService_Login_LockedAccountTakesAsLongAsUnknownUser(t *testing.T) {
+// A throttled attempt must take as long to reject as an unknown identifier,
+// which already pays for a dummy bcrypt comparison; a throttle that answers
+// without one tells the two apart by response time alone. The minimum over
+// several runs keeps scheduler noise out: the gap being closed is a whole
+// bcrypt run.
+func TestAuthService_Login_ThrottledAttemptTakesAsLongAsUnknownUser(t *testing.T) {
 	authService := setupTestAuthService(t)
+	freezeLoginClocks(authService)
 
-	for i := 0; i < loginMaxFailures; i++ {
+	for i := 0; i < loginFreeAttempts; i++ {
 		if _, err := authService.Login("testuser", "wrong-guess", testClient); err != ErrUserInvalidCredentials {
 			t.Fatalf("attempt %d: expected ErrUserInvalidCredentials, got %v", i, err)
 		}
@@ -879,10 +876,10 @@ func TestAuthService_Login_LockedAccountTakesAsLongAsUnknownUser(t *testing.T) {
 	}
 
 	unknown := fastest("no-such-user", ErrUserInvalidCredentials)
-	locked := fastest("testuser", ErrLoginThrottled)
+	throttled := fastest("testuser", ErrLoginThrottled)
 
-	if locked < unknown/2 {
-		t.Fatalf("locked account rejected in %v, unknown identifier in %v: the lock is visible by timing", locked, unknown)
+	if throttled < unknown/2 {
+		t.Fatalf("throttled attempt rejected in %v, unknown identifier in %v: the throttle is visible by timing", throttled, unknown)
 	}
 }
 
@@ -1093,7 +1090,7 @@ func TestAuthService_Login_RejectedBranchesLogTheClient(t *testing.T) {
 	}{
 		{name: "unknown identifier", identifier: "nobody", password: "whatever", attempts: 1, wantLine: "invalid credentials"},
 		{name: "wrong password", identifier: "testuser", password: "wrong-password", attempts: 1, wantLine: "invalid credentials"},
-		{name: "locked account", identifier: "testuser", password: "wrong-password", attempts: loginMaxFailures + 1, wantLine: "account locked"},
+		{name: "throttled attempt", identifier: "testuser", password: "wrong-password", attempts: loginFreeAttempts + 1, wantLine: "login throttled"},
 	}
 
 	for _, tt := range tests {

@@ -319,32 +319,48 @@ Full auth *model* (JWT structure, cookie strategy, role model) is covered in
 1. Looks up the user by identifier; on failure runs a dummy `bcrypt.CompareHashAndPassword`
    anyway (constant-time-ish defense against username enumeration via timing) before
    returning `ErrUserInvalidCredentials`.
-2. `a.attempts.recordAttempt(user.ID)` — per-user lockout counter; returns
-   `ErrLoginThrottled` if tripped, after running the same bcrypt comparison a wrong
-   password costs (result discarded) so the lock is not visible by timing. The HTTP layer
-   answers it exactly like `ErrUserInvalidCredentials` (`401 auth_invalid_credentials`,
-   see `internal/wiki/auth/errors.go`), so the lock does not reveal that an account
-   exists; only the metrics (`"locked"`) and the server log tell the two apart.
-3. Verifies the password hash. On success, if `user.TOTPEnabled`: does **not** reset the
-   attempt counter (TOTP brute-forcing shares the same counter as password brute-forcing —
-   see the comment at `auth_service.go`) and returns a **TOTP challenge** instead of a
-   session (`beginTOTPChallenge`) — the HTTP layer responds `{requiresTotp: true,
-   loginChallengeToken}` with **no cookies set** (`routes.go`).
-4. If TOTP isn't enabled: resets the attempt counter and calls `sessions.IssueSession(user)`
-   directly, issuing access + refresh tokens.
+2. `a.attempts.attempt(user.ID, client)` — the password step waits per (account, client), where
+   `client` is the grouped client address (see "Client address" below). The first 5 attempts
+   carry no wait; after that the wait is 5 s, doubling with every counted attempt up to 15 min,
+   and an entry is forgotten after an hour without a counted attempt (constants in
+   `login_attempt_tracker.go`, `loginBackoffDecay` never below `loginBackoffCap`). The attempt is
+   counted **before** the password is verified, in one critical section, so parallel guesses
+   cannot all pass the check first. During a wait even the right password is refused, because
+   otherwise the wait would not slow guessing down; a refused call is neither counted nor
+   extends the wait. A refusal returns `ErrLoginThrottled` after running the same bcrypt
+   comparison a wrong password costs (result discarded), so the wait is not visible by timing.
+   The HTTP layer answers it exactly like `ErrUserInvalidCredentials` (`401
+   auth_invalid_credentials`, no `Retry-After`, see `internal/wiki/auth/errors.go`), so the wait
+   does not reveal that an account exists; only the metrics (`"locked"` counts throttled
+   attempts) and the server log tell the two apart. Nothing here locks the account for other
+   clients: one client's wrong passwords never keep the owner out from another address. The
+   table lives in memory, holds at most 10 000 entries (expired entries go first, then the one
+   that is allowed again soonest, never refusing to track) and is cleared by a restart.
+3. Verifies the password hash. On success the (account, client) entry is cleared, whether or not
+   TOTP is enabled; only that pair, and never the TOTP lock below. If `user.TOTPEnabled`, it
+   returns a **TOTP challenge** instead of a session (`beginTOTPChallenge`) — the HTTP layer
+   responds `{requiresTotp: true, loginChallengeToken}` with **no cookies set** (`routes.go`).
+4. If TOTP isn't enabled: calls `sessions.IssueSession(user)` directly, issuing access + refresh
+   tokens.
 5. On a non-TOTP success, the handler issues the CSRF cookie (`CSRFCookie.Issue`) then sets
    auth cookies (`AuthCookies.Set`) before responding `{user, accessTokenExpiresAt}`.
 
 **TOTP second step** (only when step 3 above returned a challenge) — `POST
 /api/auth/login/totp` → `handleLoginTOTP` (`routes.go`) → `CompleteTOTPLoginUseCase` →
 `AuthService.CompleteTOTPLogin` (`auth_service.go`): validates the single-use, short-lived
-`loginChallengeToken` (session-store lookup by `jti`), records another lockout attempt against
-the *same* per-user counter as the password step, verifies the code as either a live TOTP code
-or an unused recovery code, resets the counter and revokes the challenge token on success, then
-issues the session exactly as a non-TOTP login would. Only at this point are cookies set. A
-tripped lock here gets the same `401 auth_invalid_credentials` answer as in the password step:
-the auth slice maps the lock once, for every route, and does not tell a caller when guessing
-codes becomes worthwhile again.
+`loginChallengeToken` (session-store lookup by `jti`), then counts the attempt against a
+**per-account lock** that is separate from the password step (`totpAttemptTracker`): 5 counted
+attempts refuse the account for 15 min from every address, counted before verification, cleared
+only by a full TOTP success. The lock covers every client because a 6-digit code accepts a few
+values per attempt, so a per-client budget would multiply the guesses by the number of addresses
+a guesser holds; reaching this step takes the account's password, so the lock does not let a
+third party keep the owner out. Wrong passwords never use up code attempts and wrong codes never
+use up password attempts. It then verifies the code as either a live TOTP code or an unused
+recovery code, revokes the challenge token on success, and issues the session exactly as a
+non-TOTP login would. Only at this point are cookies set. A tripped lock here gets the same
+`401 auth_invalid_credentials` answer as in the password step: the auth slice maps
+`ErrLoginThrottled` once, for every route, and does not tell a caller when guessing codes
+becomes worthwhile again.
 
 **Token refresh** — `POST /api/auth/refresh-token` → `RefreshTokenUseCase.Execute` →
 `AuthService.RefreshToken` → `sessions.RefreshToken`. Frontend drives this from
@@ -384,9 +400,12 @@ header from the right and stops at the first address that is not listed, so ever
 `X-Forwarded-For` or overwrite the header (nginx:
 `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for`); one that passes a client-supplied
 header through lets that client choose its address. The access log `ip` and
-`security.ClientBucket` (the per-client grouping for budgets) read it. Gin trusts every
-unix-socket peer, and that peer has no IP the list could name, so on a unix socket the header is
-read only when at least one proxy is listed. Without the reverse proxy in the list every visitor
-behind it resolves to the proxy's address and shares one bucket; per-client protection is fixed
-once the reverse proxy is listed in `--trusted-proxy-ips`. The first request carrying a forwarding header from an unlisted
-peer logs one warning (`warnOnUntrustedForwarding`).
+`security.ClientBucket` (the per-client grouping for budgets, which the login handler passes to
+the password-step backoff above) read it. Gin trusts every unix-socket peer, and that peer has no
+IP the list could name, so on a unix socket the header is read only when at least one proxy is
+listed.
+`--trusted-proxy-ips` is empty by default, and then every visitor behind a reverse proxy resolves
+to the proxy's address and shares one bucket (at most 15 min of waiting at a time, but for all of
+them); per-client protection is fixed once the reverse proxy is listed in `--trusted-proxy-ips`.
+The first request carrying a forwarding header from an unlisted peer logs one warning
+(`warnOnUntrustedForwarding`).

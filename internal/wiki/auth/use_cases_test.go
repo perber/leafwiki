@@ -303,10 +303,10 @@ func TestLoginUseCase_EmitsSuccessMetric(t *testing.T) {
 	}
 }
 
-// TestLoginUseCase_EmitsLockedMetric verifies that once the per-user failure
-// threshold trips, a subsequent attempt is recorded under outcome="locked"
-// (distinct from the "invalid_credentials" outcome of the failures that
-// triggered the lock itself — see loginAttemptTracker.recordAttempt).
+// TestLoginUseCase_EmitsLockedMetric verifies that once a client has used up
+// its free attempts for an account, the next attempt from it is recorded under
+// outcome="locked" (the label counts throttled attempts), distinct from the
+// "invalid_credentials" outcome of the attempts that were verified.
 func TestLoginUseCase_EmitsLockedMetric(t *testing.T) {
 	authSvc, userSvc, metrics := setupAuthUseCases(t, false)
 	if _, err := userSvc.CreateUser("alice", "alice@example.com", "securepass", coreauth.RoleViewer); err != nil {
@@ -331,7 +331,7 @@ func TestLoginUseCase_EmitsLockedMetric(t *testing.T) {
 		t.Fatalf("expected locked outcome metric, got: %s", body)
 	}
 	if !strings.Contains(body, `leafwiki_auth_login_attempts_total{outcome="invalid_credentials"} 5`) {
-		t.Fatalf("expected 5 invalid_credentials attempts before the lock, got: %s", body)
+		t.Fatalf("expected 5 invalid_credentials attempts before the throttle, got: %s", body)
 	}
 }
 
@@ -415,9 +415,8 @@ func TestCompleteTOTPLoginUseCase_EmitsVerificationMetric(t *testing.T) {
 // TestCompleteTOTPLoginUseCase_EmitsLockedMetric verifies that once wrong
 // codes trip the per-user lock, even a valid code is refused, the attempt is
 // counted under result="locked", and the client gets the same answer as for
-// wrong credentials. The password login that opened the challenge already
-// counts as one attempt (see AuthService.Login), so the lock trips on the
-// fourth wrong code.
+// wrong credentials. Only code attempts count towards this lock, not the
+// password login that opened the challenge, so it trips on the fifth wrong code.
 func TestCompleteTOTPLoginUseCase_EmitsLockedMetric(t *testing.T) {
 	authSvc, userSvc, metrics := setupAuthUseCases(t, true)
 	user, err := userSvc.CreateUser("alice", "alice@example.com", "securepass", coreauth.RoleViewer)
@@ -443,7 +442,7 @@ func TestCompleteTOTPLoginUseCase_EmitsLockedMetric(t *testing.T) {
 	challenge := loginOut.Token.LoginChallengeToken
 
 	completeUC := NewCompleteTOTPLoginUseCase(authSvc, metrics)
-	const wrongCodes = 4
+	const wrongCodes = 5
 	for i := 0; i < wrongCodes; i++ {
 		if _, err := completeUC.Execute(context.Background(), CompleteTOTPLoginInput{LoginChallengeToken: challenge, Code: "000000"}); err == nil {
 			t.Fatalf("wrong code %d: expected an error", i)

@@ -67,3 +67,4 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Deprecated`, `Superseded by 
 | [0020](./0020-server-rendered-page-html-for-crawlers.md) | Page HTML for crawlers is rendered in `internal/render` and sanitized by a stricter server policy | Accepted |
 | [0021](./0021-page-side-panel-sections.md) | The page side panel renders sections composed by the page viewer | Proposed |
 | [0022](./0022-versioned-derived-search-index.md) | The search index persists across restarts and is rebuilt on a schema version or DDL mismatch or on corruption | Proposed |
+| [0023](./0023-throttle-failed-logins-per-user-and-client.md) | Failed logins are throttled per account and client; the client address is resolved through `--trusted-proxy-ips` | Proposed |
