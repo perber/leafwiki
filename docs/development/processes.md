@@ -374,3 +374,19 @@ an unrecognized identifier, the request is rejected with `401` rather than falli
 normal auth (a misconfigured proxy must not silently downgrade to anonymous). No
 `POST /api/auth/login` call ever happens in this mode; there is no access/refresh token pair
 to manage on the frontend either.
+
+**Client address.** `c.ClientIP()` is the TCP peer unless the peer is listed in
+`--trusted-proxy-ips`. `configureClientAddress` (`internal/http/client_address.go`) hands that
+list to gin (`TrustedProxies.Entries`, rebuilt from the parsed values so an IPv4-mapped IPv6
+entry stays one host) and lets gin read `X-Forwarded-For` only, never `X-Real-IP`. Gin walks the
+header from the right and stops at the first address that is not listed, so every hop of the chain
+(CDN and proxy) must be listed, and the proxy must append the client address to
+`X-Forwarded-For` or overwrite the header (nginx:
+`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for`); one that passes a client-supplied
+header through lets that client choose its address. The access log `ip` and
+`security.ClientBucket` (the per-client grouping for budgets) read it. Gin trusts every
+unix-socket peer, and that peer has no IP the list could name, so on a unix socket the header is
+read only when at least one proxy is listed. Without the reverse proxy in the list every visitor
+behind it resolves to the proxy's address and shares one bucket; per-client protection is fixed
+once the reverse proxy is listed in `--trusted-proxy-ips`. The first request carrying a forwarding header from an unlisted
+peer logs one warning (`warnOnUntrustedForwarding`).

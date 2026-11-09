@@ -16,6 +16,16 @@ type proxyOptions struct {
 	userManagementURL              string
 }
 
+// trustedProxyIPsUsage is long because the flag decides more than it used to:
+// it is not only the remote-user allowlist but the only place X-Forwarded-For is
+// believed.
+const trustedProxyIPsUsage = "comma-separated IPs/CIDRs of your reverse proxies (e.g. 127.0.0.1,172.18.0.0/16). " +
+	"Only they are believed when they send X-Forwarded-For (the client address for logs and per-client limits) or a remote-user header. " +
+	"List every hop of the chain (CDN and proxy): the header is read right to left. The proxy must append the client address to X-Forwarded-For or overwrite the header: one that passes a client-supplied header through lets that client choose its address. " +
+	"On a unix socket the header is believed only when at least one proxy is listed. " +
+	"Without the proxy listed, visitors behind it share one client address; " +
+	"the per-client protection is fixed once the reverse proxy is listed here"
+
 // Flags declares them. Adding an option here is the whole change: the flag,
 // its default, its environment variable and its help text are one literal,
 // and --help is generated from it.
@@ -64,8 +74,8 @@ func (o *proxyOptions) Flags() []cli.Flag {
 		&cli.StringFlag{
 			Name:        "trusted-proxy-ips",
 			Destination: &o.trustedProxyIPs,
-			Category:    catProxyAuth,
-			Usage:       "comma-separated trusted proxy IPs/CIDRs (e.g. 127.0.0.1,172.18.0.0/16)",
+			Category:    catServer,
+			Usage:       trustedProxyIPsUsage,
 			Sources:     envVars("LEAFWIKI_TRUSTED_PROXY_IPS"),
 			Config:      trimmed,
 		},

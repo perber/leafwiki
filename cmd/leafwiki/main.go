@@ -393,6 +393,8 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		SnapshotEnabled:         cfg.backup.snapshot,
 		SMTPEnabled:             smtpEnabled,
 		TOTPAvailable:           w.TOTPService() != nil,
+		TrustedProxies:          trustedProxies,
+		UnixSocket:              cfg.server.unixSocket != "",
 		HTTPRemoteUser: httpinternal.HTTPRemoteUserConfig{
 			Enabled:         cfg.proxy.enableHTTPRemoteUser,
 			HeaderName:      cfg.proxy.httpRemoteUserHeader,

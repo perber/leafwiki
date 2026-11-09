@@ -160,6 +160,16 @@ type RouterOptions struct {
 	LoginURL                string                   // Optional URL the frontend redirects to instead of showing the built-in login form
 	LogoutURL               string                   // Optional URL the frontend redirects to after logout
 	WriteGate               *restore.WriteGate       // Optional; when set, gates mutating requests while a restore is in progress. nil disables the middleware entirely (no snapshot/restore enabled)
+
+	// TrustedProxies are the proxies whose X-Forwarded-For is believed when
+	// resolving the client address (logs, per-client limits). nil trusts nobody,
+	// so the client address is the TCP peer. Same list as HTTPRemoteUser.TrustedProxies.
+	TrustedProxies *auth_middleware.TrustedProxies
+
+	// UnixSocket is true when the server listens on a unix socket instead of
+	// TCP. gin trusts every unix-socket peer, so the client address is then
+	// read from X-Forwarded-For only if TrustedProxies is not empty.
+	UnixSocket bool
 }
 
 // FrontendConfig carries the minimal runtime data required to serve the embedded SPA.
@@ -210,6 +220,9 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 
 	capabilities := &capabilityPrefixes{}
 	engine := gin.New()
+	if err := configureClientAddress(engine, opts.TrustedProxies, opts.UnixSocket); err != nil {
+		panic("failed to configure the trusted proxies: " + err.Error())
+	}
 	if !opts.DisableRequestLog {
 		engine.Use(slogRequestLogger(capabilities))
 	}
@@ -217,6 +230,7 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 		engine.Use(opts.Metrics.Middleware())
 	}
 	engine.Use(gin.RecoveryWithWriter(gin.DefaultErrorWriter))
+	engine.Use(warnOnUntrustedForwarding(slog.Default(), opts.TrustedProxies))
 	base := engine.Group(opts.BasePath)
 
 	if opts.WriteGate != nil {

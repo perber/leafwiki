@@ -61,3 +61,26 @@ func (tp *TrustedProxies) IsTrusted(remoteAddr string) bool {
 	}
 	return false
 }
+
+// Entries lists the set as CIDR strings (networks first, then single
+// addresses), built from the parsed values rather than the text the operator
+// typed. Gin picks /32 or /128 from the parsed address but appends it to the
+// original text, so "::ffff:10.0.0.1" would otherwise become the IPv6 prefix
+// "::ffff:10.0.0.1/32". A nil or empty set yields an empty, non-nil slice.
+func (tp *TrustedProxies) Entries() []string {
+	entries := []string{}
+	if tp == nil {
+		return entries
+	}
+	for _, ipNet := range tp.nets {
+		entries = append(entries, ipNet.String())
+	}
+	for _, ip := range tp.ips {
+		bits := "/128"
+		if ip.To4() != nil {
+			bits = "/32"
+		}
+		entries = append(entries, ip.String()+bits)
+	}
+	return entries
+}

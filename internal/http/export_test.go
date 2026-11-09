@@ -39,3 +39,6 @@ func ServeShell(indexTemplate string, cfg FrontendConfig, opts RouterOptions, pa
 	ShellEngine(indexTemplate, cfg, opts).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 	return rec
 }
+
+var ConfigureClientAddress = configureClientAddress
+var WarnOnUntrustedForwarding = warnOnUntrustedForwarding

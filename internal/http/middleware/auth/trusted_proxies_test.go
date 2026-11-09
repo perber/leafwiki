@@ -1,6 +1,7 @@
 package auth_test
 
 import (
+	"slices"
 	"testing"
 
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
@@ -108,5 +109,42 @@ func TestIsTrusted_InvalidAddr(t *testing.T) {
 	}
 	if tp.IsTrusted("not-valid") {
 		t.Error("invalid address should not be trusted")
+	}
+}
+
+// Entries feeds gin's trusted-proxy list, which appends /32 or /128 to the
+// text it is given. Each entry is therefore rebuilt from the parsed value, so
+// an IPv4-mapped IPv6 spelling cannot turn into a far wider IPv6 prefix.
+func TestTrustedProxies_Entries(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want []string
+	}{
+		{"empty list", "", []string{}},
+		{"IPv4 address", "10.0.0.1", []string{"10.0.0.1/32"}},
+		{"IPv6 address", "2001:db8::1", []string{"2001:db8::1/128"}},
+		{"IPv4-mapped IPv6 address is one IPv4 host", "::ffff:10.0.0.1", []string{"10.0.0.1/32"}},
+		{"CIDR is masked to its network", "10.1.2.3/8", []string{"10.0.0.0/8"}},
+		{"IPv6 CIDR", "2001:db8::/32", []string{"2001:db8::/32"}},
+		{"whitespace and empty items are dropped", "  10.0.0.1 ,, 192.168.0.0/16 ", []string{"192.168.0.0/16", "10.0.0.1/32"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tp, err := authmw.ParseTrustedProxies(tt.raw)
+			if err != nil {
+				t.Fatalf("ParseTrustedProxies(%q): %v", tt.raw, err)
+			}
+			if got := tp.Entries(); !slices.Equal(got, tt.want) {
+				t.Errorf("Entries() = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTrustedProxies_EntriesOfNilTrustNobody(t *testing.T) {
+	var tp *authmw.TrustedProxies
+	if got := tp.Entries(); got == nil || len(got) != 0 {
+		t.Errorf("Entries() on a nil list = %#v, want an empty, non-nil slice", got)
 	}
 }
