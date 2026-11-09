@@ -2,12 +2,14 @@ package seo
 
 import (
 	"context"
+	"errors"
 	"html/template"
 	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	httpinternal "github.com/perber/wiki/internal/http"
 	"github.com/perber/wiki/internal/publicaccess"
@@ -190,4 +192,46 @@ func (p *pageMeta) ContributeShell(ctx context.Context, req httpinternal.ShellRe
 		// The title and description change with the page; caches must revalidate.
 		NoCache: true,
 	}
+}
+
+// crawlerBody puts the rendered page into #root for search-engine crawlers,
+// so they see the content without running the SPA (ADR-0018). The SPA's
+// createRoot replaces it once it runs.
+type crawlerBody struct {
+	body       *GetCrawlerBodyUseCase
+	log        *slog.Logger
+	busyLogged atomic.Bool
+}
+
+// NewCrawlerBody returns the shell contributor for the crawler body.
+func NewCrawlerBody(body *GetCrawlerBodyUseCase, log *slog.Logger) httpinternal.ShellContributor {
+	return &crawlerBody{body: body, log: log}
+}
+
+func (c *crawlerBody) ContributeShell(ctx context.Context, req httpinternal.ShellRequest) httpinternal.ShellParts {
+	// Whether the shell carries the page depends on User-Agent, on every
+	// route: caches must keep the variants apart and revalidate them.
+	parts := httpinternal.ShellParts{Vary: []string{"User-Agent"}, NoCache: true}
+	out, err := c.body.Execute(ctx, GetCrawlerBodyInput{
+		RoutePath: req.RoutePath,
+		BasePath:  req.BasePath,
+		UserAgent: req.Request.UserAgent(),
+	})
+	switch {
+	case errors.Is(err, errRendersBusy):
+		// Swallowed here: the crawler gets the plain shell. Logged once per
+		// process, a crawl can hit this on every request.
+		if !c.busyLogged.Swap(true) {
+			c.log.Warn("crawler body skipped, too many renders running, serving the plain shell; further skips are not logged",
+				"max_parallel_renders", maxParallelRenders)
+		}
+	case err != nil:
+		// Swallowed here: the crawler gets the plain shell. A failed render
+		// is cached, so this logs once per page version; the error carries
+		// no page content.
+		c.log.Warn("crawler body skipped, serving the plain shell", "route", req.RoutePath, "error", err)
+	case out != nil:
+		parts.Body = template.HTML(out.HTML) // escaped and sanitized by the use case
+	}
+	return parts
 }

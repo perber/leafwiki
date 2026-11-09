@@ -8,6 +8,8 @@ import (
 // Page is one page as the use cases of this package read it, shared by
 // every use case that reads a single page by its route path.
 type Page struct {
+	// ID is the page's stable ID.
+	ID    string
 	Title string
 	// Body is the page's Markdown without frontmatter.
 	Body string

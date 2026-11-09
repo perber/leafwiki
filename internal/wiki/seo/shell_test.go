@@ -3,6 +3,7 @@ package seo_test
 import (
 	"context"
 	"errors"
+	"html/template"
 	"io"
 	"log/slog"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	wikihttp "github.com/perber/wiki/internal/http"
@@ -537,5 +539,111 @@ func TestPageMarkdown_Body_ServedVerbatim(t *testing.T) {
 				t.Errorf("Content-Length = %q, want %q", got, want)
 			}
 		})
+	}
+}
+
+func crawlerBody(pages seo.PageReader, reader *fakeCrawlerBodyReader, log *slog.Logger) wikihttp.ShellContributor {
+	return seo.NewCrawlerBody(seo.NewGetCrawlerBodyUseCase(pages, reader), log)
+}
+
+func requestWithUA(routePath, userAgent string) wikihttp.ShellRequest {
+	req := shellRequest("", routePath)
+	req.Request.Header.Set("User-Agent", userAgent)
+	return req
+}
+
+// Every public shell says it varies by User-Agent and must be revalidated,
+// so a cache never hands a crawler's variant to a browser or the reverse.
+var crawlerVaryParts = wikihttp.ShellParts{Vary: []string{"User-Agent"}, NoCache: true}
+
+func TestCrawlerBody_ContributesBodyOnlyToCrawlers(t *testing.T) {
+	tests := []struct {
+		name      string
+		routePath string
+		userAgent string
+		pages     *fakePageReader
+		wantBody  string
+	}{
+		{name: "browser gets only Vary", routePath: "/docs/setup", userAgent: chromeUA, pages: pageAt("docs/setup", setupPage())},
+		{name: "crawler gets the body", routePath: "/docs/setup", userAgent: googlebotUA, pages: pageAt("docs/setup", setupPage()), wantBody: "<article><h1>Setup</h1><p>Install it.</p>\n</article>"},
+		{name: "crawler on an unknown page gets only Vary", routePath: "/docs/missing", userAgent: googlebotUA, pages: pageAt("docs/setup", setupPage())},
+		{name: "read error: only Vary", routePath: "/docs/setup", userAgent: googlebotUA, pages: &fakePageReader{err: errors.New("boom")}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := crawlerBody(tc.pages, &fakeCrawlerBodyReader{}, discardLogger()).ContributeShell(context.Background(), requestWithUA(tc.routePath, tc.userAgent))
+			want := crawlerVaryParts
+			want.Body = template.HTML(tc.wantBody)
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("parts = %+v, want %+v", got, want)
+			}
+		})
+	}
+}
+
+func TestPublicOnly_CrawlerBodyPublicAccessOff_ContributesAndReadsNothing(t *testing.T) {
+	pages := pageAt("docs/setup", setupPage())
+	reader := &fakeCrawlerBodyReader{}
+	contributor := seo.NewPublicOnly(publicaccess.Fixed(false)).Contributor(crawlerBody(pages, reader, discardLogger()))
+
+	if got := contributor.ContributeShell(context.Background(), requestWithUA("/docs/setup", googlebotUA)); !reflect.DeepEqual(got, wikihttp.ShellParts{}) {
+		t.Errorf("parts = %+v, want empty (no Vary either)", got)
+	}
+	if pages.reads != 0 || reader.reads != 0 {
+		t.Errorf("page reads %d, child reads %d; want nothing read", pages.reads, reader.reads)
+	}
+}
+
+// A page that fails to render is logged once per page version, without its
+// content, and the crawler gets the plain shell.
+func TestCrawlerBody_RenderFails_LoggedOnceWithoutContent(t *testing.T) {
+	secret := "SECRET-CONTENT "
+	pages := pageAt("huge", seo.Page{ID: "huge-id", Title: "Huge", Body: strings.Repeat(secret, 300<<10/len(secret)+1)})
+	var logs strings.Builder
+	contributor := crawlerBody(pages, &fakeCrawlerBodyReader{}, slog.New(slog.NewTextHandler(&logs, nil)))
+
+	for range 3 {
+		if got := contributor.ContributeShell(context.Background(), requestWithUA("/huge", googlebotUA)); !reflect.DeepEqual(got, crawlerVaryParts) {
+			t.Fatalf("parts = %+v, want only Vary", got)
+		}
+	}
+	if n := strings.Count(logs.String(), "level=WARN"); n != 1 {
+		t.Errorf("%d warnings, want 1:\n%s", n, logs.String())
+	}
+	if strings.Contains(logs.String(), "SECRET") || !strings.Contains(logs.String(), "too complex") {
+		t.Errorf("log = %s, want the reason without page content", logs.String())
+	}
+}
+
+// Refused renders are logged once per process, not once per request.
+func TestCrawlerBody_RendersBusy_LoggedOnce(t *testing.T) {
+	reader := &fakeCrawlerBodyReader{links: map[string]string{}, entered: make(chan struct{}), block: make(chan struct{})}
+	pages := &fakePageReader{pages: map[string]*seo.Page{}}
+	for i := range seo.MaxParallelRenders + 1 {
+		routePath := "page" + string(rune('a'+i))
+		pages.pages[routePath] = &seo.Page{ID: routePath, Title: routePath, Body: "[[" + routePath + "]]"}
+	}
+	var logs strings.Builder
+	contributor := crawlerBody(&lockedPageReader{inner: pages}, reader, slog.New(slog.NewTextHandler(&logs, nil)))
+	var wg sync.WaitGroup
+	for i := range seo.MaxParallelRenders {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			contributor.ContributeShell(context.Background(), requestWithUA("/page"+string(rune('a'+i)), googlebotUA))
+		}()
+		<-reader.entered
+	}
+
+	last := "/page" + string(rune('a'+seo.MaxParallelRenders))
+	for range 3 {
+		if got := contributor.ContributeShell(context.Background(), requestWithUA(last, googlebotUA)); !reflect.DeepEqual(got, crawlerVaryParts) {
+			t.Errorf("parts = %+v, want only Vary", got)
+		}
+	}
+	close(reader.block)
+	wg.Wait()
+	if n := strings.Count(logs.String(), "level=WARN"); n != 1 {
+		t.Errorf("%d warnings, want 1:\n%s", n, logs.String())
 	}
 }

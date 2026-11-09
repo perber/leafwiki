@@ -209,7 +209,7 @@ resync-derived state.
   `router.go` builds the `gin.Engine`, embeds the built frontend (`//go:embed dist/**`, gated by
   the `EmbedFrontend` build-time flag), sets up request logging via `slog`. `shell.go` serves
   the SPA fallback route: it runs the registered `ShellResponder`s and renders `index.html`
-  from the `ShellContributor`s on `FrontendConfig` (title, head, `#root` markup; built-ins for
+  from the `ShellContributor`s on `FrontendConfig` (title, head, `#root` markup, `Vary` fields; built-ins for
   the custom stylesheet and `InjectCodeInHeader` last), see
   [ADR-0017](./adr/0017-spa-shell-contributors.md). `registrar.go` defines
   the `RouteRegistrar` interface and `RouterContext` (engine, auth cookie manager, CSRF cookie
@@ -270,7 +270,7 @@ shape for that domain.
 
 - **`internal/wiki/pages`** — the largest domain slice: CRUD + tree operations exposed over HTTP.
   One file per use case — `create_page.go`, `update_page.go`, `move_page.go`, `copy_page.go`,
-  `delete_page.go`, `convert_page.go` (page↔section), `get_page_view.go` (`GetPageViewByIDUseCase`/`GetPageViewByPathUseCase` — the single-page view shared by API and SEO: page plus frontmatter tags and properties via `page_metadata.go`; not a visibility layer), `get_first_page_path.go` (`GetFirstPagePathUseCase` — the first top-level page or section in navigation order, the target of the root redirect), `list_page_routes.go` (`ListPageRoutesUseCase` — route path, kind and last update of every page and section in navigation order, from one locked tree read; feeds the sitemap), `get_page.go` (`PageQueries` — the remaining read-only lookups: path lookup, title, permalink), `pin_page.go` (global editorial pin, see
+  `delete_page.go`, `convert_page.go` (page↔section), `get_page_view.go` (`GetPageViewByIDUseCase`/`GetPageViewByPathUseCase` — the single-page view shared by API and SEO: page plus frontmatter tags and properties via `page_metadata.go`; not a visibility layer), `get_first_page_path.go` (`GetFirstPagePathUseCase` — the first top-level page or section in navigation order, the target of the root redirect), `list_page_routes.go` (`ListPageRoutesUseCase` — route path, kind and last update of every page and section in navigation order, from one locked tree read; feeds the sitemap; `ListChildRoutesUseCase`, a page's direct children for the crawler body), `resolve_wiki_link.go` (`ResolveWikiLinkUseCase` — a `[[target]]` to its page's route by the rule stored links follow, for the crawler body), `get_page.go` (`PageQueries` — the remaining read-only lookups: path lookup, title, permalink), `pin_page.go` (global editorial pin, see
   distinction from favorites below), `ensure_path.go`, `refactor.go` (link-refactor
   trigger), `add_favorite.go`/`remove_favorite.go`/`list_favorites.go` (per-user favorites, note the explicit distinction: pin is global/editorial via
   `tree.SetPinned` in page frontmatter, favorites is per-user via `internal/favorites`, deliberately
@@ -325,7 +325,8 @@ shape for that domain.
   file. `shell.go`: `PublicOnly` (every registration and route of the slice runs only while
   public access is on; `Handler(on, off)` for routes), the root redirect (`GET /` → 302 to the
   first page), the page Markdown responder (`Accept: text/markdown` → the page's Markdown) and
-  the page meta contributor (robots `noindex` for routes without a page); `routes.go`:
+  the page meta contributor (robots `noindex` for routes without a page), then the crawler
+  body contributor (`Vary: User-Agent` on every public shell); `routes.go`:
   `Routes` (`robots.txt`, `sitemap.xml`, GET and HEAD); `root_target.go`:
   `GetRootTargetUseCase` behind the narrow `FirstPageReader`; `urls.go`: the URL helpers the
   features share (escaped wiki path, absolute URL from `--public-url`, the page read's route
@@ -335,7 +336,10 @@ shape for that domain.
   `NoIndex` when no page is at the route; `PermalinkResolver` for permalinks) and
   `markdown.go` (`GetPageMarkdownUseCase` and the `Accept` negotiation); `robots.go`:
   `GetRobotsUseCase` and `PrivateRobots`; `sitemap.go`: `BuildSitemapUseCase` behind
-  `PageRouteLister`, streamed by `WriteXML`. The readers are implemented in
+  `PageRouteLister`, streamed by `WriteXML`; `crawler_body.go`: `GetCrawlerBodyUseCase`
+  (title, `internal/render` HTML and child links for search-engine user agents, behind
+  `PageReader` and `CrawlerBodyReader`; renders cached per page version, parallel renders
+  capped, least recently used dropped first). The readers are implemented in
   `internal/wiki/seo_adapter.go` with the pages slice's read use cases.
 
 ## Frontend — `ui/leafwiki-ui/src/`

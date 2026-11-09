@@ -305,3 +305,72 @@ func TestTreeService_RouteLookups_ConcurrentWithMoves(t *testing.T) {
 	}
 	<-done
 }
+
+func TestTreeService_ChildRoutes_ListsDirectChildrenInNavigationOrder(t *testing.T) {
+	svc, ids := subtreeFixture(t)
+	if err := svc.SortPages(ids["docs"], []string{ids["faq"], ids["guide"]}); err != nil {
+		t.Fatalf("SortPages failed: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		id   string
+		want []string
+	}{
+		{name: "section", id: ids["docs"], want: []string{"docs/faq", "docs/guide"}},
+		{name: "nested page", id: ids["guide"], want: []string{"docs/guide/intro"}},
+		{name: "leaf page", id: ids["intro"], want: []string{}},
+		{name: "root", id: "root", want: []string{"docs", "other"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			entries, err := svc.ChildRoutes(tc.id)
+			if err != nil {
+				t.Fatalf("ChildRoutes failed: %v", err)
+			}
+			got := make([]string, len(entries))
+			for i, e := range entries {
+				got[i] = e.RoutePath
+			}
+			if strings.Join(got, ",") != strings.Join(tc.want, ",") {
+				t.Errorf("route paths = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTreeService_ChildRoutes_CopiesNodeFields(t *testing.T) {
+	svc, ids := subtreeFixture(t)
+
+	entries, err := svc.ChildRoutes(ids["guide"])
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("ChildRoutes = %v, %v, want one entry", entries, err)
+	}
+	node := svc.GetTree().Children[0].Children[0].Children[0]
+	want := RouteEntry{ID: ids["intro"], Title: "intro", RoutePath: "docs/guide/intro", Kind: NodeKindPage, UpdatedAt: node.Metadata.UpdatedAt}
+	if entries[0] != want || want.UpdatedAt.IsZero() {
+		t.Errorf("entry = %+v, want %+v", entries[0], want)
+	}
+}
+
+func TestTreeService_ChildRoutes_Errors(t *testing.T) {
+	loaded, _ := subtreeFixture(t)
+	tests := []struct {
+		name string
+		svc  *TreeService
+		id   string
+		want error
+	}{
+		{name: "tree not loaded", svc: NewTreeService(t.TempDir()), id: "root", want: ErrTreeNotLoaded},
+		{name: "unknown id", svc: loaded, id: "missing", want: ErrPageNotFound},
+		{name: "empty id", svc: loaded, id: "", want: ErrPageNotFound},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			entries, err := tc.svc.ChildRoutes(tc.id)
+			if !errors.Is(err, tc.want) || entries != nil {
+				t.Fatalf("ChildRoutes = %v, %v, want nil, %v", entries, err, tc.want)
+			}
+		})
+	}
+}

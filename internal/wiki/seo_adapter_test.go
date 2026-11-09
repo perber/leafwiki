@@ -238,6 +238,7 @@ func contributeShell(t *testing.T, w *Wiki, basePath, routePath string, headers 
 		merged.Head += parts.Head
 		merged.Body += parts.Body
 		merged.NoCache = merged.NoCache || parts.NoCache
+		merged.Vary = append(merged.Vary, parts.Vary...)
 	}
 	return merged
 }
@@ -350,12 +351,16 @@ func TestWiki_PageMeta_FollowsPublicAccessAtRuntime(t *testing.T) {
 	}
 }
 
-// noindexParts is what the page meta contributor adds for a route without a page.
-var noindexParts = httpinternal.ShellParts{Head: `<meta name="robots" content="noindex">`, NoCache: true}
+// publicShellParts is what every shell of a public wiki gets: the crawler
+// body depends on User-Agent, so caches must keep the variants apart.
+var publicShellParts = httpinternal.ShellParts{NoCache: true, Vary: []string{"User-Agent"}}
+
+// noindexParts is what a public wiki's shell gets for a route without a page.
+var noindexParts = httpinternal.ShellParts{Head: `<meta name="robots" content="noindex">`, NoCache: true, Vary: []string{"User-Agent"}}
 
 // The root and the root's permalink are no page route: the root redirect or
-// the SPA decides there, so nothing is added.
-func TestWiki_PageMeta_NotAPageRoute_ContributesNothing(t *testing.T) {
+// the SPA decides there, so no page meta is added.
+func TestWiki_PageMeta_NotAPageRoute_AddsNoMeta(t *testing.T) {
 	tests := []struct {
 		name      string
 		routePath string
@@ -367,8 +372,8 @@ func TestWiki_PageMeta_NotAPageRoute_ContributesNothing(t *testing.T) {
 	setPublicAccess(t, public, true)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := contributeShell(t, w, "", tc.routePath, nil); !reflect.DeepEqual(got, httpinternal.ShellParts{}) {
-				t.Fatalf("parts = %+v, want none", got)
+			if got := contributeShell(t, w, "", tc.routePath, nil); !reflect.DeepEqual(got, publicShellParts) {
+				t.Fatalf("parts = %+v, want only %+v", got, publicShellParts)
 			}
 		})
 	}
@@ -1550,8 +1555,9 @@ func TestWiki_PageMarkdown_NotAPageOrNotPreferred_ServesTheShell(t *testing.T) {
 				return
 			}
 			vary := rec.Header().Values("Vary")
-			if tc.wantVary && (len(vary) != 1 || vary[0] != "Accept") {
-				t.Errorf("Vary = %q, want [Accept]", vary)
+			// Accept once, from the Markdown responder; User-Agent from the crawler body.
+			if tc.wantVary && !reflect.DeepEqual(vary, []string{"Accept", "User-Agent"}) {
+				t.Errorf("Vary = %q, want [Accept User-Agent]", vary)
 			}
 			if !tc.wantVary && len(vary) != 0 {
 				t.Errorf("Vary = %q, want none", vary)
@@ -1572,5 +1578,116 @@ func TestWiki_PageMarkdown_EmptyWikiRoot_ServesTheShell(t *testing.T) {
 
 	if rec.Code != http.StatusOK || !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/html") {
 		t.Fatalf("got %d %q, want the 200 shell", rec.Code, rec.Header().Get("Content-Type"))
+	}
+}
+
+const googlebotUserAgent = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
+
+// crawlerBodyWiki builds a public wiki under /wiki with a section, a page
+// linking another page by wikilink and a child page.
+func crawlerBodyWiki(t *testing.T) (*Wiki, *publicaccess.Service, *gin.Engine) {
+	t.Helper()
+	w, public, router := newSEOTestRouter(t, "/wiki")
+	setPublicAccess(t, public, true)
+	sectionKind := tree.NodeKindSection
+	docs := createPageForTest(t, w, SYSTEM_USER_ID, nil, "Docs", "docs", &sectionKind)
+	setup := createPageForTest(t, w, SYSTEM_USER_ID, &docs.ID, "Setup <&>", "setup", pageNodeKind())
+	createPageForTest(t, w, SYSTEM_USER_ID, &setup.ID, "Linux", "linux", pageNodeKind())
+	createPageForTest(t, w, SYSTEM_USER_ID, nil, "Install Guide", "install", pageNodeKind())
+	content := "See [[Install Guide]] and [Linux](linux).\n\n<script>alert(1)</script>"
+	updatePageForTest(t, w, SYSTEM_USER_ID, setup.ID, "Setup <&>", "setup", &content, pageNodeKind())
+	return w, public, router
+}
+
+func TestWiki_CrawlerBody_PageForCrawlersOnly(t *testing.T) {
+	useEmbeddedFrontend(t)
+	_, _, router := crawlerBodyWiki(t)
+	ua := map[string]string{"User-Agent": googlebotUserAgent}
+
+	t.Run("crawler gets title, rendered content and child links", func(t *testing.T) {
+		parts := crawlerRoot(t, router, "/wiki/docs/setup", ua)
+		want := `<article><h1>Setup &lt;&amp;&gt;</h1><p>See <a href="/wiki/install">Install Guide</a> and <a href="/wiki/docs/setup/linux">Linux</a>.</p>` + "\n" +
+			`</article><nav><ul><li><a href="/wiki/docs/setup/linux">Linux</a></li></ul></nav>`
+		if parts != want {
+			t.Errorf("#root =\n%s\nwant\n%s", parts, want)
+		}
+	})
+	for _, tc := range []struct {
+		name    string
+		path    string
+		headers map[string]string
+	}{
+		{name: "browser", path: "/wiki/docs/setup", headers: map[string]string{"User-Agent": "Mozilla/5.0 Chrome/130.0"}},
+		{name: "crawler on an unknown page", path: "/wiki/docs/missing", headers: ua},
+		{name: "crawler on a SPA route", path: "/wiki/settings/branding", headers: ua},
+	} {
+		t.Run(tc.name+" gets an empty #root", func(t *testing.T) {
+			if got := crawlerRoot(t, router, tc.path, tc.headers); got != "" {
+				t.Errorf("#root = %q, want empty", got)
+			}
+		})
+	}
+}
+
+// crawlerRoot serves path on the real router and returns what #root
+// holds; the router must serve the embedded frontend (useEmbeddedFrontend).
+func crawlerRoot(t *testing.T, router http.Handler, path string, headers map[string]string) string {
+	t.Helper()
+	rec := serveGET(router, path, headers)
+	_, root, ok := strings.Cut(rec.Body.String(), `<div id="root">`)
+	if !ok {
+		t.Fatalf("no #root in %d %q", rec.Code, rec.Body.String())
+	}
+	root, _, _ = strings.Cut(root, "</div>\n")
+	return root
+}
+
+// Every shell of a public wiki varies by User-Agent and Accept and is
+// no-cache; HEAD answers like GET. A private wiki's shell has neither.
+func TestWiki_CrawlerBody_VaryAndHeadOnRealRouter(t *testing.T) {
+	useEmbeddedFrontend(t)
+	w, public, router := crawlerBodyWiki(t)
+	setupID := w.tree.GetTree().Children[1].Children[0].ID
+	tests := []struct {
+		name        string
+		public      bool
+		path        string
+		userAgent   string
+		wantVary    []string
+		wantArticle bool
+	}{
+		{name: "crawler, page", public: true, path: "/wiki/docs/setup", userAgent: googlebotUserAgent, wantVary: []string{"Accept", "User-Agent"}, wantArticle: true},
+		{name: "browser, page", public: true, path: "/wiki/docs/setup", userAgent: "Mozilla/5.0 Firefox/132.0", wantVary: []string{"Accept", "User-Agent"}},
+		{name: "crawler, permalink", public: true, path: "/wiki/p/" + setupID, userAgent: googlebotUserAgent, wantVary: []string{"Accept", "User-Agent"}},
+		{name: "crawler, private wiki", public: false, path: "/wiki/docs/setup", userAgent: googlebotUserAgent},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			setPublicAccess(t, public, tc.public)
+			get := serveGET(router, tc.path, map[string]string{"User-Agent": tc.userAgent})
+			head := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodHead, tc.path, nil)
+			req.Header.Set("User-Agent", tc.userAgent)
+			router.ServeHTTP(head, req)
+
+			if get.Code != http.StatusOK || head.Code != http.StatusOK {
+				t.Fatalf("status GET %d, HEAD %d, want 200", get.Code, head.Code)
+			}
+			if got := get.Header().Values("Vary"); !reflect.DeepEqual(got, tc.wantVary) {
+				t.Errorf("Vary = %q, want %q", got, tc.wantVary)
+			}
+			if !reflect.DeepEqual(head.Header(), get.Header()) {
+				t.Errorf("headers differ\n GET: %v\nHEAD: %v", get.Header(), head.Header())
+			}
+			if got := head.Header().Get("Content-Length"); got != strconv.Itoa(get.Body.Len()) {
+				t.Errorf("Content-Length = %s, want %d", got, get.Body.Len())
+			}
+			if got := strings.Contains(get.Body.String(), "<article>"); got != tc.wantArticle {
+				t.Errorf("article in body: %v, want %v", got, tc.wantArticle)
+			}
+			if tc.public && get.Header().Get("Cache-Control") != "no-cache" {
+				t.Errorf("Cache-Control = %q, want no-cache", get.Header().Get("Cache-Control"))
+			}
+		})
 	}
 }

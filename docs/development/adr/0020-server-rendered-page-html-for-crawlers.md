@@ -2,10 +2,11 @@
 
 ## Status
 
-Proposed (2026-10-29)
+Accepted (2026-11-09; proposed 2026-10-29).
 
-Open: whether this decision is folded into ADR-0018 (search-engine rendering for public wikis,
-proposed in the same series) while that one is still Proposed.
+It stays separate from ADR-0018: that one decides when and where the wiki answers search
+engines, this one how page HTML is rendered and sanitized, which a later non-crawler user of
+`internal/render` (exports, link previews) depends on without the SEO decisions.
 
 ## Context
 
@@ -104,3 +105,11 @@ type Options struct { BasePath, RoutePath string; ResolveWikiLink func(target st
 - Every new tag or attribute the crawler HTML needs is a policy change with an XSS-corpus
   test (`policy_test.go`). Revisit when the shell gets a CSP, or when the frontend schema
   changes in a way the pinned hash flags.
+
+## Later changes
+
+- **2026-11 (#1292, crawler body):** the `seo` slice's crawler body contributor wires the
+  renderer in (see [ADR-0018](./0018-search-engine-rendering-for-public-wikis.md), "Later
+  changes"): renders are cached per page version in a 16 MB LRU cache, at most two run at
+  once, and `ErrTooComplex` or any other render error means the plain shell, logged once
+  without page content.

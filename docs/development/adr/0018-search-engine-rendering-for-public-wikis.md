@@ -227,3 +227,41 @@ fixing that is a separate change.
     `pageRoutePath` in `urls.go`), like the SPA's own page read: `/<page>/` gets the page's
     meta with the canonical link to `/<page>`, and its Markdown. `/` and `//` stay the root;
     empty segments inside the path (`/a//b`) find no page and get noindex.
+- **2026-11 (#1292, rendered body for search engines):** details fixed while implementing it:
+  - A contributor behind `PublicOnly`, registered after the page meta contributor, puts
+    `<article><h1>title</h1>` + the page rendered by `internal/render`
+    ([ADR-0020](./0020-server-rendered-page-html-for-crawlers.md)) + `<nav><ul>` links to the
+    page's direct children into `#root`. Title and child titles are escaped, child links are
+    escaped wiki paths below the base path; wikilinks resolve by the rule stored links follow
+    (`links.ResolveWikiLinkTarget`, behind `pages.ResolveWikiLinkUseCase`), children come
+    from one locked tree read (`TreeService.ChildRoutes`). No breadcrumbs. The SPA mounts with `createRoot`, which
+    replaces the content, so the page is shown once (pinned by
+    `e2e/tests/seo-crawler-body.spec.ts`).
+  - Only for user agents containing (case-insensitive) `googlebot`, `google-inspectiontool`
+    (Search Console's URL Inspection and the Rich Results Test), `bingbot`, `duckduckbot`,
+    `yandex`, `baiduspider` or `applebot`; everyone else, unknown pages, the root, SPA routes
+    and `/p/:id` permalinks (their canonical link points at the page route) get the plain
+    shell. Anyone can send such a user agent; the body is the content the SPA shows anyway.
+  - Every shell of a public wiki carries `Vary: User-Agent` (through `ShellParts.Vary`, merged
+    with the Markdown responder's `Vary: Accept`) and `Cache-Control: no-cache`, crawler or
+    not, so caches never mix the variants. A private wiki's shell has neither.
+  - Renders are cached in memory per page version (key: base path, route path and content;
+    a hit is reused only while every wikilink in it still resolves the same way), at most
+    16 MB of HTML, least recently used dropped first. At most two renders run at once; a request beyond
+    that gets the plain shell instead of waiting.
+  - A render error (`render.ErrTooComplex` or a page outside the policy) means the plain
+    shell, never a 500. The failure is cached for that page version and logged once as a
+    warning with the route and without page content; refused renders are logged once per
+    process. A client that has gone away by the time a render slot is free gets no render.
+  - Cost: child links and wikilink targets (also a `[[Folder/Title]]` resolved through the
+    route-path fallback) come from locked tree lookups without file reads. The page itself is
+    read twice per crawler request, once by the page meta contributor and once by the crawler
+    body, each through the page-view read (which reads the file for the content and again for
+    the frontmatter). Sharing that read would need request-scoped state across contributors,
+    which the shell seam does not have; it is left as is because only crawler requests pay
+    it. Browser requests read nothing more than before: the user agent is checked first.
+  - Reads go through the pages slice's use cases (`ListChildRoutesUseCase`,
+    `ResolveWikiLinkUseCase`). Once anonymous readers see only part of a wiki
+    (`internal/scopedread`, [ADR-0015](./0015-scoped-read-boundary.md)), the reader must drop
+    hidden children and resolve wikilinks against visible pages only, before ambiguity is
+    counted; otherwise a link that is ambiguous only because of a hidden page would reveal it.

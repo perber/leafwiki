@@ -158,15 +158,29 @@ func resolveWikiLinkTargets(treeService *tree.TreeService, targets []string) []T
 
 	result := make([]TargetLink, 0, len(targets))
 	for _, target := range targets {
-		result = append(result, resolveWikiLinkTarget(treeService, target))
+		link, _ := resolveWikiLinkTarget(treeService, target)
+		result = append(result, link)
 	}
 	return result
 }
 
-// resolveWikiLinkTarget resolves one target for resolveWikiLinkTargets.
-// Route paths come from the tree's locked lookups, never from a node read
-// after the lock is released, and no page file is read.
-func resolveWikiLinkTarget(treeService *tree.TreeService, target string) TargetLink {
+// ResolveWikiLinkTarget returns the route path ("/docs/setup") of the one page
+// a [[target]] points at, by the rule stored links follow (see
+// resolveWikiLinkTargets). ok is false for a broken or ambiguous target and
+// before the tree is loaded.
+func ResolveWikiLinkTarget(treeService *tree.TreeService, target string) (routePath string, ok bool) {
+	link, routePath := resolveWikiLinkTarget(treeService, target)
+	if link.State != LinkResolved {
+		return "", false
+	}
+	return routePath, true
+}
+
+// resolveWikiLinkTarget resolves one target for resolveWikiLinkTargets and
+// also returns the matched page's route path ("" unless resolved). Route
+// paths come from the tree's locked lookups, never from a node read after
+// the lock is released, and no page file is read.
+func resolveWikiLinkTarget(treeService *tree.TreeService, target string) (TargetLink, string) {
 	pages, _ := treeService.RoutesByTitle(target) // not loaded: no match, like an empty tree
 
 	// A slash-containing target with NO title match is retried as a direct
@@ -174,11 +188,12 @@ func resolveWikiLinkTarget(treeService *tree.TreeService, target string) TargetL
 	if strings.Contains(target, "/") && len(pages) == 0 {
 		routePath := strings.TrimPrefix(target, "/")
 		if page, err := treeService.RouteByPath(routePath); err == nil {
+			resolved := markdown.NormalizeRoutePath(page.RoutePath)
 			return TargetLink{
 				TargetPageID:   page.ID,
-				TargetPagePath: markdown.NormalizeRoutePath(page.RoutePath),
+				TargetPagePath: resolved,
 				State:          LinkResolved,
-			}
+			}, resolved
 		}
 		// Store as a normal broken route path so
 		// HealLinksForExactPath can heal it when the page is later
@@ -186,7 +201,7 @@ func resolveWikiLinkTarget(treeService *tree.TreeService, target string) TargetL
 		return TargetLink{
 			State:          LinkBroken,
 			TargetPagePath: "/" + routePath,
-		}
+		}, ""
 	}
 
 	link := TargetLink{
@@ -195,8 +210,9 @@ func resolveWikiLinkTarget(treeService *tree.TreeService, target string) TargetL
 	}
 	if len(pages) == 1 {
 		link.TargetPageID = pages[0].ID
+		return link, markdown.NormalizeRoutePath(pages[0].RoutePath)
 	}
-	return link
+	return link, ""
 }
 
 // collectTargetsFromContent extracts and resolves all link targets from a page's
