@@ -156,43 +156,47 @@ func resolveWikiLinkTargets(treeService *tree.TreeService, targets []string) []T
 		return nil
 	}
 
-	var result []TargetLink
+	result := make([]TargetLink, 0, len(targets))
 	for _, target := range targets {
-		pages := treeService.FindPagesByTitle(target)
-
-		// A slash-containing target with NO title match is retried as a direct
-		// route-path hint ([[Folder/Title]] → /folder/title).
-		if strings.Contains(target, "/") && len(pages) == 0 {
-			routePath := strings.TrimPrefix(target, "/")
-			page, err := treeService.FindPageByRoutePath(routePath)
-			if err == nil && page != nil {
-				result = append(result, TargetLink{
-					TargetPageID:   page.ID,
-					TargetPagePath: markdown.NormalizeRoutePath(page.CalculatePath()),
-					State:          LinkResolved,
-				})
-				continue
-			}
-			// Store as a normal broken route path so
-			// HealLinksForExactPath can heal it when the page is later
-			// created at that path.
-			result = append(result, TargetLink{
-				State:          LinkBroken,
-				TargetPagePath: "/" + routePath,
-			})
-			continue
-		}
-
-		link := TargetLink{
-			State:          classifyTitleMatches(len(pages)),
-			TargetPagePath: wikilinkSentinel(target),
-		}
-		if len(pages) == 1 {
-			link.TargetPageID = pages[0].ID
-		}
-		result = append(result, link)
+		result = append(result, resolveWikiLinkTarget(treeService, target))
 	}
 	return result
+}
+
+// resolveWikiLinkTarget resolves one target for resolveWikiLinkTargets.
+// Route paths come from the tree's locked lookups, never from a node read
+// after the lock is released, and no page file is read.
+func resolveWikiLinkTarget(treeService *tree.TreeService, target string) TargetLink {
+	pages, _ := treeService.RoutesByTitle(target) // not loaded: no match, like an empty tree
+
+	// A slash-containing target with NO title match is retried as a direct
+	// route-path hint ([[Folder/Title]] → /folder/title).
+	if strings.Contains(target, "/") && len(pages) == 0 {
+		routePath := strings.TrimPrefix(target, "/")
+		if page, err := treeService.RouteByPath(routePath); err == nil {
+			return TargetLink{
+				TargetPageID:   page.ID,
+				TargetPagePath: markdown.NormalizeRoutePath(page.RoutePath),
+				State:          LinkResolved,
+			}
+		}
+		// Store as a normal broken route path so
+		// HealLinksForExactPath can heal it when the page is later
+		// created at that path.
+		return TargetLink{
+			State:          LinkBroken,
+			TargetPagePath: "/" + routePath,
+		}
+	}
+
+	link := TargetLink{
+		State:          classifyTitleMatches(len(pages)),
+		TargetPagePath: wikilinkSentinel(target),
+	}
+	if len(pages) == 1 {
+		link.TargetPageID = pages[0].ID
+	}
+	return link
 }
 
 // collectTargetsFromContent extracts and resolves all link targets from a page's
