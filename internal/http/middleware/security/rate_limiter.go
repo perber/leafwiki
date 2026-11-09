@@ -1,7 +1,6 @@
 package security
 
 import (
-	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -104,25 +103,15 @@ func (rl *KeyedLimiter) NotifyResult(key string, success bool) {
 	delete(rl.hits, key)
 }
 
-// ClientKey extracts the rate-limit key (client host) from a request. Shared
-// by NewRateLimiter and any caller using a KeyedLimiter directly, so every
-// rate-limited path in the app keys by the same value.
-func ClientKey(c *gin.Context) string {
-	host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
-	if err != nil {
-		return c.Request.RemoteAddr
-	}
-	return host
-}
-
-// NewRateLimiter returns Gin middleware that rate-limits by client host,
+// NewRateLimiter returns Gin middleware that rate-limits per client (see
+// ClientBucket: the address behind a trusted proxy, IPv6 grouped by /64),
 // aborting with 429 once a key exceeds limit hits within window. If
 // resetOnSuccess is true, a 2xx response clears that key's count immediately.
 func NewRateLimiter(limit int, window time.Duration, resetOnSuccess bool) gin.HandlerFunc {
 	rl := NewKeyedLimiter(limit, window, resetOnSuccess)
 
 	return func(c *gin.Context) {
-		key := ClientKey(c)
+		key := ClientBucket(c)
 		if !rl.Allow(key) {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"error": "Too many requests, please try again later",

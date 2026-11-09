@@ -409,3 +409,6 @@ to the proxy's address and shares one bucket (at most 15 min of waiting at a tim
 them); per-client protection is fixed once the reverse proxy is listed in `--trusted-proxy-ips`.
 The first request carrying a forwarding header from an unlisted peer logs one warning
 (`warnOnUntrustedForwarding`).
+The rate limiters (the per-route one, the one in front of API-key checks and the failed-lookup
+limiter of shared pages) key on the same `security.ClientBucket`, so behind a listed proxy each visitor has a budget of their own and the
+addresses of one IPv6 /64 share one.

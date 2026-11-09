@@ -60,7 +60,7 @@ func InjectAPIKeyUser(cfg APIKeyConfig) gin.HandlerFunc {
 
 		var limiterKey string
 		if cfg.RateLimiter != nil {
-			limiterKey = security.ClientKey(c)
+			limiterKey = security.ClientBucket(c)
 			if !cfg.RateLimiter.Allow(limiterKey) {
 				c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "Too many API key attempts, please try again later"})
 				return

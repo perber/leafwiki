@@ -74,8 +74,9 @@ caches, search engines and the access log.
   hardening headers: the router's 404, and gin's trailing-slash redirect (`…/page/` → 301 with the
   URL in `Location`). Only the link holder's own mistyped URL triggers them; changing it means
   changing redirect behaviour for the whole application.
-- A feature that rate-limits failed lookups per client keys by `RemoteAddr`, like API keys. Behind
-  a reverse proxy all visitors share one key: failed lookups from anyone turn into 429 for
+- A feature that rate-limits failed lookups per client keys by `security.ClientBucket`, like the
+  other limiters (ADR-0023). Behind a reverse proxy that is not listed in `--trusted-proxy-ips`
+  all visitors share one key: failed lookups from anyone turn into 429 for
   everyone, while valid links keep working because they are resolved first. Because the link
   is resolved before the limit is checked, the limit saves no server work, and since a success
   resets the count, a link holder can interleave valid requests to probe without limit. Both

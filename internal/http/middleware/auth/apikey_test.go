@@ -411,3 +411,50 @@ func TestInjectAPIKeyUser_WithRequireAuth(t *testing.T) {
 		t.Errorf("expected 200 with api key auth + RequireAuth chain, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+// The failed-attempt budget belongs to a client, not to an exact address: the
+// addresses of one IPv6 /64 share it, and a forwarding header from a client
+// that is not a listed proxy does not give a fresh one.
+func TestInjectAPIKeyUser_RateLimitFollowsTheClientBucket(t *testing.T) {
+	f := createAPIKeyFixture(t)
+	cleanupWithErrorCheck(t, "api key fixture", f.closeAll)
+
+	limiter := security.NewKeyedLimiter(2, time.Minute, true)
+	router := apiKeyRouter(authmw.APIKeyConfig{Service: f.keyService, RateLimiter: limiter}, nil)
+	if err := router.SetTrustedProxies([]string{}); err != nil {
+		t.Fatalf("SetTrustedProxies: %v", err)
+	}
+	router.RemoteIPHeaders = []string{"X-Forwarded-For"}
+
+	badToken := "lw_deadbeef_" + "0000000000000000000000000000000000000000000000000000000000000000"
+	attempt := func(remoteAddr, forwardedFor string) int {
+		req := httptest.NewRequest("GET", "/test", nil)
+		req.RemoteAddr = remoteAddr
+		req.Header.Set("Authorization", "Bearer "+badToken)
+		if forwardedFor != "" {
+			req.Header.Set("X-Forwarded-For", forwardedFor)
+		}
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		return w.Code
+	}
+
+	for i, addr := range []string{"[2001:db8:1:2::1]:1000", "[2001:db8:1:2::2]:1000"} {
+		if got := attempt(addr, ""); got != http.StatusUnauthorized {
+			t.Fatalf("attempt %d: got %d, want 401", i+1, got)
+		}
+	}
+	if got := attempt("[2001:db8:1:2::ffff]:1000", ""); got != http.StatusTooManyRequests {
+		t.Fatalf("another address of the same /64: got %d, want 429", got)
+	}
+
+	const direct = "198.51.100.9:5000"
+	for i, forwarded := range []string{"203.0.113.1", "203.0.113.2"} {
+		if got := attempt(direct, forwarded); got != http.StatusUnauthorized {
+			t.Fatalf("direct attempt %d: got %d, want 401", i+1, got)
+		}
+	}
+	if got := attempt(direct, "203.0.113.3"); got != http.StatusTooManyRequests {
+		t.Fatalf("a rotated forwarding header must not give a fresh budget: got %d, want 429", got)
+	}
+}

@@ -132,3 +132,35 @@ func TestRoutes_HandleGetSharedTree_AnswersErrorsGenerically(t *testing.T) {
 		t.Errorf("response leaks the cause: %s", rec.Body.String())
 	}
 }
+
+// A failed lookup is counted per client bucket, not per raw address: an IPv6
+// client that changes its low 64 bits keeps one budget, and a client in
+// another /64 gets its own.
+func TestRoutes_HandleGetSharedPage_CountsFailuresPerClientBucket(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	notFound := fakeGetter{err: sharederrors.NewLocalizedError(sharing.ErrCodeShareLinkNotFound, "x", "x", nil)}
+	engine := gin.New()
+	r := &Routes{getPage: notFound, limiter: newFailedTokenLimiter(), log: slog.Default()}
+	engine.GET("/api/shared/:token/page", r.handleGetSharedRootPage)
+	get := func(remoteAddr string) int {
+		req := httptest.NewRequest(http.MethodGet, "/api/shared/lws_token/page", nil)
+		req.RemoteAddr = remoteAddr
+		rec := httptest.NewRecorder()
+		engine.ServeHTTP(rec, req)
+		return rec.Code
+	}
+
+	exhausted := false
+	for i := 0; i <= failedTokenLimit+1 && !exhausted; i++ {
+		exhausted = get("[2001:db8:1:2::1]:4000") == http.StatusTooManyRequests
+	}
+	if !exhausted {
+		t.Fatal("the budget of the first client never ran out")
+	}
+	if got := get("[2001:db8:1:2:ffff::7]:4001"); got != http.StatusTooManyRequests {
+		t.Errorf("same /64, other address: status = %d, want 429 (one shared budget)", got)
+	}
+	if got := get("[2001:db8:1:3::1]:4002"); got != http.StatusNotFound {
+		t.Errorf("other /64: status = %d, want 404 (own budget)", got)
+	}
+}

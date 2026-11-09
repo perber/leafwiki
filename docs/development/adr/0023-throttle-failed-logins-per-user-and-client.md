@@ -90,6 +90,14 @@ on a unix socket the header is read only when at least one proxy is listed (othe
 socket client shares the `unknown` bucket instead of choosing its own address). The flag now also decides where `X-Forwarded-For` is believed; ADR-0005 gets a
 dated entry that points here.
 
+**Rate limiters: the same key.** The per-route limiter (`NewRateLimiter`), the one in front of
+API-key checks (`KeyedLimiter` in `InjectAPIKeyUser`) and the failed-lookup limiter of shared pages
+(`internal/wiki/shares`) key on `security.ClientBucket` too, and `ClientKey` is gone, so the app
+has one function that answers "which client is this". Before, all of them used the exact TCP peer
+address: behind a listed proxy one visitor could use up the budget of
+all of them, and every address of an IPv6 /64 counted as a client of its own. This is a separate
+commit so it can be dropped without touching the backoff.
+
 ## Alternatives considered
 
 - **Keep the per-account hard lock**: a third party who knows the account name keeps the owner
@@ -137,9 +145,9 @@ dated entry that points here.
 - A restart clears the throttle. A restored `users.db` can carry other account IDs; stale entries
   are harmless and age out.
 - Other places that check a password (changing it, confirming or disabling TOTP) do not use this
-  tracker; they sit behind a session and the per-host limiter.
+  tracker; they sit behind a session and the per-client limiter.
 - The metric label `locked` no longer describes what happens; it is kept for existing
   dashboards.
-- Revisit when the numbers need tuning, when a second consumer of the client address appears (for
-  example the rate limiters keying on `ClientBucket`), or if the default of an empty
+- Revisit when the numbers need tuning, when another consumer of the client address appears and
+  needs a different grouping than `ClientBucket`, or if the default of an empty
   `--trusted-proxy-ips` changes.

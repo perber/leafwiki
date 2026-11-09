@@ -147,7 +147,7 @@ func (r *Routes) handleGetSharedTree(c *gin.Context) {
 // and once it is reached they get 429 instead of 404. All failure causes look
 // the same, so the limit reveals nothing about which links exist.
 func (r *Routes) serveShared(c *gin.Context, read func(ctx context.Context, token string) (any, error)) {
-	key := security.ClientKey(c)
+	key := security.ClientBucket(c)
 	body, err := read(c.Request.Context(), c.Param("token"))
 	switch {
 	case err == nil:
