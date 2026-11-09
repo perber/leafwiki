@@ -1604,6 +1604,37 @@ func TestResolveWikiLinkTargets_AmbiguousSlashTitle_ReturnsBroken(t *testing.T) 
 	}
 }
 
+// Run with -race: resolving reads route paths while a move rewrites the
+// target's parent.
+func TestResolveWikiLinkTargets_ConcurrentWithMoves(t *testing.T) {
+	ts, page1ID, _ := setupTreeForLinksTest(t)
+	otherID, err := ts.CreateNode("system", nil, "Other", "other", pageNodeKind())
+	if err != nil {
+		t.Fatalf("CreateNode other: %v", err)
+	}
+	docs := ts.GetTree().Children[0].ID
+	parents := []string{*otherID, docs}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 50; i++ {
+			if err := ts.MoveNode("system", page1ID, parents[i%2], tree.VersionUnchecked); err != nil {
+				t.Errorf("MoveNode: %v", err)
+				return
+			}
+		}
+	}()
+	for i := 0; i < 200; i++ {
+		// The path hint resolves only while the page is under docs.
+		links := resolveWikiLinkTargets(ts, []string{"Page 1", "docs/page1"})
+		if len(links) != 2 || links[0].State != LinkResolved {
+			t.Fatalf("links = %+v, want Page 1 resolved", links)
+		}
+	}
+	<-done
+}
+
 // ─── ReconcileTitle ────────────────────────────────────────────────────
 
 func TestLinkService_ReconcileTitle_HealsAfterPageCreation(t *testing.T) {
