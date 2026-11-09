@@ -49,7 +49,7 @@ func (uc *LoginUseCase) Execute(_ context.Context, in LoginInput) (*LoginOutput,
 	token, err := uc.auth.Login(in.Identifier, in.Password, in.Client)
 	if err != nil {
 		switch {
-		case errors.Is(err, coreauth.ErrUserAccountLocked):
+		case errors.Is(err, coreauth.ErrLoginThrottled):
 			uc.metrics.IncAuthLoginAttempt("locked")
 		case errors.Is(err, coreauth.ErrUserInvalidCredentials):
 			uc.metrics.IncAuthLoginAttempt("invalid_credentials")
@@ -94,7 +94,7 @@ func (uc *CompleteTOTPLoginUseCase) Execute(_ context.Context, in CompleteTOTPLo
 	token, err := uc.auth.CompleteTOTPLogin(in.LoginChallengeToken, in.Code)
 	if err != nil {
 		switch {
-		case errors.Is(err, coreauth.ErrUserAccountLocked):
+		case errors.Is(err, coreauth.ErrLoginThrottled):
 			uc.metrics.IncAuthTOTPVerification("locked")
 		case isUserStoreUnavailable(err):
 			// Not a real verification failure — the user store is suspended

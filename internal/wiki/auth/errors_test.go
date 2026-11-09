@@ -206,8 +206,8 @@ func TestRespondWithAuthError_LockedAccountMatchesInvalidCredentials(t *testing.
 		name string
 		err  error
 	}{
-		{name: "locked", err: coreauth.ErrUserAccountLocked},
-		{name: "locked, wrapped", err: fmt.Errorf("login: %w", coreauth.ErrUserAccountLocked)},
+		{name: "locked", err: coreauth.ErrLoginThrottled},
+		{name: "locked, wrapped", err: fmt.Errorf("login: %w", coreauth.ErrLoginThrottled)},
 		{name: "invalid credentials, wrapped", err: fmt.Errorf("login: %w", coreauth.ErrUserInvalidCredentials)},
 	}
 	for _, tt := range tests {

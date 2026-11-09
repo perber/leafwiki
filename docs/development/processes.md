@@ -320,7 +320,7 @@ Full auth *model* (JWT structure, cookie strategy, role model) is covered in
    anyway (constant-time-ish defense against username enumeration via timing) before
    returning `ErrUserInvalidCredentials`.
 2. `a.attempts.recordAttempt(user.ID)` — per-user lockout counter; returns
-   `ErrUserAccountLocked` if tripped, after running the same bcrypt comparison a wrong
+   `ErrLoginThrottled` if tripped, after running the same bcrypt comparison a wrong
    password costs (result discarded) so the lock is not visible by timing. The HTTP layer
    answers it exactly like `ErrUserInvalidCredentials` (`401 auth_invalid_credentials`,
    see `internal/wiki/auth/errors.go`), so the lock does not reveal that an account

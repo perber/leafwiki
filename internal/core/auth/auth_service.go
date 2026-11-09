@@ -181,7 +181,7 @@ func (a *AuthService) Login(identifier, password string, client Client) (*AuthTo
 		// locked account is rejected whether or not the password matches.
 		_ = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
 		a.log.Warn("login rejected: account locked", "userID", user.ID, "client", client)
-		return nil, ErrUserAccountLocked
+		return nil, ErrLoginThrottled
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
@@ -258,7 +258,7 @@ func (a *AuthService) CompleteTOTPLogin(challengeToken, code string) (*AuthToken
 
 	if !a.attempts.recordAttempt(userID) {
 		a.log.Warn("totp login rejected: account locked", "userID", userID)
-		return nil, ErrUserAccountLocked
+		return nil, ErrLoginThrottled
 	}
 
 	// Captured once and threaded through to verifyTOTPOrRecoveryCode below,

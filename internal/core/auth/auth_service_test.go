@@ -292,7 +292,7 @@ func TestAuthService_TOTPGuessing_CannotBypassLockoutViaRepeatedCorrectPasswordL
 	for i := 0; i < 10; i++ {
 		challenge, err := f.authService.Login("testuser", "securepass", testClient)
 		if err != nil {
-			if err == ErrUserAccountLocked {
+			if err == ErrLoginThrottled {
 				locked = true
 				break
 			}
@@ -300,7 +300,7 @@ func TestAuthService_TOTPGuessing_CannotBypassLockoutViaRepeatedCorrectPasswordL
 		}
 
 		_, err = f.authService.CompleteTOTPLogin(challenge.LoginChallengeToken, "000000")
-		if err == ErrUserAccountLocked {
+		if err == ErrLoginThrottled {
 			locked = true
 			break
 		}
@@ -879,7 +879,7 @@ func TestAuthService_Login_LockedAccountTakesAsLongAsUnknownUser(t *testing.T) {
 	}
 
 	unknown := fastest("no-such-user", ErrUserInvalidCredentials)
-	locked := fastest("testuser", ErrUserAccountLocked)
+	locked := fastest("testuser", ErrLoginThrottled)
 
 	if locked < unknown/2 {
 		t.Fatalf("locked account rejected in %v, unknown identifier in %v: the lock is visible by timing", locked, unknown)

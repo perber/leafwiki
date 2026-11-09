@@ -96,7 +96,7 @@ func respondWithAuthError(c *gin.Context, err error) {
 	// cannot be used to confirm that an account exists. This covers the TOTP
 	// step too. Metrics still count the lock separately (see LoginUseCase and
 	// CompleteTOTPLoginUseCase).
-	case errors.Is(err, coreauth.ErrUserAccountLocked), errors.Is(err, coreauth.ErrUserInvalidCredentials):
+	case errors.Is(err, coreauth.ErrLoginThrottled), errors.Is(err, coreauth.ErrUserInvalidCredentials):
 		respondWithAuthStatusError(c, http.StatusUnauthorized, ErrCodeAuthInvalidCredentials, "Invalid credentials", "invalid credentials")
 	case errors.Is(err, coreauth.ErrUserNotFound):
 		respondWithAuthStatusError(c, http.StatusNotFound, ErrCodeAuthUserNotFound, "User not found", "user not found")

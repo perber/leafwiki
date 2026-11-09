@@ -322,8 +322,8 @@ func TestLoginUseCase_EmitsLockedMetric(t *testing.T) {
 	}
 
 	_, err := uc.Execute(context.Background(), LoginInput{Identifier: "alice", Password: "wrong"})
-	if !errors.Is(err, coreauth.ErrUserAccountLocked) {
-		t.Fatalf("expected ErrUserAccountLocked once locked, got: %v", err)
+	if !errors.Is(err, coreauth.ErrLoginThrottled) {
+		t.Fatalf("expected ErrLoginThrottled once locked, got: %v", err)
 	}
 
 	body := metricsBody(t, metrics)
@@ -455,8 +455,8 @@ func TestCompleteTOTPLoginUseCase_EmitsLockedMetric(t *testing.T) {
 		t.Fatalf("GenerateCode: %v", err)
 	}
 	_, err = completeUC.Execute(context.Background(), CompleteTOTPLoginInput{LoginChallengeToken: challenge, Code: validCode})
-	if !errors.Is(err, coreauth.ErrUserAccountLocked) {
-		t.Fatalf("expected ErrUserAccountLocked for a valid code once locked, got: %v", err)
+	if !errors.Is(err, coreauth.ErrLoginThrottled) {
+		t.Fatalf("expected ErrLoginThrottled for a valid code once locked, got: %v", err)
 	}
 
 	body := metricsBody(t, metrics)
