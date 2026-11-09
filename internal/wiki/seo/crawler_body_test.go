@@ -4,9 +4,13 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
+	"time"
+
+	xhtml "golang.org/x/net/html"
 
 	"github.com/perber/wiki/internal/render"
 	"github.com/perber/wiki/internal/wiki/seo"
@@ -51,6 +55,12 @@ func (f *fakeCrawlerBodyReader) setLink(target, routePath string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.links[target] = routePath
+}
+
+func (f *fakeCrawlerBodyReader) deleteLink(target string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.links, target)
 }
 
 // lockedPageReader serializes reads of a fakePageReader for concurrent tests.
@@ -114,6 +124,16 @@ func TestGetCrawlerBodyUseCase_UserAgent_OnlySearchEnginesGetABody(t *testing.T)
 		{name: "Baiduspider", ua: "Mozilla/5.0 (compatible; Baiduspider/2.0; +http://www.baidu.com/search/spider.html)", wantBody: true},
 		{name: "Google-InspectionTool (URL Inspection, Rich Results Test)", ua: "Mozilla/5.0 (compatible; Google-InspectionTool/1.0;)", wantBody: true},
 		{name: "upper case", ua: "GOOGLEBOT", wantBody: true},
+		{name: "mixed case", ua: "Mozilla/5.0 (compatible; GoOgLeBoT/2.1)", wantBody: true},
+		{name: "Googlebot-Image", ua: "Googlebot-Image/1.0", wantBody: true},
+		{name: "Bingbot mobile", ua: "Mozilla/5.0 (iPhone; CPU iPhone OS 7_0 like Mac OS X) AppleWebKit/537.51.1 (KHTML, like Gecko) Version/7.0 Mobile/11A465 Safari/9537.53 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)", wantBody: true},
+		{name: "spoofed browser naming Googlebot", ua: chromeUA + " Googlebot", wantBody: true},
+		{name: "other bot", ua: "Mozilla/5.0 (compatible; AhrefsBot/7.0; +http://ahrefs.com/robot/)"},
+		{name: "browser with a bot-like token", ua: chromeUA + " MyCompanyBot/1.0"},
+		{name: "link preview bot", ua: "Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)"},
+		{name: "Facebook preview", ua: "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"},
+		{name: "AdsBot-Google", ua: "AdsBot-Google (+http://www.google.com/adsbot.html)"},
+		{name: "whitespace only", ua: "   "},
 		{name: "Chrome", ua: chromeUA},
 		{name: "Edge", ua: chromeUA + " Edg/130.0.0.0"},
 		{name: "Firefox", ua: "Mozilla/5.0 (X11; Linux x86_64; rv:132.0) Gecko/20100101 Firefox/132.0"},
@@ -271,8 +291,12 @@ func TestGetCrawlerBodyUseCase_RenderCache_PerPageVersion(t *testing.T) {
 	execute := func(routePath, wantLink string) {
 		t.Helper()
 		out, err := uc.Execute(context.Background(), crawlerInput("", routePath))
-		if err != nil || out == nil || !strings.Contains(out.HTML, `href="`+wantLink+`"`) {
-			t.Fatalf("Execute(%s) = %+v, %v, want a link to %s", routePath, out, err, wantLink)
+		if err != nil || out == nil {
+			t.Fatalf("Execute(%s) = %+v, %v, want a body", routePath, out, err)
+		}
+		// An empty wantLink means the wikilink must render as plain text.
+		if wantLink == "" && strings.Contains(out.HTML, "<a ") || wantLink != "" && !strings.Contains(out.HTML, `href="`+wantLink+`"`) {
+			t.Fatalf("Execute(%s) = %s, want link %q", routePath, out.HTML, wantLink)
 		}
 	}
 
@@ -288,6 +312,9 @@ func TestGetCrawlerBodyUseCase_RenderCache_PerPageVersion(t *testing.T) {
 		{name: "same content at another route renders", routePath: "/docs/copy", wantLink: "/docs/install", wantRenders: 2},
 		{name: "wikilink target moved renders", change: func() { reader.setLink("Install", "guide/install") }, routePath: "/docs/setup", wantLink: "/guide/install", wantRenders: 3},
 		{name: "edited content renders", change: func() { pages.pages["docs/setup"].Body = "See [[Install]] now." }, routePath: "/docs/setup", wantLink: "/guide/install", wantRenders: 4},
+		{name: "wikilink target deleted renders plain text", change: func() { reader.deleteLink("Install") }, routePath: "/docs/setup", wantLink: "", wantRenders: 5},
+		{name: "broken wikilink is cached", routePath: "/docs/setup", wantLink: "", wantRenders: 5},
+		{name: "wikilink target created again renders", change: func() { reader.setLink("Install", "docs/install") }, routePath: "/docs/setup", wantLink: "/docs/install", wantRenders: 6},
 	}
 	for _, step := range steps {
 		if step.change != nil {
@@ -424,5 +451,150 @@ func TestGetCrawlerBodyUseCase_ClientGone_NoRender(t *testing.T) {
 	}
 	if out, err := uc.Execute(context.Background(), crawlerInput("", "/docs/setup")); err != nil || out == nil {
 		t.Fatalf("Execute afterwards = %+v, %v, want a body", out, err)
+	}
+}
+
+// Many crawler requests for the same uncached page at once: at most
+// MaxParallelRenders render, the rest get the plain shell right away (no
+// waiting, no deadlock), no goroutine is left behind, and the page is cached
+// for the next request.
+func TestGetCrawlerBodyUseCase_ConcurrentFirstRequests_SamePage(t *testing.T) {
+	before := runtime.NumGoroutine()
+	pages := &lockedPageReader{inner: pageAt("docs/setup", seo.Page{ID: "setup-id", Title: "Setup", Body: "See [[Install]]."})}
+	reader := &fakeCrawlerBodyReader{links: map[string]string{"Install": "docs/install"}, entered: make(chan struct{}, 64), block: make(chan struct{})}
+	uc, counter := crawlerBodyUseCase(pages, reader)
+
+	const requests = 20
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var bodies, busy int
+	for range requests {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			out, err := uc.Execute(context.Background(), crawlerInput("", "/docs/setup"))
+			mu.Lock()
+			defer mu.Unlock()
+			switch {
+			case errors.Is(err, seo.ErrRendersBusy):
+				busy++
+			case err == nil && out != nil:
+				bodies++
+			default:
+				t.Errorf("Execute = %+v, %v", out, err)
+			}
+		}()
+	}
+	for range seo.MaxParallelRenders {
+		<-reader.entered
+	}
+	// Every request that did not get a render slot returns without waiting.
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		mu.Lock()
+		done := busy
+		mu.Unlock()
+		if done == requests-seo.MaxParallelRenders {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("busy = %d after 5s, want %d: refused requests are waiting", done, requests-seo.MaxParallelRenders)
+		}
+		time.Sleep(time.Millisecond)
+	}
+	close(reader.block) // later resolves (cache check) pass straight through
+	wg.Wait()
+
+	if bodies != seo.MaxParallelRenders || counter.count() != seo.MaxParallelRenders {
+		t.Errorf("bodies = %d, renders = %d, want %d each", bodies, counter.count(), seo.MaxParallelRenders)
+	}
+	if out, err := uc.Execute(context.Background(), crawlerInput("", "/docs/setup")); err != nil || out == nil || counter.count() != seo.MaxParallelRenders {
+		t.Errorf("after the burst: %+v, %v, renders = %d; want the cached body", out, err, counter.count())
+	}
+	deadline = time.Now().Add(5 * time.Second)
+	for runtime.NumGoroutine() > before && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if n := runtime.NumGoroutine(); n > before {
+		t.Errorf("goroutines = %d, want <= %d", n, before)
+	}
+}
+
+// Hostile page content, wikilink targets and titles never reach #root as
+// markup: the content is sanitized, the title and child titles escaped.
+func TestGetCrawlerBodyUseCase_HostileContent_IsSanitized(t *testing.T) {
+	page := seo.Page{
+		ID:    "setup-id",
+		Title: `</h1><script>alert("title")</script>`,
+		Body: "<script>alert(1)</script>\n\n<img src=x onerror=alert(2)>\n\n[x](javascript:alert(3))\n\n" +
+			"<a href=\"jAvAsCrIpT:alert(4)\">y</a>\n\n<iframe src=\"https://evil.example\"></iframe>\n\n" +
+			"<div style=\"background:url(javascript:alert(5))\" onclick=\"alert(6)\">z</div>\n\n" +
+			"[[<script>alert(7)</script>]] [[Evil]]\n\n</div></div><svg onload=alert(8)>",
+	}
+	reader := &fakeCrawlerBodyReader{
+		children: map[string][]seo.ChildPage{"setup-id": {{Title: `"><img src=x onerror=alert(9)>`, RoutePath: `docs/"><script>`}}},
+		links:    map[string]string{"Evil": `x"><script>alert(10)</script>`},
+	}
+	uc, _ := crawlerBodyUseCase(pageAt("docs/setup", page), reader)
+
+	out, err := uc.Execute(context.Background(), crawlerInput("", "/docs/setup"))
+	if err != nil || out == nil {
+		t.Fatalf("Execute = %+v, %v, want a body", out, err)
+	}
+	// Walk the markup as a browser tokenizes it: no active element, no event
+	// handler, no script URL, and every element opened is closed again, so
+	// nothing escapes #root.
+	depth := map[string]int{}
+	z := xhtml.NewTokenizer(strings.NewReader(out.HTML))
+	for {
+		tt := z.Next()
+		if tt == xhtml.ErrorToken {
+			break
+		}
+		tok := z.Token()
+		switch tt {
+		case xhtml.StartTagToken, xhtml.SelfClosingTagToken:
+			switch tok.Data {
+			case "script", "iframe", "svg", "object", "embed", "style":
+				t.Errorf("body has a <%s> element:\n%s", tok.Data, out.HTML)
+			}
+			for _, a := range tok.Attr {
+				if strings.HasPrefix(strings.ToLower(a.Key), "on") || a.Key == "style" ||
+					strings.Contains(strings.ToLower(strings.TrimSpace(a.Val)), "javascript:") {
+					t.Errorf("body has attribute %s=%q:\n%s", a.Key, a.Val, out.HTML)
+				}
+			}
+			if tt == xhtml.StartTagToken && tok.Data != "img" && tok.Data != "br" && tok.Data != "hr" {
+				depth[tok.Data]++
+			}
+		case xhtml.EndTagToken:
+			depth[tok.Data]--
+			if depth[tok.Data] < 0 {
+				t.Errorf("body closes </%s> it never opened:\n%s", tok.Data, out.HTML)
+			}
+		}
+	}
+	for tag, n := range depth {
+		if n != 0 {
+			t.Errorf("<%s> left open %d times:\n%s", tag, n, out.HTML)
+		}
+	}
+}
+
+// A body with Unicode in title, content and child routes is kept intact and
+// the child hrefs are percent-encoded.
+func TestGetCrawlerBodyUseCase_Unicode(t *testing.T) {
+	page := seo.Page{ID: "id", Title: "Übersicht 日本語 🌿", Body: "Grüße — ✓"}
+	reader := &fakeCrawlerBodyReader{children: map[string][]seo.ChildPage{"id": {{Title: "Ärger", RoutePath: "übersicht/ärger"}}}}
+	uc, _ := crawlerBodyUseCase(pageAt("übersicht", page), reader)
+
+	out, err := uc.Execute(context.Background(), crawlerInput("/wiki", "/übersicht"))
+	if err != nil || out == nil {
+		t.Fatalf("Execute = %+v, %v, want a body", out, err)
+	}
+	for _, want := range []string{"<h1>Übersicht 日本語 🌿</h1>", "Grüße — ✓", `href="/wiki/%C3%BCbersicht/%C3%A4rger">Ärger</a>`} {
+		if !strings.Contains(out.HTML, want) {
+			t.Errorf("body lacks %q:\n%s", want, out.HTML)
+		}
 	}
 }
