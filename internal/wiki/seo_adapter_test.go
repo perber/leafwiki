@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -1690,4 +1691,190 @@ func TestWiki_CrawlerBody_VaryAndHeadOnRealRouter(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The cached crawler body follows every change a reader would see: an edit
+// of the page, a renamed, moved, deleted or recreated wikilink target and a
+// renamed or added child. After each change the long-lived router's #root
+// must equal what a fresh router (empty cache) renders.
+func TestWiki_CrawlerBody_CacheFollowsTheWiki(t *testing.T) {
+	useEmbeddedFrontend(t)
+	w, public, router := crawlerBodyWiki(t)
+	ua := map[string]string{"User-Agent": googlebotUserAgent}
+	docs := w.tree.GetTree().Children[1]
+	setup := docs.Children[0]
+	linux := setup.Children[0]
+	install := w.tree.GetTree().Children[2]
+	freshRoot := func() string {
+		t.Helper()
+		fresh := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
+			BasePath: "/wiki", PublicAccess: public, DisableRequestLog: true,
+		})
+		return crawlerRoot(t, fresh, "/wiki/docs/setup", ua)
+	}
+	crawlerRoot(t, router, "/wiki/docs/setup", ua) // fill the cache
+
+	steps := []struct {
+		name    string
+		change  func()
+		want    string
+		notWant string
+	}{
+		{name: "page edited", change: func() {
+			content := "Edited: see [[Install Guide]]."
+			updatePageForTest(t, w, SYSTEM_USER_ID, setup.ID, "Setup <&>", "setup", &content, pageNodeKind())
+		}, want: `Edited: see <a href="/wiki/install">Install Guide</a>`},
+		{name: "wikilink target moved", change: func() {
+			movePageForTest(t, w, &tree.Page{PageNode: install}, docs.ID)
+		}, want: `<a href="/wiki/docs/install">Install Guide</a>`},
+		{name: "wikilink target slug changed", change: func() {
+			updatePageForTest(t, w, SYSTEM_USER_ID, install.ID, "Install Guide", "installation", nil, pageNodeKind())
+		}, want: `<a href="/wiki/docs/installation">Install Guide</a>`},
+		{name: "wikilink target renamed", change: func() {
+			updatePageForTest(t, w, SYSTEM_USER_ID, install.ID, "Installation", "installation", nil, pageNodeKind())
+		}, notWant: `href="/wiki/docs/installation"`},
+		{name: "second page takes the old title", change: func() {
+			createPageForTest(t, w, SYSTEM_USER_ID, nil, "Install Guide", "guide", pageNodeKind())
+		}, want: `<a href="/wiki/guide">Install Guide</a>`},
+		{name: "wikilink target becomes ambiguous", change: func() {
+			createPageForTest(t, w, SYSTEM_USER_ID, nil, "Install Guide", "guide-two", pageNodeKind())
+		}, notWant: `href="/wiki/guide`},
+		{name: "child renamed", change: func() {
+			updatePageForTest(t, w, SYSTEM_USER_ID, linux.ID, "Linux ✓", "linux", nil, pageNodeKind())
+		}, want: `<li><a href="/wiki/docs/setup/linux">Linux ✓</a></li>`},
+		{name: "child added", change: func() {
+			createPageForTest(t, w, SYSTEM_USER_ID, &setup.ID, "Mac", "mac", pageNodeKind())
+		}, want: `<li><a href="/wiki/docs/setup/mac">Mac</a></li>`},
+		{name: "child deleted", change: func() {
+			deletePageForTest(t, w, SYSTEM_USER_ID, linux.ID, true)
+		}, notWant: `/wiki/docs/setup/linux`},
+	}
+	for _, step := range steps {
+		step.change()
+		got := crawlerRoot(t, router, "/wiki/docs/setup", ua)
+		if want := freshRoot(); got != want {
+			t.Fatalf("%s: cached #root =\n%s\nfresh render =\n%s", step.name, got, want)
+		}
+		if step.want != "" && !strings.Contains(got, step.want) {
+			t.Fatalf("%s: #root lacks %q:\n%s", step.name, step.want, got)
+		}
+		if step.notWant != "" && strings.Contains(got, step.notWant) {
+			t.Fatalf("%s: #root still has %q:\n%s", step.name, step.notWant, got)
+		}
+	}
+}
+
+// A crawler that asks for Markdown gets the Markdown: the responder answers
+// before any contributor runs, on GET and HEAD alike.
+func TestWiki_CrawlerBody_MarkdownRequestedByCrawler_MarkdownWins(t *testing.T) {
+	useEmbeddedFrontend(t)
+	_, _, router := crawlerBodyWiki(t)
+	for _, method := range []string{http.MethodGet, http.MethodHead} {
+		t.Run(method, func(t *testing.T) {
+			rec := serveAccept(router, method, "/wiki/docs/setup", "text/markdown", map[string]string{"User-Agent": googlebotUserAgent})
+			if rec.Code != http.StatusOK || !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/markdown") {
+				t.Fatalf("got %d %q, want 200 Markdown", rec.Code, rec.Header().Get("Content-Type"))
+			}
+			if strings.Contains(rec.Body.String(), "<article>") {
+				t.Errorf("Markdown response carries the crawler body: %q", rec.Body.String())
+			}
+			if got := rec.Header().Values("Vary"); !reflect.DeepEqual(got, []string{"Accept"}) {
+				t.Errorf("Vary = %q, want [Accept]", got)
+			}
+		})
+	}
+}
+
+// A page too complex to render gives the crawler the plain shell (still with
+// the page meta) and one warning for any number of requests.
+func TestWiki_CrawlerBody_TooComplexPage_PlainShellWarnedOnce(t *testing.T) {
+	useEmbeddedFrontend(t)
+	w, public := newSEOTestWiki(t, "")
+	var logs syncBuffer
+	w.log = slog.New(slog.NewTextHandler(&logs, nil))
+	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{PublicAccess: public, DisableRequestLog: true})
+	setPublicAccess(t, public, true)
+	huge := createPageForTest(t, w, SYSTEM_USER_ID, nil, "Huge", "huge", pageNodeKind())
+	content := strings.Repeat("SECRET-CONTENT ", 300<<10/15+1)
+	updatePageForTest(t, w, SYSTEM_USER_ID, huge.ID, "Huge", "huge", &content, pageNodeKind())
+
+	for range 3 {
+		rec := serveGET(router, "/huge", map[string]string{"User-Agent": googlebotUserAgent})
+		if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), "<article>") || !strings.Contains(rec.Body.String(), "<title>Huge") {
+			t.Fatalf("got %d, want the plain shell with page meta", rec.Code)
+		}
+	}
+	got := logs.String()
+	if n := strings.Count(got, "crawler body skipped"); n != 1 {
+		t.Errorf("%d crawler warnings, want 1:\n%s", n, got)
+	}
+	if strings.Contains(got, "SECRET") {
+		t.Errorf("log carries page content")
+	}
+}
+
+// syncBuffer is a strings.Builder safe for concurrent log writes.
+type syncBuffer struct {
+	mu sync.Mutex
+	b  strings.Builder
+}
+
+func (s *syncBuffer) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.Write(p)
+}
+
+func (s *syncBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.String()
+}
+
+// Crawler requests run while the wikilink target and a child move and get
+// renamed; under -race nothing may race, and every answer is either the
+// page or the plain shell.
+func TestWiki_CrawlerBody_ConcurrentWithTreeChanges(t *testing.T) {
+	w, public := newSEOTestWiki(t, "")
+	setPublicAccess(t, public, true)
+	sectionKind := tree.NodeKindSection
+	docs := createPageForTest(t, w, SYSTEM_USER_ID, nil, "Docs", "docs", &sectionKind)
+	other := createPageForTest(t, w, SYSTEM_USER_ID, nil, "Other", "other", &sectionKind)
+	setup := createPageForTest(t, w, SYSTEM_USER_ID, &docs.ID, "Setup", "setup", pageNodeKind())
+	child := createPageForTest(t, w, SYSTEM_USER_ID, &setup.ID, "Child", "child", pageNodeKind())
+	install := createPageForTest(t, w, SYSTEM_USER_ID, &docs.ID, "Install Guide", "install", pageNodeKind())
+	content := "See [[Install Guide]]."
+	updatePageForTest(t, w, SYSTEM_USER_ID, setup.ID, "Setup", "setup", &content, pageNodeKind())
+	contributors := w.seoShellContributors()
+
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	for range 4 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+				req := httptest.NewRequest(http.MethodGet, "/docs/setup", nil)
+				req.Header.Set("User-Agent", googlebotUserAgent)
+				for _, c := range contributors {
+					c.ContributeShell(req.Context(), httpinternal.ShellRequest{Request: req, RoutePath: "/docs/setup"})
+				}
+			}
+		}()
+	}
+	for i := range 20 {
+		parent := docs.ID
+		if i%2 == 0 {
+			parent = other.ID
+		}
+		movePageForTest(t, w, install, parent)
+		updatePageForTest(t, w, SYSTEM_USER_ID, child.ID, fmt.Sprintf("Child %d", i), "child", nil, pageNodeKind())
+	}
+	close(stop)
+	wg.Wait()
 }
