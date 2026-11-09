@@ -15,13 +15,23 @@ func (t *TreeService) FindPagesByTitle(title string) []*PageNode {
 	if t.tree == nil {
 		return nil
 	}
+	return t.nodesWithTitleLocked(title)
+}
 
+// titleKey is the key of the title index: titles match case-insensitively.
+func titleKey(title string) string {
+	return strings.ToLower(title)
+}
+
+// nodesWithTitleLocked returns the nodes whose title matches title (trimmed,
+// case-insensitive), or nil for a blank title or no match. The caller holds
+// the read lock.
+func (t *TreeService) nodesWithTitleLocked(title string) []*PageNode {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return nil
 	}
-
-	nodes := t.nodesByTitle[strings.ToLower(title)]
+	nodes := t.nodesByTitle[titleKey(title)]
 	if len(nodes) == 0 {
 		return nil
 	}
@@ -132,7 +142,7 @@ func (t *TreeService) addTitleIndexForNodeLocked(node *PageNode) {
 	if node == nil || node.Title == "" {
 		return
 	}
-	key := strings.ToLower(node.Title)
+	key := titleKey(node.Title)
 	t.nodesByTitle[key] = append(t.nodesByTitle[key], node)
 }
 
@@ -140,7 +150,7 @@ func (t *TreeService) removeTitleIndexForNodeLocked(node *PageNode) {
 	if node == nil || node.Title == "" {
 		return
 	}
-	key := strings.ToLower(node.Title)
+	key := titleKey(node.Title)
 	nodes := t.nodesByTitle[key]
 	filtered := nodes[:0]
 	for _, n := range nodes {

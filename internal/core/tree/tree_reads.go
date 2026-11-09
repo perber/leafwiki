@@ -80,18 +80,9 @@ func (t *TreeService) PageRoutes(limit int) (entries []RouteEntry, truncated boo
 					truncated = true
 					return false
 				}
-				routePath := child.Slug
-				if parentPath != "" {
-					routePath = parentPath + "/" + child.Slug
-				}
-				entries = append(entries, RouteEntry{
-					ID:        child.ID,
-					Title:     child.Title,
-					RoutePath: routePath,
-					Kind:      child.Kind,
-					UpdatedAt: child.Metadata.UpdatedAt,
-				})
-				if !walk(child, routePath) {
+				entry := newRouteEntry(child, parentPath)
+				entries = append(entries, entry)
+				if !walk(child, entry.RoutePath) {
 					return false
 				}
 			}
@@ -101,6 +92,71 @@ func (t *TreeService) PageRoutes(limit int) (entries []RouteEntry, truncated boo
 		return nil
 	})
 	return entries, truncated, err
+}
+
+// RoutesByTitle returns the route of every node whose title matches title
+// (trimmed, case-insensitive, like FindPagesByTitle). Unlike the nodes
+// FindPagesByTitle returns, the route paths are computed under the read
+// lock, so a concurrent move or rename can't race with them. No files are
+// read. It returns ErrTreeNotLoaded before the tree is loaded.
+func (t *TreeService) RoutesByTitle(title string) ([]RouteEntry, error) {
+	var entries []RouteEntry
+	err := t.withRLockedTree(func() error {
+		if t.tree == nil {
+			return ErrTreeNotLoaded
+		}
+		for _, node := range t.nodesWithTitleLocked(title) {
+			entries = append(entries, routeEntryLocked(node))
+		}
+		return nil
+	})
+	return entries, err
+}
+
+// RouteByPath returns the route of the node at routePath (without a leading
+// slash, exact slugs) from one locked read without reading its file. It
+// returns ErrTreeNotLoaded before the tree is loaded and ErrPageNotFound when
+// no node is there.
+func (t *TreeService) RouteByPath(routePath string) (RouteEntry, error) {
+	var entry RouteEntry
+	err := t.withRLockedTree(func() error {
+		if t.tree == nil {
+			return ErrTreeNotLoaded
+		}
+		node := t.nodeByRoutePathLocked(routePath)
+		if node == nil {
+			return ErrPageNotFound
+		}
+		entry = routeEntryLocked(node)
+		return nil
+	})
+	return entry, err
+}
+
+// routeEntryLocked returns the RouteEntry of node with its full route path.
+// The caller holds the read lock.
+func routeEntryLocked(node *PageNode) RouteEntry {
+	parentPath := ""
+	if node.Parent != nil {
+		parentPath = strings.TrimPrefix(node.Parent.CalculatePath(), "/")
+	}
+	return newRouteEntry(node, parentPath)
+}
+
+// newRouteEntry returns the RouteEntry of node below parentPath ("" for the
+// top level). The caller holds the read lock.
+func newRouteEntry(node *PageNode, parentPath string) RouteEntry {
+	routePath := node.Slug
+	if parentPath != "" {
+		routePath = parentPath + "/" + node.Slug
+	}
+	return RouteEntry{
+		ID:        node.ID,
+		Title:     node.Title,
+		RoutePath: routePath,
+		Kind:      node.Kind,
+		UpdatedAt: node.Metadata.UpdatedAt,
+	}
 }
 
 // NodeCounts returns how many page and section nodes the tree currently holds,
@@ -287,6 +343,24 @@ func (t *TreeService) ResolvePermalinkTarget(id string) (*PermalinkTarget, error
 	}, nil
 }
 
+// nodeByRoutePathLocked returns the node at routePath (exact slugs, no empty
+// segments), or nil. The caller holds the read lock.
+func (t *TreeService) nodeByRoutePathLocked(routePath string) *PageNode {
+	parent := t.tree
+	var node *PageNode
+	for _, part := range strings.Split(routePath, "/") {
+		if part == "" {
+			return nil
+		}
+		node = t.findChildBySlugExactInParentLocked(parent, part)
+		if node == nil {
+			return nil
+		}
+		parent = node
+	}
+	return node
+}
+
 // FindPageByRoutePath finds a page in the tree by its path.
 func (t *TreeService) FindPageByRoutePath(routePath string) (*Page, error) {
 	t.mu.RLock()
@@ -296,25 +370,9 @@ func (t *TreeService) FindPageByRoutePath(routePath string) (*Page, error) {
 		return nil, ErrTreeNotLoaded
 	}
 
-	// Split the routePath into parts
-	routePart := strings.Split(routePath, "/")
-	if len(routePart) == 0 {
+	node := t.nodeByRoutePathLocked(routePath)
+	if node == nil {
 		return nil, ErrPageNotFound
-	}
-
-	parent := t.tree
-	var node *PageNode
-	for _, part := range routePart {
-		if part == "" {
-			return nil, ErrPageNotFound
-		}
-
-		node = t.findChildBySlugExactInParentLocked(parent, part)
-		if node == nil {
-			return nil, ErrPageNotFound
-		}
-
-		parent = node
 	}
 
 	content, err := t.store.ReadPageContent(node)
