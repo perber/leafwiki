@@ -31,9 +31,9 @@ import (
 //   - Never panic. Handle and log your own errors; on error return empty
 //     parts (contributor) or false (responder).
 //   - A responder whose decision depends on a request header adds the matching
-//     Vary header itself, also when it declines. A contributor has no writer;
-//     the first one whose parts depend on a header adds a Vary field to
-//     ShellParts.
+//     Vary header itself (AddVary), also when it declines. A contributor has no
+//     writer; one whose parts depend on a header names it in ShellParts.Vary,
+//     also when it contributes nothing else for this request.
 //   - A contributor that adds page-specific content sets ShellParts.NoCache,
 //     so caches revalidate the shell instead of serving a stale page title.
 //   - Registration order is the composition root's responsibility. The custom
@@ -69,6 +69,10 @@ type ShellParts struct {
 	// any contributor sets it. Set it whenever the parts depend on the page
 	// content, so a cache never serves an outdated title or description.
 	NoCache bool
+	// Vary names the request headers the parts depend on (e.g. "User-Agent").
+	// The router adds each to the shell's Vary header once, keeping what
+	// responders set (see AddVary).
+	Vary []string
 }
 
 // ShellResponder may answer a shell request itself. It returns true when it
@@ -186,9 +190,12 @@ func (h *shellHandler) serve(c *gin.Context) {
 	if h.indexErr != nil {
 		return
 	}
-	doc, noCache := h.render(req)
+	doc, noCache, vary := h.render(req)
 	if noCache {
 		c.Writer.Header().Set("Cache-Control", "no-cache")
+	}
+	for _, field := range vary {
+		AddVary(c.Writer.Header(), field)
 	}
 	// Set explicitly so HEAD reports the length GET sends; net/http computes
 	// it only for small bodies and never for HEAD. Correct only while nothing
@@ -197,9 +204,9 @@ func (h *shellHandler) serve(c *gin.Context) {
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(doc))
 }
 
-// render returns the shell document and whether a contributor asked for
-// Cache-Control: no-cache.
-func (h *shellHandler) render(req ShellRequest) (doc string, noCache bool) {
+// render returns the shell document, whether a contributor asked for
+// Cache-Control: no-cache and the Vary fields contributors named.
+func (h *shellHandler) render(req ShellRequest) (doc string, noCache bool, vary []string) {
 	ctx := req.Request.Context()
 	var title string
 	var body strings.Builder
@@ -207,6 +214,7 @@ func (h *shellHandler) render(req ShellRequest) (doc string, noCache bool) {
 	for _, contributor := range h.contributors {
 		parts := contributor.ContributeShell(ctx, req)
 		noCache = noCache || parts.NoCache
+		vary = append(vary, parts.Vary...)
 		if title == "" {
 			title = parts.Title
 		}
@@ -253,7 +261,26 @@ func (h *shellHandler) render(req ShellRequest) (doc string, noCache bool) {
 			parts = append(parts, string(head))
 		}
 	}
-	return injectIntoHead(doc, strings.Join(parts, "\n    ")), noCache
+	return injectIntoHead(doc, strings.Join(parts, "\n    ")), noCache, vary
+}
+
+// AddVary adds field to the Vary header unless a Vary line already lists it
+// (case-insensitive, also inside a comma list) or lists "*". A blank field is
+// ignored.
+func AddVary(h http.Header, field string) {
+	field = strings.TrimSpace(field)
+	if field == "" {
+		return
+	}
+	for _, line := range h.Values("Vary") {
+		for listed := range strings.SplitSeq(line, ",") {
+			listed = strings.TrimSpace(listed)
+			if listed == "*" || strings.EqualFold(listed, field) {
+				return
+			}
+		}
+	}
+	h.Add("Vary", field)
 }
 
 // shellRoutePath strips basePath from urlPath; ok is false outside basePath.
