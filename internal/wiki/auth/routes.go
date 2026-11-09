@@ -285,7 +285,9 @@ func (r *Routes) handleLogin(rctx httpinternal.RouterContext) gin.HandlerFunc {
 			return
 		}
 		out, err := r.login.Execute(c.Request.Context(), LoginInput{
-			Identifier: req.Identifier, Password: req.Password,
+			Identifier: req.Identifier,
+			Password:   req.Password,
+			Client:     coreauth.Client(security.ClientBucket(c)),
 		})
 		if err != nil {
 			respondWithAuthError(c, err)

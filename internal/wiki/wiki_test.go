@@ -353,12 +353,12 @@ func TestWiki_Login_SuccessAndFailure(t *testing.T) {
 		t.Fatal("expected auth service to be initialized")
 	}
 
-	token, err := authSvc.Login("admin", "adminpassword")
+	token, err := authSvc.Login("admin", "adminpassword", "")
 	if err != nil || token == nil {
 		t.Error("Expected login to succeed with default admin password")
 	}
 
-	_, err = authSvc.Login("admin", "wrong")
+	_, err = authSvc.Login("admin", "wrong", "")
 	if err == nil {
 		t.Error("Expected login to fail with wrong password")
 	}
@@ -722,7 +722,7 @@ func seedWikiWithUser(t *testing.T, dir string) {
 	if err := w.Favorites().Add(alice.ID, "page-1"); err != nil {
 		t.Fatalf("Favorites.Add: %v", err)
 	}
-	if _, err := w.auth.Login("alice", "alicepassword"); err != nil {
+	if _, err := w.auth.Login("alice", "alicepassword", ""); err != nil {
 		t.Fatalf("Login: %v", err)
 	}
 	if err := w.Close(); err != nil {
@@ -770,7 +770,7 @@ func TestNewWiki_CorruptQuarantinedStore_BootsAndKeepsUsers(t *testing.T) {
 				if err != nil {
 					t.Fatalf("alice lost after the restart: %v", err)
 				}
-				if _, err := w.auth.Login("alice", "alicepassword"); err != nil {
+				if _, err := w.auth.Login("alice", "alicepassword", ""); err != nil {
 					t.Fatalf("Login after the restart: %v", err)
 				}
 				favs, err := w.Favorites().ListPageIDsForUser(alice.ID)

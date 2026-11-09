@@ -266,10 +266,10 @@ func TestManager_Restore_HappyPath(t *testing.T) {
 
 	// AuthService was hot-swapped to the restored users.db: the live-only
 	// admin is gone, the snapshot's admin can log in.
-	if _, err := f.authService.Login("live-admin", "live-password-123"); err == nil {
+	if _, err := f.authService.Login("live-admin", "live-password-123", ""); err == nil {
 		t.Fatal("expected the live-only user to no longer exist after restore")
 	}
-	if _, err := f.authService.Login("snapshot-admin", "snapshot-password-123"); err != nil {
+	if _, err := f.authService.Login("snapshot-admin", "snapshot-password-123", ""); err != nil {
 		t.Fatalf("expected the snapshot's user to be able to log in after restore: %v", err)
 	}
 
@@ -522,10 +522,10 @@ func TestManager_Restore_RollsBackOnBrandingReloadFailure(t *testing.T) {
 	// handle back to the restored-to-original users.db, not just the file on
 	// disk, otherwise it would keep silently serving the rolled-back-away
 	// content through an orphaned (unlinked but still open) file handle.
-	if _, err := f.authService.Login("live-admin", "live-password-123"); err != nil {
+	if _, err := f.authService.Login("live-admin", "live-password-123", ""); err != nil {
 		t.Fatalf("expected the original live user to be able to log in again after rollback: %v", err)
 	}
-	if _, err := f.authService.Login("snapshot-admin", "snapshot-password-123"); err == nil {
+	if _, err := f.authService.Login("snapshot-admin", "snapshot-password-123", ""); err == nil {
 		t.Fatal("expected the snapshot's user to no longer exist after rollback")
 	}
 }
@@ -563,7 +563,7 @@ func TestManager_Restore_RollsBackAllFourStoresOnBrandingReloadFailure(t *testin
 		t.Error("expected write gate to be disengaged after a successful rollback")
 	}
 
-	if _, err := f.authService.Login("live-admin", "live-password-123"); err != nil {
+	if _, err := f.authService.Login("live-admin", "live-password-123", ""); err != nil {
 		t.Fatalf("expected the original live user to be able to log in again after rollback: %v", err)
 	}
 
@@ -681,7 +681,7 @@ func TestManager_Restore_WALCleanupFailure_RecoversWithoutTouchingLiveFiles(t *t
 	}
 
 	// The three stores this run actually reopens must be usable again.
-	if _, err := f.authService.Login("live-admin", "live-password-123"); err != nil {
+	if _, err := f.authService.Login("live-admin", "live-password-123", ""); err != nil {
 		t.Fatalf("expected AuthService to be usable again after recovery: %v", err)
 	}
 	if err := f.favoritesStore.Add("user-1", "another-page"); err != nil {
@@ -804,7 +804,7 @@ func TestManager_RestoreFromUpload_HappyPath(t *testing.T) {
 		t.Error("expected write gate to be disengaged after a successful restore")
 	}
 
-	if _, err := f.authService.Login("snapshot-admin", "snapshot-password-123"); err != nil {
+	if _, err := f.authService.Login("snapshot-admin", "snapshot-password-123", ""); err != nil {
 		t.Fatalf("expected the snapshot's user to be able to log in after restore: %v", err)
 	}
 }

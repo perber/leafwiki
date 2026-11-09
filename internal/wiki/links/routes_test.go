@@ -113,7 +113,7 @@ func createUserAndLogin(t *testing.T, users *coreauth.UserService, auth *coreaut
 	if _, err := users.CreateUser(name, name+"@example.com", password, role); err != nil {
 		t.Fatalf("CreateUser %q: %v", name, err)
 	}
-	token, err := auth.Login(name, password)
+	token, err := auth.Login(name, password, "")
 	if err != nil {
 		t.Fatalf("Login %q: %v", name, err)
 	}

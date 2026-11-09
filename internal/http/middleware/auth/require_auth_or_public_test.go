@@ -113,7 +113,7 @@ func TestRequireAuthOrPublicRead_ValidToken_AttachesUser_BothModes(t *testing.T)
 	fixture := createTestAuthFixture(t)
 	cleanupWithErrorCheck(t, "auth fixture", fixture.close)
 	authCookies := authmw.NewAuthCookies(true, time.Hour, 24*time.Hour)
-	tok, err := fixture.auth.Login("admin", "adminpassword")
+	tok, err := fixture.auth.Login("admin", "adminpassword", "")
 	if err != nil {
 		t.Fatalf("login: %v", err)
 	}

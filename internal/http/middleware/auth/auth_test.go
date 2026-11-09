@@ -208,7 +208,7 @@ func TestRequireAuth_WithAuthEnabled_ValidToken(t *testing.T) {
 	authCookies := authmw.NewAuthCookies(true, time.Hour, time.Hour*24)
 
 	// Login to get a valid token
-	authToken, err := fixture.auth.Login("admin", "adminpassword")
+	authToken, err := fixture.auth.Login("admin", "adminpassword", "")
 	if err != nil {
 		t.Fatalf("Failed to login: %v", err)
 	}
@@ -376,7 +376,7 @@ func TestRequireAuth_WithAuthEnabled_UserSetInContext(t *testing.T) {
 	authCookies := authmw.NewAuthCookies(true, time.Hour, time.Hour*24)
 
 	// Login to get a valid token
-	authToken, err := fixture.auth.Login("admin", "adminpassword")
+	authToken, err := fixture.auth.Login("admin", "adminpassword", "")
 	if err != nil {
 		t.Fatalf("Failed to login: %v", err)
 	}
@@ -551,7 +551,7 @@ func TestRequireAuth_ComprehensiveScenarios(t *testing.T) {
 			if tc.provideToken {
 				var token string
 				if tc.validToken {
-					authToken, err := fixture.auth.Login("admin", "adminpassword")
+					authToken, err := fixture.auth.Login("admin", "adminpassword", "")
 					if err != nil {
 						t.Fatalf("Failed to login: %v", err)
 					}
@@ -615,7 +615,7 @@ func TestOptionalAuth_ValidToken_SetsUser(t *testing.T) {
 	}()
 
 	authCookies := authmw.NewAuthCookies(true, time.Hour, time.Hour*24)
-	authToken, err := fixture.auth.Login("admin", "adminpassword")
+	authToken, err := fixture.auth.Login("admin", "adminpassword", "")
 	if err != nil {
 		t.Fatalf("login: %v", err)
 	}

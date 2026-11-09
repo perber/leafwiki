@@ -165,11 +165,13 @@ type AuthToken struct {
 // instead a short-lived login challenge is returned, and CompleteTOTPLogin
 // must be called with the resulting LoginChallengeToken and a valid TOTP or
 // recovery code before cookies may be set.
-func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
+// client is the already grouped identity of the caller, recorded in the log lines
+// of rejected logins; the empty value means unknown.
+func (a *AuthService) Login(identifier, password string, client Client) (*AuthToken, error) {
 	user, err := a.users().GetUserByIdentifier(identifier)
 	if err != nil {
 		_ = bcrypt.CompareHashAndPassword(a.dummyHash, []byte(password))
-		a.log.Warn("login failed: invalid credentials")
+		a.log.Warn("login failed: invalid credentials", "client", client)
 		return nil, ErrUserInvalidCredentials
 	}
 
@@ -178,12 +180,12 @@ func (a *AuthService) Login(identifier, password string) (*AuthToken, error) {
 		// lock is not visible by response time. The result is discarded: a
 		// locked account is rejected whether or not the password matches.
 		_ = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
-		a.log.Warn("login rejected: account locked", "userID", user.ID)
+		a.log.Warn("login rejected: account locked", "userID", user.ID, "client", client)
 		return nil, ErrUserAccountLocked
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
-		a.log.Warn("login failed: invalid credentials")
+		a.log.Warn("login failed: invalid credentials", "client", client)
 		return nil, ErrUserInvalidCredentials
 	}
 

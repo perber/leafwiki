@@ -51,6 +51,12 @@ func (u *User) ToPublicUser() *PublicUser {
 	}
 }
 
+// Client is an opaque, already grouped identity of the caller of an operation
+// (for example the network a login request came from). The empty value means
+// unknown. The core only compares it and never parses it, so how callers group
+// their clients stays out of this package.
+type Client string
+
 // Roles
 const (
 	RoleAdmin  = "admin"
