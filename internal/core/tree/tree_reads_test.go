@@ -2,6 +2,7 @@ package tree
 
 import (
 	"errors"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -204,6 +205,103 @@ func TestTreeService_PageRoutes_ConcurrentWithMutations(t *testing.T) {
 		if len(entries) != 5 {
 			t.Fatalf("got %d entries, want 5", len(entries))
 		}
+	}
+	<-done
+}
+
+// The route lookups by title and by path return route paths computed under
+// the read lock, without reading page files.
+func TestTreeService_RouteLookups_ReturnRouteEntries(t *testing.T) {
+	svc, ids := subtreeFixture(t)
+	if _, err := svc.CreateNode("user", nil, "Intro", "intro", nil); err != nil {
+		t.Fatalf("CreateNode failed: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		find func() ([]RouteEntry, error)
+		want []string
+	}{
+		{name: "title, one match", find: func() ([]RouteEntry, error) { return svc.RoutesByTitle("faq") }, want: []string{"docs/faq"}},
+		{name: "title, other case and spaces", find: func() ([]RouteEntry, error) { return svc.RoutesByTitle("  FAQ ") }, want: []string{"docs/faq"}},
+		{name: "title, two matches", find: func() ([]RouteEntry, error) { return svc.RoutesByTitle("intro") }, want: []string{"docs/guide/intro", "intro"}},
+		{name: "title, none", find: func() ([]RouteEntry, error) { return svc.RoutesByTitle("missing") }, want: []string{}},
+		{name: "title, blank", find: func() ([]RouteEntry, error) { return svc.RoutesByTitle(" ") }, want: []string{}},
+		{name: "path", find: func() ([]RouteEntry, error) {
+			e, err := svc.RouteByPath("docs/guide/intro")
+			return []RouteEntry{e}, err
+		}, want: []string{"docs/guide/intro"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			entries, err := tc.find()
+			if err != nil {
+				t.Fatalf("lookup failed: %v", err)
+			}
+			got := make([]string, len(entries))
+			for i, e := range entries {
+				got[i] = e.RoutePath
+			}
+			sort.Strings(got)
+			if strings.Join(got, ",") != strings.Join(tc.want, ",") {
+				t.Errorf("route paths = %v, want %v", got, tc.want)
+			}
+		})
+	}
+	if e, _ := svc.RouteByPath("docs/guide"); e.ID != ids["guide"] || e.Title != "guide" {
+		t.Errorf("RouteByPath entry = %+v, want guide's ID and title", e)
+	}
+}
+
+func TestTreeService_RouteLookups_Errors(t *testing.T) {
+	loaded, _ := subtreeFixture(t)
+	notLoaded := NewTreeService(t.TempDir())
+	tests := []struct {
+		name string
+		svc  *TreeService
+		path string
+		want error
+	}{
+		{name: "tree not loaded", svc: notLoaded, path: "docs", want: ErrTreeNotLoaded},
+		{name: "unknown path", svc: loaded, path: "docs/missing", want: ErrPageNotFound},
+		{name: "empty segment", svc: loaded, path: "docs//faq", want: ErrPageNotFound},
+		{name: "empty path", svc: loaded, path: "", want: ErrPageNotFound},
+		{name: "slug case differs", svc: loaded, path: "DOCS", want: ErrPageNotFound},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := tc.svc.RouteByPath(tc.path); !errors.Is(err, tc.want) {
+				t.Fatalf("RouteByPath(%q) err = %v, want %v", tc.path, err, tc.want)
+			}
+		})
+	}
+	if _, err := notLoaded.RoutesByTitle("docs"); !errors.Is(err, ErrTreeNotLoaded) {
+		t.Errorf("RoutesByTitle on an unloaded tree: err = %v, want ErrTreeNotLoaded", err)
+	}
+}
+
+// Run with -race: the lookups compute route paths while MoveNode rewrites
+// parents and slugs.
+func TestTreeService_RouteLookups_ConcurrentWithMoves(t *testing.T) {
+	svc, ids := subtreeFixture(t)
+	parents := []string{ids["other"], ids["docs"]}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 50; i++ {
+			if err := svc.MoveNode("user", ids["faq"], parents[i%2], VersionUnchecked); err != nil {
+				t.Errorf("MoveNode failed: %v", err)
+				return
+			}
+		}
+	}()
+	for i := 0; i < 200; i++ {
+		entries, err := svc.RoutesByTitle("faq")
+		if err != nil || len(entries) != 1 {
+			t.Fatalf("RoutesByTitle = %v, %v, want one entry", entries, err)
+		}
+		_, _ = svc.RouteByPath("docs/faq")
 	}
 	<-done
 }
