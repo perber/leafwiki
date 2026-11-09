@@ -404,13 +404,14 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 			TrustedProxies:  trustedProxies,
 			UserService:     w.UserService,
 		},
-		APIKeyService:     w.APIKeyService(),
-		DisableRequestLog: cfg.server.disableRequestLog,
-		UserManagementURL: cfg.proxy.userManagementURL,
-		DefaultLanguage:   cfg.frontend.defaultLanguage,
-		LoginURL:          cfg.proxy.loginURL,
-		LogoutURL:         logoutURL,
-		WriteGate:         writeGate,
+		APIKeyService:          w.APIKeyService(),
+		DisableRequestLog:      cfg.server.disableRequestLog,
+		DisableSecurityHeaders: cfg.server.disableSecurityHeaders,
+		UserManagementURL:      cfg.proxy.userManagementURL,
+		DefaultLanguage:        cfg.frontend.defaultLanguage,
+		LoginURL:               cfg.proxy.loginURL,
+		LogoutURL:              logoutURL,
+		WriteGate:              writeGate,
 	})
 
 	reloadSignals := make(chan os.Signal, 1)

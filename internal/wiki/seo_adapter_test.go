@@ -1885,3 +1885,24 @@ func TestWiki_CrawlerBody_ConcurrentWithTreeChanges(t *testing.T) {
 	close(stop)
 	wg.Wait()
 }
+
+// The root redirect is a shell responder; it carries the shell's policy and
+// the baseline headers like the shell itself.
+func TestSEORootRedirect_SecurityHeaders_MatchTheShell(t *testing.T) {
+	for _, tc := range []struct{ basePath, path string }{{"", "/"}, {"/wiki", "/wiki"}, {"/wiki", "/wiki/"}} {
+		_, public, router := newSEOTestRouter(t, tc.basePath)
+		setPublicAccess(t, public, true)
+		rec := serveGET(router, tc.path, nil)
+		if rec.Code != http.StatusFound {
+			t.Fatalf("GET %s: status = %d, want 302", tc.path, rec.Code)
+		}
+		if csp := rec.Header().Values("Content-Security-Policy"); len(csp) != 1 || !strings.Contains(csp[0], "frame-ancestors 'self'") {
+			t.Errorf("GET %s: Content-Security-Policy = %q, want the shell policy", tc.path, csp)
+		}
+		for name, want := range map[string]string{"X-Frame-Options": "SAMEORIGIN", "Referrer-Policy": "strict-origin-when-cross-origin", "X-Content-Type-Options": "nosniff"} {
+			if got := rec.Header().Values(name); len(got) != 1 || got[0] != want {
+				t.Errorf("GET %s: %s = %q, want [%q]", tc.path, name, got, want)
+			}
+		}
+	}
+}

@@ -419,6 +419,33 @@ func TestRootCommand_ResolutionPrecedence(t *testing.T) {
 	})
 }
 
+func TestRootCommand_DisableSecurityHeaders_ResolvesFlagAndEnv(t *testing.T) {
+	t.Run("headers are on by default", func(t *testing.T) {
+		runRootCommand(t, nil, func(cfg *serverConfig) {
+			if cfg.server.disableSecurityHeaders {
+				t.Fatal("disable-security-headers = true by default, want false")
+			}
+		})
+	})
+
+	t.Run("flag", func(t *testing.T) {
+		runRootCommand(t, []string{"--disable-security-headers"}, func(cfg *serverConfig) {
+			if !cfg.server.disableSecurityHeaders {
+				t.Fatal("disable-security-headers = false, want true")
+			}
+		})
+	})
+
+	t.Run("environment variable", func(t *testing.T) {
+		t.Setenv("LEAFWIKI_DISABLE_SECURITY_HEADERS", "true")
+		runRootCommand(t, nil, func(cfg *serverConfig) {
+			if !cfg.server.disableSecurityHeaders {
+				t.Fatal("disable-security-headers = false, want true")
+			}
+		})
+	})
+}
+
 // An environment variable that is declared without a value must not override a
 // default: compose and .env files do that routinely, and taking an empty
 // LEAFWIKI_HOST literally would bind the server to every interface.

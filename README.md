@@ -356,6 +356,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--base-path`                    | URL prefix for reverse proxy setups (e.g. `/wiki`)                      | `""`          | v0.8.2  |
 | `--public-url`                   | Public base URL of this wiki (absolute `http(s)://`); used for links in outgoing email, required when `--smtp-host` is set | `""` | v0.13.0 |
 | `--allow-insecure`               | ⚠️ Enables HTTP for auth cookies (required for plain HTTP)              | `false`       | v0.7.0  |
+| `--disable-security-headers`     | Omit the security response headers (needed to embed the wiki on another origin), see [Security](#security) | `false` | v0.15.0 |
 | `--disable-auth`                 | ⚠️ Disable all authentication (internal networks only)                  | `false`       | v0.7.0  |
 | `--access-token-timeout`         | Access token duration (e.g. `24h`, `15m`)                               | `15m`         | v0.7.0  |
 | `--refresh-token-timeout`        | Refresh token duration (e.g. `168h`)                                    | `168h`        | v0.7.0  |
@@ -429,6 +430,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_BASE_PATH`                    | URL prefix for reverse proxy                         | `""`          | v0.8.2  |
 | `LEAFWIKI_PUBLIC_URL`                   | Public base URL of this wiki (absolute `http(s)://`); used for links in outgoing email, required with `LEAFWIKI_SMTP_HOST` | `""` | v0.13.0 |
 | `LEAFWIKI_ALLOW_INSECURE`               | ⚠️ HTTP auth cookies                                 | `false`       | v0.7.0  |
+| `LEAFWIKI_DISABLE_SECURITY_HEADERS`     | Omit the security response headers                   | `false`       | v0.15.0 |
 | `LEAFWIKI_DISABLE_AUTH`                 | ⚠️ Disable authentication                            | `false`       | v0.7.0  |
 | `LEAFWIKI_ACCESS_TOKEN_TIMEOUT`         | Access token duration                                | `15m`         | v0.7.0  |
 | `LEAFWIKI_REFRESH_TOKEN_TIMEOUT`        | Refresh token duration                               | `168h`        | v0.7.0  |
@@ -678,6 +680,14 @@ Enabled by default since v0.7.0:
 - CSRF protection on all state-changing requests
 - Rate limiting on auth endpoints
 - Role-based access: admin, editor, viewer
+
+Since v0.15.0, responses carry `X-Frame-Options: SAMEORIGIN`,
+`Referrer-Policy: strict-origin-when-cross-origin` and `X-Content-Type-Options: nosniff` (the
+last one not on the app's own `/static/` files), and the wiki page carries a
+Content-Security-Policy
+(`object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'`).
+A page on another origin can therefore no longer embed the wiki in an `<iframe>`. If you need
+that, set **`--disable-security-headers`** and send the headers you want from your reverse proxy.
 
 **`--disable-auth`** removes all authentication. Only use for local development, trusted internal networks, or isolated environments.
 

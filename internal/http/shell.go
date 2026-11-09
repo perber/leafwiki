@@ -125,6 +125,7 @@ type shellHandler struct {
 	getFaviconFile func() string
 	responders     []ShellResponder
 	contributors   []ShellContributor // registered ones, then the built-ins
+	csp            string             // document policy, see shellCSP; "" sends none
 	embedded       bool               // index.html is served; without it gin's default 404 stays
 	index          string
 	indexErr       error
@@ -142,6 +143,7 @@ func newShellHandler(cfg FrontendConfig, opts RouterOptions, customStylesheetPat
 		getFaviconFile: cfg.GetFaviconFile,
 		responders:     cfg.ShellResponders,
 		contributors:   contributors,
+		csp:            shellCSP(opts),
 	}
 }
 
@@ -165,6 +167,11 @@ func (h *shellHandler) serve(c *gin.Context) {
 		return
 	}
 	req := ShellRequest{Request: c.Request, RoutePath: routePath, BasePath: h.basePath}
+	if h.csp != "" {
+		// Before the responders, so a redirect or the not-embedded 404 for a
+		// shell route carries the same policy as the document.
+		c.Writer.Header().Set("Content-Security-Policy", h.csp)
+	}
 	if c.Request.Method == http.MethodHead {
 		// Responders and the shell write as for GET; only the body is dropped.
 		// gin's writer stays underneath, so logging and metrics see the status.

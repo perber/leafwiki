@@ -220,7 +220,9 @@ resync-derived state.
   the SPA fallback route: it runs the registered `ShellResponder`s and renders `index.html`
   from the `ShellContributor`s on `FrontendConfig` (title, head, `#root` markup, `Vary` fields; built-ins for
   the custom stylesheet and `InjectCodeInHeader` last), see
-  [ADR-0017](./adr/0017-spa-shell-contributors.md). `registrar.go` defines
+  [ADR-0017](./adr/0017-spa-shell-contributors.md). `shell_csp.go` builds the shell's
+  Content-Security-Policy, see [ADR-0024](./adr/0024-security-response-headers.md).
+  `registrar.go` defines
   the `RouteRegistrar` interface and `RouterContext` (engine, auth cookie manager, CSRF cookie
   manager, options; `APIAuthGroup`, `APIReadGroup`, and `CapabilityGroup` for identity-free
   capability URLs, [ADR-0019](./adr/0019-capability-routes-without-identity.md)) that every
@@ -244,7 +246,9 @@ resync-derived state.
   - **`internal/http/middleware/security`** — `csrf.go`/`csrf_cookie.go` (double-submit CSRF,
     only enforced on mutating methods), `rate_limiter.go` (`KeyedLimiter` — sliding-window,
     reusable both as a full middleware and inline inside another middleware, e.g. API-key auth),
-    `untrusted_file.go` (response headers for serving user-uploaded files).
+    `untrusted_file.go` (response headers for serving user-uploaded files), `headers.go`
+    (`Headers` — `X-Frame-Options`, `Referrer-Policy`, `nosniff` on every response; the page CSP
+    comes from `shell_csp.go`, see [ADR-0024](./adr/0024-security-response-headers.md)).
   - **`internal/http/middleware/maintenance`** — `writegate.go`: blocks mutating requests during
     a restore, with an explicit segment-based (not substring-based) exemption list so the restore
     endpoint itself and a few other paths stay reachable while the gate is up.

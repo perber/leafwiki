@@ -4,15 +4,16 @@ import "github.com/urfave/cli/v3"
 
 // serverOptions holds the options for listener, data directory and logging.
 type serverOptions struct {
-	host              string
-	port              string
-	unixSocket        string
-	dataDir           string
-	basePath          string
-	publicURL         string
-	allowInsecure     bool
-	logFormat         string
-	disableRequestLog bool
+	host                   string
+	port                   string
+	unixSocket             string
+	dataDir                string
+	basePath               string
+	publicURL              string
+	allowInsecure          bool
+	disableSecurityHeaders bool
+	logFormat              string
+	disableRequestLog      bool
 }
 
 // Flags declares them. Adding an option here is the whole change: the flag,
@@ -79,6 +80,13 @@ func (o *serverOptions) Flags() []cli.Flag {
 			Category:    catServer,
 			Usage:       "allow insecure HTTP; auth cookies may then travel in plain text",
 			Sources:     envBoolVars("LEAFWIKI_ALLOW_INSECURE"),
+		},
+		&cli.BoolFlag{
+			Name:        "disable-security-headers",
+			Destination: &o.disableSecurityHeaders,
+			Category:    catServer,
+			Usage:       "omit the security response headers (X-Frame-Options, Referrer-Policy, nosniff, the page's Content-Security-Policy); needed to embed the wiki in a page on another origin",
+			Sources:     envBoolVars("LEAFWIKI_DISABLE_SECURITY_HEADERS"),
 		},
 		&cli.StringFlag{
 			Name:             "log-format",

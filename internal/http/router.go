@@ -155,6 +155,7 @@ type RouterOptions struct {
 	HTTPRemoteUser          HTTPRemoteUserConfig     // Reverse-proxy authentication via HTTP header
 	APIKeyService           *coreauth.APIKeyService  // Bearer API-key authentication; nil disables the feature
 	DisableRequestLog       bool                     // Whether to suppress per-request access log lines
+	DisableSecurityHeaders  bool                     // Whether to omit the security response headers and the shell's CSP (ADR-0024)
 	UserManagementURL       string                   // Optional URL; when set, the frontend replaces in-app user management with a link to this URL
 	DefaultLanguage         string                   // Optional default UI language code (e.g. "de"); frontend applies it only if it matches a language it ships
 	LoginURL                string                   // Optional URL the frontend redirects to instead of showing the built-in login form
@@ -231,6 +232,11 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 	}
 	engine.Use(gin.RecoveryWithWriter(gin.DefaultErrorWriter))
 	engine.Use(warnOnUntrustedForwarding(slog.Default(), opts.TrustedProxies))
+	if !opts.DisableSecurityHeaders {
+		// On the engine, not on a group: some slices build their /api groups
+		// from ctx.Base directly, and NoRoute responses need the headers too.
+		engine.Use(security.Headers(security.HeadersConfig{NosniffExemptPrefix: opts.BasePath + "/static/"}))
+	}
 	base := engine.Group(opts.BasePath)
 
 	if opts.WriteGate != nil {
