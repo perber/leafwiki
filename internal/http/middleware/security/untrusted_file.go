@@ -27,9 +27,17 @@ var inlineFileExts = map[string]struct{}{
 //     allowlist, so active content is downloaded instead of rendered;
 //   - CSP sandbox, so even a document that does render runs in an opaque
 //     origin without access to the wiki's cookies or API. PDF is exempt
-//     because Chrome refuses to render PDFs in a sandboxed document.
+//     because Chrome refuses to render PDFs in a sandboxed document;
+//   - Content-Type application/octet-stream for script types, so with nosniff
+//     a <script src> on the wiki origin cannot load an upload (ADR-0024).
+//     Other types keep theirs; an SVG only renders in <img> as an image.
+//
+// A route that sets Content-Type itself does so before calling this.
 func SetUntrustedFileHeaders(h http.Header, name string) {
 	h.Set("X-Content-Type-Options", "nosniff")
+	if isScriptType(name, h.Get("Content-Type")) {
+		h.Set("Content-Type", "application/octet-stream")
+	}
 
 	ext := strings.ToLower(path.Ext(name))
 	if ext != ".pdf" {
@@ -44,4 +52,34 @@ func SetUntrustedFileHeaders(h http.Header, name string) {
 		disposition = v
 	}
 	h.Set("Content-Disposition", disposition)
+}
+
+// scriptExts are the extensions browsers would run as a module or classic
+// script when served with a JavaScript type.
+var scriptExts = map[string]struct{}{".js": {}, ".mjs": {}, ".cjs": {}}
+
+// isScriptType reports whether a file would be served with a JavaScript MIME
+// type: by its name, by the type the system maps its extension to (on Windows
+// that comes from the registry), or by the Content-Type already set.
+func isScriptType(name, contentType string) bool {
+	ext := strings.ToLower(path.Ext(name))
+	if _, ok := scriptExts[ext]; ok {
+		return true
+	}
+	return isJavaScriptMIME(mime.TypeByExtension(ext)) || isJavaScriptMIME(contentType)
+}
+
+// isJavaScriptMIME covers the JavaScript MIME type essences of the WHATWG
+// MIME Sniffing standard (text/javascript, application/x-ecmascript, …).
+func isJavaScriptMIME(contentType string) bool {
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return false
+	}
+	for _, marker := range []string{"javascript", "ecmascript", "jscript", "livescript"} {
+		if strings.Contains(mediaType, marker) {
+			return true
+		}
+	}
+	return false
 }

@@ -46,3 +46,49 @@ func TestSetUntrustedFileHeaders_PDF_IsInlineWithoutSandbox(t *testing.T) {
 		t.Errorf("X-Content-Type-Options = %q, want nosniff", got)
 	}
 }
+
+// A script type would let a same-origin <script src> load an upload; with
+// nosniff, application/octet-stream makes the browser refuse it as a script.
+func TestSetUntrustedFileHeaders_ScriptTypes_AreServedAsOctetStream(t *testing.T) {
+	for _, tc := range []struct{ name, preset string }{
+		{"x.js", ""},
+		{"/assets/p1/X.JS", ""},
+		{"x.mjs", ""},
+		{"x.cjs", ""},
+		{"x.js", "text/javascript; charset=utf-8"},
+		{"x.txt", "text/javascript"},
+		{"x.bin", "application/x-javascript"},
+		{"x.bin", "application/ecmascript"},
+	} {
+		h := http.Header{}
+		if tc.preset != "" {
+			h.Set("Content-Type", tc.preset)
+		}
+		SetUntrustedFileHeaders(h, tc.name)
+		if got := h.Values("Content-Type"); len(got) != 1 || got[0] != "application/octet-stream" {
+			t.Errorf("%s (preset %q): Content-Type = %q, want [application/octet-stream]", tc.name, tc.preset, got)
+		}
+	}
+}
+
+// Embedded images and media keep their type; SVG in particular only renders
+// in <img> as image/svg+xml.
+func TestSetUntrustedFileHeaders_NonScriptTypes_KeepTheirContentType(t *testing.T) {
+	for _, tc := range []struct{ name, preset string }{
+		{"x.svg", ""},
+		{"x.svg", "image/svg+xml"},
+		{"x.png", "image/png"},
+		{"doc.pdf", "application/pdf"},
+		{"note.json", "application/json"},
+		{"style.css", "text/css; charset=utf-8"},
+	} {
+		h := http.Header{}
+		if tc.preset != "" {
+			h.Set("Content-Type", tc.preset)
+		}
+		SetUntrustedFileHeaders(h, tc.name)
+		if got := h.Get("Content-Type"); got != tc.preset {
+			t.Errorf("%s: Content-Type = %q, want %q unchanged", tc.name, got, tc.preset)
+		}
+	}
+}

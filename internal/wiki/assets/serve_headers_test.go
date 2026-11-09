@@ -86,3 +86,26 @@ func TestAssetServeHeaders_SafeMedia_StaysInline(t *testing.T) {
 		}
 	}
 }
+
+func TestAssetServeHeaders_Script_IsOctetStream_SVGKeepsImageType(t *testing.T) {
+	engine := newAssetServeRouter(t, map[string]string{
+		"p1/x.js":    "console.log(1)",
+		"p1/x.mjs":   "export {}",
+		"p1/pic.svg": `<svg xmlns="http://www.w3.org/2000/svg"></svg>`,
+	})
+
+	for _, p := range []string{"x.js", "x.mjs"} {
+		rec := getAsset(engine, "/assets/p1/"+p)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: status = %d", p, rec.Code)
+		}
+		if got := rec.Header().Get("Content-Type"); got != "application/octet-stream" {
+			t.Errorf("%s: Content-Type = %q, want application/octet-stream", p, got)
+		}
+	}
+
+	rec := getAsset(engine, "/assets/p1/pic.svg")
+	if got := rec.Header().Get("Content-Type"); !strings.HasPrefix(got, "image/svg+xml") {
+		t.Errorf("pic.svg: Content-Type = %q, want image/svg+xml", got)
+	}
+}

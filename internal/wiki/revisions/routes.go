@@ -239,8 +239,8 @@ func (r *Routes) handleGetRevisionAsset(c *gin.Context) {
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
-	security.SetUntrustedFileHeaders(c.Writer.Header(), assetName)
 	c.Writer.Header().Set("Content-Type", contentType)
+	security.SetUntrustedFileHeaders(c.Writer.Header(), assetName) // after Content-Type: it may replace a script type
 	http.ServeContent(c.Writer, c.Request, path.Base(assetName), stat.ModTime(), f)
 }
 

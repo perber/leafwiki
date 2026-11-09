@@ -54,6 +54,12 @@ and a startup warning says so. A `<meta>` or `<link>` snippet keeps it. The chec
 leaving it out: a false positive only costs the backstop for that install, a false negative
 breaks the header code visibly and is fixed with the kill switch.
 
+Uploads would otherwise be a same-origin script source that `'self'` allows: an editor can
+upload `x.js`, and `/assets` served it as `text/javascript`. `SetUntrustedFileHeaders` therefore
+serves every script type (`.js`, `.mjs`, `.cjs` or a JavaScript MIME type) as
+`application/octet-stream`; with `nosniff` the browser refuses it as a script. Every other type
+keeps its own, so SVG and other images still render in `<img>`.
+
 API responses, assets and every request the shell rejects carry no page policy. The knowledge
 of which built-in contributor adds script stays next to `headContributor` in `shell.go`; there
 is no CSP seam on `ShellParts` or `FrontendConfig`, because there is no second user
@@ -72,6 +78,7 @@ policy. It is permanent; finer options (an embedding allow-list) would be added 
 | `X-Content-Type-Options` | `security.Headers`; `SetUntrustedFileHeaders` sets the same value on user files (`Set`, idempotent) |
 | `Content-Security-Policy` | the shell (document policy), the Markdown responder (`sandbox`, replacing the document policy on a Markdown answer) and `SetUntrustedFileHeaders` (`sandbox` on user files), never the middleware |
 | `Content-Disposition` | `SetUntrustedFileHeaders` |
+| `Content-Type` of a user file with a script type | `SetUntrustedFileHeaders` (`application/octet-stream`) |
 
 ## Alternatives considered
 

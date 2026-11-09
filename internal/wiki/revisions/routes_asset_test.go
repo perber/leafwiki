@@ -104,3 +104,25 @@ func TestHandleGetRevisionAsset_SafeMedia_StaysInline(t *testing.T) {
 		}
 	}
 }
+
+func TestHandleGetRevisionAsset_Script_IsOctetStream_SVGKeepsImageType(t *testing.T) {
+	engine, pageID, revID := newRevisionAssetRouter(t, map[string]string{
+		"x.js":    "console.log(1)",
+		"pic.svg": `<svg xmlns="http://www.w3.org/2000/svg"></svg>`,
+	})
+
+	get := func(name string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		engine.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/pages/"+pageID+"/revisions/"+revID+"/assets/"+name, nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: status = %d, body = %s", name, rec.Code, rec.Body.String())
+		}
+		return rec
+	}
+	if got := get("x.js").Header().Get("Content-Type"); got != "application/octet-stream" {
+		t.Errorf("x.js: Content-Type = %q, want application/octet-stream", got)
+	}
+	if got := get("pic.svg").Header().Get("Content-Type"); !strings.HasPrefix(got, "image/svg+xml") {
+		t.Errorf("pic.svg: Content-Type = %q, want image/svg+xml", got)
+	}
+}
