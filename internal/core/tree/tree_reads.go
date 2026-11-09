@@ -94,6 +94,34 @@ func (t *TreeService) PageRoutes(limit int) (entries []RouteEntry, truncated boo
 	return entries, truncated, err
 }
 
+// ChildRoutes returns the direct children of the node with id ("root" for
+// the top level), pages and sections, in the order the navigation shows. Like
+// PageRoutes it is one locked read without file reads. It returns
+// ErrTreeNotLoaded before the tree is loaded and ErrPageNotFound for an
+// unknown id.
+func (t *TreeService) ChildRoutes(id string) ([]RouteEntry, error) {
+	var entries []RouteEntry
+	err := t.withRLockedTree(func() error {
+		if t.tree == nil {
+			return ErrTreeNotLoaded
+		}
+		node := t.getNodeByIDLocked(id)
+		if node == nil {
+			return ErrPageNotFound
+		}
+		parentPath := strings.TrimPrefix(node.CalculatePath(), "/") // root-relative, like PageRoutes
+		entries = make([]RouteEntry, 0, len(node.Children))
+		for _, child := range node.Children {
+			entries = append(entries, newRouteEntry(child, parentPath))
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return entries, nil
+}
+
 // RoutesByTitle returns the route of every node whose title matches title
 // (trimmed, case-insensitive, like FindPagesByTitle). Unlike the nodes
 // FindPagesByTitle returns, the route paths are computed under the read

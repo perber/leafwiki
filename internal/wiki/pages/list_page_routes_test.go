@@ -65,3 +65,46 @@ func TestListPageRoutesUseCase_TreeNotLoaded_ReturnsError(t *testing.T) {
 		t.Errorf("out = %+v, want nil", out)
 	}
 }
+
+func TestListChildRoutesUseCase_ListsDirectChildren(t *testing.T) {
+	deps := newTestDeps(t)
+	create := pages.NewCreatePageUseCase(deps.tree, deps.slug, deps.orchestrator(), slog.Default(), nil)
+	docs, err := create.Execute(context.Background(), pages.CreatePageInput{UserID: "user1", Title: "Docs", Slug: "docs", Kind: sectionKind()})
+	if err != nil {
+		t.Fatalf("CreatePage(docs) failed: %v", err)
+	}
+	setup, err := create.Execute(context.Background(), pages.CreatePageInput{UserID: "user1", Title: "Setup", Slug: "setup", Kind: pageKind(), ParentID: &docs.Page.ID})
+	if err != nil {
+		t.Fatalf("CreatePage(setup) failed: %v", err)
+	}
+	if _, err := create.Execute(context.Background(), pages.CreatePageInput{UserID: "user1", Title: "Linux", Slug: "linux", Kind: pageKind(), ParentID: &setup.Page.ID}); err != nil {
+		t.Fatalf("CreatePage(linux) failed: %v", err)
+	}
+
+	out, err := pages.NewListChildRoutesUseCase(deps.tree).Execute(context.Background(), pages.ListChildRoutesInput{PageID: docs.Page.ID})
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+	if len(out.Routes) != 1 || out.Routes[0].RoutePath != "docs/setup" || out.Routes[0].Title != "Setup" {
+		t.Errorf("routes = %+v, want only docs/setup", out.Routes)
+	}
+}
+
+func TestListChildRoutesUseCase_Errors(t *testing.T) {
+	tests := []struct {
+		name string
+		tree *tree.TreeService
+		want error
+	}{
+		{name: "tree not loaded", tree: tree.NewTreeService(t.TempDir()), want: tree.ErrTreeNotLoaded},
+		{name: "unknown page", tree: newTestDeps(t).tree, want: tree.ErrPageNotFound},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := pages.NewListChildRoutesUseCase(tc.tree).Execute(context.Background(), pages.ListChildRoutesInput{PageID: "missing"})
+			if !errors.Is(err, tc.want) || out != nil {
+				t.Fatalf("Execute = %+v, %v, want nil, %v", out, err, tc.want)
+			}
+		})
+	}
+}

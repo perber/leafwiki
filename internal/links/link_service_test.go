@@ -1604,6 +1604,53 @@ func TestResolveWikiLinkTargets_AmbiguousSlashTitle_ReturnsBroken(t *testing.T) 
 	}
 }
 
+// ─── ResolveWikiLinkTarget ───────────────────────────────────────────────────
+
+// ResolveWikiLinkTarget follows the rule stored links follow (see the
+// resolveWikiLinkTargets tests above) and returns the route path of the page.
+func TestResolveWikiLinkTarget_FollowsTheStoredLinkRule(t *testing.T) {
+	ts, _, _ := setupTreeForLinksTest(t)
+	create := func(parentID *string, title, slug string) *string {
+		t.Helper()
+		id, err := ts.CreateNode("system", parentID, title, slug, pageNodeKind())
+		if err != nil {
+			t.Fatalf("CreateNode %s: %v", slug, err)
+		}
+		return id
+	}
+	create(nil, "Notes", "notes-a")
+	create(nil, "Notes", "notes-b")
+	create(create(nil, "TCP Docs", "TCP"), "IP Notes", "IP")
+	create(nil, "TCP/IP", "tcp-ip-guide")
+
+	tests := []struct {
+		name   string
+		tree   *tree.TreeService
+		target string
+		want   string
+		wantOK bool
+	}{
+		{name: "title", tree: ts, target: "Page 1", want: "/docs/page1", wantOK: true},
+		{name: "title, other case", tree: ts, target: "page 1", want: "/docs/page1", wantOK: true},
+		{name: "unknown title", tree: ts, target: "Nonexistent Page"},
+		{name: "ambiguous title", tree: ts, target: "Notes"},
+		{name: "path hint", tree: ts, target: "docs/page2", want: "/docs/page2", wantOK: true},
+		{name: "path hint with leading slash", tree: ts, target: "/docs/page2", want: "/docs/page2", wantOK: true},
+		{name: "unknown path hint", tree: ts, target: "docs/nonexistent"},
+		{name: "slash title wins over a colliding route path", tree: ts, target: "TCP/IP", want: "/tcp-ip-guide", wantOK: true},
+		{name: "empty target", tree: ts, target: ""},
+		{name: "tree not loaded", tree: tree.NewTreeService(t.TempDir()), target: "Page 1"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := ResolveWikiLinkTarget(tc.tree, tc.target)
+			if got != tc.want || ok != tc.wantOK {
+				t.Fatalf("ResolveWikiLinkTarget(%q) = %q, %v, want %q, %v", tc.target, got, ok, tc.want, tc.wantOK)
+			}
+		})
+	}
+}
+
 // Run with -race: resolving reads route paths while a move rewrites the
 // target's parent.
 func TestResolveWikiLinkTargets_ConcurrentWithMoves(t *testing.T) {

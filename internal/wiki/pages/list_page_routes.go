@@ -39,3 +39,35 @@ func (uc *ListPageRoutesUseCase) Execute(_ context.Context, in ListPageRoutesInp
 	}
 	return &ListPageRoutesOutput{Routes: routes, Truncated: truncated}, nil
 }
+
+// ListChildRoutesInput is the input for ListChildRoutesUseCase.
+type ListChildRoutesInput struct {
+	PageID string
+}
+
+// ListChildRoutesOutput is the result of ListChildRoutesUseCase.
+type ListChildRoutesOutput struct {
+	// Routes are the page's direct children in navigation order.
+	Routes []tree.RouteEntry
+}
+
+// ListChildRoutesUseCase lists the routes of a page's direct children, e.g.
+// for the crawler body. Like the page-view reads, it is not a visibility layer.
+type ListChildRoutesUseCase struct {
+	tree *tree.TreeService
+}
+
+// NewListChildRoutesUseCase constructs a ListChildRoutesUseCase.
+func NewListChildRoutesUseCase(t *tree.TreeService) *ListChildRoutesUseCase {
+	return &ListChildRoutesUseCase{tree: t}
+}
+
+// Execute returns the child routes; tree.ErrTreeNotLoaded and
+// tree.ErrPageNotFound are passed through.
+func (uc *ListChildRoutesUseCase) Execute(_ context.Context, in ListChildRoutesInput) (*ListChildRoutesOutput, error) {
+	routes, err := uc.tree.ChildRoutes(in.PageID)
+	if err != nil {
+		return nil, err
+	}
+	return &ListChildRoutesOutput{Routes: routes}, nil
+}

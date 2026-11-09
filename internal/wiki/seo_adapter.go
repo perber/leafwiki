@@ -28,13 +28,16 @@ func (w *Wiki) seoShellResponders() []httpinternal.ShellResponder {
 // all gated on public access by one seo.PublicOnly.
 func (w *Wiki) seoShellContributors() []httpinternal.ShellContributor {
 	public := seo.NewPublicOnly(w.publicAccess)
-	pageMeta := seo.NewGetPageMetaUseCase(
-		seoPageReader{uc: wikipages.NewGetPageViewByPathUseCase(w.tree)},
-		seoPermalinkResolver{queries: wikipages.NewPageQueries(w.tree)},
-		w.siteName, w.publicURL,
-	)
+	log := w.log.With("component", "SEO")
+	pages := seoPageReader{uc: wikipages.NewGetPageViewByPathUseCase(w.tree)}
+	pageMeta := seo.NewGetPageMetaUseCase(pages, seoPermalinkResolver{queries: wikipages.NewPageQueries(w.tree)}, w.siteName, w.publicURL)
+	crawlerBody := seo.NewGetCrawlerBodyUseCase(pages, seoCrawlerBodyReader{
+		children:  wikipages.NewListChildRoutesUseCase(w.tree),
+		wikiLinks: wikipages.NewResolveWikiLinkUseCase(w.tree),
+	})
 	return []httpinternal.ShellContributor{
-		public.Contributor(seo.NewPageMeta(pageMeta, w.log.With("component", "SEO"))),
+		public.Contributor(seo.NewPageMeta(pageMeta, log)),
+		public.Contributor(seo.NewCrawlerBody(crawlerBody, log)),
 	}
 }
 
@@ -83,7 +86,7 @@ func (r seoPageReader) PageByRoutePath(ctx context.Context, routePath string) (*
 	if err != nil {
 		return nil, err
 	}
-	return &seo.Page{Title: view.Page.Title, Body: view.Page.Content, Properties: view.Properties}, nil
+	return &seo.Page{ID: view.Page.ID, Title: view.Page.Title, Body: view.Page.Content, Properties: view.Properties}, nil
 }
 
 // seoPermalinkResolver implements seo.PermalinkResolver with the pages
@@ -104,6 +107,36 @@ func (r seoPermalinkResolver) ResolvePermalink(_ context.Context, id string) (*s
 		return nil, err
 	}
 	return &seo.PermalinkTarget{RoutePath: target.Path}, nil
+}
+
+// seoCrawlerBodyReader implements seo.CrawlerBodyReader with the pages
+// slice's child listing and wikilink resolution; seo must not import pages.
+type seoCrawlerBodyReader struct {
+	children  *wikipages.ListChildRoutesUseCase
+	wikiLinks *wikipages.ResolveWikiLinkUseCase
+}
+
+func (r seoCrawlerBodyReader) ChildPages(ctx context.Context, pageID string) ([]seo.ChildPage, error) {
+	out, err := r.children.Execute(ctx, wikipages.ListChildRoutesInput{PageID: pageID})
+	if errors.Is(err, tree.ErrPageNotFound) || errors.Is(err, tree.ErrTreeNotLoaded) {
+		return nil, nil // the page went away since it was read; it is listed without children
+	}
+	if err != nil {
+		return nil, err
+	}
+	children := make([]seo.ChildPage, len(out.Routes))
+	for i, r := range out.Routes {
+		children[i] = seo.ChildPage{Title: r.Title, RoutePath: r.RoutePath}
+	}
+	return children, nil
+}
+
+func (r seoCrawlerBodyReader) ResolveWikiLink(ctx context.Context, target string) (string, bool) {
+	out, err := r.wikiLinks.Execute(ctx, wikipages.ResolveWikiLinkInput{Target: target})
+	if err != nil || out == nil {
+		return "", false
+	}
+	return out.RoutePath, true
 }
 
 // seoPageRouteLister implements seo.PageRouteLister with the pages slice's
