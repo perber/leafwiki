@@ -347,7 +347,7 @@ func TestTreeService_ChildRoutes_CopiesNodeFields(t *testing.T) {
 		t.Fatalf("ChildRoutes = %v, %v, want one entry", entries, err)
 	}
 	node := svc.GetTree().Children[0].Children[0].Children[0]
-	want := RouteEntry{ID: ids["intro"], Title: "intro", RoutePath: "docs/guide/intro", Kind: NodeKindPage, UpdatedAt: node.Metadata.UpdatedAt}
+	want := RouteEntry{ID: ids["intro"], ParentID: ids["guide"], Title: "intro", RoutePath: "docs/guide/intro", Kind: NodeKindPage, UpdatedAt: node.Metadata.UpdatedAt}
 	if entries[0] != want || want.UpdatedAt.IsZero() {
 		t.Errorf("entry = %+v, want %+v", entries[0], want)
 	}
@@ -373,4 +373,114 @@ func TestTreeService_ChildRoutes_Errors(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTreeService_SubtreeRoutes_ListsTheNodeAndItsDescendants(t *testing.T) {
+	svc, ids := subtreeFixture(t)
+	if err := svc.SortPages(ids["docs"], []string{ids["faq"], ids["guide"]}); err != nil {
+		t.Fatalf("SortPages failed: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		id   string
+		want []string
+	}{
+		{name: "section", id: ids["docs"], want: []string{"docs", "docs/faq", "docs/guide", "docs/guide/intro"}},
+		{name: "nested page", id: ids["guide"], want: []string{"docs/guide", "docs/guide/intro"}},
+		{name: "leaf page", id: ids["intro"], want: []string{"docs/guide/intro"}},
+		{name: "top-level page", id: ids["other"], want: []string{"other"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			entries, err := svc.SubtreeRoutes(tc.id)
+			if err != nil {
+				t.Fatalf("SubtreeRoutes failed: %v", err)
+			}
+			got := make([]string, len(entries))
+			for i, e := range entries {
+				got[i] = e.RoutePath
+			}
+			if strings.Join(got, ",") != strings.Join(tc.want, ",") {
+				t.Errorf("route paths = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTreeService_SubtreeRoutes_SetsParentIDs(t *testing.T) {
+	svc, ids := subtreeFixture(t)
+
+	entries, err := svc.SubtreeRoutes(ids["docs"])
+	if err != nil {
+		t.Fatalf("SubtreeRoutes failed: %v", err)
+	}
+	want := map[string]string{ids["docs"]: "root", ids["guide"]: ids["docs"], ids["intro"]: ids["guide"], ids["faq"]: ids["docs"]}
+	if len(entries) != len(want) {
+		t.Fatalf("got %d entries, want %d", len(entries), len(want))
+	}
+	for _, e := range entries {
+		if e.ParentID != want[e.ID] {
+			t.Errorf("%s: ParentID = %q, want %q", e.RoutePath, e.ParentID, want[e.ID])
+		}
+	}
+}
+
+func TestTreeService_SubtreeRoutes_Errors(t *testing.T) {
+	loaded, _ := subtreeFixture(t)
+	tests := []struct {
+		name string
+		svc  *TreeService
+		id   string
+		want error
+	}{
+		{name: "tree not loaded", svc: NewTreeService(t.TempDir()), id: "a", want: ErrTreeNotLoaded},
+		{name: "unknown id", svc: loaded, id: "missing", want: ErrPageNotFound},
+		{name: "empty id", svc: loaded, id: "", want: ErrPageNotFound},
+		{name: "tree root", svc: loaded, id: "root", want: ErrPageNotFound},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			entries, err := tc.svc.SubtreeRoutes(tc.id)
+			if !errors.Is(err, tc.want) || entries != nil {
+				t.Fatalf("SubtreeRoutes = %v, %v, want nil, %v", entries, err, tc.want)
+			}
+		})
+	}
+}
+
+// Run with -race: the walk must hold the tree lock while a move rewrites
+// Parent and Children. Every read sees faq either inside docs or outside it,
+// never half-moved.
+func TestTreeService_SubtreeRoutes_ConcurrentWithMoves(t *testing.T) {
+	svc, ids := subtreeFixture(t)
+	targets := []string{"root", ids["docs"]}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 50; i++ {
+			if err := svc.MoveNode("user", ids["faq"], targets[i%2], VersionUnchecked); err != nil {
+				t.Errorf("MoveNode failed: %v", err)
+				return
+			}
+		}
+	}()
+	for i := 0; i < 100; i++ {
+		entries, err := svc.SubtreeRoutes(ids["docs"])
+		if err != nil {
+			t.Fatalf("SubtreeRoutes failed: %v", err)
+		}
+		if len(entries) != 3 && len(entries) != 4 {
+			t.Fatalf("got %d entries, want 3 or 4", len(entries))
+		}
+		seen := map[string]bool{}
+		for j, e := range entries {
+			if j > 0 && !seen[e.ParentID] {
+				t.Fatalf("entry %s listed before its parent %s", e.ID, e.ParentID)
+			}
+			seen[e.ID] = true
+		}
+	}
+	<-done
 }

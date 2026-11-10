@@ -45,7 +45,8 @@ filesystem-canonical (`tree`, `revision`) and SQLite-derived (`links`, `tags`, `
   (markdown files + frontmatter under `root/`). `TreeService` (guarded by a single `sync.RWMutex`)
   is the one component allowed to mutate the tree: create/move/delete/copy pages and sections.
   `tree_service.go` holds the type, its lifecycle and the lock helpers; mutations live in
-  `tree_mutations.go`, reads in `tree_reads.go`, the lookup indexes in `tree_index.go`.
+  `tree_mutations.go`, reads in `tree_reads.go` (including the locked route reads `PageRoutes`,
+  `ChildRoutes` and `SubtreeRoutes`), the lookup indexes in `tree_index.go`.
   `node_store.go` holds the `NodeStore` type, page reads and the path/metadata helpers;
   `node_store_reconstruct.go` rebuilds the tree from disk (walks `root/`, reads `leafwiki_id`
   frontmatter); `node_store_write.go` holds the file write paths.

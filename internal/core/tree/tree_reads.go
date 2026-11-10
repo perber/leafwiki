@@ -50,8 +50,11 @@ func (t *TreeService) FirstRootChildPath() (string, error) {
 
 // RouteEntry is one node of the tree as a list of routes needs it.
 type RouteEntry struct {
-	ID    string
-	Title string
+	ID string
+	// ParentID is the ID of the node's parent: "root" for the top level, empty
+	// only for the tree root itself, which no route read returns.
+	ParentID string
+	Title    string
 	// RoutePath is the node's route path without a leading slash (e.g. "docs/setup").
 	RoutePath string
 	Kind      NodeKind
@@ -73,25 +76,60 @@ func (t *TreeService) PageRoutes(limit int) (entries []RouteEntry, truncated boo
 			capacity = limit
 		}
 		entries = make([]RouteEntry, 0, capacity)
-		var walk func(node *PageNode, parentPath string) bool
-		walk = func(node *PageNode, parentPath string) bool {
-			for _, child := range node.Children {
-				if limit > 0 && len(entries) == limit {
-					truncated = true
-					return false
-				}
-				entry := newRouteEntry(child, parentPath)
-				entries = append(entries, entry)
-				if !walk(child, entry.RoutePath) {
-					return false
-				}
-			}
-			return true
-		}
-		walk(t.tree, "")
+		entries, truncated = appendDescendantRoutesLocked(entries, t.tree, "", limit)
 		return nil
 	})
 	return entries, truncated, err
+}
+
+// SubtreeRoutes returns the node with id followed by all its descendants,
+// depth-first in the order the navigation shows, so every entry comes after
+// its parent. Like PageRoutes it is one locked read without file reads: the
+// subtree can't be torn by a concurrent move. It returns ErrTreeNotLoaded
+// before the tree is loaded and ErrPageNotFound for an unknown id and for the
+// tree root (use PageRoutes for the whole tree).
+func (t *TreeService) SubtreeRoutes(id string) ([]RouteEntry, error) {
+	var entries []RouteEntry
+	err := t.withRLockedTree(func() error {
+		if t.tree == nil {
+			return ErrTreeNotLoaded
+		}
+		node := t.getNodeByIDLocked(id)
+		if node == nil || node == t.tree {
+			return ErrPageNotFound
+		}
+		entry := routeEntryLocked(node)
+		entries, _ = appendDescendantRoutesLocked([]RouteEntry{entry}, node, entry.RoutePath, 0)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return entries, nil
+}
+
+// appendDescendantRoutesLocked appends the descendants of node, whose route
+// path is nodePath, depth-first in navigation order. With limit > 0 it stops
+// at limit entries and reports truncated when more exist. The caller holds
+// the read lock.
+func appendDescendantRoutesLocked(entries []RouteEntry, node *PageNode, nodePath string, limit int) (_ []RouteEntry, truncated bool) {
+	var walk func(node *PageNode, parentPath string) bool
+	walk = func(node *PageNode, parentPath string) bool {
+		for _, child := range node.Children {
+			if limit > 0 && len(entries) == limit {
+				truncated = true
+				return false
+			}
+			entry := newRouteEntry(child, parentPath)
+			entries = append(entries, entry)
+			if !walk(child, entry.RoutePath) {
+				return false
+			}
+		}
+		return true
+	}
+	walk(node, nodePath)
+	return entries, truncated
 }
 
 // ChildRoutes returns the direct children of the node with id ("root" for
@@ -178,8 +216,13 @@ func newRouteEntry(node *PageNode, parentPath string) RouteEntry {
 	if parentPath != "" {
 		routePath = parentPath + "/" + node.Slug
 	}
+	parentID := ""
+	if node.Parent != nil {
+		parentID = node.Parent.ID
+	}
 	return RouteEntry{
 		ID:        node.ID,
+		ParentID:  parentID,
 		Title:     node.Title,
 		RoutePath: routePath,
 		Kind:      node.Kind,
