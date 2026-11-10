@@ -118,3 +118,73 @@ func TestGetSharedPageUseCase_Execute_MapsErrors(t *testing.T) {
 		})
 	}
 }
+
+type fakeTreeReader struct {
+	err      error
+	gotScope scopedread.ReadScope
+}
+
+func (f *fakeTreeReader) Tree(_ context.Context, scope scopedread.ReadScope) (*scopedread.TreeNodeView, error) {
+	f.gotScope = scope
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &scopedread.TreeNodeView{ID: scope.RootID, Title: "T", Kind: "section", Children: []*scopedread.TreeNodeView{}}, nil
+}
+
+func TestGetSharedTreeUseCase_Execute_ReadsThroughTheLinkScope(t *testing.T) {
+	for _, include := range []bool{false, true} {
+		links := &fakeResolver{grant: &sharing.Grant{ShareID: "share-1", PageID: "customer", IncludeDescendants: include}}
+		trees := &fakeTreeReader{}
+
+		out, err := NewGetSharedTreeUseCase(links, trees).Execute(context.Background(), GetSharedTreeInput{Token: "lws_token"})
+		if err != nil {
+			t.Fatalf("include %v: Execute: %v", include, err)
+		}
+		if links.got != "lws_token" {
+			t.Errorf("resolved token %q, want lws_token", links.got)
+		}
+		if want := (scopedread.ReadScope{RootID: "customer", IncludeDescendants: include}); trees.gotScope != want {
+			t.Errorf("scope = %+v, want %+v", trees.gotScope, want)
+		}
+		if out.Tree.ID != "customer" {
+			t.Errorf("tree root = %q, want customer", out.Tree.ID)
+		}
+	}
+}
+
+func TestGetSharedTreeUseCase_Execute_MapsErrors(t *testing.T) {
+	storeDown := sharederrors.NewLocalizedError(sharing.ErrCodeShareLinkStoreUnavailable, "m", "t", nil)
+	diskError := errors.New("tree not loaded")
+
+	tests := []struct {
+		name        string
+		resolveErr  error
+		readErr     error
+		wantCode    string
+		wantWrapped error
+	}{
+		{name: "store suspended for a restore", resolveErr: storeDown, wantCode: sharing.ErrCodeShareLinkStoreUnavailable},
+		{name: "shared page deleted", readErr: scopedread.ErrNotFound, wantCode: sharing.ErrCodeShareLinkNotFound},
+		{name: "link to an invalid scope", readErr: scopedread.ErrInvalidScope, wantCode: sharing.ErrCodeShareLinkNotFound},
+		{name: "operational error is not a missing page", readErr: diskError, wantWrapped: diskError},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			links := &fakeResolver{grant: &sharing.Grant{ShareID: "share-1", PageID: "customer"}, err: tc.resolveErr}
+			if tc.resolveErr != nil {
+				links.grant = nil
+			}
+			out, err := NewGetSharedTreeUseCase(links, &fakeTreeReader{err: tc.readErr}).Execute(context.Background(), GetSharedTreeInput{Token: "lws_token"})
+			if out != nil {
+				t.Errorf("out = %+v, want nil on error", out)
+			}
+			if tc.wantCode != "" && errorCode(err) != tc.wantCode {
+				t.Errorf("error code = %q (err %v), want %q", errorCode(err), err, tc.wantCode)
+			}
+			if tc.wantWrapped != nil && (!errors.Is(err, tc.wantWrapped) || errorCode(err) != "") {
+				t.Errorf("err = %v, want the unlocalized cause wrapped", err)
+			}
+		})
+	}
+}

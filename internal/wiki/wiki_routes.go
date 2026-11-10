@@ -45,6 +45,7 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 	if w.shareLinks != nil {
 		w.sharesRoutes = wikishares.NewRoutes(wikishares.RoutesConfig{
 			GetPage: wikishares.NewGetSharedPageUseCase(w.shareLinks, scopedread.NewPageReader(w.tree)),
+			GetTree: wikishares.NewGetSharedTreeUseCase(w.shareLinks, scopedread.NewTreeReader(w.tree)),
 			Log:     w.log,
 		})
 	}

@@ -24,9 +24,15 @@ type sharedPageGetter interface {
 	Execute(ctx context.Context, in GetSharedPageInput) (*GetSharedPageOutput, error)
 }
 
-// Routes is the RouteRegistrar for reading pages through share links.
+type sharedTreeGetter interface {
+	Execute(ctx context.Context, in GetSharedTreeInput) (*GetSharedTreeOutput, error)
+}
+
+// Routes is the RouteRegistrar for reading through share links. All its
+// routes share one failed-lookup limiter.
 type Routes struct {
 	getPage sharedPageGetter
+	getTree sharedTreeGetter
 	limiter *security.KeyedLimiter
 	log     *slog.Logger
 }
@@ -34,6 +40,7 @@ type Routes struct {
 // RoutesConfig holds the dependencies required to build a Routes instance.
 type RoutesConfig struct {
 	GetPage *GetSharedPageUseCase
+	GetTree *GetSharedTreeUseCase
 	Log     *slog.Logger
 }
 
@@ -43,7 +50,7 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Routes{getPage: cfg.GetPage, limiter: newFailedTokenLimiter(), log: log.With("component", "shares")}
+	return &Routes{getPage: cfg.GetPage, getTree: cfg.GetTree, limiter: newFailedTokenLimiter(), log: log.With("component", "shares")}
 }
 
 func newFailedTokenLimiter() *security.KeyedLimiter {
@@ -57,6 +64,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	g := ctx.CapabilityGroup("/shared")
 	g.GET("/:token/page", r.handleGetSharedRootPage)
 	g.GET("/:token/pages/:id", r.handleGetSharedPage)
+	g.GET("/:token/tree", r.handleGetSharedTree)
 }
 
 // ─── Handlers ───────────────────────────────────────────────────────────────
@@ -98,23 +106,59 @@ func (r *Routes) handleGetSharedPage(c *gin.Context) {
 	r.serveSharedPage(c, c.Param("id"))
 }
 
-// serveSharedPage resolves the link first, so a valid link is never
-// throttled; only failed lookups count towards the per-client limit, and
-// once it is reached they get 429 instead of 404. All failure causes look the
-// same, so the limit reveals nothing about which links exist.
+// serveSharedPage serves pageID, or the shared page itself for "", through
+// serveShared.
 func (r *Routes) serveSharedPage(c *gin.Context, pageID string) {
+	r.serveShared(c, func(ctx context.Context, token string) (any, error) {
+		out, err := r.getPage.Execute(ctx, GetSharedPageInput{Token: token, PageID: pageID})
+		if err != nil {
+			return nil, err
+		}
+		return out.Page, nil
+	})
+}
+
+// handleGetSharedTree handles GET /api/shared/:token/tree
+//
+//	@Summary		Read the navigation of a share link
+//	@Description	Returns the shared page as the top of a tree. For a link that includes subpages, the tree holds every page below it as the tree is now, in navigation order; for a single-page link, the page alone with no children. Nothing above or beside the shared page is included. The token in the path is the only authorization. Unknown, expired and revoked links get the same 404 as the page routes. Requires --enable-share-links.
+//	@Description	Responses carry Referrer-Policy: no-referrer, X-Robots-Tag: noindex, nofollow and Cache-Control: no-store.
+//	@Tags			shared
+//	@Produce		json
+//	@Param			token	path		string					true	"Share link token"
+//	@Success		200		{object}	scopedread.TreeNodeView	"The shared page and the pages below it"
+//	@Failure		404		{object}	dto.ErrorResponse		"Unknown, malformed, expired or revoked link, or the shared page no longer exists (code share_link_not_found)"
+//	@Failure		429		{object}	dto.ErrorResponse		"Too many failed link lookups from this client (code share_link_too_many_attempts)"
+//	@Failure		500		{object}	dto.ErrorResponse		"Reading the tree failed (code share_link_internal_error)"
+//	@Failure		503		{object}	dto.ErrorResponse		"Share link store unavailable during a live restore (code share_link_store_unavailable)"
+//	@Router			/shared/{token}/tree [get]
+func (r *Routes) handleGetSharedTree(c *gin.Context) {
+	r.serveShared(c, func(ctx context.Context, token string) (any, error) {
+		out, err := r.getTree.Execute(ctx, GetSharedTreeInput{Token: token})
+		if err != nil {
+			return nil, err
+		}
+		return out.Tree, nil
+	})
+}
+
+// serveShared runs read, which resolves the link first, so a valid link is
+// never throttled; only failed lookups count towards the per-client limit,
+// and once it is reached they get 429 instead of 404. All failure causes look
+// the same, so the limit reveals nothing about which links exist.
+func (r *Routes) serveShared(c *gin.Context, read func(ctx context.Context, token string) (any, error)) {
 	key := security.ClientKey(c)
-	out, err := r.getPage.Execute(c.Request.Context(), GetSharedPageInput{Token: c.Param("token"), PageID: pageID})
+	body, err := read(c.Request.Context(), c.Param("token"))
 	switch {
 	case err == nil:
 		r.limiter.NotifyResult(key, true)
-		c.JSON(http.StatusOK, out.Page)
+		c.JSON(http.StatusOK, body)
 	case isNotFound(err) && !r.limiter.Allow(key):
 		respondTooManyAttempts(c)
 	case isNotFound(err):
 		respondWithShareError(c, err)
 	default:
-		r.log.Error("shared page read failed", "error", err)
+		r.log.Error("shared read failed", "error", err)
 		respondWithShareError(c, err)
 	}
 }

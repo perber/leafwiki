@@ -215,3 +215,130 @@ func TestShares_Routes_AbsentWhenShareLinksAreOff(t *testing.T) {
 		t.Fatalf("status = %d, want 404 with share links off", rec.Code)
 	}
 }
+
+// version returns the current version of page id for a write.
+func (f *sharesFixture) version(t *testing.T, id string) string {
+	t.Helper()
+	rec := authenticatedRequest(t, f.router, http.MethodGet, "/api/pages/"+id, nil)
+	var page apiPage
+	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &page) != nil {
+		t.Fatalf("get page %s: %d %s", id, rec.Code, rec.Body.String())
+	}
+	return page.Version
+}
+
+// move moves page id below parentID through the API.
+func (f *sharesFixture) move(t *testing.T, id, parentID string) {
+	t.Helper()
+	body := `{"version":"` + f.version(t, id) + `","parentId":"` + parentID + `"}`
+	if rec := authenticatedRequest(t, f.router, http.MethodPut, "/api/pages/"+id+"/move", strings.NewReader(body)); rec.Code != http.StatusOK {
+		t.Fatalf("move %s to %s: %d %s", id, parentID, rec.Code, rec.Body.String())
+	}
+}
+
+// treeOutline renders a shared tree response as "Customer(Contract)".
+func treeOutline(t *testing.T, body []byte) string {
+	t.Helper()
+	var node struct {
+		Title    string            `json:"title"`
+		Children []json.RawMessage `json:"children"`
+	}
+	if err := json.Unmarshal(body, &node); err != nil {
+		t.Fatalf("decode %s: %v", body, err)
+	}
+	if node.Children == nil {
+		t.Fatalf("children of %s is null, want []", node.Title)
+	}
+	if len(node.Children) == 0 {
+		return node.Title
+	}
+	parts := make([]string, len(node.Children))
+	for i, c := range node.Children {
+		parts[i] = treeOutline(t, c)
+	}
+	return node.Title + "(" + strings.Join(parts, ",") + ")"
+}
+
+func TestShares_GetSharedTree_ServesTheLinkScope(t *testing.T) {
+	f := newSharesFixture(t)
+
+	tests := []struct {
+		name string
+		page string
+		sub  bool
+		want string
+	}{
+		{name: "subtree link", page: f.customer, sub: true, want: "Customer(Contract)"},
+		{name: "single-page link shows no subpages", page: f.customer, want: "Customer"},
+		{name: "nothing above a nested shared page", page: f.contract, sub: true, want: "Contract"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := f.get("/api/shared/"+f.link(t, tc.page, tc.sub)+"/tree", "")
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+			}
+			if got := treeOutline(t, rec.Body.Bytes()); got != tc.want {
+				t.Errorf("tree = %s, want %s", got, tc.want)
+			}
+			if strings.Contains(rec.Body.String(), f.internal) || strings.Contains(rec.Body.String(), "slug") {
+				t.Errorf("tree leaks pages or paths outside the allow-list: %s", rec.Body.String())
+			}
+			if rec.Header().Get("Referrer-Policy") != "no-referrer" || rec.Header().Get("Cache-Control") != "no-store" {
+				t.Error("shared responses must carry the capability hardening headers")
+			}
+		})
+	}
+}
+
+// The tree follows the tree as it is now: pages created or moved below the
+// shared page appear, pages moved out disappear.
+func TestShares_GetSharedTree_FollowsMovesAndNewPages(t *testing.T) {
+	f := newSharesFixture(t)
+	url := "/api/shared/" + f.link(t, f.customer, true) + "/tree"
+	readTree := func() string {
+		t.Helper()
+		rec := f.get(url, "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+		}
+		return treeOutline(t, rec.Body.Bytes())
+	}
+
+	createPageViaAPI(t, f.router, "Invoice", "invoice", &f.contract, nil)
+	f.move(t, f.internal, f.customer)
+	if got := readTree(); got != "Customer(Contract(Invoice),Internal)" {
+		t.Fatalf("after create and move in = %s", got)
+	}
+	f.move(t, f.contract, "root")
+	if got := readTree(); got != "Customer(Internal)" {
+		t.Errorf("after move out = %s, want Customer(Internal)", got)
+	}
+}
+
+// The tree route answers like the page routes: one 404 body for every
+// failure, and its failed lookups count towards the same per-client limit.
+func TestShares_GetSharedTree_SharesNotFoundAndLimit(t *testing.T) {
+	f := newSharesFixture(t)
+	deleted := f.link(t, f.contract, true)
+	deletePageViaAPI(t, f.router, f.contract, f.version(t, f.contract), false)
+	page := f.get("/api/shared/not-a-token/page", "")
+	for name, url := range map[string]string{
+		"unknown token":       "/api/shared/lws_" + strings.Repeat("A", 43) + "/tree",
+		"shared page deleted": "/api/shared/" + deleted + "/tree",
+	} {
+		rec := f.get(url, "")
+		if rec.Code != http.StatusNotFound || rec.Body.String() != page.Body.String() {
+			t.Errorf("%s: got %d %s, want the page routes' 404 %s", name, rec.Code, rec.Body.String(), page.Body.String())
+		}
+	}
+
+	const client = "203.0.113.7:1000"
+	for i := 0; i < 10; i++ {
+		f.get("/api/shared/not-a-token/page", client)
+		f.get("/api/shared/not-a-token/tree", client)
+	}
+	if rec := f.get("/api/shared/not-a-token/tree", client); rec.Code != http.StatusTooManyRequests {
+		t.Errorf("21st failed lookup across page and tree = %d, want 429", rec.Code)
+	}
+}
