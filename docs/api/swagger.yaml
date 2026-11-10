@@ -358,6 +358,26 @@ definitions:
     - title
     - updatedAt
     type: object
+  scopedread.TreeNodeView:
+    properties:
+      children:
+        description: Children are in navigation order; never null.
+        items:
+          $ref: '#/definitions/scopedread.TreeNodeView'
+        type: array
+      id:
+        type: string
+      kind:
+        description: Kind is "page" or "section", a plain string like PageView.Kind.
+        type: string
+      title:
+        type: string
+    required:
+    - children
+    - id
+    - kind
+    - title
+    type: object
 info:
   contact: {}
   description: |-
@@ -791,6 +811,44 @@ paths:
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
       summary: Read a page inside a share link
+      tags:
+      - shared
+  /shared/{token}/tree:
+    get:
+      description: |-
+        Returns the shared page as the top of a tree. For a link that includes subpages, the tree holds every page below it as the tree is now, in navigation order; for a single-page link, the page alone with no children. Nothing above or beside the shared page is included. The token in the path is the only authorization. Unknown, expired and revoked links get the same 404 as the page routes. Requires --enable-share-links.
+        Responses carry Referrer-Policy: no-referrer, X-Robots-Tag: noindex, nofollow and Cache-Control: no-store.
+      parameters:
+      - description: Share link token
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: The shared page and the pages below it
+          schema:
+            $ref: '#/definitions/scopedread.TreeNodeView'
+        "404":
+          description: Unknown, malformed, expired or revoked link, or the shared
+            page no longer exists (code share_link_not_found)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "429":
+          description: Too many failed link lookups from this client (code share_link_too_many_attempts)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Reading the tree failed (code share_link_internal_error)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "503":
+          description: Share link store unavailable during a live restore (code share_link_store_unavailable)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Read the navigation of a share link
       tags:
       - shared
   /tags:

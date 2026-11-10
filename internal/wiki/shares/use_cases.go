@@ -21,6 +21,32 @@ type scopedPageReader interface {
 	Page(ctx context.Context, scope scopedread.ReadScope, id string) (*scopedread.PageView, error)
 }
 
+// scopedTreeReader reads the navigation inside a scope. *scopedread.TreeReader
+// implements it.
+type scopedTreeReader interface {
+	Tree(ctx context.Context, scope scopedread.ReadScope) (*scopedread.TreeNodeView, error)
+}
+
+// resolveScope resolves token to its grant and the read scope the grant
+// allows (ADR-0015). Every shared read starts here.
+func resolveScope(ctx context.Context, links linkResolver, token string) (*sharing.Grant, scopedread.ReadScope, error) {
+	grant, err := links.Resolve(ctx, token)
+	if err != nil {
+		return nil, scopedread.ReadScope{}, err
+	}
+	return grant, scopedread.ReadScope{RootID: grant.PageID, IncludeDescendants: grant.IncludeDescendants}, nil
+}
+
+// scopedReadError maps the error of a read through grant: anything the scope
+// hides is share_link_not_found, like an unknown link; operational errors are
+// wrapped with the link ID for the server log.
+func scopedReadError(grant *sharing.Grant, what string, err error) error {
+	if errors.Is(err, scopedread.ErrNotFound) || errors.Is(err, scopedread.ErrInvalidScope) {
+		return errShareLinkNotFound()
+	}
+	return fmt.Errorf("failed to read shared %s for share link %s: %w", what, grant.ShareID, err)
+}
+
 // ─── GetSharedPageUseCase ────────────────────────────────────────────────────
 
 // GetSharedPageInput is the input for GetSharedPageUseCase.
@@ -50,7 +76,7 @@ func NewGetSharedPageUseCase(links linkResolver, pages scopedPageReader) *GetSha
 // Execute returns the page, or share_link_not_found for an unknown, expired or
 // revoked link and for a page outside the link's scope alike.
 func (uc *GetSharedPageUseCase) Execute(ctx context.Context, in GetSharedPageInput) (*GetSharedPageOutput, error) {
-	grant, err := uc.links.Resolve(ctx, in.Token)
+	grant, scope, err := resolveScope(ctx, uc.links, in.Token)
 	if err != nil {
 		return nil, err
 	}
@@ -58,13 +84,47 @@ func (uc *GetSharedPageUseCase) Execute(ctx context.Context, in GetSharedPageInp
 	if id == "" {
 		id = grant.PageID
 	}
-	scope := scopedread.ReadScope{RootID: grant.PageID, IncludeDescendants: grant.IncludeDescendants}
 	page, err := uc.pages.Page(ctx, scope, id)
-	if errors.Is(err, scopedread.ErrNotFound) || errors.Is(err, scopedread.ErrInvalidScope) {
-		return nil, errShareLinkNotFound()
-	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to read shared page for share link %s: %w", grant.ShareID, err)
+		return nil, scopedReadError(grant, "page", err)
 	}
 	return &GetSharedPageOutput{Page: page}, nil
+}
+
+// ─── GetSharedTreeUseCase ────────────────────────────────────────────────────
+
+// GetSharedTreeInput is the input for GetSharedTreeUseCase.
+type GetSharedTreeInput struct {
+	Token string
+}
+
+// GetSharedTreeOutput is the output of GetSharedTreeUseCase.
+type GetSharedTreeOutput struct {
+	Tree *scopedread.TreeNodeView
+}
+
+// GetSharedTreeUseCase reads the navigation of a share link: the shared page
+// on top and, for a link that includes subpages, everything below it.
+type GetSharedTreeUseCase struct {
+	links linkResolver
+	trees scopedTreeReader
+}
+
+// NewGetSharedTreeUseCase constructs a GetSharedTreeUseCase.
+func NewGetSharedTreeUseCase(links linkResolver, trees scopedTreeReader) *GetSharedTreeUseCase {
+	return &GetSharedTreeUseCase{links: links, trees: trees}
+}
+
+// Execute returns the tree, or share_link_not_found for an unknown, expired
+// or revoked link and for a link whose page was deleted.
+func (uc *GetSharedTreeUseCase) Execute(ctx context.Context, in GetSharedTreeInput) (*GetSharedTreeOutput, error) {
+	grant, scope, err := resolveScope(ctx, uc.links, in.Token)
+	if err != nil {
+		return nil, err
+	}
+	view, err := uc.trees.Tree(ctx, scope)
+	if err != nil {
+		return nil, scopedReadError(grant, "tree", err)
+	}
+	return &GetSharedTreeOutput{Tree: view}, nil
 }

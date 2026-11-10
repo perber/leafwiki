@@ -86,3 +86,49 @@ func TestRoutes_HandleGetSharedPage_ReturnsThePageView(t *testing.T) {
 		t.Errorf("body = %v", got)
 	}
 }
+
+type fakeTreeGetter struct {
+	out *GetSharedTreeOutput
+	err error
+}
+
+func (f fakeTreeGetter) Execute(context.Context, GetSharedTreeInput) (*GetSharedTreeOutput, error) {
+	return f.out, f.err
+}
+
+func serveSharedTree(t *testing.T, getter sharedTreeGetter) *httptest.ResponseRecorder {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	r := &Routes{getTree: getter, limiter: newFailedTokenLimiter(), log: slog.Default()}
+	engine.GET("/api/shared/:token/tree", r.handleGetSharedTree)
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/shared/lws_token/tree", nil))
+	return rec
+}
+
+func TestRoutes_HandleGetSharedTree_ReturnsTheTreeView(t *testing.T) {
+	view := &scopedread.TreeNodeView{ID: "customer", Title: "Customer", Kind: "section", Children: []*scopedread.TreeNodeView{
+		{ID: "contract", Title: "Contract", Kind: "page", Children: []*scopedread.TreeNodeView{}},
+	}}
+	rec := serveSharedTree(t, fakeTreeGetter{out: &GetSharedTreeOutput{Tree: view}})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+	}
+	want := `{"id":"customer","title":"Customer","kind":"section","children":[{"id":"contract","title":"Contract","kind":"page","children":[]}]}`
+	if rec.Body.String() != want {
+		t.Errorf("body = %s, want %s", rec.Body.String(), want)
+	}
+}
+
+func TestRoutes_HandleGetSharedTree_AnswersErrorsGenerically(t *testing.T) {
+	rec := serveSharedTree(t, fakeTreeGetter{err: errors.New("read /data/root: permission denied")})
+
+	if rec.Code != http.StatusInternalServerError || !strings.Contains(rec.Body.String(), ErrCodeShareLinkInternal) {
+		t.Fatalf("got %d %s, want 500 %s", rec.Code, rec.Body.String(), ErrCodeShareLinkInternal)
+	}
+	if strings.Contains(rec.Body.String(), "/data/") {
+		t.Errorf("response leaks the cause: %s", rec.Body.String())
+	}
+}
