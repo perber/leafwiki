@@ -154,8 +154,9 @@ resync-derived state.
   `id`/`name`/`class`/`style`). No tree, no HTTP. [ADR-0020](./adr/0020-server-rendered-page-html-for-crawlers.md).
 - **`internal/scopedread`** — the read boundary for callers that may see only part of the wiki
   (share links, #1252): `ReadScope` (a root page, optionally with its subtree) and
-  `PageReader`, which checks the scope before reading and returns an allow-listed `PageView`.
-  Out of scope, unknown and deleted pages are the same `ErrNotFound`.
+  `PageReader`, which checks the scope before reading and returns an allow-listed `PageView`, and
+  `TreeReader`, which returns the scope as a tree of allow-listed `TreeNodeView`s with nothing above
+  the root. Out of scope, unknown and deleted pages are the same `ErrNotFound`.
   [ADR-0015](./adr/0015-scoped-read-boundary.md).
 - **`internal/sharing`** — share links (#1252, experimental, `--enable-share-links`):
   `share_link_store.go` (`share_links.db`, own file, real state, part of full backup/restore;

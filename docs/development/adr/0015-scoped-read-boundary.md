@@ -49,8 +49,9 @@ The approach was agreed with the maintainer on #1252.
    touching the filesystem.
 5. **Readers return projections with an explicit field allow-list**, never the normal API DTOs
    or core types. `PageView` carries `id`, `title`, `kind`, `content` (the body without
-   frontmatter) and `updatedAt`. A test fails when a field is added without updating the
-   allow-list.
+   frontmatter) and `updatedAt`. `TreeNodeView` carries `id`, `title`, `kind` and `children`; no
+   slug or path, which would reveal the tree above the scope. A test fails when a field is added
+   to either without updating the allow-list.
 6. **Out of scope, unknown and deleted are the same `ErrNotFound`.** Operational errors (tree not
    loaded, file read failure) are passed through, so a broken instance is not reported as a
    missing page. They can contain file system paths, so the HTTP layer answers them with a
@@ -58,13 +59,16 @@ The approach was agreed with the maintainer on #1252.
 7. **Readers depend on small consumer-defined interfaces** (`PageSource`) that the existing
    services already satisfy. The services stay concrete; no interface is introduced for a
    service as a whole.
-8. **One structural query was added to the tree:** `TreeService.IsInSubtree(id, rootID)` walks
-   the parent chain under the read lock. It answers a question about structure ("is this node
-   below that one"), not about visibility, so it stays within what `core/tree` may know.
+8. **Structural queries on the tree:** `TreeService.IsInSubtree(id, rootID)` walks the parent
+   chain under the read lock; `TreeService.SubtreeRoutes(id)` lists a node and its descendants
+   in one locked walk, so a tree read can't be torn by a concurrent move. They answer questions
+   about structure ("is this node below that one", "what is below this node"), not about
+   visibility, so they stay within what `core/tree` may know.
 
 Abstractions are added with their first use. This ADR's first change adds `ReadScope` and the
-single-page reader. The tree reader (navigation inside a subtree scope) and the asset reader
-follow with their first callers in later steps of #1252.
+single-page reader; `TreeReader` (the navigation of a scope, the root alone for a single-page
+scope) followed with the shared tree route. The asset reader follows with its first caller in a
+later step of #1252.
 
 ## Alternatives considered
 
