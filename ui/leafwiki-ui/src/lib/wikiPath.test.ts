@@ -95,6 +95,45 @@ describe('getWikiLinkSearchAndHash', () => {
       search: '',
       hash: '#a%20b%22c',
     },
+    {
+      name: 'markup-like hash, angle brackets encoded',
+      href: 'page-1#"><img>',
+      search: '',
+      hash: '#%22%3E%3Cimg%3E',
+    },
+    {
+      name: 'NUL escape kept as written',
+      href: 'p#%00',
+      search: '',
+      hash: '#%00',
+    },
+    {
+      name: 'second # kept in the hash',
+      href: 'p#a#b',
+      search: '',
+      hash: '#a#b',
+    },
+    {
+      name: '? after # kept in the hash',
+      href: 'p#a?b',
+      search: '',
+      hash: '#a?b',
+    },
+    { name: 'empty query', href: 'p?#h', search: '', hash: '#h' },
+    { name: 'hash only', href: '#h', search: '', hash: '#h' },
+    { name: 'backslash path', href: '..\\p?x=1#h', search: '?x=1', hash: '#h' },
+    {
+      name: 'non-special scheme keeps its hash',
+      href: 'javascript:alert(1)#h',
+      search: '',
+      hash: '#h',
+    },
+    {
+      name: 'unparseable href, nothing',
+      href: 'http://[#h',
+      search: '',
+      hash: '',
+    },
   ])('returns the $name', ({ href, search, hash }) => {
     expect(getWikiLinkSearchAndHash(href)).toEqual({ search, hash })
   })

@@ -6,7 +6,7 @@ import { useDialogsStore } from '@/stores/dialogs'
 import { useSessionStore } from '@/stores/session'
 import { useTreeStore } from '@/stores/tree'
 import { act, fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MarkdownLink } from './MarkdownLink'
 
@@ -282,8 +282,56 @@ describe('MarkdownLink fragments and queries (#1801)', () => {
       path: 'docs/current',
       expected: '/docs/page-1#%C3%BCberschrift',
     },
+    {
+      name: 'markup-like fragment, percent-encoded instead of parsed',
+      href: '/docs/page-1#"><img src=x onerror=alert(1)>',
+      path: 'docs/current',
+      expected: '/docs/page-1#%22%3E%3Cimg%20src=x%20onerror=alert(1)%3E',
+    },
+    {
+      name: 'NUL escape in the fragment, kept as written',
+      href: '/docs/page-1#%00',
+      path: 'docs/current',
+      expected: '/docs/page-1#%00',
+    },
+    {
+      name: 'second # inside the fragment',
+      href: '/docs/page-1#a#b',
+      path: 'docs/current',
+      expected: '/docs/page-1#a#b',
+    },
+    {
+      name: '? after # stays part of the fragment',
+      href: '/docs/page-1#a?b',
+      path: 'docs/current',
+      expected: '/docs/page-1#a?b',
+    },
+    {
+      name: 'empty query before the fragment',
+      href: 'page-1?#heading2',
+      path: 'docs',
+      expected: '/docs/page-1#heading2',
+    },
+    {
+      name: 'dot-relative link back to the current page',
+      href: './#heading2',
+      path: 'docs/page-1',
+      expected: '/docs/page-1#heading2',
+    },
+    {
+      name: 'backslash parent link',
+      href: '..\\page-1#heading2',
+      path: 'docs/current',
+      expected: '/docs/page-1#heading2',
+    },
+    {
+      name: 'very long fragment',
+      href: `/docs/page-1#${'h'.repeat(5000)}`,
+      path: 'docs/current',
+      expected: `/docs/page-1#${'h'.repeat(5000)}`,
+    },
   ])('keeps the fragment: $name', ({ href, path, expected }) => {
-    render(
+    const { container } = render(
       <MemoryRouter>
         <MarkdownLink href={href} path={path}>
           Page
@@ -294,6 +342,53 @@ describe('MarkdownLink fragments and queries (#1801)', () => {
     const link = screen.getByRole('link', { name: 'Page' })
     expect(link).toHaveAttribute('href', expected)
     expect(link).not.toHaveAttribute('target')
+    expect(container.querySelector('img')).toBeNull()
+  })
+
+  function LocationProbe() {
+    const location = useLocation()
+    return (
+      <output data-testid="location">
+        {location.pathname + location.search + location.hash}
+      </output>
+    )
+  }
+
+  it('navigates to the target page with the query and heading in the location', () => {
+    render(
+      <MemoryRouter initialEntries={['/docs/current']}>
+        <MarkdownLink href="page-1?q=term#heading2" path="docs">
+          Page
+        </MarkdownLink>
+        <LocationProbe />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(screen.getByRole('link', { name: 'Page' }))
+
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/docs/page-1?q=term#heading2',
+    )
+  })
+
+  it('keeps the fragment in the edit-mode preview, resolved against the edited page', () => {
+    // Without a path prop the link resolves against window.location, which in
+    // the editor is /e/<page>.
+    window.history.replaceState(null, '', '/e/docs/current')
+    try {
+      render(
+        <MemoryRouter initialEntries={['/e/docs/current']}>
+          <MarkdownLink href="../page-1#heading2">Page</MarkdownLink>
+        </MemoryRouter>,
+      )
+
+      expect(screen.getByRole('link', { name: 'Page' })).toHaveAttribute(
+        'href',
+        '/docs/page-1#heading2',
+      )
+    } finally {
+      window.history.replaceState(null, '', '/')
+    }
   })
 
   it('keeps a same-page fragment as a plain anchor', () => {
