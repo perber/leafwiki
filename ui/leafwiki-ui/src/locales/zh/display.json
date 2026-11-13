@@ -1,6 +1,6 @@
 {
-  "menuLabel": "目录显示",
-  "pageTitle": "目录显示",
+  "menuLabel": "显示",
+  "pageTitle": "显示",
   "sectionTitle": "目录显示",
   "sectionDescription": "控制查看页面时何时显示“本页目录”。",
   "checkboxLabel": "始终显示目录",

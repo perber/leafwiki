@@ -109,6 +109,12 @@ export const createLeafWikiRouter = (
               </SettingsSectionGuard>
             ),
           })),
+          ...settingsSections.flatMap((section) =>
+            (section.redirectFrom ?? []).map((oldPath) => ({
+              path: oldPath,
+              element: <Navigate to={`/settings/${section.path}`} replace />,
+            })),
+          ),
         ],
       },
       {

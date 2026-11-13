@@ -1,6 +1,6 @@
 {
-  "menuLabel": "Table of contents",
-  "pageTitle": "Table of contents",
+  "menuLabel": "Display",
+  "pageTitle": "Display",
   "sectionTitle": "Table of contents",
   "sectionDescription": "Controls when the \"On this page\" table of contents is shown while viewing a page.",
   "checkboxLabel": "Always show the table of contents",

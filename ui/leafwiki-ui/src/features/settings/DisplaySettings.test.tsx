@@ -3,7 +3,7 @@ import { useConfigStore } from '@/stores/config'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import TocDisplaySettings from './TocDisplaySettings'
+import DisplaySettings from './DisplaySettings'
 
 vi.mock('sonner', () => ({
   toast: { error: vi.fn(), success: vi.fn() },
@@ -28,17 +28,17 @@ beforeEach(() => {
   setAlwaysShowToc.mockResolvedValue(undefined)
 })
 
-describe('TocDisplaySettings', () => {
+describe('DisplaySettings', () => {
   it('reflects the current off state', () => {
     setConfig({ alwaysShowToc: false })
-    render(<TocDisplaySettings />)
+    render(<DisplaySettings />)
 
     expect(screen.getByTestId('toc-display-checkbox')).not.toBeChecked()
   })
 
   it('reflects the current on state', () => {
     setConfig({ alwaysShowToc: true })
-    render(<TocDisplaySettings />)
+    render(<DisplaySettings />)
 
     expect(screen.getByTestId('toc-display-checkbox')).toBeChecked()
   })
@@ -46,7 +46,7 @@ describe('TocDisplaySettings', () => {
   it('toggling on applies immediately and shows a success toast', async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
     setConfig({ alwaysShowToc: false })
-    render(<TocDisplaySettings />)
+    render(<DisplaySettings />)
 
     await user.click(screen.getByTestId('toc-display-checkbox'))
     expect(setAlwaysShowToc).toHaveBeenCalledWith(true)
@@ -56,7 +56,7 @@ describe('TocDisplaySettings', () => {
   it('toggling off applies immediately and shows a success toast', async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
     setConfig({ alwaysShowToc: true })
-    render(<TocDisplaySettings />)
+    render(<DisplaySettings />)
 
     await user.click(screen.getByTestId('toc-display-checkbox'))
     expect(setAlwaysShowToc).toHaveBeenCalledWith(false)
@@ -67,7 +67,7 @@ describe('TocDisplaySettings', () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
     setAlwaysShowToc.mockRejectedValueOnce(new Error('boom'))
     setConfig({ alwaysShowToc: false })
-    render(<TocDisplaySettings />)
+    render(<DisplaySettings />)
 
     await user.click(screen.getByTestId('toc-display-checkbox'))
     expect(toast.error).toHaveBeenCalled()

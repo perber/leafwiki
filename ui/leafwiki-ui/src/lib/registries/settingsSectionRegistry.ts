@@ -10,10 +10,10 @@ import {
   ApiKeysManagement,
   BackupSettings,
   BrandingSettings,
+  DisplaySettings,
   Importer,
   PublicAccessSettings,
   SnapshotSettings,
-  TocDisplaySettings,
   UserManagement,
   BrokenLinks,
 } from '@/features/router/lazy-routes'
@@ -59,6 +59,9 @@ export interface SettingsSection {
   // Only set for sections that link out to an external URL instead of
   // rendering their own route (mirrors today's userManagementUrl case).
   externalHref?: (ctx: SettingsSectionContext) => string | undefined
+  // Former path segments of this section; the router redirects them to
+  // `path` so old bookmarks keep working after a rename.
+  redirectFrom?: string[]
   Component: LazyExoticComponent<ComponentType>
 }
 
@@ -107,13 +110,14 @@ export const settingsSections: SettingsSection[] = [
     Component: PublicAccessSettings,
   },
   {
-    id: 'toc-display',
-    path: 'toc-display',
+    id: 'display',
+    path: 'display',
     labelKey: 'menuLabel',
-    ns: 'tocDisplay',
+    ns: 'display',
     icon: ListTree,
     roles: ['admin'],
-    Component: TocDisplaySettings,
+    redirectFrom: ['toc-display'],
+    Component: DisplaySettings,
   },
   {
     id: 'users',

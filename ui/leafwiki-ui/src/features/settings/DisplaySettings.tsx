@@ -7,8 +7,8 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useSetTitle } from '../viewer/setTitle'
 
-export default function TocDisplaySettings() {
-  const { t } = useTranslation('tocDisplay')
+export default function DisplaySettings() {
+  const { t } = useTranslation('display')
   useSetTitle({ title: t('pageTitle') })
 
   const alwaysShowToc = useConfigStore((s) => s.alwaysShowToc)
