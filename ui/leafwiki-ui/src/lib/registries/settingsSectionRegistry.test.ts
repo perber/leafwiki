@@ -188,6 +188,9 @@ describe('settingsSections gating (regression for the pre-registry backup/snapsh
       'backup',
       'snapshots',
       'importer',
+      'public-access',
+      'display',
+      'brokenLinks',
     ]
     for (const id of adminOnlyIds) {
       const s = settingsSections.find((sec) => sec.id === id)!
@@ -200,6 +203,26 @@ describe('settingsSections gating (regression for the pre-registry backup/snapsh
           enableApiKeyManagement: true,
         }),
       ).toBe(false)
+    }
+  })
+})
+
+describe('settingsSections paths', () => {
+  // A redirectFrom entry that equals a live path (or another section's
+  // redirectFrom) would make two /settings children match the same URL.
+  it('never reuses a path or a redirectFrom segment across sections', () => {
+    const segments = settingsSections.flatMap((s) => [
+      s.path,
+      ...(s.redirectFrom ?? []),
+    ])
+    expect(new Set(segments).size).toBe(segments.length)
+  })
+
+  it('uses plain single path segments for redirectFrom entries', () => {
+    for (const s of settingsSections) {
+      for (const old of s.redirectFrom ?? []) {
+        expect(old).toMatch(/^[a-zA-Z0-9-]+$/)
+      }
     }
   })
 })
