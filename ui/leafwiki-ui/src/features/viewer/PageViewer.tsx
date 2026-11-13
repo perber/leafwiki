@@ -173,6 +173,10 @@ export default function PageViewer() {
   }, [page?.id])
 
   const alwaysShowToc = useConfigStore((s) => s.alwaysShowToc)
+  // Set on the subheader, metadata bar and viewer alike: the first two are
+  // portaled/rendered outside .page-viewer and must follow the same width
+  // (index.css, [data-content-width]).
+  const contentWidth = useConfigStore((s) => s.contentWidth)
   const showToc = shouldShowToc(tocEntries.length, alwaysShowToc)
   const visibleTocEntries = useMemo(
     () => (showToc ? tocEntries : []),
@@ -229,6 +233,7 @@ export default function PageViewer() {
                   ? 'page-viewer__subheader--toc-reserved-collapsed'
                   : 'page-viewer__subheader--toc-reserved'),
             )}
+            data-content-width={contentWidth}
           >
             <div className="page-viewer__subheader-inner">
               <div className="page-viewer__subheader-main">
@@ -278,13 +283,16 @@ export default function PageViewer() {
       {subheader}
       {tocPane}
       {page && !error && (
-        <div className="page-viewer__metadata-bar hidden sm:block print:hidden">
+        <div
+          className="page-viewer__metadata-bar hidden sm:block print:hidden"
+          data-content-width={contentWidth}
+        >
           <div className="page-viewer__metadata-bar-inner">
             <PageMetadata page={page} />
           </div>
         </div>
       )}
-      <div className="page-viewer">
+      <div className="page-viewer" data-content-width={contentWidth}>
         {page && !error && (
           <div className="page-viewer__body">
             <article className="page-viewer__content">

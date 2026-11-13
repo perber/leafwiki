@@ -6,5 +6,15 @@
   "checkboxLabel": "Mostrar siempre la tabla de contenidos",
   "checkboxDescription": "De forma predeterminada, la tabla de contenidos solo aparece cuando una página tiene más de 3 encabezados. Activa esta opción para mostrarla siempre, incluso en páginas con uno o dos encabezados.",
   "savedToast": "Configuración de la tabla de contenidos guardada",
-  "updateError": "No se pudo actualizar la configuración de la tabla de contenidos"
+  "updateError": "No se pudo actualizar la configuración de la tabla de contenidos",
+  "contentWidthSectionTitle": "Ancho de página",
+  "contentWidthSectionDescription": "Controla el ancho del texto de una página al verla. Se aplica a todos, incluidos los visitantes que no han iniciado sesión.",
+  "contentWidthLabel": "Ancho del contenido de la página",
+  "contentWidthOptions": {
+    "default": "Predeterminado (columna de lectura estrecha)",
+    "wide": "Ancho"
+  },
+  "contentWidthDescription": "El modo predeterminado mantiene el texto en una columna estrecha y fácil de leer. Ancho usa todo el ancho del área de la página. La vista previa del editor y el historial de la página mantienen la columna estrecha.",
+  "contentWidthSavedToast": "Ancho de página guardado",
+  "contentWidthUpdateError": "No se pudo actualizar el ancho de página"
 }

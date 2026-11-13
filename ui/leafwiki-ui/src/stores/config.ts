@@ -1,6 +1,7 @@
 import { getConfig } from '@/lib/api/config'
 import {
   setAlwaysShowToc as setAlwaysShowTocApi,
+  setContentWidth as setContentWidthApi,
   setPublicAccess as setPublicAccessApi,
 } from '@/lib/api/instanceSettings'
 import {
@@ -8,6 +9,11 @@ import {
   DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES,
   DEFAULT_MAX_AVATAR_UPLOAD_SIZE_BYTES,
 } from '@/lib/config'
+import {
+  DEFAULT_CONTENT_WIDTH,
+  toContentWidth,
+  type ContentWidth,
+} from '@/lib/contentWidth'
 import i18next, { getAvailableLanguages } from '@/lib/i18n'
 import { sleep } from '@/lib/sleep'
 import { create } from 'zustand'
@@ -16,6 +22,7 @@ type ConfigStore = {
   publicAccess: boolean
   publicAccessEnvManaged: boolean
   alwaysShowToc: boolean
+  contentWidth: ContentWidth
   editorLimit: number
   hideLinkMetadataSection: boolean
   authDisabled: boolean
@@ -58,6 +65,9 @@ type ConfigStore = {
   // Runtime toggle of "always show TOC" (admin only). Updates the store in
   // place on success, same as setPublicAccess.
   setAlwaysShowToc: (alwaysShow: boolean) => Promise<void>
+  // Runtime change of the page content width (admin only). Updates the
+  // store in place on success, same as setPublicAccess.
+  setContentWidth: (contentWidth: ContentWidth) => Promise<void>
 }
 
 // A single failed attempt would otherwise leave configLoadSucceeded false —
@@ -71,6 +81,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
   publicAccess: false,
   publicAccessEnvManaged: false,
   alwaysShowToc: false,
+  contentWidth: DEFAULT_CONTENT_WIDTH,
   editorLimit: 0,
   hideLinkMetadataSection: false,
   authDisabled: false,
@@ -122,6 +133,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
           publicAccess: config.publicAccess,
           publicAccessEnvManaged: config.publicAccessEnvManaged ?? false,
           alwaysShowToc: config.alwaysShowToc ?? false,
+          contentWidth: toContentWidth(config.contentWidth),
           editorLimit: config.editorLimit ?? 0,
           hideLinkMetadataSection: config.hideLinkMetadataSection,
           authDisabled: config.authDisabled,
@@ -195,5 +207,10 @@ export const useConfigStore = create<ConfigStore>((set) => ({
   setAlwaysShowToc: async (alwaysShow: boolean) => {
     const res = await setAlwaysShowTocApi(alwaysShow)
     set({ alwaysShowToc: res.alwaysShow })
+  },
+
+  setContentWidth: async (contentWidth: ContentWidth) => {
+    const res = await setContentWidthApi(contentWidth)
+    set({ contentWidth: toContentWidth(res.contentWidth) })
   },
 }))

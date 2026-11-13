@@ -109,5 +109,7 @@
   "user not found": "Utilisateur introuvable",
   "zip entry exceeds the per-file size limit": "Un fichier dans l'archive téléversée est trop volumineux",
   "decompressed zip contents exceed the total size limit": "L'archive téléversée est trop volumineuse une fois décompressée",
-  "zip entry's decompression ratio exceeds the allowed maximum": "L'archive téléversée ressemble à une bombe de décompression"
+  "zip entry's decompression ratio exceeds the allowed maximum": "L'archive téléversée ressemble à une bombe de décompression",
+  "invalid page content width": "Largeur de page non valide",
+  "failed to update page display setting": "Impossible de mettre à jour le paramètre d'affichage"
 }

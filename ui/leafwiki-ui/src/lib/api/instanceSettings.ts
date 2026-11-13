@@ -1,7 +1,9 @@
+import type { ContentWidth } from '@/lib/contentWidth'
 import { fetchWithAuth } from './auth'
 
 const PUBLIC_ACCESS_URL = '/api/admin/settings/public-access'
 const TOC_DISPLAY_URL = '/api/admin/settings/toc-display'
+const CONTENT_WIDTH_URL = '/api/admin/settings/content-width'
 
 export type PublicAccessResponse = {
   enabled: boolean
@@ -35,5 +37,23 @@ export async function setAlwaysShowToc(
   return await fetchWithAuth<TocDisplayResponse>(TOC_DISPLAY_URL, {
     method: 'PUT',
     body: JSON.stringify({ alwaysShow }),
+  })
+}
+
+export type ContentWidthResponse = {
+  contentWidth: ContentWidth
+}
+
+/**
+ * Set the instance-wide page content width. Rejects with an
+ * ApiLocalizedError carrying code `page_display_invalid_content_width`
+ * (HTTP 400) for a value the server doesn't know.
+ */
+export async function setContentWidth(
+  contentWidth: ContentWidth,
+): Promise<ContentWidthResponse> {
+  return await fetchWithAuth<ContentWidthResponse>(CONTENT_WIDTH_URL, {
+    method: 'PUT',
+    body: JSON.stringify({ contentWidth }),
   })
 }

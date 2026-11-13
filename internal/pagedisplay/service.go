@@ -1,8 +1,8 @@
 // Package pagedisplay owns the instance-wide page display settings an admin
-// sets on the "Display" settings page. Today that is the "always show table
-// of contents" flag: whether the page viewer's TOC panel/dropdown should be
-// shown for every page, regardless of how many headings it has (see
-// PageViewer.tsx's default >3-heading threshold).
+// sets on the "Display" settings page: the "always show table of contents"
+// flag (whether the page viewer's TOC panel/dropdown is shown for every
+// page, regardless of PageViewer.tsx's default >3-heading threshold) and the
+// page content width (see content_width.go).
 //
 // Unlike internal/publicaccess, this has no env/CLI-flag-pinned variant —
 // these are cosmetic display preferences, not security decisions, so they
@@ -12,6 +12,7 @@ package pagedisplay
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/perber/wiki/internal/core/settings"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
@@ -25,13 +26,17 @@ const FileName = "toc-display.json"
 
 // fileConfig is the on-disk shape of toc-display.json.
 type fileConfig struct {
-	AlwaysShow bool `json:"alwaysShow"`
+	AlwaysShow   bool   `json:"alwaysShow"`
+	ContentWidth string `json:"contentWidth,omitempty"`
 }
 
-// Service is the process-wide holder of the current always-show-TOC flag.
-// Safe for concurrent use — the underlying settings.Store provides locking.
+// Service is the process-wide holder of the current page display settings.
+// Safe for concurrent use: the underlying settings.Store locks reads and
+// writes, and writeMu serializes the setters' read-modify-write (and Reload)
+// so changing one setting never drops a concurrent change to the other.
 type Service struct {
-	store *settings.Store[fileConfig]
+	store   *settings.Store[fileConfig]
+	writeMu sync.Mutex
 }
 
 // New returns a Service whose flag is read from (and written back to)
@@ -48,12 +53,20 @@ func New(storageDir string) (*Service, error) {
 // Settings returns the current page display settings.
 func (s *Service) Settings() Settings {
 	cfg := s.store.Get()
-	return Settings{AlwaysShowToc: cfg.AlwaysShow}
+	return Settings{
+		AlwaysShowToc: cfg.AlwaysShow,
+		ContentWidth:  normalizeContentWidth(cfg.ContentWidth),
+	}
 }
 
 // SetAlwaysShow persists a new value and updates the in-memory cache.
 func (s *Service) SetAlwaysShow(alwaysShow bool) error {
-	if err := s.store.Put(fileConfig{AlwaysShow: alwaysShow}); err != nil {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+
+	cfg := s.store.Get()
+	cfg.AlwaysShow = alwaysShow
+	if err := s.store.Put(cfg); err != nil {
 		return sharederrors.NewLocalizedError(
 			"toc_display_update_failed",
 			"Failed to update TOC display setting",
@@ -64,9 +77,39 @@ func (s *Service) SetAlwaysShow(alwaysShow bool) error {
 	return nil
 }
 
+// SetContentWidth validates and persists a new page content width. A value
+// outside ContentWidths() fails with ErrCodeInvalidContentWidth and changes
+// nothing.
+func (s *Service) SetContentWidth(width string) error {
+	if !isValidContentWidth(width) {
+		return errInvalidContentWidth(width)
+	}
+
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+
+	cfg := s.store.Get()
+	cfg.ContentWidth = width
+	if err := s.store.Put(cfg); err != nil {
+		return sharederrors.NewLocalizedError(
+			ErrCodeUpdateFailed,
+			"Failed to update page display setting",
+			"failed to update page display setting",
+			err,
+		)
+	}
+	return nil
+}
+
 // Reload re-reads toc-display.json into the in-memory cache. Called after a
-// restore swaps in a different data dir.
+// restore swaps in a different data dir. It holds writeMu like the setters,
+// so a setter cannot read the old cache before the reload and write it back
+// over the restored values after it. Lock order is always writeMu, then the
+// store's own lock.
 func (s *Service) Reload() error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+
 	if err := s.store.Reload(); err != nil {
 		return fmt.Errorf("failed to reload toc-display config: %w", err)
 	}

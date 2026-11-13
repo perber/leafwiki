@@ -165,7 +165,8 @@ resync-derived state.
   `share_link_not_found`), `token.go` (256-bit `lws_` tokens). What a resolved link may read is
   decided by the scoped read layer (`internal/scopedread`, ADR-0015).
 - **`internal/pagedisplay`** — the instance-wide page display settings behind the admin
-  "Display" settings page (today the "always show table of contents" flag), stored in
+  "Display" settings page (the "always show table of contents" flag and the page content
+  width, an enum validated in `content_width.go`), stored in
   `toc-display.json` (`FileName`; old name kept for existing data dirs and backups); same
   provider pattern (`Provider` returns all of them as one `Settings` value, `Fixed` for tests).
   `GET /api/config` merges `Settings.ConfigFields()` in flat, so a new display setting needs no
@@ -422,6 +423,11 @@ light/dark mode application).
   all content in one 680px reading column, including media, code and tables, aligned with
   breadcrumbs, metadata and backlinks. Wrapped breadcrumbs grow the header, and
   expanded metadata values wrap within the reading column. Nested indentation and print layout stay separate.
+  The admin page width (Settings → Display, `contentWidth` in `/api/config`) can lift that
+  column for the page view only: `PageViewer.tsx` sets `data-content-width` on `.page-viewer`,
+  its subheader and its metadata bar, and `index.css` holds one `[data-content-width]` block per
+  width (`wide` = the full `max-w-5xl` layout from before #1696). The values live in
+  `lib/contentWidth.ts` and `internal/pagedisplay/content_width.go`.
 - **`features/progressbar`** — top-of-page loading progress bar (`progressbarStore.ts`, driven
   today by manual `setLoading` calls; a planned TanStack Query migration would drive this from
   `useIsFetching` instead — not yet implemented).

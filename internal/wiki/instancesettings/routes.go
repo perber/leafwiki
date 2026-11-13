@@ -1,7 +1,8 @@
 // Package instancesettings exposes admin-only instance settings that can be
-// changed at runtime instead of only via flags/env + a restart. Today that is
-// just the public-access ("public mode") toggle; it is the natural home for
-// future runtime-reconfigurable RouterOptions.
+// changed at runtime instead of only via flags/env + a restart: the
+// public-access ("public mode") toggle and the page display settings
+// (always-show TOC, content width). It is the natural home for future
+// runtime-reconfigurable RouterOptions.
 package instancesettings
 
 import (
@@ -22,6 +23,7 @@ import (
 type PageDisplaySettings interface {
 	Settings() pagedisplay.Settings
 	SetAlwaysShow(alwaysShow bool) error
+	SetContentWidth(width string) error
 }
 
 // Routes is the RouteRegistrar for runtime instance settings.
@@ -55,6 +57,10 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	adminGroup.PUT("/toc-display",
 		authmw.RequireAdmin(ctx.Opts.AuthDisabled),
 		r.handleSetTocDisplay,
+	)
+	adminGroup.PUT("/content-width",
+		authmw.RequireAdmin(ctx.Opts.AuthDisabled),
+		r.handleSetContentWidth,
 	)
 }
 
@@ -102,6 +108,29 @@ func (r *Routes) handleSetTocDisplay(c *gin.Context) {
 		"actor_id", actorID(c),
 	)
 	c.JSON(http.StatusOK, gin.H{"alwaysShow": r.pageDisplay.Settings().AlwaysShowToc})
+}
+
+func (r *Routes) handleSetContentWidth(c *gin.Context) {
+	var req struct {
+		ContentWidth *string `json:"contentWidth"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.ContentWidth == nil {
+		respondWithStatusError(c, http.StatusBadRequest, ErrCodeInvalidPayload, "Invalid payload", "invalid payload")
+		return
+	}
+
+	if err := r.pageDisplay.SetContentWidth(*req.ContentWidth); err != nil {
+		respondWithError(c, err)
+		return
+	}
+
+	// camelCase fields per ADR-0008; the older handlers above still use
+	// snake_case.
+	r.log.Info("page content width changed",
+		"contentWidth", r.pageDisplay.Settings().ContentWidth,
+		"actorID", actorID(c),
+	)
+	c.JSON(http.StatusOK, gin.H{"contentWidth": r.pageDisplay.Settings().ContentWidth})
 }
 
 func actorID(c *gin.Context) string {

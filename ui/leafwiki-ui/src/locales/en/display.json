@@ -6,5 +6,15 @@
   "checkboxLabel": "Always show the table of contents",
   "checkboxDescription": "By default the table of contents only appears once a page has more than 3 headings. Turn this on to always show it, even on pages with just one or two headings.",
   "savedToast": "Table of contents setting saved",
-  "updateError": "Could not update the table of contents setting"
+  "updateError": "Could not update the table of contents setting",
+  "contentWidthSectionTitle": "Page width",
+  "contentWidthSectionDescription": "Controls how wide the text of a page is while viewing it. Applies to everyone, including visitors who are not signed in.",
+  "contentWidthLabel": "Width of the page content",
+  "contentWidthOptions": {
+    "default": "Default (narrow reading column)",
+    "wide": "Wide"
+  },
+  "contentWidthDescription": "The default keeps text in a narrow column that is easy to read. Wide uses the full width of the page area. The editor preview and page history keep the narrow column.",
+  "contentWidthSavedToast": "Page width saved",
+  "contentWidthUpdateError": "Could not update the page width"
 }

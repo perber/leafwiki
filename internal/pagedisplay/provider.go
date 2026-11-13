@@ -9,6 +9,8 @@ type Settings struct {
 	// AlwaysShowToc reports whether the TOC should always be shown,
 	// regardless of heading count.
 	AlwaysShowToc bool `json:"alwaysShowToc"`
+	// ContentWidth is the page reading-column width, one of ContentWidths().
+	ContentWidth string `json:"contentWidth"`
 }
 
 // ConfigFields returns the settings as the flat key/value pairs that

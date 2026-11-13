@@ -904,6 +904,7 @@ func TestAPIDocs_RouterFixture_IncludesOptionalOperations(t *testing.T) {
 		{"POST", "/api/admin/restore/self-restart"},
 		{"PUT", "/api/admin/settings/public-access"},
 		{"PUT", "/api/admin/settings/toc-display"},
+		{"PUT", "/api/admin/settings/content-width"},
 		{"PUT", "/api/users/me/password"},
 		{"POST", "/api/auth/password/forgot"},
 		{"GET", "/api/user-settings"},

@@ -1,5 +1,13 @@
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { mapApiError } from '@/lib/api/errors'
+import { CONTENT_WIDTHS, isContentWidth } from '@/lib/contentWidth'
 import { useConfigStore } from '@/stores/config'
 import { Loader2 } from 'lucide-react'
 import { useState } from 'react'
@@ -13,8 +21,11 @@ export default function DisplaySettings() {
 
   const alwaysShowToc = useConfigStore((s) => s.alwaysShowToc)
   const setAlwaysShowToc = useConfigStore((s) => s.setAlwaysShowToc)
+  const contentWidth = useConfigStore((s) => s.contentWidth)
+  const setContentWidth = useConfigStore((s) => s.setContentWidth)
 
   const [saving, setSaving] = useState(false)
+  const [savingWidth, setSavingWidth] = useState(false)
 
   const apply = async (checked: boolean) => {
     setSaving(true)
@@ -28,8 +39,21 @@ export default function DisplaySettings() {
     }
   }
 
+  const applyWidth = async (value: string) => {
+    if (!isContentWidth(value) || value === contentWidth) return
+    setSavingWidth(true)
+    try {
+      await setContentWidth(value)
+      toast.success(t('contentWidthSavedToast'))
+    } catch (err) {
+      toast.error(mapApiError(err, t('contentWidthUpdateError')).message)
+    } finally {
+      setSavingWidth(false)
+    }
+  }
+
   return (
-    <div className="settings" data-testid="toc-display-settings">
+    <div className="settings" data-testid="display-settings">
       <h1 className="settings__title">{t('pageTitle')}</h1>
       <div className="settings__section">
         <h2 className="settings__section-title">{t('sectionTitle')}</h2>
@@ -40,7 +64,7 @@ export default function DisplaySettings() {
         <div className="settings__field">
           <label className="settings__checkbox-label">
             <Checkbox
-              data-testid="toc-display-checkbox"
+              data-testid="display-toc-checkbox"
               checked={alwaysShowToc}
               disabled={saving}
               onCheckedChange={(checked) => {
@@ -52,6 +76,51 @@ export default function DisplaySettings() {
           </label>
           <p className="settings__section-description">
             {t('checkboxDescription')}
+          </p>
+        </div>
+      </div>
+
+      <div className="settings__section">
+        <h2 className="settings__section-title">
+          {t('contentWidthSectionTitle')}
+        </h2>
+        <p className="settings__section-description">
+          {t('contentWidthSectionDescription')}
+        </p>
+
+        <div className="settings__field">
+          <label
+            id="display-content-width-label"
+            className="settings__field-label"
+          >
+            {t('contentWidthLabel')}
+            {savingWidth && (
+              <Loader2 className="ml-2 inline h-4 w-4 animate-spin" />
+            )}
+          </label>
+          <Select
+            value={contentWidth}
+            disabled={savingWidth}
+            onValueChange={(value) => {
+              void applyWidth(value)
+            }}
+          >
+            <SelectTrigger
+              data-testid="display-content-width-select"
+              aria-labelledby="display-content-width-label"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CONTENT_WIDTHS.map((width) => (
+                <SelectItem key={width} value={width}>
+                  {t(`contentWidthOptions.${width}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="settings__section-description">
+            {t('contentWidthDescription')}
           </p>
         </div>
       </div>

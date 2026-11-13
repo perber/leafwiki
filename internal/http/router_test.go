@@ -3725,6 +3725,102 @@ func TestTocDisplayToggle_BadPayload_Returns400(t *testing.T) {
 	}
 }
 
+func TestContentWidthSetting_ConfigEndpointReflectsTheChange(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	svc, err := pagedisplay.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("pagedisplay.New: %v", err)
+	}
+	router := routerWithTocDisplay(t, w, svc)
+
+	readConfig := func() map[string]any {
+		req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("GET /api/config: %d", rec.Code)
+		}
+		var m map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &m); err != nil {
+			t.Fatalf("decode /api/config: %v", err)
+		}
+		return m
+	}
+
+	if cfg := readConfig(); cfg["contentWidth"] != "default" || cfg["alwaysShowToc"] != false {
+		t.Fatalf("initial config: want contentWidth=default alwaysShowToc=false, got %v / %v", cfg["contentWidth"], cfg["alwaysShowToc"])
+	}
+
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/admin/settings/content-width", strings.NewReader(`{"contentWidth":"wide"}`))
+	if rec.Code != http.StatusOK || rec.Body.String() != `{"contentWidth":"wide"}` {
+		t.Fatalf("set wide: want 200 {\"contentWidth\":\"wide\"}, got %d %s", rec.Code, rec.Body.String())
+	}
+	if cfg := readConfig(); cfg["contentWidth"] != "wide" {
+		t.Fatalf("after set: want contentWidth=wide, got %v", cfg["contentWidth"])
+	}
+}
+
+func TestContentWidthSetting_RequiresAdmin(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	svc, err := pagedisplay.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("pagedisplay.New: %v", err)
+	}
+	router := routerWithTocDisplay(t, w, svc)
+
+	if code := anonStatus(router, http.MethodPut, "/api/admin/settings/content-width"); code != http.StatusUnauthorized {
+		t.Fatalf("anon PUT: want 401, got %d", code)
+	}
+
+	authenticatedRequest(t, router, http.MethodPost, "/api/users",
+		strings.NewReader(`{"username":"ed3","email":"ed3@example.com","password":"editorpass","role":"editor"}`))
+	rec := authenticatedRequestAs(t, router, "ed3", "editorpass", http.MethodPut, "/api/admin/settings/content-width", strings.NewReader(`{"contentWidth":"wide"}`))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("editor PUT: want 403, got %d %s", rec.Code, rec.Body.String())
+	}
+	if got := svc.Settings().ContentWidth; got != pagedisplay.ContentWidthDefault {
+		t.Fatalf("content width changed by a rejected request: %q", got)
+	}
+}
+
+func TestContentWidthSetting_BadPayload_Returns400(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	svc, err := pagedisplay.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("pagedisplay.New: %v", err)
+	}
+	router := routerWithTocDisplay(t, w, svc)
+
+	tests := []struct {
+		name     string
+		body     string
+		wantCode string
+	}{
+		{name: "missing field", body: `{}`, wantCode: "instance_settings_invalid_payload"},
+		{name: "wrong type", body: `{"contentWidth":true}`, wantCode: "instance_settings_invalid_payload"},
+		{name: "not json", body: `not json`, wantCode: "instance_settings_invalid_payload"},
+		{name: "unknown width", body: `{"contentWidth":"huge"}`, wantCode: pagedisplay.ErrCodeInvalidContentWidth},
+		{name: "empty width", body: `{"contentWidth":""}`, wantCode: pagedisplay.ErrCodeInvalidContentWidth},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := authenticatedRequest(t, router, http.MethodPut, "/api/admin/settings/content-width", strings.NewReader(tc.body))
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("payload %q: want 400, got %d %s", tc.body, rec.Code, rec.Body.String())
+			}
+			if !strings.Contains(rec.Body.String(), `"code":"`+tc.wantCode+`"`) {
+				t.Fatalf("payload %q: want error code %q, got %s", tc.body, tc.wantCode, rec.Body.String())
+			}
+		})
+	}
+	if got := svc.Settings().ContentWidth; got != pagedisplay.ContentWidthDefault {
+		t.Fatalf("content width changed by rejected requests: %q", got)
+	}
+}
+
 func TestMovePageEndpoint(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)

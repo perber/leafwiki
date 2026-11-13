@@ -6,5 +6,15 @@
   "checkboxLabel": "Toujours afficher la table des matières",
   "checkboxDescription": "Par défaut, la table des matières n'apparaît que lorsqu'une page contient plus de 3 titres. Activez cette option pour l'afficher en permanence, même sur les pages n'ayant qu'un ou deux titres.",
   "savedToast": "Paramètre de table des matières enregistré",
-  "updateError": "Impossible de mettre à jour le paramètre de table des matières"
+  "updateError": "Impossible de mettre à jour le paramètre de table des matières",
+  "contentWidthSectionTitle": "Largeur de page",
+  "contentWidthSectionDescription": "Contrôle la largeur du texte d'une page lors de sa consultation. S'applique à tous, y compris aux visiteurs non connectés.",
+  "contentWidthLabel": "Largeur du contenu de la page",
+  "contentWidthOptions": {
+    "default": "Par défaut (colonne de lecture étroite)",
+    "wide": "Large"
+  },
+  "contentWidthDescription": "Le mode par défaut garde le texte dans une colonne étroite et facile à lire. Large utilise toute la largeur de la zone de page. L'aperçu de l'éditeur et l'historique de la page conservent la colonne étroite.",
+  "contentWidthSavedToast": "Largeur de page enregistrée",
+  "contentWidthUpdateError": "Impossible de mettre à jour la largeur de page"
 }
