@@ -9,6 +9,7 @@ import {
 } from '@/lib/registries'
 import { buildViewUrl, stripBasePath, withBasePath } from '@/lib/routePath'
 import {
+  getWikiLinkSearchAndHash,
   normalizeWikiRoutePath,
   resolveWikiLinkPath,
   toWikiLookupPath,
@@ -257,7 +258,7 @@ export function MarkdownLink({
 
     return (
       <Link
-        to={normalizedHref}
+        to={{ pathname: normalizedHref, ...getWikiLinkSearchAndHash(href) }}
         state={createNavigationVisitState()}
         {...props}
         className="no-underline hover:underline"

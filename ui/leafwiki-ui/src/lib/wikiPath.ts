@@ -73,6 +73,26 @@ export function resolveWikiLinkPath(currentPath: string, href: string): string {
 }
 
 /**
+ * Returns the query string and hash fragment of a Markdown link target.
+ *
+ * The path helpers above drop both because the tree lookup needs the bare
+ * page path; the rendered link keeps them so a link to a heading on another
+ * page lands on that heading (#1801). Parsing through the URL API encodes
+ * them exactly once, the way the browser would.
+ */
+export function getWikiLinkSearchAndHash(href: string): {
+  search: string
+  hash: string
+} {
+  try {
+    const url = new URL(href, 'https://leafwiki.local/')
+    return { search: url.search, hash: url.hash }
+  } catch {
+    return { search: '', hash: '' }
+  }
+}
+
+/**
  * Returns the parent wiki route/path for a page.
  *
  * Top-level pages resolve to `/`.
