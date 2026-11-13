@@ -469,7 +469,7 @@ func runServer(
 	reloadSignals, shutdownSignals <-chan os.Signal,
 ) error {
 	server := &http.Server{
-		Handler:           router.Handler(),
+		Handler:           httpinternal.Handler(router),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
