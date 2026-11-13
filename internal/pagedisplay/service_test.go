@@ -115,6 +115,22 @@ func TestService_Reload_PicksUpExternalFileChange(t *testing.T) {
 	}
 }
 
+// A data directory written before the tocdisplay -> pagedisplay rename
+// holds toc-display.json; the renamed package must keep reading it.
+func TestService_New_ReadsExistingTocDisplayFile(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "toc-display.json"), []byte(`{"alwaysShow":true}`), 0o600); err != nil {
+		t.Fatalf("write existing file: %v", err)
+	}
+	svc, err := New(dir)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if !svc.AlwaysShow() {
+		t.Fatal("expected AlwaysShow() true from a pre-existing toc-display.json")
+	}
+}
+
 func TestService_Load_CorruptFileIsAnError(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "toc-display.json"), []byte("not json"), 0o600); err != nil {
