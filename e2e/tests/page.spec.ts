@@ -1670,6 +1670,75 @@ Body text.`;
     test.expect(ratio(h1)).toBeLessThan(1);
   });
 
+  // Regression for #1802: the inline-code wrapper was an inline-block, whose
+  // baseline is its last line. Table cells align on the baseline, so a label
+  // next to wrapped inline code dropped to the code's last line. (Firefox also
+  // let it overflow the row; the suite runs Chromium only, so that part was
+  // checked by hand.) The fix must not lift single-line code off the text
+  // baseline either.
+  test('wrapped inline code in a table keeps the row cells aligned at the top', async ({
+    page,
+  }) => {
+    const timestamp = Date.now();
+    const slug = `table-inline-code-wrap-${timestamp}`;
+    const title = `Table Inline Code Wrap ${timestamp}`;
+    const content = [
+      '|What|Command|Where|',
+      '|-|-|-|',
+      '|Add sshkey|`ssh-copy-id -i ~/.ssh/id_ed25519 root@your-vps-ip-with-a-long-name`|remote|',
+      '',
+      'Run `whoami` first.',
+    ].join('\n');
+
+    // Desktop width (useIsMobile is < 768px), so the copy button is rendered too.
+    await page.setViewportSize({ width: 820, height: 900 });
+    await createPageWithContent(page, { title, slug, content });
+
+    const viewPage = new ViewPage(page);
+    await viewPage.goto(`/${slug}`);
+
+    const code = page.locator('article table code.inline-code');
+    await code.waitFor({ state: 'visible' });
+
+    const layout = await code.evaluate((element) => {
+      const row = element.closest('tr') as HTMLElement;
+      const label = row.querySelector('td') as HTMLElement;
+      const range = document.createRange();
+      range.selectNodeContents(label);
+      return {
+        codeLines: element.getClientRects().length,
+        codeTop: element.getBoundingClientRect().top,
+        labelTop: range.getBoundingClientRect().top,
+        labelBottom: range.getBoundingClientRect().bottom,
+        rowBottom: row.getBoundingClientRect().bottom,
+        boxDecorationBreak: window.getComputedStyle(element).boxDecorationBreak,
+      };
+    });
+
+    // The scenario only holds if the code actually wraps.
+    test.expect(layout.codeLines).toBeGreaterThan(1);
+    // The label starts on the code's first line, not its last.
+    test.expect(Math.abs(layout.labelTop - layout.codeTop)).toBeLessThan(8);
+    test.expect(layout.labelBottom).toBeLessThanOrEqual(layout.rowBottom);
+    // Every wrapped line gets its own padding and rounded corners.
+    test.expect(layout.boxDecorationBreak).toBe('clone');
+
+    // An empty inline-block sits on the baseline of its line: one inside the
+    // code and one in the text beside it must line up.
+    const paragraphCode = page.locator('article p code.inline-code');
+    const baselineOffset = await paragraphCode.evaluate((element) => {
+      const marker = () => {
+        const span = document.createElement('span');
+        span.style.display = 'inline-block';
+        return span;
+      };
+      const inCode = element.appendChild(marker());
+      const inText = (element.closest('p') as HTMLElement).appendChild(marker());
+      return inCode.getBoundingClientRect().top - inText.getBoundingClientRect().top;
+    });
+    test.expect(Math.abs(baselineOffset)).toBeLessThan(1);
+  });
+
   test('headline hash navigation keeps target below sticky toc', async ({ page }) => {
     const timestamp = Date.now();
     const slug = `headline-anchor-sticky-${timestamp}`;
