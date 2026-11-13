@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   getDeleteRedirectRoutePath,
   getParentWikiRoutePath,
+  getWikiLinkSearchAndHash,
   getWikiTargetRoutePath,
   normalizeWikiRoutePath,
   resolveWikiLinkPath,
@@ -56,6 +57,46 @@ describe('resolveWikiLinkPath', () => {
 
   it('resolves absolute wiki paths from the site root', () => {
     expect(resolveWikiLinkPath('/docs/guide', '/root-page')).toBe('/root-page')
+  })
+})
+
+describe('getWikiLinkSearchAndHash', () => {
+  it.each([
+    { name: 'plain path', href: 'page-1', search: '', hash: '' },
+    { name: 'hash', href: 'page-1#heading2', search: '', hash: '#heading2' },
+    {
+      name: 'absolute path with hash',
+      href: '/docs/page-1#heading2',
+      search: '',
+      hash: '#heading2',
+    },
+    {
+      name: 'query and hash',
+      href: '../page-1?q=term#heading2',
+      search: '?q=term',
+      hash: '#heading2',
+    },
+    { name: 'empty hash', href: 'page-1#', search: '', hash: '' },
+    {
+      name: 'non-ASCII hash, encoded once',
+      href: 'page-1#überschrift',
+      search: '',
+      hash: '#%C3%BCberschrift',
+    },
+    {
+      name: 'already encoded hash, not encoded twice',
+      href: 'page-1#%C3%BCberschrift',
+      search: '',
+      hash: '#%C3%BCberschrift',
+    },
+    {
+      name: 'hash with spaces and quotes',
+      href: 'page-1#a b"c',
+      search: '',
+      hash: '#a%20b%22c',
+    },
+  ])('returns the $name', ({ href, search, hash }) => {
+    expect(getWikiLinkSearchAndHash(href)).toEqual({ search, hash })
   })
 })
 

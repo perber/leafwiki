@@ -234,6 +234,100 @@ describe('MarkdownLink web URLs', () => {
   })
 })
 
+describe('MarkdownLink fragments and queries (#1801)', () => {
+  const target = makePage('t', 'docs/page-1', null)
+
+  beforeEach(() => {
+    useDialogsStore.setState({ dialogType: null, dialogProps: null })
+    useTreeStore.setState({
+      byId: { t: target },
+      byPath: { 'docs/page-1': target },
+    })
+  })
+
+  it.each([
+    {
+      name: 'absolute link with a heading',
+      href: '/docs/page-1#heading2',
+      path: 'docs/current',
+      expected: '/docs/page-1#heading2',
+    },
+    {
+      name: 'relative link with a heading',
+      href: 'page-1#heading2',
+      path: 'docs',
+      expected: '/docs/page-1#heading2',
+    },
+    {
+      name: 'relative parent link with a heading',
+      href: '../page-1#heading2',
+      path: 'docs/current',
+      expected: '/docs/page-1#heading2',
+    },
+    {
+      name: 'link with a query and a heading',
+      href: '/docs/page-1?q=term#heading2',
+      path: 'docs/current',
+      expected: '/docs/page-1?q=term#heading2',
+    },
+    {
+      name: 'link with a trailing slash and a heading',
+      href: '/docs/page-1/#heading2',
+      path: 'docs/current',
+      expected: '/docs/page-1#heading2',
+    },
+    {
+      name: 'link with a non-ASCII heading, encoded once',
+      href: '/docs/page-1#%C3%BCberschrift',
+      path: 'docs/current',
+      expected: '/docs/page-1#%C3%BCberschrift',
+    },
+  ])('keeps the fragment: $name', ({ href, path, expected }) => {
+    render(
+      <MemoryRouter>
+        <MarkdownLink href={href} path={path}>
+          Page
+        </MarkdownLink>
+      </MemoryRouter>,
+    )
+
+    const link = screen.getByRole('link', { name: 'Page' })
+    expect(link).toHaveAttribute('href', expected)
+    expect(link).not.toHaveAttribute('target')
+  })
+
+  it('keeps a same-page fragment as a plain anchor', () => {
+    render(
+      <MemoryRouter>
+        <MarkdownLink href="#heading2">Section</MarkdownLink>
+      </MemoryRouter>,
+    )
+
+    const link = screen.getByRole('link', { name: 'Section' })
+    expect(link).toHaveAttribute('href', '#heading2')
+    expect(link).not.toHaveAttribute('target')
+  })
+
+  it('offers to create a missing target without the fragment in its path', () => {
+    render(
+      <MemoryRouter>
+        <MarkdownLink href="/docs/missing?q=term#heading2">
+          Missing
+        </MarkdownLink>
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Missing' }))
+
+    expect(useDialogsStore.getState().dialogType).toBe(
+      DIALOG_CREATE_PAGE_BY_PATH,
+    )
+    expect(useDialogsStore.getState().dialogProps).toMatchObject({
+      initialPath: 'docs/missing',
+    })
+  })
+})
+
 describe('MarkdownLink tree updates', () => {
   const target = makePage('t', 'target', null)
 

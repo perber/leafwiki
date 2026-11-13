@@ -219,7 +219,9 @@ remarkMath, remarkGfm, remarkFlexibleMarkers, remarkImageSize
 `MarkdownLink` renders absolute HTTP(S) and protocol-relative links as ordinary anchors,
 preserving the complete URL. Links to the browser's current origin open in the current tab;
 external web links open in a new tab with `noopener noreferrer`. Relative wiki links keep
-client-side navigation and page lookup; relative asset links keep opening in a new tab.
+client-side navigation and page lookup; the lookup uses the bare path, while the rendered
+link keeps the query and fragment (so `[x](page#heading)` lands on the heading). Relative
+asset links keep opening in a new tab.
 
 Key facts:
 
