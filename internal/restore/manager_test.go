@@ -20,10 +20,10 @@ import (
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/shared/sqliteutil"
 	"github.com/perber/wiki/internal/favorites"
+	"github.com/perber/wiki/internal/pagedisplay"
 	"github.com/perber/wiki/internal/publicaccess"
 	snapshotSvc "github.com/perber/wiki/internal/snapshot"
 	"github.com/perber/wiki/internal/test_utils"
-	"github.com/perber/wiki/internal/tocdisplay"
 	"github.com/perber/wiki/internal/usersettings"
 )
 
@@ -38,7 +38,7 @@ type managerFixture struct {
 	authService  *auth.AuthService
 	branding     *branding.BrandingService
 	publicAccess *publicaccess.Service
-	tocDisplay   *tocdisplay.Service
+	pageDisplay  *pagedisplay.Service
 	resyncCalls  int
 }
 
@@ -79,19 +79,19 @@ func newManagerFixtureWithBranding(t *testing.T, wikiVersion, brandingJSON strin
 	if err != nil {
 		t.Fatalf("NewSettingsManaged failed: %v", err)
 	}
-	tocDisplayService, err := tocdisplay.New(dataDir)
+	pageDisplayService, err := pagedisplay.New(dataDir)
 	if err != nil {
-		t.Fatalf("tocdisplay.New failed: %v", err)
+		t.Fatalf("pagedisplay.New failed: %v", err)
 	}
 
-	f := &managerFixture{dataDir: dataDir, snapshotID: snapshotID, authService: authService, branding: brandingService, publicAccess: publicAccessService, tocDisplay: tocDisplayService}
+	f := &managerFixture{dataDir: dataDir, snapshotID: snapshotID, authService: authService, branding: brandingService, publicAccess: publicAccessService, pageDisplay: pageDisplayService}
 	f.manager = NewManager(Config{
 		SnapshotManager: snapshotMgr,
 		DataDir:         dataDir,
 		WikiVersion:     wikiVersion,
 		WriteGate:       NewWriteGate(),
 		AuthService:     authService,
-		Reloadables:     []settings.Reloadable{brandingService, publicAccessService, tocDisplayService},
+		Reloadables:     []settings.Reloadable{brandingService, publicAccessService, pageDisplayService},
 		TriggerResync:   func() { f.resyncCalls++ },
 	})
 
@@ -285,7 +285,7 @@ func TestManager_Restore_HappyPath(t *testing.T) {
 	if !f.publicAccess.Enabled() {
 		t.Error("expected public access reloaded from the restored public-access.json")
 	}
-	if !f.tocDisplay.AlwaysShow() {
+	if !f.pageDisplay.AlwaysShow() {
 		t.Error("expected always-show-TOC reloaded from the restored toc-display.json")
 	}
 }

@@ -12,7 +12,7 @@ where," those answer "how does layer X work" and "how does flow Y run." Part of 
 `internal/core/*` (filesystem/DB primitives — tree, auth, markdown, revision) into the top-level
 derived-index packages (`internal/links`, `internal/tags`, `internal/properties`, `internal/search`,
 `internal/favorites`, `internal/usersettings`, `internal/avatar`, `internal/publicaccess`,
-`internal/tocdisplay`, `internal/snapshot`, `internal/restore`, `internal/backup`,
+`internal/pagedisplay`, `internal/snapshot`, `internal/restore`, `internal/backup`,
 `internal/branding`, `internal/importer`), then into the `internal/wiki/<domain>` slices (`pages`,
 `pagesave`, `auth`, `resync`, `revisions`, `search`, `links`, `tags`, `properties`, `apikeys`, `shares`,
 `assets`, `avatar`, `backup`, `branding`, `health`, `importer`, `instancesettings`, `restore`,
@@ -164,8 +164,10 @@ resync-derived state.
   resolve a token to a `Grant`; unknown, malformed, expired and revoked tokens all give
   `share_link_not_found`), `token.go` (256-bit `lws_` tokens). What a resolved link may read is
   decided by the scoped read layer (`internal/scopedread`, ADR-0015).
-- **`internal/tocdisplay`** — the instance-wide "always show table of contents" flag, same
-  provider pattern (`Provider` interface, `Fixed` for flag-pinned values).
+- **`internal/pagedisplay`** — the instance-wide page display settings behind the admin
+  "Display" settings page (today the "always show table of contents" flag), stored in
+  `toc-display.json` (old name kept for existing data dirs and backups); same provider pattern
+  (`Provider` interface, `Fixed` for flag-pinned values).
 - **`internal/favorites`** — per-user private favorited-pages list. `favorites_store.go`
   (`favorites.db`, own file). Explicitly documented in its own package doc comment as *not*
   filesystem-derived and therefore never touched by resync.

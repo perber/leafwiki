@@ -1,4 +1,4 @@
-package tocdisplay
+package pagedisplay
 
 // Provider is the read-only view of the always-show-TOC flag that the HTTP
 // layer depends on. *Service implements it; so does the value returned by

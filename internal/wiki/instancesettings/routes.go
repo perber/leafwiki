@@ -12,24 +12,24 @@ import (
 	coreauth "github.com/perber/wiki/internal/core/auth"
 	httpinternal "github.com/perber/wiki/internal/http"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
+	"github.com/perber/wiki/internal/pagedisplay"
 	"github.com/perber/wiki/internal/publicaccess"
-	"github.com/perber/wiki/internal/tocdisplay"
 )
 
 // Routes is the RouteRegistrar for runtime instance settings.
 type Routes struct {
 	publicAccess *publicaccess.Service
-	tocDisplay   *tocdisplay.Service
+	pageDisplay  *pagedisplay.Service
 	authService  *coreauth.AuthService
 	log          *slog.Logger
 }
 
 // NewRoutes constructs the instance-settings RouteRegistrar.
-func NewRoutes(publicAccess *publicaccess.Service, tocDisplay *tocdisplay.Service, authService *coreauth.AuthService, log *slog.Logger) *Routes {
+func NewRoutes(publicAccess *publicaccess.Service, pageDisplay *pagedisplay.Service, authService *coreauth.AuthService, log *slog.Logger) *Routes {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Routes{publicAccess: publicAccess, tocDisplay: tocDisplay, authService: authService, log: log}
+	return &Routes{publicAccess: publicAccess, pageDisplay: pageDisplay, authService: authService, log: log}
 }
 
 // RegisterRoutes implements RouteRegistrar.
@@ -84,16 +84,16 @@ func (r *Routes) handleSetTocDisplay(c *gin.Context) {
 		return
 	}
 
-	if err := r.tocDisplay.SetAlwaysShow(*req.AlwaysShow); err != nil {
+	if err := r.pageDisplay.SetAlwaysShow(*req.AlwaysShow); err != nil {
 		respondWithError(c, err)
 		return
 	}
 
 	r.log.Info("toc always-show setting changed",
-		"always_show", r.tocDisplay.AlwaysShow(),
+		"always_show", r.pageDisplay.AlwaysShow(),
 		"actor_id", actorID(c),
 	)
-	c.JSON(http.StatusOK, gin.H{"alwaysShow": r.tocDisplay.AlwaysShow()})
+	c.JSON(http.StatusOK, gin.H{"alwaysShow": r.pageDisplay.AlwaysShow()})
 }
 
 func actorID(c *gin.Context) string {

@@ -21,10 +21,10 @@ import (
 	httpinternal "github.com/perber/wiki/internal/http"
 	"github.com/perber/wiki/internal/http/dto"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
+	"github.com/perber/wiki/internal/pagedisplay"
 	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/scopedread"
 	"github.com/perber/wiki/internal/test_utils"
-	"github.com/perber/wiki/internal/tocdisplay"
 	"github.com/perber/wiki/internal/wiki"
 	wikibackup "github.com/perber/wiki/internal/wiki/backup"
 	"github.com/perber/wiki/internal/wiki/health"
@@ -869,15 +869,15 @@ func newAPIDocsRouterWith(t *testing.T, override func(*httpinternal.RouterOption
 	w.SetSnapshotRoutes(wikisnapshot.NewRoutes(nil, nil, w.AuthService(), 0))
 	w.SetRestoreRoutes(wikirestore.NewRoutes(nil, w.AuthService()))
 	publicAccess := publicaccess.NewEnvManaged(false)
-	tocDisplay, err := tocdisplay.New(t.TempDir())
+	pageDisplay, err := pagedisplay.New(t.TempDir())
 	if err != nil {
-		t.Fatalf("tocdisplay.New: %v", err)
+		t.Fatalf("pagedisplay.New: %v", err)
 	}
-	w.SetInstanceSettingsRoutes(wikiinstancesettings.NewRoutes(publicAccess, tocDisplay, w.AuthService(), slog.Default()))
+	w.SetInstanceSettingsRoutes(wikiinstancesettings.NewRoutes(publicAccess, pageDisplay, w.AuthService(), slog.Default()))
 
 	router := newTestRouter(w, func(o *httpinternal.RouterOptions) {
 		o.PublicAccess = publicAccess
-		o.AlwaysShowToc = tocDisplay
+		o.AlwaysShowToc = pageDisplay
 		o.EnableRevision = true
 		o.EnableLinkRefactor = true
 		o.EnableAPIKeyManagement = true

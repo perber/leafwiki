@@ -1,4 +1,4 @@
-package tocdisplay
+package pagedisplay
 
 import (
 	"encoding/json"

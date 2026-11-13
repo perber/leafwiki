@@ -22,9 +22,9 @@ import (
 	"github.com/perber/wiki/internal/core/tree"
 	httpinternal "github.com/perber/wiki/internal/http"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
+	"github.com/perber/wiki/internal/pagedisplay"
 	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/test_utils"
-	"github.com/perber/wiki/internal/tocdisplay"
 	"github.com/perber/wiki/internal/wiki"
 	wikiinstancesettings "github.com/perber/wiki/internal/wiki/instancesettings"
 )
@@ -3470,13 +3470,13 @@ func TestReadRouteAccessMatrix(t *testing.T) {
 // routerWithPublicAccess wires the instance-settings registrar (the runtime
 // public-mode toggle endpoint) into a test router, with the same
 // publicaccess.Service backing both the toggle and the read-route gate. The
-// toc-display service is an unrelated throwaway — these tests don't assert
+// pagedisplay service is an unrelated throwaway — these tests don't assert
 // on it.
 func routerWithPublicAccess(t *testing.T, w *wiki.Wiki, svc *publicaccess.Service) *gin.Engine {
 	t.Helper()
-	tocSvc, err := tocdisplay.New(t.TempDir())
+	tocSvc, err := pagedisplay.New(t.TempDir())
 	if err != nil {
-		t.Fatalf("tocdisplay.New: %v", err)
+		t.Fatalf("pagedisplay.New: %v", err)
 	}
 	w.SetInstanceSettingsRoutes(wikiinstancesettings.NewRoutes(svc, tocSvc, w.AuthService(), slog.Default()))
 	return newTestRouter(w, func(o *httpinternal.RouterOptions) {
@@ -3485,10 +3485,10 @@ func routerWithPublicAccess(t *testing.T, w *wiki.Wiki, svc *publicaccess.Servic
 }
 
 // routerWithTocDisplay wires the instance-settings registrar's toc-display
-// toggle endpoint into a test router, with the same tocdisplay.Service
+// toggle endpoint into a test router, with the same pagedisplay.Service
 // backing both the toggle and /api/config. The public-access service is an
 // unrelated throwaway — these tests don't assert on it.
-func routerWithTocDisplay(t *testing.T, w *wiki.Wiki, svc *tocdisplay.Service) *gin.Engine {
+func routerWithTocDisplay(t *testing.T, w *wiki.Wiki, svc *pagedisplay.Service) *gin.Engine {
 	t.Helper()
 	paSvc, err := publicaccess.NewSettingsManaged(t.TempDir())
 	if err != nil {
@@ -3642,9 +3642,9 @@ func TestPublicAccessToggle_BadPayload_Returns400(t *testing.T) {
 func TestTocDisplayToggle_ConfigEndpointReflectsTheChangeOnTheSameEngine(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
-	svc, err := tocdisplay.New(t.TempDir())
+	svc, err := pagedisplay.New(t.TempDir())
 	if err != nil {
-		t.Fatalf("tocdisplay.New: %v", err)
+		t.Fatalf("pagedisplay.New: %v", err)
 	}
 	router := routerWithTocDisplay(t, w, svc)
 
@@ -3688,9 +3688,9 @@ func TestTocDisplayToggle_ConfigEndpointReflectsTheChangeOnTheSameEngine(t *test
 func TestTocDisplayToggle_RequiresAdmin(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
-	svc, err := tocdisplay.New(t.TempDir())
+	svc, err := pagedisplay.New(t.TempDir())
 	if err != nil {
-		t.Fatalf("tocdisplay.New: %v", err)
+		t.Fatalf("pagedisplay.New: %v", err)
 	}
 	router := routerWithTocDisplay(t, w, svc)
 
@@ -3711,9 +3711,9 @@ func TestTocDisplayToggle_RequiresAdmin(t *testing.T) {
 func TestTocDisplayToggle_BadPayload_Returns400(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
-	svc, err := tocdisplay.New(t.TempDir())
+	svc, err := pagedisplay.New(t.TempDir())
 	if err != nil {
-		t.Fatalf("tocdisplay.New: %v", err)
+		t.Fatalf("pagedisplay.New: %v", err)
 	}
 	router := routerWithTocDisplay(t, w, svc)
 

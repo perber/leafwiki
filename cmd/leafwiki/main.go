@@ -33,10 +33,10 @@ import (
 	httpinternal "github.com/perber/wiki/internal/http"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	authmw "github.com/perber/wiki/internal/http/middleware/auth"
+	"github.com/perber/wiki/internal/pagedisplay"
 	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/restore"
 	"github.com/perber/wiki/internal/snapshot"
-	"github.com/perber/wiki/internal/tocdisplay"
 	"github.com/perber/wiki/internal/wiki"
 	wikibackup "github.com/perber/wiki/internal/wiki/backup"
 	wikiinstancesettings "github.com/perber/wiki/internal/wiki/instancesettings"
@@ -230,9 +230,9 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		slog.Default().Info("set --public-url for canonical links")
 	}
 
-	tocDisplayService, err := tocdisplay.New(cfg.server.dataDir)
+	pageDisplayService, err := pagedisplay.New(cfg.server.dataDir)
 	if err != nil {
-		fail("Failed to load toc-display configuration", "error", err)
+		fail("Failed to load page display configuration", "error", err)
 	}
 
 	if !cfg.auth.disableAuth {
@@ -297,7 +297,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		fail("Failed to initialize Wiki", "error", err)
 	}
 
-	w.SetInstanceSettingsRoutes(wikiinstancesettings.NewRoutes(publicAccessService, tocDisplayService, w.AuthService(), slog.Default()))
+	w.SetInstanceSettingsRoutes(wikiinstancesettings.NewRoutes(publicAccessService, pageDisplayService, w.AuthService(), slog.Default()))
 
 	// Log .leafwikiignore status
 	rootDir := filepath.Join(cfg.server.dataDir, "root")
@@ -358,7 +358,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 			WriteGate:          writeGate,
 			AuthService:        w.AuthService(),
 			Stores:             w.StateStores(),
-			Reloadables:        []settings.Reloadable{w.BrandingService(), publicAccessService, tocDisplayService},
+			Reloadables:        []settings.Reloadable{w.BrandingService(), publicAccessService, pageDisplayService},
 			UserResolver:       w.UserResolver(),
 			TriggerResync:      w.TriggerResyncAsync,
 			MaxUploadSizeBytes: restoreUploadMaxSize,
@@ -372,7 +372,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            publicAccessService,
-		AlwaysShowToc:           tocDisplayService,
+		AlwaysShowToc:           pageDisplayService,
 		EditorLimit:             cfg.auth.editorLimit,
 		InjectCodeInHeader:      cfg.frontend.injectCodeInHeader,
 		CustomStylesheet:        cfg.frontend.customStylesheet,
