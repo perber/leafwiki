@@ -21,6 +21,7 @@ vi.mock('@codemirror/state', () => ({
 
 const destroySpy = vi.fn()
 const dispatchSpy = vi.fn()
+const { themeSpy } = vi.hoisted(() => ({ themeSpy: vi.fn() }))
 vi.mock('@codemirror/view', () => ({
   EditorView: Object.assign(
     class {
@@ -34,7 +35,10 @@ vi.mock('@codemirror/view', () => ({
       }
     },
     {
-      theme: () => ({}),
+      theme: (spec: unknown) => {
+        themeSpy(spec)
+        return {}
+      },
       lineWrapping: {},
       updateListener: { of: () => ({}) },
       domEventHandlers: () => ({}),
@@ -173,5 +177,36 @@ describe('MarkdownCodeEditor – resetKey controls reinitialization', () => {
     expect(createSpy).toHaveBeenCalledWith(
       expect.objectContaining({ doc: 'page B content' }),
     )
+  })
+})
+
+// shadcn Dialog overlay and content (components/ui/dialog.tsx) use z-50.
+const DIALOG_Z_INDEX = 50
+
+describe('MarkdownCodeEditor – theme', () => {
+  beforeEach(() => {
+    themeSpy.mockClear()
+  })
+
+  // Regression for #1800: CodeMirror's base theme puts .cm-panels at
+  // z-index 300, which drew the search panel above the Asset Manager dialog.
+  it('keeps the search panel below the dialog layer', () => {
+    render(
+      <MarkdownCodeEditor
+        initialValue=""
+        resetKey="page-1"
+        onChange={vi.fn()}
+        editorViewRef={createRef<EditorViewType | null>()}
+      />,
+    )
+
+    const panels = themeSpy.mock.calls
+      .map(
+        ([spec]) => (spec as Record<string, { zIndex?: number }>)['.cm-panels'],
+      )
+      .find(Boolean)
+
+    expect(panels?.zIndex).toBeGreaterThan(0)
+    expect(panels?.zIndex).toBeLessThan(DIALOG_Z_INDEX)
   })
 })
