@@ -27,6 +27,7 @@ import {
   Paperclip,
   Rows2,
   Redo,
+  SpellCheck,
   Strikethrough,
   Table,
   Undo,
@@ -61,6 +62,8 @@ export default function MarkdownToolbar({
   const openDialog = useDialogsStore((state) => state.openDialog)
   const lineWrap = useEditorStore((s) => s.lineWrap)
   const toggleLineWrap = useEditorStore((s) => s.toggleLineWrap)
+  const spellcheck = useEditorStore((s) => s.spellcheck)
+  const toggleSpellcheck = useEditorStore((s) => s.toggleSpellcheck)
   const autoSave = useUserSettingsStore((s) => s.autoSave)
   const toggleAutoSave = useUserSettingsStore((s) => s.toggleAutoSave)
   const autoSaveStatus = useEditorStore((s) => s.autoSaveStatus)
@@ -454,6 +457,35 @@ export default function MarkdownToolbar({
             </Button>
           </TooltipWrapper>
         )}
+        {!isMobile && (
+          <TooltipWrapper
+            label={t(
+              spellcheck
+                ? 'toolbar.spellcheckDisableTooltip'
+                : 'toolbar.spellcheckEnableTooltip',
+            )}
+            side="top"
+            align="center"
+          >
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleSpellcheck}
+              className={cn('markdown-toolbar__button', {
+                'markdown-toolbar__button--active': spellcheck,
+              })}
+              aria-pressed={spellcheck}
+              aria-label={t(
+                spellcheck
+                  ? 'toolbar.spellcheckDisableTooltip'
+                  : 'toolbar.spellcheckEnableTooltip',
+              )}
+              data-testid="toggle-spellcheck-button"
+            >
+              <SpellCheck className="markdown-toolbar__icon" />
+            </Button>
+          </TooltipWrapper>
+        )}
         {isMobile && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -529,6 +561,14 @@ export default function MarkdownToolbar({
                 }}
               >
                 {t('toolbar.lineWrap')}
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={spellcheck}
+                onCheckedChange={(checked) => {
+                  if (checked !== spellcheck) toggleSpellcheck()
+                }}
+              >
+                {t('toolbar.spellcheck')}
               </DropdownMenuCheckboxItem>
               <DropdownMenuSeparator />
               <DropdownMenuCheckboxItem

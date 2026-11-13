@@ -82,6 +82,7 @@ const MarkdownEditor = (
     togglePreview,
     togglePreviewLayout,
     lineWrap,
+    spellcheck,
   } = useEditorStore()
 
   const [activeTab, setActiveTab] = useState<'editor' | 'preview'>('editor')
@@ -360,6 +361,7 @@ const MarkdownEditor = (
             onCursorLineChange={onCursorLineChange}
             editorViewRef={editorViewRef}
             lineWrap={lineWrap}
+            spellcheck={spellcheck}
             onPasteRich={pasteRich}
           />
         </>
@@ -371,6 +373,7 @@ const MarkdownEditor = (
       pageId,
       pasteRich,
       lineWrap,
+      spellcheck,
       onCursorLineChange,
       renderToolbar,
     ],

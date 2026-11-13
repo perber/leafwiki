@@ -11,6 +11,8 @@ type EditorStore = {
   togglePreviewLayout: () => void
   lineWrap: boolean
   toggleLineWrap: () => void
+  spellcheck: boolean
+  toggleSpellcheck: () => void
   autoSaveStatus: AutoSaveStatus
   setAutoSaveStatus: (status: AutoSaveStatus) => void
 }
@@ -25,6 +27,8 @@ export const useEditorStore = create<EditorStore>()(
       togglePreviewLayout: () => set({ previewStacked: !get().previewStacked }),
       lineWrap: true,
       toggleLineWrap: () => set({ lineWrap: !get().lineWrap }),
+      spellcheck: true,
+      toggleSpellcheck: () => set({ spellcheck: !get().spellcheck }),
       autoSaveStatus: 'idle',
       setAutoSaveStatus: (status) => set({ autoSaveStatus: status }),
     }),
@@ -34,6 +38,7 @@ export const useEditorStore = create<EditorStore>()(
         previewVisible: state.previewVisible,
         previewStacked: state.previewStacked,
         lineWrap: state.lineWrap,
+        spellcheck: state.spellcheck,
       }),
     },
   ),

@@ -45,6 +45,8 @@
     "redoTooltip": "Wiederholen",
     "lineWrapEnableTooltip": "Zeilenumbruch aktivieren",
     "lineWrapDisableTooltip": "Zeilenumbruch deaktivieren",
+    "spellcheckEnableTooltip": "Rechtschreibprüfung aktivieren",
+    "spellcheckDisableTooltip": "Rechtschreibprüfung deaktivieren",
     "moreOptionsAriaLabel": "Weitere Formatierungsoptionen",
     "previewSplitTooltip": "Geteilte Vorschauansicht verwenden",
     "previewStackedTooltip": "Gestapelte Vorschauansicht verwenden",
@@ -62,6 +64,7 @@
     "heading3": "Überschrift 3",
     "insertTable": "Tabelle einfügen (3×3)",
     "lineWrap": "Zeilenumbruch",
+    "spellcheck": "Rechtschreibprüfung",
     "autoSave": "Automatisches Speichern",
     "autoSavePaused": "pausiert"
   },

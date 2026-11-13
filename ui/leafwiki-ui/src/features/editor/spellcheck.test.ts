@@ -1,6 +1,6 @@
 import { markdown } from '@codemirror/lang-markdown'
 import { ensureSyntaxTree, forceParsing } from '@codemirror/language'
-import { EditorState } from '@codemirror/state'
+import { Compartment, EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { afterEach, describe, expect, it } from 'vitest'
 import { noSpellcheckRanges, spellcheck } from './spellcheck'
@@ -114,5 +114,28 @@ describe('spellcheck extension', () => {
     forceParsing(editor, editor.state.doc.length, 10_000)
     const marked = editor.contentDOM.querySelectorAll('[spellcheck="false"]')
     expect(Array.from(marked, (el) => el.textContent)).toEqual(['`make ci`'])
+  })
+})
+
+describe('spellcheck extension in a compartment', () => {
+  it('turns the spellcheck and its code marks off when reconfigured away', () => {
+    const compartment = new Compartment()
+    const doc = 'Run `npm ci` now'
+    const view = new EditorView({
+      state: EditorState.create({
+        doc,
+        extensions: [markdown(), compartment.of(spellcheck)],
+      }),
+      parent: document.body,
+    })
+    forceParsing(view, doc.length, 10_000)
+
+    view.dispatch({ effects: compartment.reconfigure([]) })
+    expect(view.contentDOM.getAttribute('spellcheck')).toBe('false')
+    expect(view.contentDOM.querySelectorAll('span[spellcheck]')).toHaveLength(0)
+
+    view.dispatch({ effects: compartment.reconfigure(spellcheck) })
+    expect(view.contentDOM.getAttribute('spellcheck')).toBe('true')
+    view.destroy()
   })
 })
