@@ -76,6 +76,8 @@ jobs:
   # can't catch filesystem differences (#1698).
   test-go-windows:
     runs-on: windows-latest
+    # Guard against a hung test; the go test timeout below fires first.
+    timeout-minutes: 30
     steps:
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -90,8 +92,11 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
+      # File I/O on the Windows runner is several times slower than on Linux:
+      # internal/http alone takes 7-8 min there, close to go test's default
+      # 10-minute per-package timeout, and a slow fsync tips it over.
       - name: Run tests on windows/amd64
-        run: go test ./...
+        run: go test -timeout 20m ./...
 
   # windows/amd64 and darwin/arm64 are release targets, but the release
   # workflow is the only other place that builds them; without this a
