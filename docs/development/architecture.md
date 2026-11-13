@@ -39,7 +39,7 @@ cmd/leafwiki  →  internal/wiki (composition root)  →  internal/wiki/<domain>
   resolution), `excerpt`, `shared` (the `sharederrors.LocalizedError` convention lives here),
   `treemigration`, `tools`. Plus sibling top-level packages at the same layer: `internal/search`,
   `internal/links`, `internal/tags`, `internal/properties`, `internal/favorites`,
-  `internal/usersettings`, `internal/avatar`, `internal/publicaccess`, `internal/tocdisplay`,
+  `internal/usersettings`, `internal/avatar`, `internal/publicaccess`, `internal/pagedisplay`,
   `internal/branding`, `internal/importer`, `internal/backup`, `internal/snapshot`,
   `internal/restore`.
 

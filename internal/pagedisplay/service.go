@@ -1,13 +1,14 @@
-// Package tocdisplay owns the "always show table of contents" instance-wide
-// setting: whether the page viewer's TOC panel/dropdown should be shown for
-// every page, regardless of how many headings it has (see
+// Package pagedisplay owns the instance-wide page display settings an admin
+// sets on the "Display" settings page. Today that is the "always show table
+// of contents" flag: whether the page viewer's TOC panel/dropdown should be
+// shown for every page, regardless of how many headings it has (see
 // PageViewer.tsx's default >3-heading threshold).
 //
 // Unlike internal/publicaccess, this has no env/CLI-flag-pinned variant —
-// it's a cosmetic display preference, not a security decision, so it is
-// always settings-managed: a single JSON file in the data directory that an
-// admin can toggle at runtime with no restart.
-package tocdisplay
+// these are cosmetic display preferences, not security decisions, so they
+// are always settings-managed: a single JSON file in the data directory that
+// an admin can change at runtime with no restart.
+package pagedisplay
 
 import (
 	"fmt"
@@ -15,6 +16,12 @@ import (
 	"github.com/perber/wiki/internal/core/settings"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 )
+
+// fileName keeps the package's original name on disk: existing data
+// directories already hold it, and backups and restore list it by name
+// (internal/restore/swap.go, internal/snapshot). Renaming it would orphan
+// the stored setting.
+const fileName = "toc-display.json"
 
 // fileConfig is the on-disk shape of toc-display.json.
 type fileConfig struct {
@@ -31,7 +38,7 @@ type Service struct {
 // <storageDir>/toc-display.json. The initial value is whatever the file
 // currently holds; a missing file means disabled.
 func New(storageDir string) (*Service, error) {
-	st, err := settings.New(storageDir, "toc-display.json", 0o600, fileConfig{}, nil)
+	st, err := settings.New(storageDir, fileName, 0o600, fileConfig{}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read toc-display config: %w", err)
 	}

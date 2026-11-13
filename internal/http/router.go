@@ -17,9 +17,9 @@ import (
 	auth_middleware "github.com/perber/wiki/internal/http/middleware/auth"
 	"github.com/perber/wiki/internal/http/middleware/maintenance"
 	"github.com/perber/wiki/internal/http/middleware/security"
+	"github.com/perber/wiki/internal/pagedisplay"
 	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/restore"
-	"github.com/perber/wiki/internal/tocdisplay"
 )
 
 //go:embed dist/**
@@ -110,8 +110,8 @@ type RouterOptions struct {
 	// AlwaysShowToc is the current "always show table of contents" state
 	// (show the TOC panel/dropdown regardless of heading count), read per
 	// request so it can be toggled at runtime with no restart. nil is
-	// treated as a fixed-false provider. See internal/tocdisplay.
-	AlwaysShowToc           tocdisplay.Provider
+	// treated as a fixed-false provider. See internal/pagedisplay.
+	AlwaysShowToc           pagedisplay.Provider
 	EditorLimit             int                      // Max admin+editor users allowed; 0 = unlimited
 	InjectCodeInHeader      string                   // Raw HTML/JS code to inject into the <head> tag
 	CustomStylesheet        string                   // Path to a custom CSS file (resolved by wiki before passing)
@@ -173,7 +173,7 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 	}
 
 	if opts.AlwaysShowToc == nil {
-		opts.AlwaysShowToc = tocdisplay.Fixed(false)
+		opts.AlwaysShowToc = pagedisplay.Fixed(false)
 	}
 
 	if Environment == "production" {

@@ -64,7 +64,7 @@ architecture, even when they work.
 | **Open/Closed** | New features register at an extension point; shared code doesn't change to learn about them (rules 1–3 below). |
 | **Single Responsibility** | One use case per operation, one slice per capability; handlers only translate HTTP, use cases orchestrate, core stores. |
 | **Liskov Substitution** | Every implementation of a seam (`PageSideEffect`, `Provider`, a registry entry) must work wherever the seam is used: same error contract, no hidden preconditions, no panics the caller doesn't expect. `Managed` and `Fixed` settings are interchangeable. |
-| **Interface Segregation** | Consumers define small interfaces with only the methods they call (`importer.ImporterWiki`, `tocdisplay.Provider`), not a dependency on `*wiki.Wiki` or a whole service. |
+| **Interface Segregation** | Consumers define small interfaces with only the methods they call (`importer.ImporterWiki`, `pagedisplay.Provider`), not a dependency on `*wiki.Wiki` or a whole service. |
 | **Dependency Inversion** | Slices and features depend on interfaces; the composition root (`wiki.go`, `cmd/leafwiki`) picks and wires the implementations. |
 
 **The test for every change:** could a second feature of the same kind be added later without
@@ -80,7 +80,7 @@ Rules:
    | `RouterContext.CapabilityGroup` | `internal/http/registrar.go` | read-only routes whose URL secret is the authorization (share links); no identity, hardened, never logged ([ADR-0019](./adr/0019-capability-routes-without-identity.md)) |
    | `PageSideEffect` | `internal/wiki/pagesave` | reactions to page create/update/move/delete/restore |
    | `ShellResponder` / `ShellContributor` on `FrontendConfig` | `internal/http/shell.go` | the HTML document served for SPA routes: title, head and `#root` markup, or another response ([ADR-0017](./adr/0017-spa-shell-contributors.md)) |
-   | `Provider` interfaces + `settings.Value` (`Managed`/`Fixed`) | `internal/publicaccess`, `internal/tocdisplay`, `internal/core/settings` | instance settings changeable at runtime or pinned by a flag |
+   | `Provider` interfaces + `settings.Value` (`Managed`/`Fixed`) | `internal/publicaccess`, `internal/pagedisplay`, `internal/core/settings` | instance settings changeable at runtime or pinned by a flag |
    | Narrow consumer interfaces | e.g. `importer.ImporterWiki` | a package depends on what it needs, not on `*wiki.Wiki` |
    | State store registration (`stateDBs` + `restore.SwappableStore`) | `internal/restore/swap.go`, `Wiki.StateStores` | a new SQLite store with real state joins snapshots and live restore ([ADR-0016](./adr/0016-state-store-registration.md)) |
    | Scoped readers (`ReadScope` + one reader per resource) | `internal/scopedread` | reading part of the wiki for a caller that may not see all of it ([ADR-0015](./adr/0015-scoped-read-boundary.md)) |
