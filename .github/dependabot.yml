@@ -18,6 +18,8 @@ updates:
     commit-message:
       prefix: "chore"
     open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
 
   # Backend (Go)
   - package-ecosystem: "gomod"
@@ -33,6 +35,8 @@ updates:
     commit-message:
       prefix: "chore"
     open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
 
   # Docker base images
   - package-ecosystem: "docker"
@@ -44,6 +48,8 @@ updates:
     commit-message:
       prefix: "chore"
     open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
 
   # Frontend (npm)
   - package-ecosystem: "npm"
@@ -65,6 +71,8 @@ updates:
     commit-message:
       prefix: "chore"
     open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
 
   # End-to-end tests (npm)
   - package-ecosystem: "npm"
@@ -80,3 +88,5 @@ updates:
     commit-message:
       prefix: "chore"
     open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7

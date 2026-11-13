@@ -18,6 +18,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          persist-credentials: false
           fetch-depth: 0  # Fetch all history for accurate changelog generation
 
       - name: Set up Docker Buildx
@@ -42,6 +43,7 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+          cache: false # release artifacts must not be built from a restorable (poisonable) cache
 
       - name: Make release binaries
         run: |
@@ -78,7 +80,7 @@ jobs:
         run: |
           TAGS=$(git tag --sort=-v:refname)
           echo "Available tags: $TAGS"
-          CURRENT="${{ github.ref_name }}"
+          CURRENT="$GITHUB_REF_NAME"
           PREVIOUS=""
           for tag in $TAGS; do
             if [ "$tag" = "$CURRENT" ]; then continue; fi
@@ -90,8 +92,10 @@ jobs:
 
       - name: Generate categorized changelog
         id: changelog
+        env:
+          PREVIOUS: ${{ steps.latest.outputs.tag }}
         run: |
-          make changelog PREVIOUS=${{ steps.latest.outputs.tag }} CURRENT=${{ github.ref_name }}
+          make changelog PREVIOUS="$PREVIOUS" CURRENT="$GITHUB_REF_NAME"
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           cat current_release_changelog.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT

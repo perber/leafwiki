@@ -54,6 +54,7 @@ jobs:
       - name: Checkout PR commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          persist-credentials: false
           ref: ${{ steps.pr.outputs.sha }}
 
       - name: Set version/owner
@@ -112,12 +113,16 @@ jobs:
       # into the registry, so it's the only job that needs GHCR_GITHUB_TOKEN.
       - name: Push image to GHCR
         id: push
+        env:
+          OWNER: ${{ needs.build.outputs.owner }}
+          VERSION: ${{ needs.build.outputs.version }}
+          GHCR_TOKEN: ${{ secrets.GHCR_GITHUB_TOKEN }}
         run: |
-          IMAGE=ghcr.io/${{ needs.build.outputs.owner }}/leafwiki:${{ needs.build.outputs.version }}
+          IMAGE="ghcr.io/$OWNER/leafwiki:$VERSION"
           skopeo copy \
-            --dest-creds "${{ github.actor }}:${{ secrets.GHCR_GITHUB_TOKEN }}" \
+            --dest-creds "$GITHUB_ACTOR:$GHCR_TOKEN" \
             oci-archive:image.tar \
-            docker://$IMAGE
+            "docker://$IMAGE"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
       - name: Comment image reference on PR
