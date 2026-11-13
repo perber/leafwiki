@@ -11,6 +11,11 @@
      of the surrounding text as in body copy. */
   font-size: 0.75em;
   font-weight: 500;
+  /* Long inline code wraps (e.g. in table cells); give every line its own
+     padding and rounded corners instead of one box sliced at the breaks
+     (#1802). */
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 /* Tailwind Typography's `prose` class wraps inline `code` in backticks via
@@ -25,7 +30,12 @@
 
 .markdown-inline-code {
   position: relative;
-  display: inline-block;
+  /* Inline, not inline-block: an inline-block's baseline is its last line, so
+     wrapped code pulled the text beside it (and the neighbouring table cells,
+     which align on the baseline) down to its last line, and Firefox let those
+     cells overflow the row (#1802). `vertical-align: top` would fix the table
+     but lifts single-line code off the text baseline. */
+  display: inline;
 }
 
 .markdown-inline-code__copy-button {
