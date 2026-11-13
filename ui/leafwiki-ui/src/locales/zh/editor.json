@@ -45,6 +45,8 @@
     "redoTooltip": "重做",
     "lineWrapEnableTooltip": "启用自动换行",
     "lineWrapDisableTooltip": "关闭自动换行",
+    "spellcheckEnableTooltip": "启用拼写检查",
+    "spellcheckDisableTooltip": "关闭拼写检查",
     "moreOptionsAriaLabel": "更多格式选项",
     "previewSplitTooltip": "使用并排预览布局",
     "previewStackedTooltip": "使用堆叠预览布局",
@@ -62,6 +64,7 @@
     "heading3": "三级标题",
     "insertTable": "插入表格（3×3）",
     "lineWrap": "自动换行",
+    "spellcheck": "拼写检查",
     "autoSave": "自动保存",
     "autoSavePaused": "已暂停"
   },

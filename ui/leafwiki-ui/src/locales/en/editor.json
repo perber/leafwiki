@@ -45,6 +45,8 @@
     "redoTooltip": "Redo",
     "lineWrapEnableTooltip": "Enable line wrap",
     "lineWrapDisableTooltip": "Disable line wrap",
+    "spellcheckEnableTooltip": "Enable spell check",
+    "spellcheckDisableTooltip": "Disable spell check",
     "moreOptionsAriaLabel": "More formatting options",
     "previewSplitTooltip": "Use side-by-side preview layout",
     "previewStackedTooltip": "Use stacked preview layout",
@@ -62,6 +64,7 @@
     "heading3": "Heading 3",
     "insertTable": "Insert Table (3×3)",
     "lineWrap": "Line wrap",
+    "spellcheck": "Spell check",
     "autoSave": "Auto-save",
     "autoSavePaused": "paused"
   },

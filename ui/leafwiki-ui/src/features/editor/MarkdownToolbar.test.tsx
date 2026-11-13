@@ -5,6 +5,8 @@ import MarkdownToolbar from './MarkdownToolbar'
 import type { MarkdownEditorRef } from './MarkdownEditor'
 
 let mockIsMobile = false
+let mockSpellcheck = true
+const toggleSpellcheckMock = vi.fn()
 
 vi.mock('@/components/TooltipWrapper', () => ({
   TooltipWrapper: ({ children }: { children: ReactNode }) => children,
@@ -35,12 +37,16 @@ vi.mock('@/stores/editor', () => ({
     selector: (state: {
       lineWrap: boolean
       toggleLineWrap: ReturnType<typeof vi.fn>
+      spellcheck: boolean
+      toggleSpellcheck: ReturnType<typeof vi.fn>
       autoSaveStatus: 'idle'
     }) => unknown,
   ) =>
     selector({
       lineWrap: true,
       toggleLineWrap: vi.fn(),
+      spellcheck: mockSpellcheck,
+      toggleSpellcheck: toggleSpellcheckMock,
       autoSaveStatus: 'idle',
     }),
 }))
@@ -225,5 +231,90 @@ describe('MarkdownToolbar highlight control', () => {
     fireEvent.click(await screen.findByText('toolbar.highlight'))
 
     expect(insertWrappedTextMock).toHaveBeenCalledWith('==')
+  })
+})
+
+describe('MarkdownToolbar spell check control', () => {
+  const editorRef: RefObject<MarkdownEditorRef> = {
+    current: {
+      canUndo: () => false,
+      canRedo: () => false,
+      getMarkdown: () => '',
+      insertWrappedText: vi.fn(),
+      insertHeading: vi.fn(),
+      insertAtCursor: vi.fn(),
+      replaceSelection: vi.fn(),
+      pasteRich: vi.fn(),
+      pastePlain: vi.fn(),
+      focus: vi.fn(),
+      undo: vi.fn(),
+      redo: vi.fn(),
+      editorViewRef: { current: null },
+    },
+  }
+
+  function renderToolbar() {
+    render(
+      <MarkdownToolbar
+        editorRef={editorRef}
+        pageId="page-1"
+        previewVisible={false}
+        previewStacked={false}
+        onTogglePreview={vi.fn()}
+        onTogglePreviewLayout={vi.fn()}
+      />,
+    )
+  }
+
+  beforeEach(() => {
+    mockIsMobile = false
+    mockSpellcheck = true
+    toggleSpellcheckMock.mockClear()
+  })
+
+  it('toggles the spell check from the desktop button', () => {
+    renderToolbar()
+
+    const button = screen.getByTestId('toggle-spellcheck-button')
+    expect(button).toHaveAttribute('aria-pressed', 'true')
+    expect(button).toHaveAttribute(
+      'aria-label',
+      'toolbar.spellcheckDisableTooltip',
+    )
+
+    fireEvent.click(button)
+
+    expect(toggleSpellcheckMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers to enable the spell check when it is off', () => {
+    mockSpellcheck = false
+    renderToolbar()
+
+    const button = screen.getByTestId('toggle-spellcheck-button')
+    expect(button).toHaveAttribute('aria-pressed', 'false')
+    expect(button).toHaveAttribute(
+      'aria-label',
+      'toolbar.spellcheckEnableTooltip',
+    )
+  })
+
+  it('toggles the spell check from the mobile dropdown', async () => {
+    mockIsMobile = true
+    renderToolbar()
+
+    expect(
+      screen.queryByTestId('toggle-spellcheck-button'),
+    ).not.toBeInTheDocument()
+
+    fireEvent.pointerDown(screen.getByLabelText('toolbar.moreOptionsAriaLabel'))
+    const item = await screen.findByRole('menuitemcheckbox', {
+      name: 'toolbar.spellcheck',
+    })
+    expect(item).toHaveAttribute('aria-checked', 'true')
+
+    fireEvent.click(item)
+
+    expect(toggleSpellcheckMock).toHaveBeenCalledTimes(1)
   })
 })

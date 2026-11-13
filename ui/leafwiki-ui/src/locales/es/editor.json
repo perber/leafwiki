@@ -45,6 +45,8 @@
     "redoTooltip": "Rehacer",
     "lineWrapEnableTooltip": "Activar ajuste de línea",
     "lineWrapDisableTooltip": "Desactivar ajuste de línea",
+    "spellcheckEnableTooltip": "Activar corrección ortográfica",
+    "spellcheckDisableTooltip": "Desactivar corrección ortográfica",
     "moreOptionsAriaLabel": "Más opciones de formato",
     "previewSplitTooltip": "Usar vista previa en paralelo",
     "previewStackedTooltip": "Usar vista previa apilada",
@@ -62,6 +64,7 @@
     "heading3": "Encabezado 3",
     "insertTable": "Insertar tabla (3×3)",
     "lineWrap": "Ajuste de línea",
+    "spellcheck": "Corrección ortográfica",
     "autoSave": "Autoguardado",
     "autoSavePaused": "pausado"
   },

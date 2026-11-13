@@ -487,8 +487,8 @@ Per [ADR-0006: Zustand Feature-Local Stores](./adr/0006-zustand-feature-local-st
 - **`apikeys.ts`** — API key list/create/delete.
 - **`branding.ts`** — logo/favicon/site-name state, including cache-busting version counters
   (`logoVersion`/`faviconVersion`).
-- **`editor.ts`** — editor UI state and preferences (preview layout, line wrap, auto-save
-  status) — persisted, but distinct from `features/editor/pageEditorStore.ts` which owns the actual
+- **`editor.ts`** — editor UI state and preferences (preview layout, line wrap, spell check,
+  auto-save status) — persisted, but distinct from `features/editor/pageEditorStore.ts` which owns the actual
   draft content/dirty state for the page currently open.
 - **`userSettings.ts`** — the user's own preferences (auto-save, language, date/time format),
   fetched via `GET /api/user-settings`, not persisted to localStorage (same pattern as
