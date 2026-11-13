@@ -297,6 +297,11 @@ export default function MarkdownCodeEditor({
             lineHeight: '1.5',
           },
           '.cm-panels': {
+            // CodeMirror's base theme uses z-index 300, which put the sticky
+            // search panel above dialogs (z-50) like the Asset Manager (#1800).
+            // .cm-scroller is its own stacking context at z-index 0, so any
+            // positive value keeps the panel above the editor content.
+            zIndex: 10,
             backgroundColor: 'hsl(var(--surface))',
             color: 'hsl(var(--interface-text))',
           },
