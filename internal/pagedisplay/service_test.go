@@ -21,10 +21,7 @@ func newTestService(t *testing.T, dir string) *Service {
 }
 
 func TestService_NoFile_DisabledByDefault(t *testing.T) {
-	svc, err := New(t.TempDir())
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
+	svc := newTestService(t, t.TempDir())
 	if svc.Settings().AlwaysShowToc {
 		t.Fatal("expected AlwaysShowToc false when toc-display.json is absent")
 	}
@@ -33,10 +30,7 @@ func TestService_NoFile_DisabledByDefault(t *testing.T) {
 func TestService_SetAlwaysShow_PersistsAcrossReconstruction(t *testing.T) {
 	dir := t.TempDir()
 
-	svc, err := New(dir)
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
+	svc := newTestService(t, dir)
 	if err := svc.SetAlwaysShow(true); err != nil {
 		t.Fatalf("SetAlwaysShow(true): %v", err)
 	}
@@ -44,10 +38,7 @@ func TestService_SetAlwaysShow_PersistsAcrossReconstruction(t *testing.T) {
 		t.Fatal("expected AlwaysShowToc true right after SetAlwaysShow(true)")
 	}
 
-	reopened, err := New(dir)
-	if err != nil {
-		t.Fatalf("New (reopen): %v", err)
-	}
+	reopened := newTestService(t, dir)
 	if !reopened.Settings().AlwaysShowToc {
 		t.Fatal("expected persisted AlwaysShowToc true after reconstruction")
 	}
@@ -55,10 +46,7 @@ func TestService_SetAlwaysShow_PersistsAcrossReconstruction(t *testing.T) {
 	if err := reopened.SetAlwaysShow(false); err != nil {
 		t.Fatalf("SetAlwaysShow(false): %v", err)
 	}
-	again, err := New(dir)
-	if err != nil {
-		t.Fatalf("New (reopen 2): %v", err)
-	}
+	again := newTestService(t, dir)
 	if again.Settings().AlwaysShowToc {
 		t.Fatal("expected persisted AlwaysShowToc false after SetAlwaysShow(false)")
 	}
@@ -66,10 +54,7 @@ func TestService_SetAlwaysShow_PersistsAcrossReconstruction(t *testing.T) {
 
 func TestService_SetAlwaysShow_WritesModeSixHundredJSON(t *testing.T) {
 	dir := t.TempDir()
-	svc, err := New(dir)
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
+	svc := newTestService(t, dir)
 	if err := svc.SetAlwaysShow(true); err != nil {
 		t.Fatalf("SetAlwaysShow(true): %v", err)
 	}
@@ -102,10 +87,7 @@ func TestService_SetAlwaysShow_WritesModeSixHundredJSON(t *testing.T) {
 
 func TestService_Reload_PicksUpExternalFileChange(t *testing.T) {
 	dir := t.TempDir()
-	svc, err := New(dir)
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
+	svc := newTestService(t, dir)
 	if svc.Settings().AlwaysShowToc {
 		t.Fatal("precondition: expected disabled")
 	}
@@ -133,10 +115,7 @@ func TestService_New_ReadsExistingTocDisplayFile(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "toc-display.json"), []byte(`{"alwaysShow":true}`), 0o600); err != nil {
 		t.Fatalf("write existing file: %v", err)
 	}
-	svc, err := New(dir)
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
+	svc := newTestService(t, dir)
 	if !svc.Settings().AlwaysShowToc {
 		t.Fatal("expected AlwaysShowToc true from a pre-existing toc-display.json")
 	}
@@ -153,10 +132,7 @@ func TestService_Load_CorruptFileIsAnError(t *testing.T) {
 }
 
 func TestService_ConcurrentAccess_IsRaceFree(t *testing.T) {
-	svc, err := New(t.TempDir())
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
+	svc := newTestService(t, t.TempDir())
 
 	var wg sync.WaitGroup
 	for i := 0; i < 20; i++ {

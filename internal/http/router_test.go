@@ -3501,6 +3501,22 @@ func routerWithTocDisplay(t *testing.T, w *wiki.Wiki, svc *pagedisplay.Service) 
 	})
 }
 
+// readConfigJSON fetches GET /api/config anonymously and decodes the body.
+func readConfigJSON(t *testing.T, router http.Handler) map[string]any {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/config: %d", rec.Code)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &m); err != nil {
+		t.Fatalf("decode /api/config: %v", err)
+	}
+	return m
+}
+
 func anonStatus(router http.Handler, method, path string) int {
 	req := httptest.NewRequest(method, path, nil)
 	rec := httptest.NewRecorder()
@@ -3552,21 +3568,7 @@ func TestPublicAccessToggle_ConfigEndpointReflectsTheChange(t *testing.T) {
 	}
 	router := routerWithPublicAccess(t, w, svc)
 
-	readConfig := func() map[string]any {
-		req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
-		rec := httptest.NewRecorder()
-		router.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("GET /api/config: %d", rec.Code)
-		}
-		var m map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &m); err != nil {
-			t.Fatalf("decode /api/config: %v", err)
-		}
-		return m
-	}
-
-	cfg := readConfig()
+	cfg := readConfigJSON(t, router)
 	if cfg["publicAccess"] != false || cfg["publicAccessEnvManaged"] != false {
 		t.Fatalf("initial config: want publicAccess=false envManaged=false, got %v / %v", cfg["publicAccess"], cfg["publicAccessEnvManaged"])
 	}
@@ -3576,7 +3578,7 @@ func TestPublicAccessToggle_ConfigEndpointReflectsTheChange(t *testing.T) {
 		t.Fatalf("enable: %d %s", rec.Code, rec.Body.String())
 	}
 
-	if cfg := readConfig(); cfg["publicAccess"] != true {
+	if cfg := readConfigJSON(t, router); cfg["publicAccess"] != true {
 		t.Fatalf("after enable: want publicAccess=true, got %v", cfg["publicAccess"])
 	}
 }
@@ -3648,21 +3650,7 @@ func TestTocDisplayToggle_ConfigEndpointReflectsTheChangeOnTheSameEngine(t *test
 	}
 	router := routerWithTocDisplay(t, w, svc)
 
-	readConfig := func() map[string]any {
-		req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
-		rec := httptest.NewRecorder()
-		router.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("GET /api/config: %d", rec.Code)
-		}
-		var m map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &m); err != nil {
-			t.Fatalf("decode /api/config: %v", err)
-		}
-		return m
-	}
-
-	if cfg := readConfig(); cfg["alwaysShowToc"] != false {
+	if cfg := readConfigJSON(t, router); cfg["alwaysShowToc"] != false {
 		t.Fatalf("initial config: want alwaysShowToc=false, got %v", cfg["alwaysShowToc"])
 	}
 
@@ -3671,7 +3659,7 @@ func TestTocDisplayToggle_ConfigEndpointReflectsTheChangeOnTheSameEngine(t *test
 		t.Fatalf("enable: want 200 {\"alwaysShow\":true}, got %d %s", rec.Code, rec.Body.String())
 	}
 
-	if cfg := readConfig(); cfg["alwaysShowToc"] != true {
+	if cfg := readConfigJSON(t, router); cfg["alwaysShowToc"] != true {
 		t.Fatalf("after enable: want alwaysShowToc=true, got %v", cfg["alwaysShowToc"])
 	}
 
@@ -3680,7 +3668,7 @@ func TestTocDisplayToggle_ConfigEndpointReflectsTheChangeOnTheSameEngine(t *test
 		t.Fatalf("disable: want 200, got %d %s", rec.Code, rec.Body.String())
 	}
 
-	if cfg := readConfig(); cfg["alwaysShowToc"] != false {
+	if cfg := readConfigJSON(t, router); cfg["alwaysShowToc"] != false {
 		t.Fatalf("after disable: want alwaysShowToc=false, got %v", cfg["alwaysShowToc"])
 	}
 }
@@ -3734,21 +3722,7 @@ func TestContentWidthSetting_ConfigEndpointReflectsTheChange(t *testing.T) {
 	}
 	router := routerWithTocDisplay(t, w, svc)
 
-	readConfig := func() map[string]any {
-		req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
-		rec := httptest.NewRecorder()
-		router.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("GET /api/config: %d", rec.Code)
-		}
-		var m map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &m); err != nil {
-			t.Fatalf("decode /api/config: %v", err)
-		}
-		return m
-	}
-
-	if cfg := readConfig(); cfg["contentWidth"] != "default" || cfg["alwaysShowToc"] != false {
+	if cfg := readConfigJSON(t, router); cfg["contentWidth"] != "default" || cfg["alwaysShowToc"] != false {
 		t.Fatalf("initial config: want contentWidth=default alwaysShowToc=false, got %v / %v", cfg["contentWidth"], cfg["alwaysShowToc"])
 	}
 
@@ -3756,7 +3730,7 @@ func TestContentWidthSetting_ConfigEndpointReflectsTheChange(t *testing.T) {
 	if rec.Code != http.StatusOK || rec.Body.String() != `{"contentWidth":"wide"}` {
 		t.Fatalf("set wide: want 200 {\"contentWidth\":\"wide\"}, got %d %s", rec.Code, rec.Body.String())
 	}
-	if cfg := readConfig(); cfg["contentWidth"] != "wide" {
+	if cfg := readConfigJSON(t, router); cfg["contentWidth"] != "wide" {
 		t.Fatalf("after set: want contentWidth=wide, got %v", cfg["contentWidth"])
 	}
 }

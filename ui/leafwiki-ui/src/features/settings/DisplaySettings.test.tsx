@@ -40,39 +40,33 @@ beforeEach(() => {
 })
 
 describe('DisplaySettings', () => {
-  it('reflects the current off state', () => {
-    setConfig({ alwaysShowToc: false })
+  it.each([
+    { state: 'off', alwaysShowToc: false },
+    { state: 'on', alwaysShowToc: true },
+  ])('reflects the current $state state', ({ alwaysShowToc }) => {
+    setConfig({ alwaysShowToc })
     render(<DisplaySettings />)
 
-    expect(screen.getByTestId('display-toc-checkbox')).not.toBeChecked()
+    expect(
+      screen.getByRole('checkbox', { checked: alwaysShowToc }),
+    ).toHaveAttribute('data-testid', 'display-toc-checkbox')
   })
 
-  it('reflects the current on state', () => {
-    setConfig({ alwaysShowToc: true })
-    render(<DisplaySettings />)
+  it.each([
+    { direction: 'on', from: false },
+    { direction: 'off', from: true },
+  ])(
+    'toggling $direction applies immediately and shows a success toast',
+    async ({ from }) => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 })
+      setConfig({ alwaysShowToc: from })
+      render(<DisplaySettings />)
 
-    expect(screen.getByTestId('display-toc-checkbox')).toBeChecked()
-  })
-
-  it('toggling on applies immediately and shows a success toast', async () => {
-    const user = userEvent.setup({ pointerEventsCheck: 0 })
-    setConfig({ alwaysShowToc: false })
-    render(<DisplaySettings />)
-
-    await user.click(screen.getByTestId('display-toc-checkbox'))
-    expect(setAlwaysShowToc).toHaveBeenCalledWith(true)
-    expect(toast.success).toHaveBeenCalled()
-  })
-
-  it('toggling off applies immediately and shows a success toast', async () => {
-    const user = userEvent.setup({ pointerEventsCheck: 0 })
-    setConfig({ alwaysShowToc: true })
-    render(<DisplaySettings />)
-
-    await user.click(screen.getByTestId('display-toc-checkbox'))
-    expect(setAlwaysShowToc).toHaveBeenCalledWith(false)
-    expect(toast.success).toHaveBeenCalled()
-  })
+      await user.click(screen.getByTestId('display-toc-checkbox'))
+      expect(setAlwaysShowToc).toHaveBeenCalledWith(!from)
+      expect(toast.success).toHaveBeenCalled()
+    },
+  )
 
   it('shows an error toast when the update fails', async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
