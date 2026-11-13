@@ -177,7 +177,11 @@ export function AddPageDialog({
       dialogType={DIALOG_ADD_PAGE}
       onClose={handleCancel}
       onConfirm={async (actionType: string): Promise<boolean> => {
-        return await handleCreate(actionType !== 'no-redirect', nodeKind)
+        // Only "Create & Edit" ('confirm') opens the editor. The Enter key
+        // always sends 'confirm', so a section, which has no such button,
+        // must not redirect either (#1562).
+        const redirect = nodeKind === NODE_KIND_PAGE && actionType === 'confirm'
+        return await handleCreate(redirect, nodeKind)
       }}
       testidPrefix="add-page-dialog"
       cancelButton={{
