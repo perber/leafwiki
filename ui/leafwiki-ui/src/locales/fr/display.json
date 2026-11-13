@@ -1,6 +1,6 @@
 {
-  "menuLabel": "Table des matières",
-  "pageTitle": "Table des matières",
+  "menuLabel": "Affichage",
+  "pageTitle": "Affichage",
   "sectionTitle": "Table des matières",
   "sectionDescription": "Contrôle l'affichage du panneau « Sur cette page » lors de la consultation d'une page.",
   "checkboxLabel": "Toujours afficher la table des matières",

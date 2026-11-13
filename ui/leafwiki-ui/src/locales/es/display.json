@@ -1,6 +1,6 @@
 {
-  "menuLabel": "Tabla de contenidos",
-  "pageTitle": "Tabla de contenidos",
+  "menuLabel": "Visualización",
+  "pageTitle": "Visualización",
   "sectionTitle": "Tabla de contenidos",
   "sectionDescription": "Controla cuándo se muestra la tabla de contenidos \"En esta página\" al ver una página.",
   "checkboxLabel": "Mostrar siempre la tabla de contenidos",

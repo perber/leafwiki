@@ -83,6 +83,23 @@ describe('createLeafWikiRouter /settings route', () => {
     expect((element.props as { to: string }).to).toBe('/settings/users')
   })
 
+  it.each([['toc-display', '/settings/display']])(
+    'redirects the old /settings/%s bookmark to %s',
+    (oldPath, target) => {
+      const router = createLeafWikiRouter(false, false, false, '', true)
+      const settingsRoute = router.routes.find((r) => r.path === '/settings')
+      const childRoute = settingsRoute?.children?.find(
+        (c) => c.path === oldPath,
+      )
+      const element = childRoute?.element
+      if (!isValidElement(element)) {
+        throw new Error(`expected /settings/${oldPath} route to render`)
+      }
+      expect(element.type).toBe(Navigate)
+      expect(element.props).toMatchObject({ to: target, replace: true })
+    },
+  )
+
   it('gates every settings section route through SettingsSectionGuard — regression for the pre-registry backup/snapshots direct-URL bypass', () => {
     const router = createLeafWikiRouter(false, false, false, '', true)
     const settingsRoute = router.routes.find((r) => r.path === '/settings')

@@ -431,9 +431,10 @@ light/dark mode application).
 - **`features/settings`** — the unified settings page: `SettingsLayout.tsx`, `SettingsNav.tsx`
   (registry-driven section nav), `SettingsSectionGuard.tsx` (route-level role/feature guard),
   `adminSections.ts` (admin-only sections bundled into one lazy chunk),
-  `PublicAccessSettings.tsx`, `TocDisplaySettings.tsx`, and `account/` (visible to every user:
-  `AccountSettings.tsx`, `PreferencesPanel.tsx` with the language switcher, `AvatarPanel.tsx`,
-  `ChangeOwnPasswordPanel.tsx`, `TotpPanel.tsx`).
+  `PublicAccessSettings.tsx`, `DisplaySettings.tsx` (instance-wide page display; the registry
+  entry's `redirectFrom` keeps the old `/settings/toc-display` URL working), and `account/`
+  (visible to every user: `AccountSettings.tsx`, `PreferencesPanel.tsx` with the language
+  switcher, `AvatarPanel.tsx`, `ChangeOwnPasswordPanel.tsx`, `TotpPanel.tsx`).
 - **`features/shortcuts`** — keyboard shortcuts help dialog (`ShortcutsDialog.tsx`), consumes
   `lib/shortcuts/shortcutCatalog.ts`.
 - **`features/sidebar`** — left navigation sidebar shell and its accordion sections
