@@ -74,6 +74,11 @@ updates:
     groups:
       e2e-dependencies:
         patterns: ["*"]
+    ignore:
+      # Same as the frontend: typescript-eslint doesn't support TS 7 yet.
+      - dependency-name: "typescript"
+        update-types:
+          - "version-update:semver-major"
     labels:
       - "dependencies"
       - "e2e"
