@@ -675,4 +675,29 @@ describe('MarkdownPreview plain link tree refresh', () => {
     )
     expect(container.querySelector('a[href="/target"]')).toBeNull()
   })
+
+  it.each([
+    { markdown: '[Target](/target#section)', href: '/target#section' },
+    { markdown: '[Target](target?q=1#section)', href: '/target?q=1#section' },
+    {
+      markdown: '<a href="/target#section">Target</a>',
+      href: '/target#section',
+    },
+  ])(
+    'keeps the heading anchor of $markdown through the sanitizer (#1801)',
+    ({ markdown, href }) => {
+      useTreeStore.setState({ byId: { target }, byPath: { target } })
+      const { container } = render(
+        <MemoryRouter>
+          <TooltipProvider>
+            <MarkdownPreview content={markdown} />
+          </TooltipProvider>
+        </MemoryRouter>,
+      )
+
+      const link = container.querySelector('a')
+      expect(link?.getAttribute('href')).toBe(href)
+      expect(link?.textContent).toBe('Target')
+    },
+  )
 })
