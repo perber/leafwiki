@@ -7,6 +7,24 @@ import ExternalRedirect from '../auth/ExternalRedirect'
 import { ForgotPasswordForm, LoginForm } from './lazy-routes'
 import { createLeafWikiRouter } from './router'
 
+type LeafWikiRouter = ReturnType<typeof createLeafWikiRouter>
+
+// routeElement walks nested route paths (e.g. ['/settings', 'display']) and
+// returns the element the innermost route renders.
+function routeElement(router: LeafWikiRouter, paths: string[]) {
+  let routes = router.routes
+  let element: unknown
+  for (const path of paths) {
+    const route = routes.find((r) => r.path === path)
+    element = route?.element
+    routes = route?.children ?? []
+  }
+  if (!isValidElement(element)) {
+    throw new Error(`expected route ${paths.join(' > ')} to render an element`)
+  }
+  return element
+}
+
 function loginRouteElementType(authDisabled: boolean, loginUrl: string) {
   const router = createLeafWikiRouter(
     false,
@@ -15,12 +33,7 @@ function loginRouteElementType(authDisabled: boolean, loginUrl: string) {
     loginUrl,
     true,
   )
-  const loginRoute = router.routes.find((route) => route.path === '/login')
-  const element = loginRoute?.element
-  if (!isValidElement(element)) {
-    throw new Error('expected /login route to render an element')
-  }
-  return element.type
+  return routeElement(router, ['/login']).type
 }
 
 describe('createLeafWikiRouter /login route', () => {
@@ -43,12 +56,7 @@ describe('createLeafWikiRouter /login route', () => {
 
 function forgotPasswordRouteElementType(smtpEnabled: boolean) {
   const router = createLeafWikiRouter(false, false, false, '', smtpEnabled)
-  const route = router.routes.find((r) => r.path === '/forgot-password')
-  const element = route?.element
-  if (!isValidElement(element)) {
-    throw new Error('expected /forgot-password route to render an element')
-  }
-  return element.type
+  return routeElement(router, ['/forgot-password']).type
 }
 
 describe('createLeafWikiRouter /forgot-password route', () => {
@@ -64,56 +72,30 @@ describe('createLeafWikiRouter /forgot-password route', () => {
 describe('createLeafWikiRouter /settings route', () => {
   it('redirects to / for a read-only viewer', () => {
     const router = createLeafWikiRouter(true, false, false, '', true)
-    const route = router.routes.find((r) => r.path === '/settings')
-    const element = route?.element
-    if (!isValidElement(element)) {
-      throw new Error('expected /settings route to render an element')
-    }
-    expect(element.type).toBe(Navigate)
+    expect(routeElement(router, ['/settings']).type).toBe(Navigate)
   })
 
-  it('redirects the compat /users route to /settings/users', () => {
+  it.each([
+    ['the compat /users route', ['/users'], '/settings/users'],
+    [
+      'the old /settings/toc-display bookmark',
+      ['/settings', 'toc-display'],
+      '/settings/display',
+    ],
+  ])('redirects %s to %s', (_name, paths, target) => {
     const router = createLeafWikiRouter(false, false, false, '', true)
-    const route = router.routes.find((r) => r.path === '/users')
-    const element = route?.element
-    if (!isValidElement(element)) {
-      throw new Error('expected /users route to render an element')
-    }
+    const element = routeElement(router, paths)
     expect(element.type).toBe(Navigate)
-    expect((element.props as { to: string }).to).toBe('/settings/users')
+    expect(element.props).toMatchObject({ to: target, replace: true })
   })
 
-  it.each([['toc-display', '/settings/display']])(
-    'redirects the old /settings/%s bookmark to %s',
-    (oldPath, target) => {
+  it.each(settingsSections.map((section) => [section.path]))(
+    'gates /settings/%s through SettingsSectionGuard — regression for the pre-registry backup/snapshots direct-URL bypass',
+    (path) => {
       const router = createLeafWikiRouter(false, false, false, '', true)
-      const settingsRoute = router.routes.find((r) => r.path === '/settings')
-      const childRoute = settingsRoute?.children?.find(
-        (c) => c.path === oldPath,
+      expect(routeElement(router, ['/settings', path]).type).toBe(
+        SettingsSectionGuard,
       )
-      const element = childRoute?.element
-      if (!isValidElement(element)) {
-        throw new Error(`expected /settings/${oldPath} route to render`)
-      }
-      expect(element.type).toBe(Navigate)
-      expect(element.props).toMatchObject({ to: target, replace: true })
     },
   )
-
-  it('gates every settings section route through SettingsSectionGuard — regression for the pre-registry backup/snapshots direct-URL bypass', () => {
-    const router = createLeafWikiRouter(false, false, false, '', true)
-    const settingsRoute = router.routes.find((r) => r.path === '/settings')
-    const children = settingsRoute?.children ?? []
-
-    for (const section of settingsSections) {
-      const childRoute = children.find((c) => c.path === section.path)
-      const element = childRoute?.element
-      if (!isValidElement(element)) {
-        throw new Error(
-          `expected /settings/${section.path} route to render an element`,
-        )
-      }
-      expect(element.type).toBe(SettingsSectionGuard)
-    }
-  })
 })
