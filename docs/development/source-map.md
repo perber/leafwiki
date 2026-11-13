@@ -166,8 +166,10 @@ resync-derived state.
   decided by the scoped read layer (`internal/scopedread`, ADR-0015).
 - **`internal/pagedisplay`** — the instance-wide page display settings behind the admin
   "Display" settings page (today the "always show table of contents" flag), stored in
-  `toc-display.json` (old name kept for existing data dirs and backups); same provider pattern
-  (`Provider` interface, `Fixed` for flag-pinned values).
+  `toc-display.json` (`FileName`; old name kept for existing data dirs and backups); same
+  provider pattern (`Provider` returns all of them as one `Settings` value, `Fixed` for tests).
+  `GET /api/config` merges `Settings.ConfigFields()` in flat, so a new display setting needs no
+  change in the HTTP layer.
 - **`internal/favorites`** — per-user private favorited-pages list. `favorites_store.go`
   (`favorites.db`, own file). Explicitly documented in its own package doc comment as *not*
   filesystem-derived and therefore never touched by resync.

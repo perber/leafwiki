@@ -14,8 +14,8 @@ func TestService_NoFile_DisabledByDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	if svc.AlwaysShow() {
-		t.Fatal("expected AlwaysShow() false when toc-display.json is absent")
+	if svc.Settings().AlwaysShowToc {
+		t.Fatal("expected AlwaysShowToc false when toc-display.json is absent")
 	}
 }
 
@@ -29,16 +29,16 @@ func TestService_SetAlwaysShow_PersistsAcrossReconstruction(t *testing.T) {
 	if err := svc.SetAlwaysShow(true); err != nil {
 		t.Fatalf("SetAlwaysShow(true): %v", err)
 	}
-	if !svc.AlwaysShow() {
-		t.Fatal("expected AlwaysShow() true right after SetAlwaysShow(true)")
+	if !svc.Settings().AlwaysShowToc {
+		t.Fatal("expected AlwaysShowToc true right after SetAlwaysShow(true)")
 	}
 
 	reopened, err := New(dir)
 	if err != nil {
 		t.Fatalf("New (reopen): %v", err)
 	}
-	if !reopened.AlwaysShow() {
-		t.Fatal("expected persisted AlwaysShow() true after reconstruction")
+	if !reopened.Settings().AlwaysShowToc {
+		t.Fatal("expected persisted AlwaysShowToc true after reconstruction")
 	}
 
 	if err := reopened.SetAlwaysShow(false); err != nil {
@@ -48,8 +48,8 @@ func TestService_SetAlwaysShow_PersistsAcrossReconstruction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New (reopen 2): %v", err)
 	}
-	if again.AlwaysShow() {
-		t.Fatal("expected persisted AlwaysShow() false after SetAlwaysShow(false)")
+	if again.Settings().AlwaysShowToc {
+		t.Fatal("expected persisted AlwaysShowToc false after SetAlwaysShow(false)")
 	}
 }
 
@@ -95,7 +95,7 @@ func TestService_Reload_PicksUpExternalFileChange(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	if svc.AlwaysShow() {
+	if svc.Settings().AlwaysShowToc {
 		t.Fatal("precondition: expected disabled")
 	}
 
@@ -103,15 +103,15 @@ func TestService_Reload_PicksUpExternalFileChange(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "toc-display.json"), []byte(`{"alwaysShow": true}`), 0o600); err != nil {
 		t.Fatalf("write external file: %v", err)
 	}
-	if svc.AlwaysShow() {
+	if svc.Settings().AlwaysShowToc {
 		t.Fatal("expected cache to still read false before Reload()")
 	}
 
 	if err := svc.Reload(); err != nil {
 		t.Fatalf("Reload: %v", err)
 	}
-	if !svc.AlwaysShow() {
-		t.Fatal("expected AlwaysShow() true after Reload() picked up the new file")
+	if !svc.Settings().AlwaysShowToc {
+		t.Fatal("expected AlwaysShowToc true after Reload() picked up the new file")
 	}
 }
 
@@ -126,8 +126,8 @@ func TestService_New_ReadsExistingTocDisplayFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	if !svc.AlwaysShow() {
-		t.Fatal("expected AlwaysShow() true from a pre-existing toc-display.json")
+	if !svc.Settings().AlwaysShowToc {
+		t.Fatal("expected AlwaysShowToc true from a pre-existing toc-display.json")
 	}
 }
 
@@ -151,7 +151,29 @@ func TestService_ConcurrentAccess_IsRaceFree(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		wg.Add(2)
 		go func(v int) { defer wg.Done(); _ = svc.SetAlwaysShow(v%2 == 0) }(i)
-		go func() { defer wg.Done(); _ = svc.AlwaysShow() }()
+		go func() { defer wg.Done(); _ = svc.Settings() }()
 	}
 	wg.Wait()
+}
+
+func TestSettings_ConfigFields_UsesTheConfigAPINames(t *testing.T) {
+	got := Settings{AlwaysShowToc: true}.ConfigFields()
+	if got["alwaysShowToc"] != true {
+		t.Fatalf("ConfigFields()[alwaysShowToc] = %v, want true (all fields: %v)", got["alwaysShowToc"], got)
+	}
+}
+
+func TestFixed_Settings_ReturnsPinnedSettings(t *testing.T) {
+	want := Settings{AlwaysShowToc: true}
+	if got := Fixed(want).Settings(); got != want {
+		t.Fatalf("Fixed(%+v).Settings() = %+v", want, got)
+	}
+}
+
+// FileName is wired into snapshots and restore by name; it must keep
+// pointing at the file existing data directories already hold.
+func TestFileName_IsTheHistoricalTocDisplayFile(t *testing.T) {
+	if FileName != "toc-display.json" {
+		t.Fatalf("FileName = %q, want %q", FileName, "toc-display.json")
+	}
 }

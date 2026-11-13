@@ -877,7 +877,7 @@ func newAPIDocsRouterWith(t *testing.T, override func(*httpinternal.RouterOption
 
 	router := newTestRouter(w, func(o *httpinternal.RouterOptions) {
 		o.PublicAccess = publicAccess
-		o.AlwaysShowToc = pageDisplay
+		o.PageDisplay = pageDisplay
 		o.EnableRevision = true
 		o.EnableLinkRefactor = true
 		o.EnableAPIKeyManagement = true

@@ -3497,7 +3497,7 @@ func routerWithTocDisplay(t *testing.T, w *wiki.Wiki, svc *pagedisplay.Service) 
 	w.SetInstanceSettingsRoutes(wikiinstancesettings.NewRoutes(paSvc, svc, w.AuthService(), slog.Default()))
 	return newTestRouter(w, func(o *httpinternal.RouterOptions) {
 		o.PublicAccess = paSvc
-		o.AlwaysShowToc = svc
+		o.PageDisplay = svc
 	})
 }
 

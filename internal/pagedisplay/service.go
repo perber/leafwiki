@@ -17,11 +17,11 @@ import (
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 )
 
-// fileName keeps the package's original name on disk: existing data
-// directories already hold it, and backups and restore list it by name
-// (internal/restore/swap.go, internal/snapshot). Renaming it would orphan
-// the stored setting.
-const fileName = "toc-display.json"
+// FileName is the settings file inside the data directory. It keeps the
+// package's original name on disk: existing data directories already hold
+// it, and backups and restore list it by name (internal/restore/swap.go,
+// internal/snapshot). Renaming it would orphan the stored setting.
+const FileName = "toc-display.json"
 
 // fileConfig is the on-disk shape of toc-display.json.
 type fileConfig struct {
@@ -38,17 +38,17 @@ type Service struct {
 // <storageDir>/toc-display.json. The initial value is whatever the file
 // currently holds; a missing file means disabled.
 func New(storageDir string) (*Service, error) {
-	st, err := settings.New(storageDir, fileName, 0o600, fileConfig{}, nil)
+	st, err := settings.New(storageDir, FileName, 0o600, fileConfig{}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read toc-display config: %w", err)
 	}
 	return &Service{store: st}, nil
 }
 
-// AlwaysShow reports whether the TOC should always be shown, regardless of
-// heading count.
-func (s *Service) AlwaysShow() bool {
-	return s.store.Get().AlwaysShow
+// Settings returns the current page display settings.
+func (s *Service) Settings() Settings {
+	cfg := s.store.Get()
+	return Settings{AlwaysShowToc: cfg.AlwaysShow}
 }
 
 // SetAlwaysShow persists a new value and updates the in-memory cache.

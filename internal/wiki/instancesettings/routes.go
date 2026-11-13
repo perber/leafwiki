@@ -16,16 +16,24 @@ import (
 	"github.com/perber/wiki/internal/publicaccess"
 )
 
+// PageDisplaySettings is what the display-settings routes need from
+// internal/pagedisplay: read the current settings and change them.
+// *pagedisplay.Service implements it.
+type PageDisplaySettings interface {
+	Settings() pagedisplay.Settings
+	SetAlwaysShow(alwaysShow bool) error
+}
+
 // Routes is the RouteRegistrar for runtime instance settings.
 type Routes struct {
 	publicAccess *publicaccess.Service
-	pageDisplay  *pagedisplay.Service
+	pageDisplay  PageDisplaySettings
 	authService  *coreauth.AuthService
 	log          *slog.Logger
 }
 
 // NewRoutes constructs the instance-settings RouteRegistrar.
-func NewRoutes(publicAccess *publicaccess.Service, pageDisplay *pagedisplay.Service, authService *coreauth.AuthService, log *slog.Logger) *Routes {
+func NewRoutes(publicAccess *publicaccess.Service, pageDisplay PageDisplaySettings, authService *coreauth.AuthService, log *slog.Logger) *Routes {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -90,10 +98,10 @@ func (r *Routes) handleSetTocDisplay(c *gin.Context) {
 	}
 
 	r.log.Info("toc always-show setting changed",
-		"always_show", r.pageDisplay.AlwaysShow(),
+		"always_show", r.pageDisplay.Settings().AlwaysShowToc,
 		"actor_id", actorID(c),
 	)
-	c.JSON(http.StatusOK, gin.H{"alwaysShow": r.pageDisplay.AlwaysShow()})
+	c.JSON(http.StatusOK, gin.H{"alwaysShow": r.pageDisplay.Settings().AlwaysShowToc})
 }
 
 func actorID(c *gin.Context) string {

@@ -205,36 +205,49 @@ func (r *Routes) handleConfig(ctx httpinternal.RouterContext) gin.HandlerFunc {
 			)
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{
-			"publicAccess":            opts.PublicAccess.Enabled(),
-			"publicAccessEnvManaged":  opts.PublicAccess.EnvManaged(),
-			"alwaysShowToc":           opts.AlwaysShowToc.AlwaysShow(),
-			"editorLimit":             opts.EditorLimit,
-			"hideLinkMetadataSection": opts.HideLinkMetadataSection,
-			"authDisabled":            opts.AuthDisabled,
-			"basePath":                opts.BasePath,
-			"maxAssetUploadSizeBytes": opts.MaxAssetUploadSizeBytes,
-			// Avatar constraints are fixed feature constants (internal/avatar),
-			// not a configurable RouterOptions field like MaxAssetUploadSizeBytes
-			// above — read straight from the package rather than plumbed through
-			// Opts, since there's no flag/env var that could ever override them.
-			"maxAvatarUploadSizeBytes": coreavatar.MaxUploadSize,
-			"avatarAllowedExts":        coreavatar.AllowedExts(),
-			"enableRevision":           opts.EnableRevision,
-			"enableLinkRefactor":       opts.EnableLinkRefactor,
-			"enableApiKeyManagement":   opts.EnableAPIKeyManagement,
-			"gitBackupEnabled":         opts.GitBackupEnabled,
-			"gitBackupEnvManaged":      opts.GitBackupEnvManaged,
-			"gitBackupConfigured":      opts.GitBackupConfigured,
-			"snapshotEnabled":          opts.SnapshotEnabled,
-			"smtpEnabled":              opts.SMTPEnabled,
-			"totpAvailable":            opts.TOTPAvailable,
-			"httpRemoteUserEnabled":    opts.HTTPRemoteUser.Enabled,
-			"loginUrl":                 opts.LoginURL,
-			"logoutUrl":                opts.LogoutURL,
-			"userManagementUrl":        opts.UserManagementURL,
-			"defaultLanguage":          opts.DefaultLanguage,
-		})
+		config := baseConfig(opts)
+		// The page display settings are merged in flat (alwaysShowToc, …) so
+		// a new display setting reaches the frontend without a change here.
+		// TestBaseConfig_PageDisplayFields_DoNotShadowBuiltInKeys keeps their
+		// names apart from the built-in keys.
+		for key, value := range opts.PageDisplay.Settings().ConfigFields() {
+			config[key] = value
+		}
+		c.JSON(http.StatusOK, config)
+	}
+}
+
+// baseConfig returns the built-in /api/config fields, before the page
+// display settings are merged in.
+func baseConfig(opts httpinternal.RouterOptions) gin.H {
+	return gin.H{
+		"publicAccess":            opts.PublicAccess.Enabled(),
+		"publicAccessEnvManaged":  opts.PublicAccess.EnvManaged(),
+		"editorLimit":             opts.EditorLimit,
+		"hideLinkMetadataSection": opts.HideLinkMetadataSection,
+		"authDisabled":            opts.AuthDisabled,
+		"basePath":                opts.BasePath,
+		"maxAssetUploadSizeBytes": opts.MaxAssetUploadSizeBytes,
+		// Avatar constraints are fixed feature constants (internal/avatar),
+		// not a configurable RouterOptions field like MaxAssetUploadSizeBytes
+		// above — read straight from the package rather than plumbed through
+		// Opts, since there's no flag/env var that could ever override them.
+		"maxAvatarUploadSizeBytes": coreavatar.MaxUploadSize,
+		"avatarAllowedExts":        coreavatar.AllowedExts(),
+		"enableRevision":           opts.EnableRevision,
+		"enableLinkRefactor":       opts.EnableLinkRefactor,
+		"enableApiKeyManagement":   opts.EnableAPIKeyManagement,
+		"gitBackupEnabled":         opts.GitBackupEnabled,
+		"gitBackupEnvManaged":      opts.GitBackupEnvManaged,
+		"gitBackupConfigured":      opts.GitBackupConfigured,
+		"snapshotEnabled":          opts.SnapshotEnabled,
+		"smtpEnabled":              opts.SMTPEnabled,
+		"totpAvailable":            opts.TOTPAvailable,
+		"httpRemoteUserEnabled":    opts.HTTPRemoteUser.Enabled,
+		"loginUrl":                 opts.LoginURL,
+		"logoutUrl":                opts.LogoutURL,
+		"userManagementUrl":        opts.UserManagementURL,
+		"defaultLanguage":          opts.DefaultLanguage,
 	}
 }
 
