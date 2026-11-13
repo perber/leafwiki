@@ -2,7 +2,7 @@ module github.com/perber/wiki
 
 go 1.26.0
 
-toolchain go1.27.3
+toolchain go1.27.4
 
 require (
 	github.com/dustin/go-humanize v1.1.0
