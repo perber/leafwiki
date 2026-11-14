@@ -26,7 +26,7 @@ type PageView struct {
 // PageSource is what PageReader needs from the tree. *tree.TreeService
 // implements it.
 type PageSource interface {
-	subtreeChecker
+	SubtreeChecker
 	GetPage(id string) (*tree.Page, error)
 }
 

@@ -132,6 +132,7 @@ func TestPageReader_Page_ChecksScopeBeforeReadingContent(t *testing.T) {
 	}{
 		{name: "single page, other id", scope: ReadScope{RootID: "docs"}, id: "guide"},
 		{name: "subtree, sibling", scope: ReadScope{RootID: "docs", IncludeDescendants: true}, id: "other"},
+		{name: "single page, deleted root", scope: ReadScope{RootID: "gone"}, id: "gone"},
 		{name: "invalid scope", scope: ReadScope{}, id: "docs"},
 	}
 	for _, tc := range tests {

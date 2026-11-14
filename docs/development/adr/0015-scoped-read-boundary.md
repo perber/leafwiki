@@ -45,8 +45,9 @@ The approach was agreed with the maintainer on #1252.
 3. **Subtree scopes are evaluated against the tree at read time.** Pages created or moved below
    `RootID` later become visible; pages moved out stop being visible.
 4. **Readers check the scope before they read content or files.** `PageReader.Page` checks the
-   scope first and only then calls `TreeService.GetPage`. Asset readers will do the same before
-   touching the filesystem.
+   scope first and only then calls `TreeService.GetPage`; `AssetReader.Asset` checks it before
+   opening a file. The check also confirms that the page still exists, so files left behind by a
+   deleted page are not served.
 5. **Readers return projections with an explicit field allow-list**, never the normal API DTOs
    or core types. `PageView` carries `id`, `title`, `kind`, `content` (the body without
    frontmatter) and `updatedAt`. `TreeNodeView` carries `id`, `title`, `kind` and `children`; no
@@ -67,8 +68,7 @@ The approach was agreed with the maintainer on #1252.
 
 Abstractions are added with their first use. This ADR's first change adds `ReadScope` and the
 single-page reader; `TreeReader` (the navigation of a scope, the root alone for a single-page
-scope) followed with the shared tree route. The asset reader follows with its first caller in a
-later step of #1252.
+scope) followed with the shared tree route, and `AssetReader` with the shared asset route.
 
 ## Alternatives considered
 
