@@ -27,6 +27,12 @@ type scopedTreeReader interface {
 	Tree(ctx context.Context, scope scopedread.ReadScope) (*scopedread.TreeNodeView, error)
 }
 
+// scopedAssetReader opens a page's asset inside a scope.
+// *scopedread.AssetReader implements it.
+type scopedAssetReader interface {
+	Asset(ctx context.Context, scope scopedread.ReadScope, pageID, filename string) (*scopedread.AssetFile, error)
+}
+
 // resolveScope resolves token to its grant and the read scope the grant
 // allows (ADR-0015). Every shared read starts here.
 func resolveScope(ctx context.Context, links linkResolver, token string) (*sharing.Grant, scopedread.ReadScope, error) {
@@ -127,4 +133,46 @@ func (uc *GetSharedTreeUseCase) Execute(ctx context.Context, in GetSharedTreeInp
 		return nil, scopedReadError(grant, "tree", err)
 	}
 	return &GetSharedTreeOutput{Tree: view}, nil
+}
+
+// ─── GetSharedAssetUseCase ───────────────────────────────────────────────────
+
+// GetSharedAssetInput is the input for GetSharedAssetUseCase.
+type GetSharedAssetInput struct {
+	Token    string
+	PageID   string
+	Filename string
+}
+
+// GetSharedAssetOutput is the output of GetSharedAssetUseCase. The caller
+// closes Asset.Content.
+type GetSharedAssetOutput struct {
+	Asset *scopedread.AssetFile
+}
+
+// GetSharedAssetUseCase opens an asset through a share link: an asset of the
+// shared page or, for a link that includes subpages, of a page below it.
+type GetSharedAssetUseCase struct {
+	links  linkResolver
+	assets scopedAssetReader
+}
+
+// NewGetSharedAssetUseCase constructs a GetSharedAssetUseCase.
+func NewGetSharedAssetUseCase(links linkResolver, assets scopedAssetReader) *GetSharedAssetUseCase {
+	return &GetSharedAssetUseCase{links: links, assets: assets}
+}
+
+// Execute returns the open asset, or share_link_not_found for an unknown,
+// expired or revoked link, a page outside the link's scope and a missing
+// file alike.
+func (uc *GetSharedAssetUseCase) Execute(ctx context.Context, in GetSharedAssetInput) (*GetSharedAssetOutput, error) {
+	grant, scope, err := resolveScope(ctx, uc.links, in.Token)
+	if err != nil {
+		return nil, err
+	}
+	asset, err := uc.assets.Asset(ctx, scope, in.PageID, in.Filename)
+	if err != nil {
+		return nil, scopedReadError(grant, "asset", err)
+	}
+	return &GetSharedAssetOutput{Asset: asset}, nil
 }
