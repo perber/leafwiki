@@ -27,7 +27,7 @@ With query: [WithQuery](/docs/page4?foo=bar)
 With both: [Both](/docs/page5?foo=bar#section)
 `
 
-	links := extractLinksFromMarkdown(md)
+	links := ExtractMarkdownLinks(md)
 
 	want := []string{
 		"/docs/page1",
@@ -56,7 +56,7 @@ func TestExtractLinksFromMarkdown_IgnoresExternalLinksCaseInsensitive(t *testing
 [Wiki](/docs/page1)
 `
 
-	links := extractLinksFromMarkdown(md)
+	links := ExtractMarkdownLinks(md)
 
 	if len(links) != 1 {
 		t.Fatalf("expected 1 wiki link, got %d: %#v", len(links), links)
@@ -73,7 +73,7 @@ Asset relative: [Image](assets/abc/picture.png)
 Internal: [Page](/docs/page1)
 `
 
-	links := extractLinksFromMarkdown(md)
+	links := ExtractMarkdownLinks(md)
 
 	want := []string{"/docs/page1"}
 	if len(links) != len(want) {
@@ -96,7 +96,7 @@ Mixed case Mailto: [E](Mailto:foo@bar.com)
 Internal: [Page](/docs/page1)
 `
 
-	links := extractLinksFromMarkdown(md)
+	links := ExtractMarkdownLinks(md)
 
 	want := []string{"/docs/page1"}
 	if len(links) != len(want) {
@@ -1321,7 +1321,7 @@ func TestLinkService_UpdateLinksAndHealForPages_ReindexesOutgoingForSourcePages(
 	}
 }
 
-// ─── extractWikiLinksFromMarkdown ────────────────────────────────────────────
+// ─── ExtractWikiLinkTargets ────────────────────────────────────────────
 
 func TestExtractWikiLinksFromMarkdown_BasicSyntax(t *testing.T) {
 	md := `
@@ -1330,7 +1330,7 @@ Also check [[Meeting Notes|our last meeting]].
 And [[Folder/SubPage]] path hint.
 Normal [link](/docs/page) stays untouched.
 `
-	got := extractWikiLinksFromMarkdown(md)
+	got := ExtractWikiLinkTargets(md)
 	want := []string{"Project Plan", "Meeting Notes", "Folder/SubPage"}
 	if len(got) != len(want) {
 		t.Fatalf("expected %d wiki links, got %d: %v", len(want), len(got), got)
@@ -1344,7 +1344,7 @@ Normal [link](/docs/page) stays untouched.
 
 func TestExtractWikiLinksFromMarkdown_DeduplicatesTargets(t *testing.T) {
 	md := `[[Notes]] and [[Notes]] again and [[Notes|different alias]].`
-	got := extractWikiLinksFromMarkdown(md)
+	got := ExtractWikiLinkTargets(md)
 	if len(got) != 1 {
 		t.Fatalf("expected 1 deduplicated entry, got %d: %v", len(got), got)
 	}
@@ -1356,14 +1356,14 @@ func TestExtractWikiLinksFromMarkdown_DeduplicatesTargets(t *testing.T) {
 func TestExtractWikiLinksFromMarkdown_IgnoresFencedCodeBlock(t *testing.T) {
 	md := "```bash\nif [[ -n \"$computed_hash\" && -n \"$src_hash\" ]]; then\n  [[ \"$src_hash\" == sha256-* ]]\nfi\n```\n"
 
-	got := extractWikiLinksFromMarkdown(md)
+	got := ExtractWikiLinkTargets(md)
 	if len(got) != 0 {
 		t.Fatalf("expected no wiki links from fenced code block, got %v", got)
 	}
 }
 
 func TestExtractWikiLinksFromMarkdown_IgnoresInlineCode(t *testing.T) {
-	got := extractWikiLinksFromMarkdown("`[[ -n $x ]]`")
+	got := ExtractWikiLinkTargets("`[[ -n $x ]]`")
 	if len(got) != 0 {
 		t.Fatalf("expected no wiki links from inline code, got %v", got)
 	}
@@ -1372,7 +1372,7 @@ func TestExtractWikiLinksFromMarkdown_IgnoresInlineCode(t *testing.T) {
 func TestExtractWikiLinksFromMarkdown_MixedRealAndCodeBlock(t *testing.T) {
 	md := "See [[Real Page]].\n\n```\n[[ -z \"$x\" ]]\n```\n"
 
-	got := extractWikiLinksFromMarkdown(md)
+	got := ExtractWikiLinkTargets(md)
 	if len(got) != 1 {
 		t.Fatalf("expected 1 wiki link, got %d: %v", len(got), got)
 	}
@@ -1382,7 +1382,7 @@ func TestExtractWikiLinksFromMarkdown_MixedRealAndCodeBlock(t *testing.T) {
 }
 
 func TestExtractWikiLinksFromMarkdown_IgnoresIndentedCodeBlock(t *testing.T) {
-	got := extractWikiLinksFromMarkdown("    [[ Something ]]\n")
+	got := ExtractWikiLinkTargets("    [[ Something ]]\n")
 	if len(got) != 0 {
 		t.Fatalf("expected no wiki links from indented code block, got %v", got)
 	}
@@ -1394,7 +1394,7 @@ func TestExtractWikiLinksFromMarkdown_IgnoresBashConditionalsOutsideCodeBlocks(t
 		`if [[ "$src_hash" == sha256-* ]]; then`,
 	}
 	for _, content := range cases {
-		got := extractWikiLinksFromMarkdown(content)
+		got := ExtractWikiLinkTargets(content)
 		if len(got) != 0 {
 			t.Errorf("input %q: expected no wiki links, got %v", content, got)
 		}
@@ -1402,7 +1402,7 @@ func TestExtractWikiLinksFromMarkdown_IgnoresBashConditionalsOutsideCodeBlocks(t
 }
 
 func TestExtractWikiLinksFromMarkdown_Empty(t *testing.T) {
-	got := extractWikiLinksFromMarkdown("No wiki links here.")
+	got := ExtractWikiLinkTargets("No wiki links here.")
 	if len(got) != 0 {
 		t.Fatalf("expected empty slice, got %v", got)
 	}

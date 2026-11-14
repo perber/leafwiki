@@ -21,12 +21,15 @@ type PageView struct {
 	Kind      string    `json:"kind"`
 	Content   string    `json:"content"`
 	UpdatedAt time.Time `json:"updatedAt"`
+	// Links are the links in Content that lead to a page inside the scope;
+	// never null. See LinkView.
+	Links []LinkView `json:"links"`
 }
 
 // PageSource is what PageReader needs from the tree. *tree.TreeService
 // implements it.
 type PageSource interface {
-	subtreeChecker
+	linkSource
 	GetPage(id string) (*tree.Page, error)
 }
 
@@ -66,11 +69,16 @@ func (r *PageReader) Page(ctx context.Context, scope ReadScope, id string) (*Pag
 	if err != nil {
 		return nil, err
 	}
+	pageLinks, err := scopedLinks(r.src, scope, id, page.Content)
+	if err != nil {
+		return nil, err
+	}
 	return &PageView{
 		ID:        page.ID,
 		Title:     page.Title,
 		Kind:      string(page.Kind),
 		Content:   page.Content,
 		UpdatedAt: page.Metadata.UpdatedAt,
+		Links:     pageLinks,
 	}, nil
 }

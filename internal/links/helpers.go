@@ -73,8 +73,12 @@ func isAssetLinkDestination(dest string) bool {
 	return strings.HasPrefix(dest, "/assets/") || strings.HasPrefix(dest, "assets/")
 }
 
-// extractLinksFromMarkdown extracts all links from the given markdown content.
-func extractLinksFromMarkdown(content string) []string {
+// ExtractMarkdownLinks returns the destinations of the page links in content,
+// the ones the link index tracks: without query and fragment, and without
+// external links (http, https, mailto), fragment-only links and asset links.
+// Readers that resolve a page's links outside this package use it, so they
+// see the same links the index does.
+func ExtractMarkdownLinks(content string) []string {
 	links := []string{}
 	reader := text.NewReader([]byte(content))
 	doc := markdownParser.Parser().Parse(reader)
@@ -110,10 +114,10 @@ func extractLinksFromMarkdown(content string) []string {
 	return links
 }
 
-// extractWikiLinksFromMarkdown returns all target strings from [[Target]] and
+// ExtractWikiLinkTargets returns all target strings from [[Target]] and
 // [[Target|Alias]] syntax found in content. The returned strings are the raw
 // target values (may be a title or a "Folder/Title" path hint).
-func extractWikiLinksFromMarkdown(content string) []string {
+func ExtractWikiLinkTargets(content string) []string {
 	wikiLinks := markdown.ParseWikiLinks(content)
 	if len(wikiLinks) == 0 {
 		return nil
@@ -218,10 +222,10 @@ func resolveWikiLinkTarget(treeService *tree.TreeService, target string) (Target
 // collectTargetsFromContent extracts and resolves all link targets from a page's
 // content — both standard Markdown links and [[Title]] wiki-link syntax.
 func collectTargetsFromContent(treeService *tree.TreeService, pagePath string, content string) []TargetLink {
-	mdLinks := extractLinksFromMarkdown(content)
+	mdLinks := ExtractMarkdownLinks(content)
 	mdTargets := resolveTargetLinks(treeService, pagePath, mdLinks)
 
-	wikiTargets := extractWikiLinksFromMarkdown(content)
+	wikiTargets := ExtractWikiLinkTargets(content)
 	wikiResolved := resolveWikiLinkTargets(treeService, wikiTargets)
 
 	return append(mdTargets, wikiResolved...)
