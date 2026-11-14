@@ -51,7 +51,7 @@ jobs:
 
       - name: Rebase
         id: rebase
-        uses: peter-evans/rebase@e4945786f7ca41fe6e101cead4395f5489593943 # v4.0.0
+        uses: peter-evans/rebase@d6f70ba4beda4faa44e582a974ec3b7b40713951 # v4.1.1
         with:
           head: ${{ steps.pr.outputs.head }}
 
