@@ -2,6 +2,7 @@ package assets
 
 import (
 	"errors"
+	"io"
 	"mime/multipart"
 	"os"
 	"path/filepath"
@@ -351,5 +352,185 @@ func TestSaveAssetForPage_TooLarge_DoesNotLeavePartialFile(t *testing.T) {
 
 	if len(entries) != 0 {
 		t.Fatalf("expected no files after failed upload, got %d", len(entries))
+	}
+}
+
+func TestOpenAsset_ReadsTheFile(t *testing.T) {
+	tmp := t.TempDir()
+	service := NewAssetService(tmp, tree.NewSlugService())
+	pageDir := filepath.Join(tmp, "assets", "a7b3")
+	if err := os.MkdirAll(pageDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(pageDir, "my image.png"), []byte("hello image"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	f, err := service.OpenAsset("a7b3", "my image.png")
+	if err != nil {
+		t.Fatalf("OpenAsset: %v", err)
+	}
+	t.Cleanup(func() { _ = f.Close() })
+	body, err := io.ReadAll(f)
+	if err != nil || string(body) != "hello image" {
+		t.Fatalf("content = %q, %v, want hello image", body, err)
+	}
+}
+
+// Anything that is not a regular file directly in the page's asset folder is
+// ErrAssetNotFound, before or without touching the disk.
+func TestOpenAsset_NotFound(t *testing.T) {
+	tmp := t.TempDir()
+	service := NewAssetService(tmp, tree.NewSlugService())
+	pageDir := filepath.Join(tmp, "assets", "a7b3")
+	if err := os.MkdirAll(filepath.Join(pageDir, "folder"), 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	for name, content := range map[string]string{
+		filepath.Join(tmp, "assets", "a7b3", "ok.png"):   "ok",
+		filepath.Join(tmp, "assets", "other.png"):        "outside the page folder",
+		filepath.Join(tmp, "secret.txt"):                 "outside the assets folder",
+		filepath.Join(tmp, "assets", "b9c1", "peer.png"): "another page's asset",
+	} {
+		if err := os.MkdirAll(filepath.Dir(name), 0755); err != nil {
+			t.Fatalf("MkdirAll: %v", err)
+		}
+		if err := os.WriteFile(name, []byte(content), 0644); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+	}
+
+	tests := []struct{ name, pageID, filename string }{
+		{"unknown file", "a7b3", "missing.png"},
+		{"unknown page folder", "zzzz", "ok.png"},
+		{"a directory", "a7b3", "folder"},
+		{"empty name", "a7b3", ""},
+		{"empty page id", "", "other.png"},
+		{"dot dot name", "a7b3", ".."},
+		{"traversal in name", "a7b3", "../other.png"},
+		{"backslash traversal in name", "a7b3", `..\other.png`},
+		{"traversal to another page", "a7b3", "../b9c1/peer.png"},
+		{"dot dot page id", "..", "secret.txt"},
+		{"traversal in page id", "../..", "secret.txt"},
+		{"page id with a separator", "a7b3/folder", "ok.png"},
+		{"dot page id", ".", "other.png"},
+		{"absolute name", "a7b3", filepath.Join(tmp, "secret.txt")},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			f, err := service.OpenAsset(tc.pageID, tc.filename)
+			if f != nil {
+				_ = f.Close()
+			}
+			if !errors.Is(err, ErrAssetNotFound) {
+				t.Fatalf("OpenAsset(%q, %q) err = %v, want ErrAssetNotFound", tc.pageID, tc.filename, err)
+			}
+		})
+	}
+}
+
+// A symlink inside the page's folder must not lead out of it.
+func TestOpenAsset_DoesNotFollowSymlinksOut(t *testing.T) {
+	tmp := t.TempDir()
+	service := NewAssetService(tmp, tree.NewSlugService())
+	pageDir := filepath.Join(tmp, "assets", "a7b3")
+	if err := os.MkdirAll(pageDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	secret := filepath.Join(tmp, "secret.txt")
+	if err := os.WriteFile(secret, []byte("secret"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	if err := os.Symlink(secret, filepath.Join(pageDir, "link.png")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	f, err := service.OpenAsset("a7b3", "link.png")
+	if f != nil {
+		_ = f.Close()
+	}
+	if !errors.Is(err, ErrAssetNotFound) {
+		t.Fatalf("err = %v, want ErrAssetNotFound", err)
+	}
+}
+
+// Names Windows would alias to another file or folder are rejected before the
+// disk is touched, on every platform.
+func TestValidateServedName_RejectsWindowsAliases(t *testing.T) {
+	for _, name := range []string{"b9c1.", "b9c1 ", "a.png:secret", "a.png::$DATA", "C:x.png", "a\x00b", "a\tb", "a\x7fb", "..", "a/b"} {
+		if err := validateServedName(name); err == nil {
+			t.Errorf("validateServedName(%q) = nil, want an error", name)
+		}
+	}
+	for _, name := range []string{"a7b3", "my image.png", "report.v2.pdf", "Bild-ä.png", "x_y-z"} {
+		if err := validateServedName(name); err != nil {
+			t.Errorf("validateServedName(%q) = %v, want nil", name, err)
+		}
+	}
+}
+
+// Names that Windows normalises or resolves specially (trailing dots and
+// spaces, alternate data streams, 8.3 short names, device names, NUL) and names
+// that are too long. Whatever such a name does on the platform, it is either
+// ErrAssetNotFound or a file of the requested page's own folder; it never
+// yields a file of another page or one outside the page's folder.
+func TestOpenAsset_WindowsAliasesStayInThePageFolder(t *testing.T) {
+	tmp := t.TempDir()
+	service := NewAssetService(tmp, tree.NewSlugService())
+	for name, content := range map[string]string{
+		filepath.Join("a7b3", "salaries-2024.png"): "own",
+		filepath.Join("b9c1", "salaries-2024.png"): "peer",
+		filepath.Join("b9c1", "peer.png"):          "peer",
+		"outside.png":                              "outside",
+	} {
+		path := filepath.Join(tmp, "assets", name)
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatalf("MkdirAll: %v", err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+	}
+
+	tests := []struct{ name, pageID, filename, owner string }{
+		{"trailing dot", "a7b3", "salaries-2024.png.", "own"},
+		{"trailing space", "a7b3", "salaries-2024.png ", "own"},
+		{"alternate data stream", "a7b3", "salaries-2024.png:secret", "own"},
+		{"default data stream", "a7b3", "salaries-2024.png::$DATA", "own"},
+		{"short 8.3 name", "a7b3", "SALARI~1.PNG", "own"},
+		{"short 8.3 name of the peer file", "a7b3", "PEER~1.PNG", "own"},
+		{"device name", "a7b3", "CON", "own"},
+		{"device name with extension", "a7b3", "aux.png", "own"},
+		{"nul device", "a7b3", "NUL", "own"},
+		{"nul byte", "a7b3", "salaries-2024.png\x00.txt", "own"},
+		{"drive-relative name", "a7b3", "C:peer.png", "own"},
+		{"unicode name", "a7b3", "gehälter-日本.png", "own"},
+		{"too long name", "a7b3", strings.Repeat("a", 300) + ".png", "own"},
+		{"another page's file name", "a7b3", "peer.png", "own"},
+		{"page id with a trailing dot", "b9c1.", "peer.png", "peer"},
+		{"page id with a trailing space", "b9c1 ", "peer.png", "peer"},
+		{"page id with a stream", "a7b3::$INDEX_ALLOCATION", "salaries-2024.png", "own"},
+		{"page id that is a drive", "C:", "outside.png", "own"},
+		{"page id that is a device", "NUL", "peer.png", "own"},
+		{"page id with a nul byte", "a7b3\x00", "salaries-2024.png", "own"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			f, err := service.OpenAsset(tc.pageID, tc.filename)
+			if err != nil {
+				if !errors.Is(err, ErrAssetNotFound) {
+					t.Fatalf("OpenAsset(%q, %q) err = %v, want ErrAssetNotFound or a file of the page", tc.pageID, tc.filename, err)
+				}
+				return
+			}
+			defer func() { _ = f.Close() }()
+			body, readErr := io.ReadAll(f)
+			if readErr != nil {
+				t.Fatalf("ReadAll: %v", readErr)
+			}
+			if string(body) != tc.owner {
+				t.Fatalf("OpenAsset(%q, %q) served %q, want only a file of the requested page (%q)", tc.pageID, tc.filename, body, tc.owner)
+			}
+		})
 	}
 }

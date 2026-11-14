@@ -44,9 +44,10 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 	w.apiKeysRoutes = w.buildAPIKeysRoutes()
 	if w.shareLinks != nil {
 		w.sharesRoutes = wikishares.NewRoutes(wikishares.RoutesConfig{
-			GetPage: wikishares.NewGetSharedPageUseCase(w.shareLinks, scopedread.NewPageReader(w.tree)),
-			GetTree: wikishares.NewGetSharedTreeUseCase(w.shareLinks, scopedread.NewTreeReader(w.tree)),
-			Log:     w.log,
+			GetPage:  wikishares.NewGetSharedPageUseCase(w.shareLinks, scopedread.NewPageReader(w.tree)),
+			GetTree:  wikishares.NewGetSharedTreeUseCase(w.shareLinks, scopedread.NewTreeReader(w.tree)),
+			GetAsset: wikishares.NewGetSharedAssetUseCase(w.shareLinks, scopedread.NewAssetReader(w.tree, w.asset)),
+			Log:      w.log,
 		})
 	}
 	w.importerRoutes = w.buildImporterRoutes(options)

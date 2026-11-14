@@ -732,6 +732,54 @@ paths:
       summary: Get search indexing status
       tags:
       - search
+  /shared/{token}/assets/{pageId}/{name}:
+    get:
+      description: |-
+        Returns an asset of the shared page or, for a link that includes subpages, of a page below it. The link's scope is checked before the file is opened, so the assets of a page outside the link are unreachable even when a shared page embeds them. The token in the path is the only authorization. A page outside the link, an unknown link and a missing file get the same 404. Requires --enable-share-links.
+        Responses carry the headers of /assets (X-Content-Type-Options: nosniff, Content-Security-Policy: sandbox except for PDFs, Content-Disposition inline for raster images, audio, video and PDFs, attachment otherwise, SVG included) plus Referrer-Policy: no-referrer, X-Robots-Tag: noindex, nofollow and Cache-Control: no-store. Range requests are supported.
+      parameters:
+      - description: Share link token
+        in: path
+        name: token
+        required: true
+        type: string
+      - description: ID of the page the asset belongs to
+        in: path
+        name: pageId
+        required: true
+        type: string
+      - description: File name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: The asset
+          schema:
+            type: file
+        "404":
+          description: Unknown, malformed, expired or revoked link, a page outside
+            the link, or no such file (code share_link_not_found)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "429":
+          description: Too many failed link lookups from this client (code share_link_too_many_attempts)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Reading the asset failed (code share_link_internal_error)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "503":
+          description: Share link store unavailable during a live restore (code share_link_store_unavailable)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Read an asset through a share link
+      tags:
+      - shared
   /shared/{token}/page:
     get:
       description: |-

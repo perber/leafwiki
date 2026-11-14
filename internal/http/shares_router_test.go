@@ -3,6 +3,7 @@ package http_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sort"
@@ -340,5 +341,242 @@ func TestShares_GetSharedTree_SharesNotFoundAndLimit(t *testing.T) {
 	}
 	if rec := f.get("/api/shared/not-a-token/tree", client); rec.Code != http.StatusTooManyRequests {
 		t.Errorf("21st failed lookup across page and tree = %d, want 429", rec.Code)
+	}
+}
+
+// Assets go through the link's scope: the assets of pages inside it are
+// served with the untrusted-file headers, everything else is the uniform 404,
+// also for an asset of a page outside the link that a shared page embeds.
+func TestShares_GetSharedAsset_ServesOnlyTheLinkScope(t *testing.T) {
+	f := newSharesFixture(t)
+	uploadAssetViaAPI(t, f.router, f.customer, "logo.png", "customer logo")
+	uploadAssetViaAPI(t, f.router, f.contract, "scan.pdf", "contract scan")
+	uploadAssetViaAPI(t, f.router, f.internal, "salaries.png", "internal")
+	single := f.link(t, f.customer, false)
+	subtree := f.link(t, f.customer, true)
+	notFound := f.get("/api/shared/not-a-token/page", "").Body.String()
+
+	tests := []struct {
+		name string
+		url  string
+		want string // "" for the uniform 404, "router" for the router's own 404
+	}{
+		{name: "the shared page's asset", url: "/api/shared/" + single + "/assets/" + f.customer + "/logo.png", want: "customer logo"},
+		{name: "a subpage's asset through a subtree link", url: "/api/shared/" + subtree + "/assets/" + f.contract + "/scan.pdf", want: "contract scan"},
+		{name: "a subpage's asset through a single-page link", url: "/api/shared/" + single + "/assets/" + f.contract + "/scan.pdf"},
+		{name: "an asset of a page outside the link", url: "/api/shared/" + subtree + "/assets/" + f.internal + "/salaries.png"},
+		{name: "a missing file", url: "/api/shared/" + subtree + "/assets/" + f.customer + "/nope.png"},
+		{name: "a traversal to another page's asset", url: "/api/shared/" + subtree + "/assets/" + f.customer + "/..%2F" + f.internal + "%2Fsalaries.png", want: "router"},
+		{name: "the asset folder of the tree root", url: "/api/shared/" + subtree + "/assets/root/logo.png"},
+		{name: "an unknown link", url: "/api/shared/lws_" + strings.Repeat("A", 43) + "/assets/" + f.customer + "/logo.png"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := f.get(tc.url, "")
+			if tc.want == "router" {
+				// the decoded "/" makes the path match no route at all
+				if rec.Code != http.StatusNotFound || strings.Contains(rec.Body.String(), "internal") {
+					t.Fatalf("got %d %s, want a 404 without content", rec.Code, rec.Body.String())
+				}
+				return
+			}
+			if tc.want == "" {
+				if rec.Code != http.StatusNotFound || rec.Body.String() != notFound {
+					t.Fatalf("got %d %s, want the uniform 404 %s", rec.Code, rec.Body.String(), notFound)
+				}
+				return
+			}
+			if rec.Code != http.StatusOK || rec.Body.String() != tc.want {
+				t.Fatalf("got %d %q, want 200 %q", rec.Code, rec.Body.String(), tc.want)
+			}
+			for h, v := range map[string]string{"X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Cache-Control": "no-store"} {
+				if rec.Header().Get(h) != v {
+					t.Errorf("%s = %q, want %q", h, rec.Header().Get(h), v)
+				}
+			}
+		})
+	}
+}
+
+// A page moved out of the scope takes its assets with it, and a deleted
+// page's assets are gone through the link.
+func TestShares_GetSharedAsset_FollowsMovesAndDeletes(t *testing.T) {
+	f := newSharesFixture(t)
+	uploadAssetViaAPI(t, f.router, f.contract, "scan.pdf", "contract scan")
+	url := "/api/shared/" + f.link(t, f.customer, true) + "/assets/" + f.contract + "/scan.pdf"
+	if rec := f.get(url, ""); rec.Code != http.StatusOK {
+		t.Fatalf("before the move = %d, want 200", rec.Code)
+	}
+
+	f.move(t, f.contract, "root")
+	if rec := f.get(url, ""); rec.Code != http.StatusNotFound {
+		t.Errorf("after moving the page out = %d, want 404", rec.Code)
+	}
+	f.move(t, f.contract, f.customer)
+	deletePageViaAPI(t, f.router, f.contract, f.version(t, f.contract), false)
+	if rec := f.get(url, ""); rec.Code != http.StatusNotFound {
+		t.Errorf("after deleting the page = %d, want 404", rec.Code)
+	}
+}
+
+// Range requests work, so a browser can stream a video or a large PDF.
+func TestShares_GetSharedAsset_SupportsRanges(t *testing.T) {
+	f := newSharesFixture(t)
+	uploadAssetViaAPI(t, f.router, f.customer, "clip.txt", "0123456789")
+	req := httptest.NewRequest(http.MethodGet, "/api/shared/"+f.link(t, f.customer, false)+"/assets/"+f.customer+"/clip.txt", nil)
+	req.Header.Set("Range", "bytes=2-4")
+	rec := httptest.NewRecorder()
+	f.router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusPartialContent || rec.Body.String() != "234" {
+		t.Fatalf("got %d %q, want 206 \"234\"", rec.Code, rec.Body.String())
+	}
+}
+
+// Page ids and file names that Windows normalises (trailing dot or space,
+// streams, 8.3 names, device names) or that are encoded oddly never reach an
+// asset the link does not cover: they are a 404, or at most the link's own file.
+func TestShares_GetSharedAsset_AliasedNamesStayInScope(t *testing.T) {
+	f := newSharesFixture(t)
+	uploadAssetViaAPI(t, f.router, f.customer, "logo-customer.png", "customer logo")
+	uploadAssetViaAPI(t, f.router, f.internal, "salaries-2024.png", "internal")
+	single := f.link(t, f.customer, false)
+	notFound := f.get("/api/shared/not-a-token/page", "").Body.String()
+	base := "/api/shared/" + single + "/assets/"
+
+	tests := []struct {
+		name string
+		url  string
+	}{
+		{"page id with a trailing dot", base + f.internal + "./salaries-2024.png"},
+		{"page id with an encoded trailing dot", base + f.internal + "%2E/salaries-2024.png"},
+		{"page id with a trailing space", base + f.internal + "%20/salaries-2024.png"},
+		{"page id with a stream", base + f.internal + "::$INDEX_ALLOCATION/salaries-2024.png"},
+		{"upper-case page id", base + strings.ToUpper(f.internal) + "/salaries-2024.png"},
+		{"page id root", base + "ROOT/salaries-2024.png"},
+		{"link page id with a trailing dot", base + f.customer + "./logo-customer.png"},
+		{"link page id with a trailing space", base + f.customer + "%20/logo-customer.png"},
+		{"encoded dot dot page id", base + "%2E%2E/salaries-2024.png"},
+		{"encoded backslash in the name", base + f.customer + "/..%5C" + f.internal + "%5Csalaries-2024.png"},
+		{"nul byte in the name", base + f.customer + "/logo-customer.png%00.txt"},
+		{"nul byte in the page id", base + f.customer + "%00/logo-customer.png"},
+		{"another page's name in this page's folder", base + f.customer + "/salaries-2024.png"},
+		{"short 8.3 name", base + f.customer + "/LOGO-C~1.PNG"},
+		{"alternate data stream", base + f.customer + "/logo-customer.png:secret"},
+		{"device name", base + f.customer + "/CON"},
+		{"device name with extension", base + f.customer + "/aux.png"},
+		{"very long name", base + f.customer + "/" + strings.Repeat("a", 5000) + ".png"},
+		{"unicode name", base + f.customer + "/gehälter-日本.png"},
+		{"encoded unicode name", base + f.customer + "/geh%C3%A4lter.png"},
+	}
+	for i, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// one client per case: the cases are mostly failed lookups, more
+			// than the per-client limit allows from a single address
+			rec := f.get(tc.url, fmt.Sprintf("192.0.2.%d:1000", 10+i))
+			if strings.Contains(rec.Body.String(), "internal") {
+				t.Fatalf("body leaks the internal asset: %q", rec.Body.String())
+			}
+			switch rec.Code {
+			case http.StatusOK:
+				if rec.Body.String() != "customer logo" {
+					t.Fatalf("got 200 %q, want 404 or the link's own file", rec.Body.String())
+				}
+			case http.StatusNotFound:
+				if b := rec.Body.String(); b != notFound && !strings.Contains(b, "404 page not found") {
+					t.Errorf("404 body = %q, want the uniform 404 or the router's", b)
+				}
+			default:
+				t.Fatalf("status = %d, want 404 or the link's own file", rec.Code)
+			}
+		})
+	}
+}
+
+// Conditional and HEAD requests do not turn an out-of-scope or missing asset
+// into anything but the uniform 404, and do not break an in-scope one.
+func TestShares_GetSharedAsset_ConditionalRequests(t *testing.T) {
+	f := newSharesFixture(t)
+	uploadAssetViaAPI(t, f.router, f.customer, "clip.txt", "0123456789")
+	uploadAssetViaAPI(t, f.router, f.internal, "salaries.txt", "internal")
+	single := f.link(t, f.customer, false)
+	notFound := f.get("/api/shared/not-a-token/page", "").Body.String()
+	future := time.Now().Add(24 * time.Hour).UTC().Format(http.TimeFormat)
+	own := "/api/shared/" + single + "/assets/" + f.customer + "/clip.txt"
+	foreign := "/api/shared/" + single + "/assets/" + f.internal + "/salaries.txt"
+	missing := "/api/shared/" + single + "/assets/" + f.customer + "/nope.txt"
+
+	tests := []struct {
+		name    string
+		method  string
+		url     string
+		headers map[string]string
+		want    int
+		body    string // checked for a 200
+	}{
+		{name: "own, If-Modified-Since in the future", method: "GET", url: own, headers: map[string]string{"If-Modified-Since": future}, want: 304},
+		{name: "own, If-None-Match star", method: "GET", url: own, headers: map[string]string{"If-None-Match": "*"}, want: 304},
+		{name: "own, unmatched If-Range", method: "GET", url: own, headers: map[string]string{"Range": "bytes=0-1", "If-Range": `"x"`}, want: 200, body: "0123456789"},
+		{name: "own, multi-range", method: "GET", url: own, headers: map[string]string{"Range": "bytes=0-1,4-5"}, want: 206},
+		{name: "own, unsatisfiable range", method: "GET", url: own, headers: map[string]string{"Range": "bytes=50-60"}, want: 416},
+		{name: "own, HEAD finds no route", method: "HEAD", url: own, want: 404},
+		{name: "foreign, If-Modified-Since in the future", method: "GET", url: foreign, headers: map[string]string{"If-Modified-Since": future}, want: 404},
+		{name: "foreign, If-None-Match star", method: "GET", url: foreign, headers: map[string]string{"If-None-Match": "*"}, want: 404},
+		{name: "foreign, range", method: "GET", url: foreign, headers: map[string]string{"Range": "bytes=0-3"}, want: 404},
+		{name: "foreign, HEAD", method: "HEAD", url: foreign, want: 404},
+		{name: "missing, If-Modified-Since in the future", method: "GET", url: missing, headers: map[string]string{"If-Modified-Since": future}, want: 404},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(tc.method, tc.url, nil)
+			for k, v := range tc.headers {
+				req.Header.Set(k, v)
+			}
+			rec := httptest.NewRecorder()
+			f.router.ServeHTTP(rec, req)
+			if rec.Code != tc.want {
+				t.Fatalf("status = %d, want %d: %q", rec.Code, tc.want, rec.Body.String())
+			}
+			if tc.want == http.StatusOK && rec.Body.String() != tc.body {
+				t.Errorf("body = %q, want %q", rec.Body.String(), tc.body)
+			}
+			if tc.want == http.StatusNotFound && strings.Contains(rec.Body.String(), "internal") {
+				t.Errorf("404 leaks content: %q", rec.Body.String())
+			}
+			if tc.want == http.StatusNotFound && tc.method == "GET" && rec.Body.String() != notFound {
+				t.Errorf("404 body = %q, want the uniform 404", rec.Body.String())
+			}
+		})
+	}
+}
+
+// Every kind of asset 404 counts towards the per-client limit, and a served
+// asset resets it.
+func TestShares_GetSharedAsset_FailuresCountTowardsTheLimit(t *testing.T) {
+	f := newSharesFixture(t)
+	uploadAssetViaAPI(t, f.router, f.customer, "logo.png", "customer logo")
+	uploadAssetViaAPI(t, f.router, f.internal, "salaries.png", "internal")
+	link := f.link(t, f.customer, false)
+	const client = "203.0.113.9:1000"
+	base := "/api/shared/" + link + "/assets/"
+	failures := []string{
+		base + f.customer + "/nope.png",
+		base + f.internal + "/salaries.png",
+		"/api/shared/not-a-token/assets/" + f.customer + "/logo.png",
+	}
+
+	for i := 0; i < 19; i++ {
+		f.get(failures[i%len(failures)], client)
+	}
+	if rec := f.get(base+f.customer+"/logo.png", client); rec.Code != http.StatusOK {
+		t.Fatalf("valid asset after 19 failures = %d, want 200", rec.Code)
+	}
+	for i := 0; i < 20; i++ {
+		if rec := f.get(failures[i%len(failures)], client); rec.Code != http.StatusNotFound {
+			t.Fatalf("failure %d after the reset = %d, want 404", i+1, rec.Code)
+		}
+	}
+	if rec := f.get(failures[0], client); rec.Code != http.StatusTooManyRequests {
+		t.Errorf("21st failure = %d, want 429", rec.Code)
 	}
 }

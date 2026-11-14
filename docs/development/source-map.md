@@ -85,7 +85,8 @@ filesystem-canonical (`tree`, `revision`) and SQLite-derived (`links`, `tags`, `
   policy implemented on top of this.
 - **`internal/core/assets`** — per-page file attachments (`assets_service.go`): upload, list,
   delete, path resolution under each page's asset directory; enforces the configured max upload
-  size.
+  size. `OpenAsset` opens one file through an `os.Root` on the page's folder, for readers that
+  serve single files.
 - **`internal/core/excerpt`** — `excerpt.go` renders a short plain-text excerpt (`MaxRunes = 180`)
   from a page's markdown via `goldmark` + `bluemonday` HTML sanitization, used by search results
   and tag listings. `FromBodyStart` does the same over the start of the body, for excerpts built
@@ -156,7 +157,8 @@ resync-derived state.
   (share links, #1252): `ReadScope` (a root page, optionally with its subtree) and
   `PageReader`, which checks the scope before reading and returns an allow-listed `PageView`, and
   `TreeReader`, which returns the scope as a tree of allow-listed `TreeNodeView`s with nothing above
-  the root. Out of scope, unknown and deleted pages are the same `ErrNotFound`.
+  the root, and `AssetReader`, which checks the scope before opening a page's asset. Out of scope,
+  unknown and deleted pages are the same `ErrNotFound`.
   [ADR-0015](./adr/0015-scoped-read-boundary.md).
 - **`internal/sharing`** — share links (#1252, experimental, `--enable-share-links`):
   `share_link_store.go` (`share_links.db`, own file, real state, part of full backup/restore;
@@ -299,13 +301,14 @@ shape for that domain.
   package (search query endpoint, tag listing/filter, property listing/filter, backlink/link-status
   endpoints respectively).
 - **`internal/wiki/shares`** — the public read surface of share links (#1252, `--enable-share-links`):
-  `GET /api/shared/{token}/page`, `/pages/{id}` and `/tree` in a capability group
-  ([ADR-0019](./adr/0019-capability-routes-without-identity.md)). The use cases resolve the token to a
-  `sharing.Grant`, turn it into a `scopedread.ReadScope` (`resolveScope`) and read through
-  `scopedread.PageReader` or `TreeReader` ([ADR-0015](./adr/0015-scoped-read-boundary.md)); every "no
-  such link or page" is the same 404, and failed lookups on any of the routes count towards one
-  per-client limit. The slice is registered at boot only when share links
-  are enabled; a runtime admin switch would move that decision into a provider checked per request.
+  `GET /api/shared/{token}/page`, `/pages/{id}`, `/tree` and `/assets/{pageId}/{name}` in a
+  capability group ([ADR-0019](./adr/0019-capability-routes-without-identity.md)). The use cases
+  resolve the token to a `sharing.Grant`, turn it into a `scopedread.ReadScope` (`resolveScope`)
+  and read through `scopedread.PageReader`, `TreeReader` or `AssetReader`
+  ([ADR-0015](./adr/0015-scoped-read-boundary.md)); every "no such link or page" is the same 404,
+  and failed lookups on any of the routes count towards one per-client limit. The slice is
+  registered at boot only when share links are enabled; a runtime admin switch would move that
+  decision into a provider checked per request.
 - **`internal/wiki/apikeys`** — API key CRUD HTTP surface over `core/auth`'s `APIKeyService`.
 - **`internal/wiki/assets`** — per-page asset upload/list/delete HTTP surface over
   `core/assets`.
