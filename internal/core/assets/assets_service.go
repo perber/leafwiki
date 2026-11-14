@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"mime/multipart"
 	"os"
@@ -113,6 +114,72 @@ func NewAssetService(storageDir string, slugger *tree.SlugService) *AssetService
 
 func (s *AssetService) GetAssetsDir() string {
 	return s.assetsDir
+}
+
+// ErrAssetNotFound is the sentinel OpenAsset returns for anything that is not
+// a regular file directly in the page's asset folder. It is not localized:
+// the localized asset_not_found errors of delete and rename are for editors,
+// this one is mapped by the caller.
+var ErrAssetNotFound = errors.New("asset not found")
+
+// validateServedName checks a page ID or file name before OpenAsset touches
+// the disk. On top of validateFilename it rejects what Windows would alias to
+// another name: a colon (drive letters, alternate data streams), control
+// characters, and a trailing dot or space, which Windows strips, so "b9c1."
+// would open the folder of page "b9c1". Uploaded names never contain these;
+// the slug normalisation of GenerateUniqueFilename removes them.
+func validateServedName(name string) error {
+	if err := validateFilename(name); err != nil {
+		return err
+	}
+	if strings.HasSuffix(name, ".") || strings.HasSuffix(name, " ") {
+		return fmt.Errorf("name must not end in a dot or space")
+	}
+	for _, r := range name {
+		if r == ':' || r < 0x20 || r == 0x7f {
+			return fmt.Errorf("name must not contain a colon or control characters")
+		}
+	}
+	return nil
+}
+
+// OpenAsset opens the asset filename of the page pageID for reading; the
+// caller closes it. Names that validateServedName rejects never reach the
+// disk, and the file is opened through an os.Root on the page's folder, so
+// neither ".." nor a symlink can lead out of it. A missing page folder or file,
+// a directory and an escaping path are all ErrAssetNotFound; only a permission
+// error is returned as it is.
+func (s *AssetService) OpenAsset(pageID, filename string) (*os.File, error) {
+	if validateServedName(pageID) != nil || validateServedName(filename) != nil {
+		return nil, ErrAssetNotFound
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	root, err := os.OpenRoot(assetPageDiskPath(s.assetsDir, pageID))
+	if err != nil {
+		return nil, openAssetError(err)
+	}
+	defer func() { _ = root.Close() }()
+	f, err := root.Open(filename)
+	if err != nil {
+		return nil, openAssetError(err)
+	}
+	info, err := f.Stat()
+	if err != nil || !info.Mode().IsRegular() {
+		_ = f.Close()
+		return nil, ErrAssetNotFound
+	}
+	return f, nil
+}
+
+// openAssetError maps an open failure to ErrAssetNotFound, except a permission
+// error, which is an operational problem and not a missing asset.
+func openAssetError(err error) error {
+	if errors.Is(err, fs.ErrPermission) {
+		return fmt.Errorf("open asset: %w", err)
+	}
+	return ErrAssetNotFound
 }
 
 func (s *AssetService) ensureAssetPagePathExists(page *tree.PageNode) (string, error) {
