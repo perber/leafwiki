@@ -533,6 +533,7 @@ var documentedModels = map[string]reflect.Type{
 	"dto.TaggedPage":          reflect.TypeFor[dto.TaggedPage](),
 	"dto.UserLabel":           reflect.TypeFor[dto.UserLabel](),
 	"health.HealthResponse":   reflect.TypeFor[health.HealthResponse](),
+	"scopedread.LinkView":     reflect.TypeFor[scopedread.LinkView](),
 	"scopedread.PageView":     reflect.TypeFor[scopedread.PageView](),
 	"scopedread.TreeNodeView": reflect.TypeFor[scopedread.TreeNodeView](),
 }
