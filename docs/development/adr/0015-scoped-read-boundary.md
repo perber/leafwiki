@@ -49,9 +49,9 @@ The approach was agreed with the maintainer on #1252.
    touching the filesystem.
 5. **Readers return projections with an explicit field allow-list**, never the normal API DTOs
    or core types. `PageView` carries `id`, `title`, `kind`, `content` (the body without
-   frontmatter) and `updatedAt`. `TreeNodeView` carries `id`, `title`, `kind` and `children`; no
-   slug or path, which would reveal the tree above the scope. A test fails when a field is added
-   to either without updating the allow-list.
+   frontmatter), `updatedAt` and `links` (decision 9). `TreeNodeView` carries `id`, `title`, `kind`
+   and `children`; no slug or path, which would reveal the tree above the scope. A test fails when
+   a field is added to any of them without updating the allow-list.
 6. **Out of scope, unknown and deleted are the same `ErrNotFound`.** Operational errors (tree not
    loaded, file read failure) are passed through, so a broken instance is not reported as a
    missing page. They can contain file system paths, so the HTTP layer answers them with a
@@ -64,6 +64,21 @@ The approach was agreed with the maintainer on #1252.
    in one locked walk, so a tree read can't be torn by a concurrent move. They answer questions
    about structure ("is this node below that one", "what is below this node"), not about
    visibility, so they stay within what `core/tree` may know.
+9. **The reader resolves a page's links, the client doesn't.** A scoped caller has no route
+   paths, so it can't resolve relative links or `[[Title]]` itself. `PageView.links` lists the
+   links whose target is a page inside the scope, with that page's ID (`LinkView`); everything
+   else (external, fragment and asset links, links outside the scope, unknown or ambiguous
+   targets) is left out and shown as plain text. Links are extracted by the link index's rules
+   (`links.ExtractMarkdownLinks`, `ExtractWikiLinkTargets`, imported from `internal/links` on
+   purpose so both see the same links) and resolved against the whole tree, then checked against
+   the scope, so a target outside the scope looks like one that doesn't exist. One deliberate
+   departure from the index: a `[[Title]]` is matched only among the pages inside the scope, and
+   its path hint is tried when none of them match. Counting a same-titled page outside would make
+   the link ambiguous or suppress the hint and so reveal that page; the normal view may therefore
+   show a `[[Title]]` as ambiguous that the shared view resolves. The lookup key (`target`) is an
+   href without query and fragment, percent-decoded, or the trimmed wikilink target. At most 500
+   distinct targets are resolved per read. The content itself is returned as written: link
+   targets the author typed stay visible as text, like the rest of the page.
 
 Abstractions are added with their first use. This ADR's first change adds `ReadScope` and the
 single-page reader; `TreeReader` (the navigation of a scope, the root alone for a single-page

@@ -336,6 +336,25 @@ definitions:
     - checks
     - status
     type: object
+  scopedread.LinkView:
+    properties:
+      kind:
+        description: Kind is "href" for a Markdown link or "wikilink" for [[Target]].
+        type: string
+      pageId:
+        type: string
+      target:
+        description: |-
+          Target is the lookup key. For an href: the destination without query
+          and fragment, percent-decoded (a client takes its rendered href,
+          drops "?…" and "#…" and applies decodeURIComponent per the same rule).
+          For a wikilink: the trimmed target of [[Target]] or [[Target|Alias]].
+        type: string
+    required:
+    - kind
+    - pageId
+    - target
+    type: object
   scopedread.PageView:
     properties:
       content:
@@ -347,6 +366,13 @@ definitions:
           Kind is "page" or "section". A plain string, so the shape seen by
           scoped callers doesn't change with the core NodeKind type.
         type: string
+      links:
+        description: |-
+          Links are the links in Content that lead to a page inside the scope;
+          never null. See LinkView.
+        items:
+          $ref: '#/definitions/scopedread.LinkView'
+        type: array
       title:
         type: string
       updatedAt:
@@ -355,6 +381,7 @@ definitions:
     - content
     - id
     - kind
+    - links
     - title
     - updatedAt
     type: object

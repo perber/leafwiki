@@ -1258,12 +1258,34 @@
                 }
             }
         },
+        "scopedread.LinkView": {
+            "type": "object",
+            "required": [
+                "kind",
+                "pageId",
+                "target"
+            ],
+            "properties": {
+                "kind": {
+                    "description": "Kind is \"href\" for a Markdown link or \"wikilink\" for [[Target]].",
+                    "type": "string"
+                },
+                "pageId": {
+                    "type": "string"
+                },
+                "target": {
+                    "description": "Target is the lookup key. For an href: the destination without query\nand fragment, percent-decoded (a client takes its rendered href,\ndrops \"?…\" and \"#…\" and applies decodeURIComponent per the same rule).\nFor a wikilink: the trimmed target of [[Target]] or [[Target|Alias]].",
+                    "type": "string"
+                }
+            }
+        },
         "scopedread.PageView": {
             "type": "object",
             "required": [
                 "content",
                 "id",
                 "kind",
+                "links",
                 "title",
                 "updatedAt"
             ],
@@ -1277,6 +1299,13 @@
                 "kind": {
                     "description": "Kind is \"page\" or \"section\". A plain string, so the shape seen by\nscoped callers doesn't change with the core NodeKind type.",
                     "type": "string"
+                },
+                "links": {
+                    "description": "Links are the links in Content that lead to a page inside the scope;\nnever null. See LinkView.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/scopedread.LinkView"
+                    }
                 },
                 "title": {
                     "type": "string"

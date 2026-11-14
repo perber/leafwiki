@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -104,7 +105,7 @@ func TestShares_GetSharedPage_ServesTheLinkScope(t *testing.T) {
 				keys = append(keys, k)
 			}
 			sort.Strings(keys)
-			if strings.Join(keys, ",") != "content,id,kind,title,updatedAt" {
+			if strings.Join(keys, ",") != "content,id,kind,links,title,updatedAt" {
 				t.Errorf("response fields = %v, want only the allow-listed page view", keys)
 			}
 			if rec.Header().Get("Referrer-Policy") != "no-referrer" {
@@ -340,5 +341,46 @@ func TestShares_GetSharedTree_SharesNotFoundAndLimit(t *testing.T) {
 	}
 	if rec := f.get("/api/shared/not-a-token/tree", client); rec.Code != http.StatusTooManyRequests {
 		t.Errorf("21st failed lookup across page and tree = %d, want 429", rec.Code)
+	}
+}
+
+// The shared page lists the links that lead inside the link's scope, so the
+// shared view can follow them; a link to a page outside the scope is not
+// listed, and neither is anything that would tell it exists.
+func TestShares_GetSharedPage_ListsLinksInsideTheScope(t *testing.T) {
+	f := newSharesFixture(t)
+	content := "[Contract](contract) [Internal](/internal) [[Contract]] [[Internal]] [[Nowhere]]"
+	body := `{"version":"` + f.version(t, f.customer) + `","title":"Customer","slug":"customer","content":` + strconv.Quote(content) + `}`
+	if rec := authenticatedRequest(t, f.router, http.MethodPut, "/api/pages/"+f.customer, strings.NewReader(body)); rec.Code != http.StatusOK {
+		t.Fatalf("update content: %d %s", rec.Code, rec.Body.String())
+	}
+
+	tests := []struct {
+		name string
+		sub  bool
+		want string
+	}{
+		{name: "subtree link", sub: true, want: `[{"kind":"href","target":"contract","pageId":"` + f.contract + `"},{"kind":"wikilink","target":"Contract","pageId":"` + f.contract + `"}]`},
+		{name: "single-page link", want: `[]`},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := f.get("/api/shared/"+f.link(t, f.customer, tc.sub)+"/page", "")
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+			}
+			var got struct {
+				Links json.RawMessage `json:"links"`
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			if string(got.Links) != tc.want {
+				t.Errorf("links = %s, want %s", got.Links, tc.want)
+			}
+			if strings.Contains(string(got.Links), f.internal) {
+				t.Errorf("links mention a page outside the link: %s", got.Links)
+			}
+		})
 	}
 }
