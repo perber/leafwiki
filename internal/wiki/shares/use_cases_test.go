@@ -3,6 +3,7 @@ package shares
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -176,6 +177,79 @@ func TestGetSharedTreeUseCase_Execute_MapsErrors(t *testing.T) {
 				links.grant = nil
 			}
 			out, err := NewGetSharedTreeUseCase(links, &fakeTreeReader{err: tc.readErr}).Execute(context.Background(), GetSharedTreeInput{Token: "lws_token"})
+			if out != nil {
+				t.Errorf("out = %+v, want nil on error", out)
+			}
+			if tc.wantCode != "" && errorCode(err) != tc.wantCode {
+				t.Errorf("error code = %q (err %v), want %q", errorCode(err), err, tc.wantCode)
+			}
+			if tc.wantWrapped != nil && (!errors.Is(err, tc.wantWrapped) || errorCode(err) != "") {
+				t.Errorf("err = %v, want the unlocalized cause wrapped", err)
+			}
+		})
+	}
+}
+
+type fakeAssetReader struct {
+	err       error
+	gotScope  scopedread.ReadScope
+	gotPageID string
+	gotName   string
+}
+
+func (f *fakeAssetReader) Asset(_ context.Context, scope scopedread.ReadScope, pageID, filename string) (*scopedread.AssetFile, error) {
+	f.gotScope, f.gotPageID, f.gotName = scope, pageID, filename
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &scopedread.AssetFile{Name: filename, Content: nopReadSeekCloser{strings.NewReader("png")}}, nil
+}
+
+type nopReadSeekCloser struct{ *strings.Reader }
+
+func (nopReadSeekCloser) Close() error { return nil }
+
+func TestGetSharedAssetUseCase_Execute_ReadsThroughTheLinkScope(t *testing.T) {
+	links := &fakeResolver{grant: &sharing.Grant{ShareID: "share-1", PageID: "customer", IncludeDescendants: true}}
+	assets := &fakeAssetReader{}
+
+	out, err := NewGetSharedAssetUseCase(links, assets).Execute(context.Background(), GetSharedAssetInput{Token: "lws_token", PageID: "contract", Filename: "scan.pdf"})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if links.got != "lws_token" {
+		t.Errorf("resolved token %q, want lws_token", links.got)
+	}
+	if want := (scopedread.ReadScope{RootID: "customer", IncludeDescendants: true}); assets.gotScope != want {
+		t.Errorf("scope = %+v, want %+v", assets.gotScope, want)
+	}
+	if assets.gotPageID != "contract" || assets.gotName != "scan.pdf" || out.Asset.Name != "scan.pdf" {
+		t.Errorf("read %s/%s (out %q), want contract/scan.pdf", assets.gotPageID, assets.gotName, out.Asset.Name)
+	}
+}
+
+func TestGetSharedAssetUseCase_Execute_MapsErrors(t *testing.T) {
+	storeDown := sharederrors.NewLocalizedError(sharing.ErrCodeShareLinkStoreUnavailable, "m", "t", nil)
+	denied := errors.New("open asset: permission denied")
+
+	tests := []struct {
+		name        string
+		resolveErr  error
+		readErr     error
+		wantCode    string
+		wantWrapped error
+	}{
+		{name: "store suspended for a restore", resolveErr: storeDown, wantCode: sharing.ErrCodeShareLinkStoreUnavailable},
+		{name: "page outside the scope or file missing", readErr: scopedread.ErrNotFound, wantCode: sharing.ErrCodeShareLinkNotFound},
+		{name: "operational error is not a missing asset", readErr: denied, wantWrapped: denied},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			links := &fakeResolver{grant: &sharing.Grant{ShareID: "share-1", PageID: "customer"}, err: tc.resolveErr}
+			if tc.resolveErr != nil {
+				links.grant = nil
+			}
+			out, err := NewGetSharedAssetUseCase(links, &fakeAssetReader{err: tc.readErr}).Execute(context.Background(), GetSharedAssetInput{Token: "lws_token", PageID: "customer", Filename: "a.png"})
 			if out != nil {
 				t.Errorf("out = %+v, want nil on error", out)
 			}
