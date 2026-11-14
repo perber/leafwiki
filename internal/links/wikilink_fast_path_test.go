@@ -8,14 +8,14 @@ import (
 
 func TestExtractWikiLinksFromMarkdown_NonWikilinkDocuments_ReturnNoTargets(t *testing.T) {
 	for _, content := range []string{"", "Plain text [link](/page)", "`code`\n\n```go\nvar x = 1\n```", "[[unfinished", "[[ -n $value ]]"} {
-		if got := extractWikiLinksFromMarkdown(content); len(got) != 0 {
+		if got := ExtractWikiLinkTargets(content); len(got) != 0 {
 			t.Fatalf("%q: got %v", content, got)
 		}
 	}
 }
 func TestExtractWikiLinksFromMarkdown_MixedCodeAndUnicode_PreservesTargets(t *testing.T) {
 	content := "[[Überblick]] [[Notes|Alias]] `[[Inline]]`\n\n```\n[[Fenced]]\n```\n\n    [[Indented]]\n\n[[Überblick]]"
-	if got := extractWikiLinksFromMarkdown(content); !reflect.DeepEqual(got, []string{"Überblick", "Notes"}) {
+	if got := ExtractWikiLinkTargets(content); !reflect.DeepEqual(got, []string{"Überblick", "Notes"}) {
 		t.Fatalf("got %v", got)
 	}
 }
@@ -28,7 +28,7 @@ func BenchmarkExtractWikiLinksFastPath(b *testing.B) {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for b.Loop() {
-				extractWikiLinksFromMarkdown(tc.content)
+				ExtractWikiLinkTargets(tc.content)
 			}
 		})
 	}
