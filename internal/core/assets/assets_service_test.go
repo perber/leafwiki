@@ -468,3 +468,69 @@ func TestValidateServedName_RejectsWindowsAliases(t *testing.T) {
 		}
 	}
 }
+
+// Names that Windows normalises or resolves specially (trailing dots and
+// spaces, alternate data streams, 8.3 short names, device names, NUL) and names
+// that are too long. Whatever such a name does on the platform, it is either
+// ErrAssetNotFound or a file of the requested page's own folder; it never
+// yields a file of another page or one outside the page's folder.
+func TestOpenAsset_WindowsAliasesStayInThePageFolder(t *testing.T) {
+	tmp := t.TempDir()
+	service := NewAssetService(tmp, tree.NewSlugService())
+	for name, content := range map[string]string{
+		filepath.Join("a7b3", "salaries-2024.png"): "own",
+		filepath.Join("b9c1", "salaries-2024.png"): "peer",
+		filepath.Join("b9c1", "peer.png"):          "peer",
+		"outside.png":                              "outside",
+	} {
+		path := filepath.Join(tmp, "assets", name)
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatalf("MkdirAll: %v", err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+	}
+
+	tests := []struct{ name, pageID, filename, owner string }{
+		{"trailing dot", "a7b3", "salaries-2024.png.", "own"},
+		{"trailing space", "a7b3", "salaries-2024.png ", "own"},
+		{"alternate data stream", "a7b3", "salaries-2024.png:secret", "own"},
+		{"default data stream", "a7b3", "salaries-2024.png::$DATA", "own"},
+		{"short 8.3 name", "a7b3", "SALARI~1.PNG", "own"},
+		{"short 8.3 name of the peer file", "a7b3", "PEER~1.PNG", "own"},
+		{"device name", "a7b3", "CON", "own"},
+		{"device name with extension", "a7b3", "aux.png", "own"},
+		{"nul device", "a7b3", "NUL", "own"},
+		{"nul byte", "a7b3", "salaries-2024.png\x00.txt", "own"},
+		{"drive-relative name", "a7b3", "C:peer.png", "own"},
+		{"unicode name", "a7b3", "gehälter-日本.png", "own"},
+		{"too long name", "a7b3", strings.Repeat("a", 300) + ".png", "own"},
+		{"another page's file name", "a7b3", "peer.png", "own"},
+		{"page id with a trailing dot", "b9c1.", "peer.png", "peer"},
+		{"page id with a trailing space", "b9c1 ", "peer.png", "peer"},
+		{"page id with a stream", "a7b3::$INDEX_ALLOCATION", "salaries-2024.png", "own"},
+		{"page id that is a drive", "C:", "outside.png", "own"},
+		{"page id that is a device", "NUL", "peer.png", "own"},
+		{"page id with a nul byte", "a7b3\x00", "salaries-2024.png", "own"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			f, err := service.OpenAsset(tc.pageID, tc.filename)
+			if err != nil {
+				if !errors.Is(err, ErrAssetNotFound) {
+					t.Fatalf("OpenAsset(%q, %q) err = %v, want ErrAssetNotFound or a file of the page", tc.pageID, tc.filename, err)
+				}
+				return
+			}
+			defer func() { _ = f.Close() }()
+			body, readErr := io.ReadAll(f)
+			if readErr != nil {
+				t.Fatalf("ReadAll: %v", readErr)
+			}
+			if string(body) != tc.owner {
+				t.Fatalf("OpenAsset(%q, %q) served %q, want only a file of the requested page (%q)", tc.pageID, tc.filename, body, tc.owner)
+			}
+		})
+	}
+}
