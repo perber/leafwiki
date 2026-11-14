@@ -85,7 +85,8 @@ filesystem-canonical (`tree`, `revision`) and SQLite-derived (`links`, `tags`, `
   policy implemented on top of this.
 - **`internal/core/assets`** — per-page file attachments (`assets_service.go`): upload, list,
   delete, path resolution under each page's asset directory; enforces the configured max upload
-  size.
+  size. `OpenAsset` opens one file through an `os.Root` on the page's folder, for readers that
+  serve single files.
 - **`internal/core/excerpt`** — `excerpt.go` renders a short plain-text excerpt (`MaxRunes = 180`)
   from a page's markdown via `goldmark` + `bluemonday` HTML sanitization, used by search results
   and tag listings. `FromBodyStart` does the same over the start of the body, for excerpts built
@@ -158,7 +159,8 @@ resync-derived state.
   `PageReader`, which checks the scope before reading and returns an allow-listed `PageView` with
   the page's links that lead inside the scope (`links.go`), and
   `TreeReader`, which returns the scope as a tree of allow-listed `TreeNodeView`s with nothing above
-  the root. Out of scope, unknown and deleted pages are the same `ErrNotFound`.
+  the root, and `AssetReader`, which checks the scope before opening a page's asset. Out of scope,
+  unknown and deleted pages are the same `ErrNotFound`.
   [ADR-0015](./adr/0015-scoped-read-boundary.md).
 - **`internal/sharing`** — share links (#1252, experimental, `--enable-share-links`):
   `share_link_store.go` (`share_links.db`, own file, real state, part of full backup/restore;

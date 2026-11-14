@@ -40,7 +40,7 @@ const maxScopedLinkTargets = 500
 // linkSource is what resolving a page's links needs from the tree.
 // *tree.TreeService implements it.
 type linkSource interface {
-	subtreeChecker
+	SubtreeChecker
 	ResolvePermalinkTarget(id string) (*tree.PermalinkTarget, error)
 	RouteByPath(routePath string) (tree.RouteEntry, error)
 	RoutesByTitle(title string) ([]tree.RouteEntry, error)

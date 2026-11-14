@@ -45,8 +45,9 @@ type ReadScope struct {
 	IncludeDescendants bool
 }
 
-// subtreeChecker is the slice of the tree a scope check needs.
-type subtreeChecker interface {
+// SubtreeChecker is the slice of the tree a scope check needs.
+// *tree.TreeService implements it.
+type SubtreeChecker interface {
 	IsInSubtree(id, rootID string) (bool, error)
 }
 
@@ -58,17 +59,16 @@ func (s ReadScope) validate() error {
 	return nil
 }
 
-// check returns nil if id is inside the scope and ErrNotFound if it is not.
+// check returns nil if id is an existing page inside the scope and
+// ErrNotFound if it is not. It asks the tree even for a single-page scope, so
+// a reader of files keyed by page ID (assets) can't serve a deleted page's.
 // It never reads page content.
-func (s ReadScope) check(src subtreeChecker, id string) error {
+func (s ReadScope) check(src SubtreeChecker, id string) error {
 	if id == "" {
 		return ErrNotFound
 	}
-	if !s.IncludeDescendants {
-		if id != s.RootID {
-			return ErrNotFound
-		}
-		return nil
+	if !s.IncludeDescendants && id != s.RootID {
+		return ErrNotFound
 	}
 	in, err := src.IsInSubtree(id, s.RootID)
 	if errors.Is(err, tree.ErrPageNotFound) {
