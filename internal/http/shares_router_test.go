@@ -342,3 +342,92 @@ func TestShares_GetSharedTree_SharesNotFoundAndLimit(t *testing.T) {
 		t.Errorf("21st failed lookup across page and tree = %d, want 429", rec.Code)
 	}
 }
+
+// Assets go through the link's scope: the assets of pages inside it are
+// served with the untrusted-file headers, everything else is the uniform 404,
+// also for an asset of a page outside the link that a shared page embeds.
+func TestShares_GetSharedAsset_ServesOnlyTheLinkScope(t *testing.T) {
+	f := newSharesFixture(t)
+	uploadAssetViaAPI(t, f.router, f.customer, "logo.png", "customer logo")
+	uploadAssetViaAPI(t, f.router, f.contract, "scan.pdf", "contract scan")
+	uploadAssetViaAPI(t, f.router, f.internal, "salaries.png", "internal")
+	single := f.link(t, f.customer, false)
+	subtree := f.link(t, f.customer, true)
+	notFound := f.get("/api/shared/not-a-token/page", "").Body.String()
+
+	tests := []struct {
+		name string
+		url  string
+		want string // "" for the uniform 404, "router" for the router's own 404
+	}{
+		{name: "the shared page's asset", url: "/api/shared/" + single + "/assets/" + f.customer + "/logo.png", want: "customer logo"},
+		{name: "a subpage's asset through a subtree link", url: "/api/shared/" + subtree + "/assets/" + f.contract + "/scan.pdf", want: "contract scan"},
+		{name: "a subpage's asset through a single-page link", url: "/api/shared/" + single + "/assets/" + f.contract + "/scan.pdf"},
+		{name: "an asset of a page outside the link", url: "/api/shared/" + subtree + "/assets/" + f.internal + "/salaries.png"},
+		{name: "a missing file", url: "/api/shared/" + subtree + "/assets/" + f.customer + "/nope.png"},
+		{name: "a traversal to another page's asset", url: "/api/shared/" + subtree + "/assets/" + f.customer + "/..%2F" + f.internal + "%2Fsalaries.png", want: "router"},
+		{name: "the asset folder of the tree root", url: "/api/shared/" + subtree + "/assets/root/logo.png"},
+		{name: "an unknown link", url: "/api/shared/lws_" + strings.Repeat("A", 43) + "/assets/" + f.customer + "/logo.png"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := f.get(tc.url, "")
+			if tc.want == "router" {
+				// the decoded "/" makes the path match no route at all
+				if rec.Code != http.StatusNotFound || strings.Contains(rec.Body.String(), "internal") {
+					t.Fatalf("got %d %s, want a 404 without content", rec.Code, rec.Body.String())
+				}
+				return
+			}
+			if tc.want == "" {
+				if rec.Code != http.StatusNotFound || rec.Body.String() != notFound {
+					t.Fatalf("got %d %s, want the uniform 404 %s", rec.Code, rec.Body.String(), notFound)
+				}
+				return
+			}
+			if rec.Code != http.StatusOK || rec.Body.String() != tc.want {
+				t.Fatalf("got %d %q, want 200 %q", rec.Code, rec.Body.String(), tc.want)
+			}
+			for h, v := range map[string]string{"X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Cache-Control": "no-store"} {
+				if rec.Header().Get(h) != v {
+					t.Errorf("%s = %q, want %q", h, rec.Header().Get(h), v)
+				}
+			}
+		})
+	}
+}
+
+// A page moved out of the scope takes its assets with it, and a deleted
+// page's assets are gone through the link.
+func TestShares_GetSharedAsset_FollowsMovesAndDeletes(t *testing.T) {
+	f := newSharesFixture(t)
+	uploadAssetViaAPI(t, f.router, f.contract, "scan.pdf", "contract scan")
+	url := "/api/shared/" + f.link(t, f.customer, true) + "/assets/" + f.contract + "/scan.pdf"
+	if rec := f.get(url, ""); rec.Code != http.StatusOK {
+		t.Fatalf("before the move = %d, want 200", rec.Code)
+	}
+
+	f.move(t, f.contract, "root")
+	if rec := f.get(url, ""); rec.Code != http.StatusNotFound {
+		t.Errorf("after moving the page out = %d, want 404", rec.Code)
+	}
+	f.move(t, f.contract, f.customer)
+	deletePageViaAPI(t, f.router, f.contract, f.version(t, f.contract), false)
+	if rec := f.get(url, ""); rec.Code != http.StatusNotFound {
+		t.Errorf("after deleting the page = %d, want 404", rec.Code)
+	}
+}
+
+// Range requests work, so a browser can stream a video or a large PDF.
+func TestShares_GetSharedAsset_SupportsRanges(t *testing.T) {
+	f := newSharesFixture(t)
+	uploadAssetViaAPI(t, f.router, f.customer, "clip.txt", "0123456789")
+	req := httptest.NewRequest(http.MethodGet, "/api/shared/"+f.link(t, f.customer, false)+"/assets/"+f.customer+"/clip.txt", nil)
+	req.Header.Set("Range", "bytes=2-4")
+	rec := httptest.NewRecorder()
+	f.router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusPartialContent || rec.Body.String() != "234" {
+		t.Fatalf("got %d %q, want 206 \"234\"", rec.Code, rec.Body.String())
+	}
+}

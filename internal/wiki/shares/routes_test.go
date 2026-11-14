@@ -132,3 +132,81 @@ func TestRoutes_HandleGetSharedTree_AnswersErrorsGenerically(t *testing.T) {
 		t.Errorf("response leaks the cause: %s", rec.Body.String())
 	}
 }
+
+type fakeAssetGetter struct {
+	out *GetSharedAssetOutput
+	err error
+}
+
+func (f fakeAssetGetter) Execute(context.Context, GetSharedAssetInput) (*GetSharedAssetOutput, error) {
+	return f.out, f.err
+}
+
+func serveSharedAsset(t *testing.T, getter sharedAssetGetter, name string) *httptest.ResponseRecorder {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	r := &Routes{getAsset: getter, limiter: newFailedTokenLimiter(), log: slog.Default()}
+	engine.GET("/api/shared/:token/assets/:pageId/:name", r.handleGetSharedAsset)
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/shared/lws_token/assets/customer/"+name, nil))
+	return rec
+}
+
+// The asset is served with the untrusted-file headers of /assets: an SVG in
+// a sandbox, a non-image file as a download.
+func TestRoutes_HandleGetSharedAsset_ServesTheFileHardened(t *testing.T) {
+	tests := []struct {
+		name            string
+		wantType        string
+		wantDisposition string
+		wantCSP         string
+	}{
+		{name: "pic.svg", wantType: "image/svg+xml", wantDisposition: "attachment", wantCSP: "sandbox"},
+		{name: "pic.png", wantType: "image/png", wantDisposition: "inline", wantCSP: "sandbox"},
+		{name: "page.html", wantType: "text/html; charset=utf-8", wantDisposition: "attachment", wantCSP: "sandbox"},
+		{name: "doc.pdf", wantType: "application/pdf", wantDisposition: "inline", wantCSP: ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			closed := &closeRecorder{Reader: strings.NewReader("<svg onload=alert(1)>")}
+			out := &GetSharedAssetOutput{Asset: &scopedread.AssetFile{Name: tc.name, Content: closed}}
+			rec := serveSharedAsset(t, fakeAssetGetter{out: out}, tc.name)
+
+			if rec.Code != http.StatusOK || rec.Body.String() != "<svg onload=alert(1)>" {
+				t.Fatalf("got %d %q", rec.Code, rec.Body.String())
+			}
+			h := rec.Header()
+			if h.Get("Content-Type") != tc.wantType || h.Get("X-Content-Type-Options") != "nosniff" || h.Get("Content-Security-Policy") != tc.wantCSP {
+				t.Errorf("headers = %v", h)
+			}
+			if !strings.HasPrefix(h.Get("Content-Disposition"), tc.wantDisposition) {
+				t.Errorf("Content-Disposition = %q, want %s", h.Get("Content-Disposition"), tc.wantDisposition)
+			}
+			if !closed.closed {
+				t.Error("the asset was not closed")
+			}
+		})
+	}
+}
+
+func TestRoutes_HandleGetSharedAsset_AnswersErrorsGenerically(t *testing.T) {
+	rec := serveSharedAsset(t, fakeAssetGetter{err: errors.New("open /data/assets/x: permission denied")}, "x.png")
+
+	if rec.Code != http.StatusInternalServerError || !strings.Contains(rec.Body.String(), ErrCodeShareLinkInternal) {
+		t.Fatalf("got %d %s, want 500 %s", rec.Code, rec.Body.String(), ErrCodeShareLinkInternal)
+	}
+	if strings.Contains(rec.Body.String(), "/data/") {
+		t.Errorf("response leaks the cause: %s", rec.Body.String())
+	}
+}
+
+type closeRecorder struct {
+	*strings.Reader
+	closed bool
+}
+
+func (c *closeRecorder) Close() error {
+	c.closed = true
+	return nil
+}

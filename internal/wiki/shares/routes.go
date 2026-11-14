@@ -28,20 +28,26 @@ type sharedTreeGetter interface {
 	Execute(ctx context.Context, in GetSharedTreeInput) (*GetSharedTreeOutput, error)
 }
 
+type sharedAssetGetter interface {
+	Execute(ctx context.Context, in GetSharedAssetInput) (*GetSharedAssetOutput, error)
+}
+
 // Routes is the RouteRegistrar for reading through share links. All its
 // routes share one failed-lookup limiter.
 type Routes struct {
-	getPage sharedPageGetter
-	getTree sharedTreeGetter
-	limiter *security.KeyedLimiter
-	log     *slog.Logger
+	getPage  sharedPageGetter
+	getTree  sharedTreeGetter
+	getAsset sharedAssetGetter
+	limiter  *security.KeyedLimiter
+	log      *slog.Logger
 }
 
 // RoutesConfig holds the dependencies required to build a Routes instance.
 type RoutesConfig struct {
-	GetPage *GetSharedPageUseCase
-	GetTree *GetSharedTreeUseCase
-	Log     *slog.Logger
+	GetPage  *GetSharedPageUseCase
+	GetTree  *GetSharedTreeUseCase
+	GetAsset *GetSharedAssetUseCase
+	Log      *slog.Logger
 }
 
 // NewRoutes constructs the shares RouteRegistrar.
@@ -50,7 +56,13 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Routes{getPage: cfg.GetPage, getTree: cfg.GetTree, limiter: newFailedTokenLimiter(), log: log.With("component", "shares")}
+	return &Routes{
+		getPage:  cfg.GetPage,
+		getTree:  cfg.GetTree,
+		getAsset: cfg.GetAsset,
+		limiter:  newFailedTokenLimiter(),
+		log:      log.With("component", "shares"),
+	}
 }
 
 func newFailedTokenLimiter() *security.KeyedLimiter {
@@ -65,6 +77,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	g.GET("/:token/page", r.handleGetSharedRootPage)
 	g.GET("/:token/pages/:id", r.handleGetSharedPage)
 	g.GET("/:token/tree", r.handleGetSharedTree)
+	g.GET("/:token/assets/:pageId/:name", r.handleGetSharedAsset)
 }
 
 // ─── Handlers ───────────────────────────────────────────────────────────────
@@ -142,17 +155,56 @@ func (r *Routes) handleGetSharedTree(c *gin.Context) {
 	})
 }
 
+// handleGetSharedAsset handles GET /api/shared/:token/assets/:pageId/:name
+//
+//	@Summary		Read an asset through a share link
+//	@Description	Returns an asset of the shared page or, for a link that includes subpages, of a page below it. The link's scope is checked before the file is opened, so the assets of a page outside the link are unreachable even when a shared page embeds them. The token in the path is the only authorization. A page outside the link, an unknown link and a missing file get the same 404. Requires --enable-share-links.
+//	@Description	Responses carry the headers of /assets (X-Content-Type-Options: nosniff, Content-Security-Policy: sandbox except for PDFs, Content-Disposition inline for raster images, audio, video and PDFs, attachment otherwise, SVG included) plus Referrer-Policy: no-referrer, X-Robots-Tag: noindex, nofollow and Cache-Control: no-store. Range requests are supported.
+//	@Tags			shared
+//	@Produce		octet-stream
+//	@Param			token	path		string				true	"Share link token"
+//	@Param			pageId	path		string				true	"ID of the page the asset belongs to"
+//	@Param			name	path		string				true	"File name"
+//	@Success		200		{file}		binary				"The asset"
+//	@Failure		404		{object}	dto.ErrorResponse	"Unknown, malformed, expired or revoked link, a page outside the link, or no such file (code share_link_not_found)"
+//	@Failure		429		{object}	dto.ErrorResponse	"Too many failed link lookups from this client (code share_link_too_many_attempts)"
+//	@Failure		500		{object}	dto.ErrorResponse	"Reading the asset failed (code share_link_internal_error)"
+//	@Failure		503		{object}	dto.ErrorResponse	"Share link store unavailable during a live restore (code share_link_store_unavailable)"
+//	@Router			/shared/{token}/assets/{pageId}/{name} [get]
+func (r *Routes) handleGetSharedAsset(c *gin.Context) {
+	key := security.ClientKey(c)
+	out, err := r.getAsset.Execute(c.Request.Context(), GetSharedAssetInput{
+		Token: c.Param("token"), PageID: c.Param("pageId"), Filename: c.Param("name"),
+	})
+	if err != nil {
+		r.respondFailure(c, key, err)
+		return
+	}
+	r.limiter.NotifyResult(key, true)
+	defer func() { _ = out.Asset.Content.Close() }()
+	security.SetUntrustedFileHeaders(c.Writer.Header(), out.Asset.Name)
+	http.ServeContent(c.Writer, c.Request, out.Asset.Name, out.Asset.ModTime, out.Asset.Content)
+}
+
 // serveShared runs read, which resolves the link first, so a valid link is
-// never throttled; only failed lookups count towards the per-client limit,
-// and once it is reached they get 429 instead of 404. All failure causes look
-// the same, so the limit reveals nothing about which links exist.
+// never throttled, and answers its result as JSON.
 func (r *Routes) serveShared(c *gin.Context, read func(ctx context.Context, token string) (any, error)) {
 	key := security.ClientKey(c)
 	body, err := read(c.Request.Context(), c.Param("token"))
+	if err != nil {
+		r.respondFailure(c, key, err)
+		return
+	}
+	r.limiter.NotifyResult(key, true)
+	c.JSON(http.StatusOK, body)
+}
+
+// respondFailure answers a failed shared read. Only failed lookups count
+// towards the per-client limit, and once it is reached they get 429 instead
+// of 404. All failure causes look the same, so the limit reveals nothing
+// about which links exist.
+func (r *Routes) respondFailure(c *gin.Context, key string, err error) {
 	switch {
-	case err == nil:
-		r.limiter.NotifyResult(key, true)
-		c.JSON(http.StatusOK, body)
 	case isNotFound(err) && !r.limiter.Allow(key):
 		respondTooManyAttempts(c)
 	case isNotFound(err):

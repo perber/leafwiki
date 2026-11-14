@@ -42,6 +42,9 @@ func TestShares_AccessLog_NeverContainsTheToken(t *testing.T) {
 		{"GET", "/api/shared/" + token + "/tree?t=" + token},
 		{"HEAD", "/api/shared/" + token + "/tree"},
 		{"POST", "/api/shared/" + token + "/tree"},
+		{"GET", "/api/shared/" + token + "/assets/" + f.customer + "/logo.png"},
+		{"GET", "/api/shared/" + token + "/assets/" + f.customer + "/logo.png?t=" + token},
+		{"GET", "/api/shared/" + token + "/assets/" + f.customer + "/..%2F..%2F" + token},
 	}
 	for _, tc := range tests {
 		req := httptest.NewRequest(tc.method, tc.url, nil)

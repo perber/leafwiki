@@ -301,13 +301,14 @@ shape for that domain.
   package (search query endpoint, tag listing/filter, property listing/filter, backlink/link-status
   endpoints respectively).
 - **`internal/wiki/shares`** — the public read surface of share links (#1252, `--enable-share-links`):
-  `GET /api/shared/{token}/page`, `/pages/{id}` and `/tree` in a capability group
-  ([ADR-0019](./adr/0019-capability-routes-without-identity.md)). The use cases resolve the token to a
-  `sharing.Grant`, turn it into a `scopedread.ReadScope` (`resolveScope`) and read through
-  `scopedread.PageReader` or `TreeReader` ([ADR-0015](./adr/0015-scoped-read-boundary.md)); every "no
-  such link or page" is the same 404, and failed lookups on any of the routes count towards one
-  per-client limit. The slice is registered at boot only when share links
-  are enabled; a runtime admin switch would move that decision into a provider checked per request.
+  `GET /api/shared/{token}/page`, `/pages/{id}`, `/tree` and `/assets/{pageId}/{name}` in a
+  capability group ([ADR-0019](./adr/0019-capability-routes-without-identity.md)). The use cases
+  resolve the token to a `sharing.Grant`, turn it into a `scopedread.ReadScope` (`resolveScope`)
+  and read through `scopedread.PageReader`, `TreeReader` or `AssetReader`
+  ([ADR-0015](./adr/0015-scoped-read-boundary.md)); every "no such link or page" is the same 404,
+  and failed lookups on any of the routes count towards one per-client limit. The slice is
+  registered at boot only when share links are enabled; a runtime admin switch would move that
+  decision into a provider checked per request.
 - **`internal/wiki/apikeys`** — API key CRUD HTTP surface over `core/auth`'s `APIKeyService`.
 - **`internal/wiki/assets`** — per-page asset upload/list/delete HTTP surface over
   `core/assets`.
