@@ -2,6 +2,7 @@ package assets
 
 import (
 	"errors"
+	"io"
 	"mime/multipart"
 	"os"
 	"path/filepath"
@@ -351,5 +352,119 @@ func TestSaveAssetForPage_TooLarge_DoesNotLeavePartialFile(t *testing.T) {
 
 	if len(entries) != 0 {
 		t.Fatalf("expected no files after failed upload, got %d", len(entries))
+	}
+}
+
+func TestOpenAsset_ReadsTheFile(t *testing.T) {
+	tmp := t.TempDir()
+	service := NewAssetService(tmp, tree.NewSlugService())
+	pageDir := filepath.Join(tmp, "assets", "a7b3")
+	if err := os.MkdirAll(pageDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(pageDir, "my image.png"), []byte("hello image"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	f, err := service.OpenAsset("a7b3", "my image.png")
+	if err != nil {
+		t.Fatalf("OpenAsset: %v", err)
+	}
+	t.Cleanup(func() { _ = f.Close() })
+	body, err := io.ReadAll(f)
+	if err != nil || string(body) != "hello image" {
+		t.Fatalf("content = %q, %v, want hello image", body, err)
+	}
+}
+
+// Anything that is not a regular file directly in the page's asset folder is
+// ErrAssetNotFound, before or without touching the disk.
+func TestOpenAsset_NotFound(t *testing.T) {
+	tmp := t.TempDir()
+	service := NewAssetService(tmp, tree.NewSlugService())
+	pageDir := filepath.Join(tmp, "assets", "a7b3")
+	if err := os.MkdirAll(filepath.Join(pageDir, "folder"), 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	for name, content := range map[string]string{
+		filepath.Join(tmp, "assets", "a7b3", "ok.png"):   "ok",
+		filepath.Join(tmp, "assets", "other.png"):        "outside the page folder",
+		filepath.Join(tmp, "secret.txt"):                 "outside the assets folder",
+		filepath.Join(tmp, "assets", "b9c1", "peer.png"): "another page's asset",
+	} {
+		if err := os.MkdirAll(filepath.Dir(name), 0755); err != nil {
+			t.Fatalf("MkdirAll: %v", err)
+		}
+		if err := os.WriteFile(name, []byte(content), 0644); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+	}
+
+	tests := []struct{ name, pageID, filename string }{
+		{"unknown file", "a7b3", "missing.png"},
+		{"unknown page folder", "zzzz", "ok.png"},
+		{"a directory", "a7b3", "folder"},
+		{"empty name", "a7b3", ""},
+		{"empty page id", "", "other.png"},
+		{"dot dot name", "a7b3", ".."},
+		{"traversal in name", "a7b3", "../other.png"},
+		{"backslash traversal in name", "a7b3", `..\other.png`},
+		{"traversal to another page", "a7b3", "../b9c1/peer.png"},
+		{"dot dot page id", "..", "secret.txt"},
+		{"traversal in page id", "../..", "secret.txt"},
+		{"page id with a separator", "a7b3/folder", "ok.png"},
+		{"dot page id", ".", "other.png"},
+		{"absolute name", "a7b3", filepath.Join(tmp, "secret.txt")},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			f, err := service.OpenAsset(tc.pageID, tc.filename)
+			if f != nil {
+				_ = f.Close()
+			}
+			if !errors.Is(err, ErrAssetNotFound) {
+				t.Fatalf("OpenAsset(%q, %q) err = %v, want ErrAssetNotFound", tc.pageID, tc.filename, err)
+			}
+		})
+	}
+}
+
+// A symlink inside the page's folder must not lead out of it.
+func TestOpenAsset_DoesNotFollowSymlinksOut(t *testing.T) {
+	tmp := t.TempDir()
+	service := NewAssetService(tmp, tree.NewSlugService())
+	pageDir := filepath.Join(tmp, "assets", "a7b3")
+	if err := os.MkdirAll(pageDir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	secret := filepath.Join(tmp, "secret.txt")
+	if err := os.WriteFile(secret, []byte("secret"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	if err := os.Symlink(secret, filepath.Join(pageDir, "link.png")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	f, err := service.OpenAsset("a7b3", "link.png")
+	if f != nil {
+		_ = f.Close()
+	}
+	if !errors.Is(err, ErrAssetNotFound) {
+		t.Fatalf("err = %v, want ErrAssetNotFound", err)
+	}
+}
+
+// Names Windows would alias to another file or folder are rejected before the
+// disk is touched, on every platform.
+func TestValidateServedName_RejectsWindowsAliases(t *testing.T) {
+	for _, name := range []string{"b9c1.", "b9c1 ", "a.png:secret", "a.png::$DATA", "C:x.png", "a\x00b", "a\tb", "a\x7fb", "..", "a/b"} {
+		if err := validateServedName(name); err == nil {
+			t.Errorf("validateServedName(%q) = nil, want an error", name)
+		}
+	}
+	for _, name := range []string{"a7b3", "my image.png", "report.v2.pdf", "Bild-ä.png", "x_y-z"} {
+		if err := validateServedName(name); err != nil {
+			t.Errorf("validateServedName(%q) = %v, want nil", name, err)
+		}
 	}
 }
