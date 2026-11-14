@@ -7,13 +7,12 @@ on:
   schedule:
     - cron: "0 3 1 * *"
 
-permissions:
-  packages: write
-
 jobs:
   cleanup-closed-pr:
     if: github.event_name == 'pull_request_target'
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
 
     steps:
       - name: Delete closed PR images
@@ -55,6 +54,8 @@ jobs:
   cleanup-old-images:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
 
     steps:
       - name: Delete old PR images
