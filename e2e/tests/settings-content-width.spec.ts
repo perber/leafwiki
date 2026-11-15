@@ -1,5 +1,11 @@
 import { type Page, expect, test } from '@playwright/test';
-import { createPageViaApi, csrfHeader, loggedIn, setContentWidth } from '../helpers/apiContext';
+import {
+  createPageViaApi,
+  csrfHeader,
+  loggedIn,
+  setAlwaysShowToc,
+  setContentWidth,
+} from '../helpers/apiContext';
 import LoginPage from '../pages/LoginPage';
 import ViewPage from '../pages/ViewPage';
 import { toAppPath } from '../pages/appPath';
@@ -13,6 +19,7 @@ const paragraph =
 // Instance-wide setting: always reset it so other specs see the default.
 test.afterEach(async () => {
   await setContentWidth('default');
+  await setAlwaysShowToc(false);
 });
 
 async function createLongPage() {
@@ -109,6 +116,77 @@ test('"wide" keeps the 680px column in the editor preview', async ({ page }) => 
     readingColumn,
   );
   expect(prose!.width).toBeLessThanOrEqual(readingColumn);
+});
+
+// With the TOC side panel open or collapsed, "wide" content must still line
+// up with the header rows and never run under the panel.
+for (const tocState of ['expanded', 'collapsed'] as const) {
+  test(`"wide" stays aligned next to the ${tocState} TOC side panel`, async ({ page }) => {
+    const slug = await createLongPage();
+    await setContentWidth('wide');
+    await setAlwaysShowToc(true);
+    await page.setViewportSize({ width: 1600, height: 900 });
+    const loginPage = new LoginPage(page);
+    const viewPage = new ViewPage(page);
+    await loginPage.loginViaApi(user, password);
+    await viewPage.expectUserLoggedIn();
+
+    await page.goto(toAppPath(`/${slug}`));
+    await expect(page.locator('article>h1')).toHaveText('Content Width');
+    const panel = page.getByTestId('toc-side-panel');
+    await expect(panel).toBeVisible();
+    if (tocState === 'collapsed') {
+      await page.getByTestId('toc-side-panel-collapse').click();
+      await expect(page.getByTestId('toc-side-panel-expand')).toBeVisible();
+    } else if (await page.getByTestId('toc-side-panel-expand').isVisible()) {
+      await page.getByTestId('toc-side-panel-expand').click();
+    }
+
+    const wide = await measureViewer(page);
+    const panelBox = (await panel.boundingBox())!;
+    expect(wide.paragraph.width).toBeGreaterThan(readingColumn);
+    expect(
+      wide.content.x + wide.content.width,
+      'content ends before the TOC panel starts',
+    ).toBeLessThanOrEqual(panelBox.x + 1);
+    for (const [name, row] of [
+      ['subheader', wide.subheaderInner],
+      ['metadata bar', wide.metadataInner],
+    ] as const) {
+      expect(
+        Math.abs(row.x - wide.content.x),
+        `${name} row starts where the content starts`,
+      ).toBeLessThan(3);
+    }
+  });
+}
+
+test('"wide" keeps the 680px column in the page history preview', async ({ page }) => {
+  const slug = await createLongPage();
+  await setContentWidth('wide');
+  await page.setViewportSize({ width: 2200, height: 900 });
+  const loginPage = new LoginPage(page);
+  const viewPage = new ViewPage(page);
+  await loginPage.loginViaApi(user, password);
+  await viewPage.expectUserLoggedIn();
+
+  await page.goto(toAppPath(`/history/${slug}`));
+  const content = page.getByTestId('page-history-page-content');
+  // The history page opens the previous revision; preview the current one,
+  // which holds the long paragraph.
+  await page
+    .locator('button[data-testid^="history-sidebar-revision-"]', {
+      has: page.locator('[data-testid^="history-sidebar-revision-current-badge-"]'),
+    })
+    .click();
+  const prose = content.locator('p').first();
+  await expect(prose).toBeVisible();
+  const contentBox = (await content.boundingBox())!;
+  const proseBox = (await prose.boundingBox())!;
+  expect(contentBox.width, 'precondition: the preview is wider than the column').toBeGreaterThan(
+    readingColumn,
+  );
+  expect(proseBox.width).toBeLessThanOrEqual(readingColumn);
 });
 
 test('only admins can change the page width', async () => {
