@@ -4,7 +4,7 @@ import { useDialogsStore } from '@/stores/dialogs'
 import { useTreeStore } from '@/stores/tree'
 import { DEFAULT_PAGE_DISPLAY } from '@/lib/pageDisplay'
 import { useConfigStore } from '@/stores/config'
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import type React from 'react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -213,5 +213,86 @@ describe('TreeNode subpage count', () => {
         screen.getByTestId(`tree-node-subpage-count-${target.id}`),
       ).getByText('1'),
     ).toBeInTheDocument()
+  })
+
+  // The tree re-renders memoised rows from fresh store objects; the count
+  // must follow a local move (drag and drop) and a turned-on setting
+  // without a reload.
+  describe('follows store updates', () => {
+    const findNode = (n: PageNode | null, id: string): PageNode | null => {
+      if (!n) return null
+      if (n.id === id) return n
+      for (const c of n.children ?? []) {
+        const hit = findNode(c, id)
+        if (hit) return hit
+      }
+      return null
+    }
+    function FromStore({ id }: { id: string }) {
+      const n = useTreeStore((s) => findNode(s.tree, id))
+      return n ? <TreeNode node={n} /> : null
+    }
+    const countOf = (id: string) =>
+      screen.queryByTestId(`tree-node-subpage-count-${id}`)?.firstChild
+        ?.textContent ?? null
+
+    beforeEach(() => {
+      const guides = {
+        ...section([
+          { ...child('a'), parentId: 'guides' },
+          { ...child('b'), parentId: 'guides' },
+        ]),
+        id: 'guides',
+        parentId: 'root',
+      }
+      const target = { ...node, id: 'target', parentId: 'root', kind: 'page' }
+      useTreeStore.setState({
+        tree: {
+          ...node,
+          id: 'root',
+          kind: 'section',
+          parentId: null,
+          children: [guides, target as PageNode],
+        },
+      })
+    })
+
+    it('updates both sections when a child moves, and counts a page that became a section', () => {
+      useConfigStore.setState({
+        pageDisplay: { ...DEFAULT_PAGE_DISPLAY, showSubpageCount: true },
+      })
+      render(
+        <MemoryRouter>
+          <FromStore id="guides" />
+          <FromStore id="target" />
+        </MemoryRouter>,
+      )
+      expect(countOf('guides')).toBe('2')
+      expect(countOf('target')).toBeNull()
+
+      act(() => useTreeStore.getState().moveNodeLocally('a', 'target', 0))
+
+      expect(countOf('guides')).toBe('1')
+      expect(countOf('target')).toBe('1')
+    })
+
+    it('appears and disappears when the setting changes while the tree is shown', () => {
+      render(
+        <MemoryRouter>
+          <FromStore id="guides" />
+        </MemoryRouter>,
+      )
+      expect(countOf('guides')).toBeNull()
+
+      act(() =>
+        useConfigStore.setState({
+          pageDisplay: { ...DEFAULT_PAGE_DISPLAY, showSubpageCount: true },
+        }),
+      )
+      expect(countOf('guides')).toBe('2')
+
+      act(() => useConfigStore.setState({ pageDisplay: DEFAULT_PAGE_DISPLAY }))
+      expect(countOf('guides')).toBeNull()
+    })
   })
 })
