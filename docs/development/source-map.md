@@ -165,8 +165,8 @@ resync-derived state.
   `share_link_not_found`), `token.go` (256-bit `lws_` tokens). What a resolved link may read is
   decided by the scoped read layer (`internal/scopedread`, ADR-0015).
 - **`internal/pagedisplay`** — the instance-wide page display settings behind the admin
-  "Display" settings page (the "always show table of contents" flag and the page content
-  width, an enum validated in `content_width.go`), stored in
+  "Display" settings page (the "always show table of contents" flag, the page content
+  width, an enum validated in `content_width.go`, and the "show subpage count" flag), stored in
   `toc-display.json` (`FileName`; old name kept for existing data dirs and backups); same
   provider pattern (`Provider` returns all of them as one `Settings` value, `Fixed` for tests).
   `GET /api/config` merges `Settings.ConfigFields()` in flat, so a new display setting needs no
@@ -462,7 +462,10 @@ light/dark mode application).
   (`TreeDnd.tsx`, `treeDndStore.ts`, `treeDndUtils.ts`), context menu
   (`TreeNodeActionsMenu.tsx`), and the flat pinned-pages sub-list (`PinnedSection.tsx`,
   `PinnedPageItem.tsx` — global/editorial pin, distinct from the per-user favorites star also
-  rendered on tree rows).
+  rendered on tree rows). With the "show subpage count" display setting on, section rows and
+  the section overview (`features/viewer/EmptySectionChildrenList.tsx`) show
+  `components/SubpageCount.tsx`: the number of direct children in the client tree, which is
+  already filtered for the viewer, so nothing is counted server side.
 - **`features/users`** — admin user management (`UserManagement.tsx`, `UserFormDialog.tsx`,
   create/edit/delete buttons and dialogs, `ResendInviteButton.tsx`, admin password change via
   `ChangePasswordDialog.tsx`). A user's own TOTP setup lives in `features/settings/account`.

@@ -18,7 +18,8 @@ func TestPatch_IsEmptyAndChangedFields(t *testing.T) {
 		{name: "no field", patch: Patch{}, empty: true, want: nil},
 		{name: "only alwaysShowToc", patch: Patch{AlwaysShowToc: ptr(false)}, want: []string{"alwaysShowToc"}},
 		{name: "only contentWidth", patch: Patch{ContentWidth: ptr("")}, want: []string{"contentWidth"}},
-		{name: "both fields", patch: Patch{AlwaysShowToc: ptr(true), ContentWidth: ptr(ContentWidthWide)}, want: []string{"alwaysShowToc", "contentWidth"}},
+		{name: "only showSubpageCount", patch: Patch{ShowSubpageCount: ptr(false)}, want: []string{"showSubpageCount"}},
+		{name: "all fields", patch: Patch{AlwaysShowToc: ptr(true), ContentWidth: ptr(ContentWidthWide), ShowSubpageCount: ptr(true)}, want: []string{"alwaysShowToc", "contentWidth", "showSubpageCount"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -52,10 +53,11 @@ func TestPatch_JSONNamesMatchSettings(t *testing.T) {
 
 func TestPatch_DecodesSettingsJSON(t *testing.T) {
 	var p Patch
-	if err := json.Unmarshal([]byte(`{"alwaysShowToc":true,"contentWidth":"wide"}`), &p); err != nil {
+	if err := json.Unmarshal([]byte(`{"alwaysShowToc":true,"contentWidth":"wide","showSubpageCount":true}`), &p); err != nil {
 		t.Fatalf("Unmarshal: %v", err)
 	}
-	if p.AlwaysShowToc == nil || !*p.AlwaysShowToc || p.ContentWidth == nil || *p.ContentWidth != ContentWidthWide {
+	if p.AlwaysShowToc == nil || !*p.AlwaysShowToc || p.ContentWidth == nil || *p.ContentWidth != ContentWidthWide ||
+		p.ShowSubpageCount == nil || !*p.ShowSubpageCount {
 		t.Fatalf("decoded patch = %+v", p)
 	}
 }

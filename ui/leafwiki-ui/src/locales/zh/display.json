@@ -16,5 +16,11 @@
   },
   "contentWidthDescription": "默认将正文保持在易于阅读的窄栏中。“宽”使用页面区域的全部宽度。编辑器预览和页面历史仍保持窄栏。",
   "contentWidthSavedToast": "页面宽度已保存",
-  "contentWidthUpdateError": "无法更新页面宽度"
+  "contentWidthUpdateError": "无法更新页面宽度",
+  "subpageCountSectionTitle": "子页面数量",
+  "subpageCountSectionDescription": "在导航树和章节概览中显示每个章节包含多少个子页面。对所有人生效，包括未登录的访客。",
+  "subpageCountCheckboxLabel": "显示子页面数量",
+  "subpageCountCheckboxDescription": "每个章节显示其直接包含的页面和章节数量。访客无法查看的页面不计入。",
+  "subpageCountSavedToast": "子页面数量设置已保存",
+  "subpageCountUpdateError": "无法更新子页面数量设置"
 }

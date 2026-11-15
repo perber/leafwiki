@@ -10,8 +10,9 @@ import (
 // PUT /api/admin/settings/display decodes its body straight into a Patch and
 // a new setting needs a new field here, not in the HTTP layer.
 type Patch struct {
-	AlwaysShowToc *bool   `json:"alwaysShowToc,omitempty"`
-	ContentWidth  *string `json:"contentWidth,omitempty"`
+	AlwaysShowToc    *bool   `json:"alwaysShowToc,omitempty"`
+	ContentWidth     *string `json:"contentWidth,omitempty"`
+	ShowSubpageCount *bool   `json:"showSubpageCount,omitempty"`
 }
 
 // IsEmpty reports whether the patch changes nothing.

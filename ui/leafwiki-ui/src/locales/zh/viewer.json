@@ -20,7 +20,9 @@
     "subpagesAriaLabel": "{{title}} 的子页面",
     "sectionSuffix": "（章节）",
     "updatedByLabel": "由 {{editor}} 更新 · {{time}}",
-    "updatedLabel": "更新于 {{time}}"
+    "updatedLabel": "更新于 {{time}}",
+    "subpageCount_one": "{{count}} 个子页面",
+    "subpageCount_other": "{{count}} 个子页面"
   },
   "markdownPreview": {
     "renderError": "此页面包含无法安全渲染的 Markdown。",

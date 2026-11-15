@@ -1,3 +1,4 @@
+import { SubpageCount } from '@/components/SubpageCount'
 import { Button } from '@/components/ui/button'
 import { NODE_KIND_PAGE, NODE_KIND_SECTION, Page } from '@/lib/api/pages'
 import i18next from '@/lib/i18n'
@@ -81,6 +82,12 @@ export default function EmptySectionChildrenList({
                 <li key={n.id}>
                   <Link to={`/${n.path}`} state={createNavigationVisitState()}>
                     {n.title}
+                    {n.kind === NODE_KIND_SECTION && (
+                      <SubpageCount
+                        count={n.children?.length ?? 0}
+                        testId={`subpage-count-${n.id}`}
+                      />
+                    )}
                   </Link>{' '}
                   {n.kind === NODE_KIND_SECTION &&
                     ` ${t('section.sectionSuffix')}`}

@@ -182,7 +182,11 @@ describe('pageDisplay', () => {
 
   it('updatePageDisplay sends the patch and takes only the patched fields from the reply', async () => {
     useConfigStore.setState({
-      pageDisplay: { alwaysShowToc: false, contentWidth: 'default' },
+      pageDisplay: {
+        alwaysShowToc: false,
+        contentWidth: 'default',
+        showSubpageCount: false,
+      },
     })
     ;(instanceSettingsApi.updatePageDisplay as Mock).mockResolvedValueOnce({
       alwaysShowToc: true,
@@ -198,12 +202,17 @@ describe('pageDisplay', () => {
     expect(useConfigStore.getState().pageDisplay).toEqual({
       alwaysShowToc: false,
       contentWidth: 'wide',
+      showSubpageCount: false,
     })
   })
 
   it('updatePageDisplay falls back to the default for an unknown confirmed width', async () => {
     useConfigStore.setState({
-      pageDisplay: { alwaysShowToc: false, contentWidth: 'wide' },
+      pageDisplay: {
+        alwaysShowToc: false,
+        contentWidth: 'wide',
+        showSubpageCount: false,
+      },
     })
     ;(instanceSettingsApi.updatePageDisplay as Mock).mockResolvedValueOnce({
       alwaysShowToc: false,
@@ -216,7 +225,11 @@ describe('pageDisplay', () => {
   })
 
   it('updatePageDisplay keeps the old settings when the request fails', async () => {
-    const before = { alwaysShowToc: true, contentWidth: 'default' as const }
+    const before = {
+      alwaysShowToc: true,
+      contentWidth: 'default' as const,
+      showSubpageCount: true,
+    }
     useConfigStore.setState({ pageDisplay: before })
     ;(instanceSettingsApi.updatePageDisplay as Mock).mockRejectedValueOnce(
       new Error('boom'),
@@ -235,7 +248,11 @@ describe('pageDisplay', () => {
       publicAccess: true,
       editorLimit: 7,
       defaultLanguage: 'de',
-      pageDisplay: { alwaysShowToc: false, contentWidth: 'default' },
+      pageDisplay: {
+        alwaysShowToc: false,
+        contentWidth: 'default',
+        showSubpageCount: false,
+      },
     })
     ;(instanceSettingsApi.updatePageDisplay as Mock).mockResolvedValueOnce({
       alwaysShowToc: true,
@@ -258,7 +275,11 @@ describe('pageDisplay', () => {
   // server holds after both writes, whatever order the replies arrive in.
   it('two in-flight updates keep both changes when the replies arrive out of order', async () => {
     useConfigStore.setState({
-      pageDisplay: { alwaysShowToc: false, contentWidth: 'default' },
+      pageDisplay: {
+        alwaysShowToc: false,
+        contentWidth: 'default',
+        showSubpageCount: false,
+      },
     })
     let resolveToc: (v: unknown) => void = () => {}
     let resolveWidth: (v: unknown) => void = () => {}
@@ -281,6 +302,7 @@ describe('pageDisplay', () => {
     expect(useConfigStore.getState().pageDisplay).toEqual({
       alwaysShowToc: true,
       contentWidth: 'wide',
+      showSubpageCount: false,
     })
   })
 })

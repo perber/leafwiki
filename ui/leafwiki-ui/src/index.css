@@ -2924,12 +2924,18 @@
     @apply w-full flex-1 overflow-hidden;
   }
 
+  /* Flex so a section's subpage count stays visible after the title
+     while the title truncates first. */
   .tree-node__link {
-    @apply w-full py-2;
+    @apply flex w-full min-w-0 items-baseline gap-1.5 py-2;
   }
 
   .tree-node__title {
-    @apply text-interface-text block truncate overflow-hidden text-sm text-ellipsis;
+    @apply text-interface-text block min-w-0 truncate overflow-hidden text-sm text-ellipsis;
+  }
+
+  .tree-node__link .subpage-count {
+    @apply ml-0;
   }
 
   .tree-node__title--active {
@@ -3363,6 +3369,12 @@
 
   .child-list__section li a {
     @apply text-interface-text! hover:underline!;
+  }
+
+  /* Number of direct subpages after a section title (SubpageCount).
+     inline-block keeps the link's hover underline off the number. */
+  .subpage-count {
+    @apply text-muted-foreground ml-1.5 inline-block shrink-0 text-xs font-normal tabular-nums;
   }
 
   /* ─── Page Metadata (tags + properties in PageViewer) ─────────────────────── */

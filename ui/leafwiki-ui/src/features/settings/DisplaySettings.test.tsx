@@ -57,7 +57,10 @@ describe('DisplaySettings', () => {
     render(<DisplaySettings />)
 
     expect(
-      screen.getByRole('checkbox', { checked: alwaysShowToc }),
+      screen.getByRole('checkbox', {
+        name: 'Always show the table of contents',
+        checked: alwaysShowToc,
+      }),
     ).toHaveAttribute('data-testid', 'display-toc-checkbox')
   })
 
@@ -87,6 +90,55 @@ describe('DisplaySettings', () => {
 
     await user.click(screen.getByTestId('display-toc-checkbox'))
     expect(toast.error).toHaveBeenCalled()
+    expect(toast.success).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    { state: 'off', showSubpageCount: false },
+    { state: 'on', showSubpageCount: true },
+  ])(
+    'reflects the current $state state of the subpage count',
+    ({ showSubpageCount }) => {
+      setConfig({ showSubpageCount })
+      render(<DisplaySettings />)
+
+      const checkbox = screen.getByRole('checkbox', {
+        name: 'Show the number of subpages',
+      })
+      expect(checkbox).toHaveAttribute(
+        'data-testid',
+        'display-subpage-count-checkbox',
+      )
+      expect(checkbox).toHaveAttribute('aria-checked', String(showSubpageCount))
+    },
+  )
+
+  it.each([
+    { direction: 'on', from: false },
+    { direction: 'off', from: true },
+  ])(
+    'toggling the subpage count $direction saves only that field',
+    async ({ from }) => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 })
+      setConfig({ showSubpageCount: from })
+      render(<DisplaySettings />)
+
+      await user.click(screen.getByTestId('display-subpage-count-checkbox'))
+      expect(updatePageDisplay).toHaveBeenCalledWith({
+        showSubpageCount: !from,
+      })
+      expect(toast.success).toHaveBeenCalledWith('Subpage count setting saved')
+    },
+  )
+
+  it('shows an error toast when saving the subpage count fails', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    updatePageDisplay.mockRejectedValueOnce(new Error('boom'))
+    setConfig({ showSubpageCount: false })
+    render(<DisplaySettings />)
+
+    await user.click(screen.getByTestId('display-subpage-count-checkbox'))
+    expect(toast.error).toHaveBeenCalledWith('boom')
     expect(toast.success).not.toHaveBeenCalled()
   })
 
