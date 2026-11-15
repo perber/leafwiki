@@ -21,10 +21,72 @@ func newTestService(t *testing.T, dir string) *Service {
 	return svc
 }
 
-func TestService_NoFile_DisabledByDefault(t *testing.T) {
-	svc := newTestService(t, t.TempDir())
-	if svc.Settings().AlwaysShowToc {
-		t.Fatal("expected AlwaysShowToc false when toc-display.json is absent")
+// Settings reads whatever toc-display.json holds and falls back to the
+// default for a missing file, a missing field (a file written before the
+// field existed, or before the tocdisplay -> pagedisplay rename) or a value
+// a hand edit broke.
+func TestService_Settings_ReadsFileOrFallsBackToDefaults(t *testing.T) {
+	defaults := Settings{ContentWidth: ContentWidthDefault}
+	tests := []struct {
+		name string
+		file string // "" = no file
+		want Settings
+	}{
+		{name: "no file", file: "", want: defaults},
+		{name: "file from before content width existed", file: `{"alwaysShow":true}`, want: Settings{AlwaysShowToc: true, ContentWidth: ContentWidthDefault}},
+		{name: "empty width", file: `{"contentWidth":""}`, want: defaults},
+		{name: "unknown width from a hand-edited file", file: `{"contentWidth":"huge"}`, want: defaults},
+		{name: "default width", file: `{"contentWidth":"default"}`, want: defaults},
+		{name: "wide", file: `{"contentWidth":"wide"}`, want: Settings{ContentWidth: ContentWidthWide}},
+		{name: "file from before the subpage count existed", file: `{"alwaysShow":true,"contentWidth":"wide"}`, want: Settings{AlwaysShowToc: true, ContentWidth: ContentWidthWide}},
+		{name: "subpage count off", file: `{"showSubpageCount":false}`, want: defaults},
+		{name: "subpage count on", file: `{"showSubpageCount":true}`, want: Settings{ContentWidth: ContentWidthDefault, ShowSubpageCount: true}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if tc.file != "" {
+				if err := os.WriteFile(filepath.Join(dir, FileName), []byte(tc.file), 0o600); err != nil {
+					t.Fatalf("write file: %v", err)
+				}
+			}
+			if got := newTestService(t, dir).Settings(); got != tc.want {
+				t.Fatalf("Settings() = %+v, want %+v", got, tc.want)
+			}
+		})
+	}
+}
+
+// A restore drops in a different toc-display.json; the cache keeps the old
+// values until Reload picks the new file up.
+func TestService_Reload_PicksUpExternalFileChange(t *testing.T) {
+	tests := []struct {
+		name string
+		file string
+		want Settings
+	}{
+		{name: "toc flag", file: `{"alwaysShow": true}`, want: Settings{AlwaysShowToc: true, ContentWidth: ContentWidthDefault}},
+		{name: "content width", file: `{"contentWidth":"wide"}`, want: Settings{ContentWidth: ContentWidthWide}},
+		{name: "subpage count", file: `{"showSubpageCount":true}`, want: Settings{ContentWidth: ContentWidthDefault, ShowSubpageCount: true}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			svc := newTestService(t, dir)
+			before := svc.Settings()
+			if err := os.WriteFile(filepath.Join(dir, FileName), []byte(tc.file), 0o600); err != nil {
+				t.Fatalf("write external file: %v", err)
+			}
+			if got := svc.Settings(); got != before {
+				t.Fatalf("Settings() before Reload = %+v, want the cached %+v", got, before)
+			}
+			if err := svc.Reload(); err != nil {
+				t.Fatalf("Reload: %v", err)
+			}
+			if got := svc.Settings(); got != tc.want {
+				t.Fatalf("Settings() after Reload = %+v, want %+v", got, tc.want)
+			}
+		})
 	}
 }
 
@@ -124,42 +186,6 @@ func TestService_SetAlwaysShow_WriteFailure_ReturnsTranslatableError(t *testing.
 	}
 }
 
-func TestService_Reload_PicksUpExternalFileChange(t *testing.T) {
-	dir := t.TempDir()
-	svc := newTestService(t, dir)
-	if svc.Settings().AlwaysShowToc {
-		t.Fatal("precondition: expected disabled")
-	}
-
-	// Simulate a restore dropping in a different toc-display.json.
-	if err := os.WriteFile(filepath.Join(dir, "toc-display.json"), []byte(`{"alwaysShow": true}`), 0o600); err != nil {
-		t.Fatalf("write external file: %v", err)
-	}
-	if svc.Settings().AlwaysShowToc {
-		t.Fatal("expected cache to still read false before Reload()")
-	}
-
-	if err := svc.Reload(); err != nil {
-		t.Fatalf("Reload: %v", err)
-	}
-	if !svc.Settings().AlwaysShowToc {
-		t.Fatal("expected AlwaysShowToc true after Reload() picked up the new file")
-	}
-}
-
-// A data directory written before the tocdisplay -> pagedisplay rename
-// holds toc-display.json; the renamed package must keep reading it.
-func TestService_New_ReadsExistingTocDisplayFile(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "toc-display.json"), []byte(`{"alwaysShow":true}`), 0o600); err != nil {
-		t.Fatalf("write existing file: %v", err)
-	}
-	svc := newTestService(t, dir)
-	if !svc.Settings().AlwaysShowToc {
-		t.Fatal("expected AlwaysShowToc true from a pre-existing toc-display.json")
-	}
-}
-
 func TestService_Load_CorruptFileIsAnError(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "toc-display.json"), []byte("not json"), 0o600); err != nil {
@@ -218,34 +244,6 @@ func TestFixed_Settings_ReturnsPinnedSettings(t *testing.T) {
 func TestFileName_IsTheHistoricalTocDisplayFile(t *testing.T) {
 	if FileName != "toc-display.json" {
 		t.Fatalf("FileName = %q, want %q", FileName, "toc-display.json")
-	}
-}
-
-func TestService_ContentWidth_ReadsFileValueOrFallsBackToDefault(t *testing.T) {
-	tests := []struct {
-		name string
-		file string // "" = no file
-		want string
-	}{
-		{name: "no file", file: "", want: ContentWidthDefault},
-		{name: "file written before content width existed", file: `{"alwaysShow":true}`, want: ContentWidthDefault},
-		{name: "empty value", file: `{"contentWidth":""}`, want: ContentWidthDefault},
-		{name: "unknown value from a hand-edited file", file: `{"contentWidth":"huge"}`, want: ContentWidthDefault},
-		{name: "default", file: `{"contentWidth":"default"}`, want: ContentWidthDefault},
-		{name: "wide", file: `{"contentWidth":"wide"}`, want: ContentWidthWide},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			dir := t.TempDir()
-			if tc.file != "" {
-				if err := os.WriteFile(filepath.Join(dir, "toc-display.json"), []byte(tc.file), 0o600); err != nil {
-					t.Fatalf("write file: %v", err)
-				}
-			}
-			if got := newTestService(t, dir).Settings().ContentWidth; got != tc.want {
-				t.Fatalf("ContentWidth = %q, want %q", got, tc.want)
-			}
-		})
 	}
 }
 
@@ -309,47 +307,6 @@ func TestService_Setters_KeepTheOtherSetting(t *testing.T) {
 	want = Settings{AlwaysShowToc: true, ContentWidth: ContentWidthDefault}
 	if got := newTestService(t, dir).Settings(); got != want {
 		t.Fatalf("Settings after second round = %+v, want %+v", got, want)
-	}
-}
-
-func TestService_Reload_PicksUpExternalContentWidth(t *testing.T) {
-	dir := t.TempDir()
-	svc := newTestService(t, dir)
-	if err := os.WriteFile(filepath.Join(dir, "toc-display.json"), []byte(`{"contentWidth":"wide"}`), 0o600); err != nil {
-		t.Fatalf("write external file: %v", err)
-	}
-	if err := svc.Reload(); err != nil {
-		t.Fatalf("Reload: %v", err)
-	}
-	if got := svc.Settings().ContentWidth; got != ContentWidthWide {
-		t.Fatalf("ContentWidth after Reload = %q, want %q", got, ContentWidthWide)
-	}
-}
-
-// A missing showSubpageCount (a file from before the setting existed) means off.
-func TestService_ShowSubpageCount_ReadsFileValueOrDefaultsOff(t *testing.T) {
-	tests := []struct {
-		name string
-		file string // "" = no file
-		want bool
-	}{
-		{name: "no file", file: "", want: false},
-		{name: "file written before the setting existed", file: `{"alwaysShow":true,"contentWidth":"wide"}`, want: false},
-		{name: "off", file: `{"showSubpageCount":false}`, want: false},
-		{name: "on", file: `{"showSubpageCount":true}`, want: true},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			dir := t.TempDir()
-			if tc.file != "" {
-				if err := os.WriteFile(filepath.Join(dir, FileName), []byte(tc.file), 0o600); err != nil {
-					t.Fatalf("write file: %v", err)
-				}
-			}
-			if got := newTestService(t, dir).Settings().ShowSubpageCount; got != tc.want {
-				t.Fatalf("ShowSubpageCount = %v, want %v", got, tc.want)
-			}
-		})
 	}
 }
 
