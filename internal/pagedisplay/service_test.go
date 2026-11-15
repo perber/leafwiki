@@ -310,6 +310,30 @@ func TestService_Setters_KeepTheOtherSetting(t *testing.T) {
 	}
 }
 
+// The per-setting setters behind the old toc-display and content-width
+// routes go through the same patch path; they must not reset the subpage
+// count an admin turned on via the combined display route.
+func TestService_Setters_KeepShowSubpageCount(t *testing.T) {
+	dir := t.TempDir()
+	svc := newTestService(t, dir)
+	if _, err := svc.Update(Patch{ShowSubpageCount: ptr(true)}); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if err := svc.SetAlwaysShow(true); err != nil {
+		t.Fatalf("SetAlwaysShow: %v", err)
+	}
+	if err := svc.SetContentWidth(ContentWidthWide); err != nil {
+		t.Fatalf("SetContentWidth: %v", err)
+	}
+	want := Settings{AlwaysShowToc: true, ContentWidth: ContentWidthWide, ShowSubpageCount: true}
+	if got := svc.Settings(); got != want {
+		t.Fatalf("Settings() = %+v, want %+v", got, want)
+	}
+	if got := newTestService(t, dir).Settings(); got != want {
+		t.Fatalf("Settings after reconstruction = %+v, want %+v", got, want)
+	}
+}
+
 // The on-disk key is the one older files and backups will carry from now on.
 func TestService_Update_WritesShowSubpageCountToFile(t *testing.T) {
 	dir := t.TempDir()
