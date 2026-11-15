@@ -128,6 +128,7 @@ var undocumentedAPIRouteLiteral = map[string]string{
 	"PUT /api/admin/settings/public-access": "instancesettings: pending package documentation",
 	"PUT /api/admin/settings/toc-display":   "instancesettings: pending package documentation",
 	"PUT /api/admin/settings/content-width": "instancesettings: pending package documentation",
+	"PUT /api/admin/settings/display":       "instancesettings: pending package documentation",
 }
 
 var undocumentedAPIRoutes, undocumentedAPIRoutesErr = parseAPIRouteExceptions(undocumentedAPIRouteLiteral)

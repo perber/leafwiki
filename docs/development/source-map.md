@@ -170,7 +170,8 @@ resync-derived state.
   `toc-display.json` (`FileName`; old name kept for existing data dirs and backups); same
   provider pattern (`Provider` returns all of them as one `Settings` value, `Fixed` for tests).
   `GET /api/config` merges `Settings.ConfigFields()` in flat, so a new display setting needs no
-  change in the HTTP layer.
+  change in the HTTP layer. Writes go through `Service.Update(Patch)` (pointer fields, all
+  validated before one write); `IsInvalidInput` tells the HTTP layer which codes are 400s.
 - **`internal/favorites`** — per-user private favorited-pages list. `favorites_store.go`
   (`favorites.db`, own file). Explicitly documented in its own package doc comment as *not*
   filesystem-derived and therefore never touched by resync.
@@ -325,7 +326,10 @@ shape for that domain.
 - **`internal/wiki/avatar`**, **`internal/wiki/usersettings`** — HTTP surfaces over
   `internal/avatar` and `internal/usersettings` (own avatar, own preferences).
 - **`internal/wiki/instancesettings`** — admin-only instance settings changeable at runtime
-  instead of via flag + restart; today the public-access toggle.
+  instead of via flag + restart: the public-access toggle and the page display settings.
+  `PUT /api/admin/settings/display` takes any subset of the `pagedisplay.Settings` JSON fields
+  (strictly decoded) and returns all of them; the older `toc-display` and `content-width`
+  routes stay for API clients.
 - **`internal/wiki/seo`** — search-engine rendering for public wikis
   ([ADR-0018](./adr/0018-search-engine-rendering-for-public-wikis.md)); registers SPA shell
   responders and contributors and its own routes. One file per feature holds its seo-owned
