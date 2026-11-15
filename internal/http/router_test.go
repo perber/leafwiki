@@ -3806,33 +3806,7 @@ func TestContentWidthSetting_BadPayload_Returns400(t *testing.T) {
 // routes too: only an admin-scoped key owned by an admin may change them,
 // and the content-width route answers exactly like its toc-display sibling.
 func TestContentWidthSetting_APIKey_OnlyAdminKeyOfAdminMayChange(t *testing.T) {
-	w, err := wiki.NewWiki(&wiki.WikiOptions{
-		StorageDir:             t.TempDir(),
-		AdminPassword:          "adminpassword",
-		JWTSecret:              "secretkey",
-		AccessTokenTimeout:     15 * time.Minute,
-		RefreshTokenTimeout:    7 * 24 * time.Hour,
-		EnableAPIKeyManagement: true,
-	})
-	if err != nil {
-		t.Fatalf("NewWiki: %v", err)
-	}
-	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(w.Close, t) })
-	svc, err := pagedisplay.New(t.TempDir())
-	if err != nil {
-		t.Fatalf("pagedisplay.New: %v", err)
-	}
-	paSvc, err := publicaccess.NewSettingsManaged(t.TempDir())
-	if err != nil {
-		t.Fatalf("publicaccess.NewSettingsManaged: %v", err)
-	}
-	w.SetInstanceSettingsRoutes(wikiinstancesettings.NewRoutes(paSvc, svc, w.AuthService(), slog.Default()))
-	router := newTestRouter(w, func(o *httpinternal.RouterOptions) {
-		o.APIKeyService = w.APIKeyService()
-		o.EnableAPIKeyManagement = true
-		o.PublicAccess = paSvc
-		o.PageDisplay = svc
-	})
+	w, router, svc := routerWithDisplayAPIKeys(t)
 
 	tests := []struct {
 		name     string
