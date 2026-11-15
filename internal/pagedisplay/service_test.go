@@ -526,3 +526,39 @@ func TestService_WriteFailure_KeepsHistoricalErrorCodes(t *testing.T) {
 		})
 	}
 }
+
+// After a restore swaps the file and Reload runs, a partial Update starts
+// from the restored values, not from the cache before the restore.
+func TestService_Update_AfterReload_KeepsRestoredFields(t *testing.T) {
+	tests := []struct {
+		name     string
+		restored string
+		patch    Patch
+		want     Settings
+	}{
+		{name: "width patch keeps restored toc flag", restored: `{"alwaysShow":true}`, patch: Patch{ContentWidth: ptr(ContentWidthWide)}, want: Settings{AlwaysShowToc: true, ContentWidth: ContentWidthWide}},
+		{name: "toc patch keeps restored width", restored: `{"contentWidth":"wide"}`, patch: Patch{AlwaysShowToc: ptr(true)}, want: Settings{AlwaysShowToc: true, ContentWidth: ContentWidthWide}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			svc := newTestService(t, dir)
+			if err := os.WriteFile(filepath.Join(dir, FileName), []byte(tc.restored), 0o600); err != nil {
+				t.Fatalf("write restored file: %v", err)
+			}
+			if err := svc.Reload(); err != nil {
+				t.Fatalf("Reload: %v", err)
+			}
+			got, err := svc.Update(tc.patch)
+			if err != nil {
+				t.Fatalf("Update: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("Update after Reload = %+v, want %+v", got, tc.want)
+			}
+			if got := newTestService(t, dir).Settings(); got != tc.want {
+				t.Fatalf("settings on disk after Update = %+v, want %+v", got, tc.want)
+			}
+		})
+	}
+}
