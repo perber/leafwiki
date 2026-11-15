@@ -251,4 +251,36 @@ describe('pageDisplay', () => {
     expect(state.editorLimit).toBe(7)
     expect(state.defaultLanguage).toBe('de')
   })
+
+  // The TOC checkbox and the width picker have separate saving flags, so an
+  // admin can have both requests in flight. Each reply carries all display
+  // settings as of its own write; the store must end up with what the
+  // server holds after both writes, whatever order the replies arrive in.
+  it('two in-flight updates keep both changes when the replies arrive out of order', async () => {
+    useConfigStore.setState({
+      pageDisplay: { alwaysShowToc: false, contentWidth: 'default' },
+    })
+    let resolveToc: (v: unknown) => void = () => {}
+    let resolveWidth: (v: unknown) => void = () => {}
+    ;(instanceSettingsApi.updatePageDisplay as Mock)
+      .mockImplementationOnce(() => new Promise((r) => (resolveToc = r)))
+      .mockImplementationOnce(() => new Promise((r) => (resolveWidth = r)))
+
+    const toc = useConfigStore
+      .getState()
+      .updatePageDisplay({ alwaysShowToc: true })
+    const width = useConfigStore
+      .getState()
+      .updatePageDisplay({ contentWidth: 'wide' })
+    // Server order: toc write first, then width write.
+    resolveWidth({ alwaysShowToc: true, contentWidth: 'wide' })
+    await width
+    resolveToc({ alwaysShowToc: true, contentWidth: 'default' })
+    await toc
+
+    expect(useConfigStore.getState().pageDisplay).toEqual({
+      alwaysShowToc: true,
+      contentWidth: 'wide',
+    })
+  })
 })
