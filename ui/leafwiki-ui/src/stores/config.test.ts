@@ -229,4 +229,26 @@ describe('pageDisplay', () => {
     ).rejects.toThrow('boom')
     expect(useConfigStore.getState().pageDisplay).toEqual(before)
   })
+
+  it('updatePageDisplay leaves unrelated config fields alone', async () => {
+    useConfigStore.setState({
+      publicAccess: true,
+      editorLimit: 7,
+      defaultLanguage: 'de',
+      pageDisplay: { alwaysShowToc: false, contentWidth: 'default' },
+    })
+    ;(instanceSettingsApi.updatePageDisplay as Mock).mockResolvedValueOnce({
+      alwaysShowToc: true,
+      contentWidth: 'default',
+      // A reply carrying a non-display field must not leak into the store.
+      publicAccess: false,
+    })
+
+    await useConfigStore.getState().updatePageDisplay({ alwaysShowToc: true })
+
+    const state = useConfigStore.getState()
+    expect(state.publicAccess).toBe(true)
+    expect(state.editorLimit).toBe(7)
+    expect(state.defaultLanguage).toBe('de')
+  })
 })
