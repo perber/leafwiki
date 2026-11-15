@@ -6,8 +6,9 @@ import (
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 )
 
-// ErrCodeInvalidContentWidth is returned by SetContentWidth for a value that
-// is not one of ContentWidths(). The HTTP layer maps it to 400.
+// ErrCodeInvalidContentWidth is returned by SetContentWidth and Update for a
+// value that is not one of ContentWidths(). The HTTP layer maps it to 400
+// (see IsInvalidInput).
 const ErrCodeInvalidContentWidth = "page_display_invalid_content_width"
 
 // ErrCodeUpdateFailed is returned when a display setting other than the

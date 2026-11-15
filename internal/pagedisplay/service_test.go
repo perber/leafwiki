@@ -180,6 +180,11 @@ func TestService_ConcurrentAccess_IsRaceFree(t *testing.T) {
 		go func() { defer wg.Done(); _ = svc.Settings() }()
 		wg.Add(1)
 		go func() { defer wg.Done(); _ = svc.SetContentWidth(ContentWidthWide) }()
+		wg.Add(1)
+		go func(v int) {
+			defer wg.Done()
+			_, _ = svc.Update(Patch{AlwaysShowToc: ptr(v%3 == 0), ContentWidth: ptr(ContentWidthDefault)})
+		}(i)
 		// Reload shares the setters' lock; this also guards against a
 		// lock-order deadlock between it and the store's own lock.
 		wg.Add(1)
@@ -399,6 +404,124 @@ func TestService_Setters_OnPreExistingFile(t *testing.T) {
 			}
 			if got := newTestService(t, dir).Settings(); got != tc.want {
 				t.Fatalf("settings on disk = %+v, want %+v", got, tc.want)
+			}
+		})
+	}
+}
+
+func ptr[T any](v T) *T { return &v }
+
+// Update changes exactly the fields the patch carries and keeps the rest.
+func TestService_Update_AppliesOnlyGivenFields(t *testing.T) {
+	start := Settings{AlwaysShowToc: true, ContentWidth: ContentWidthWide}
+	tests := []struct {
+		name  string
+		patch Patch
+		want  Settings
+	}{
+		{name: "empty patch changes nothing", patch: Patch{}, want: start},
+		{name: "only alwaysShowToc", patch: Patch{AlwaysShowToc: ptr(false)}, want: Settings{AlwaysShowToc: false, ContentWidth: ContentWidthWide}},
+		{name: "only contentWidth", patch: Patch{ContentWidth: ptr(ContentWidthDefault)}, want: Settings{AlwaysShowToc: true, ContentWidth: ContentWidthDefault}},
+		{name: "both fields", patch: Patch{AlwaysShowToc: ptr(false), ContentWidth: ptr(ContentWidthDefault)}, want: Settings{AlwaysShowToc: false, ContentWidth: ContentWidthDefault}},
+		{name: "same values", patch: Patch{AlwaysShowToc: ptr(true), ContentWidth: ptr(ContentWidthWide)}, want: start},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			svc := newTestService(t, dir)
+			if _, err := svc.Update(Patch{AlwaysShowToc: ptr(start.AlwaysShowToc), ContentWidth: ptr(start.ContentWidth)}); err != nil {
+				t.Fatalf("Update(start): %v", err)
+			}
+			got, err := svc.Update(tc.patch)
+			if err != nil {
+				t.Fatalf("Update(%+v): %v", tc.patch, err)
+			}
+			if got != tc.want {
+				t.Fatalf("Update returned %+v, want %+v", got, tc.want)
+			}
+			if got := svc.Settings(); got != tc.want {
+				t.Fatalf("in-memory settings = %+v, want %+v", got, tc.want)
+			}
+			if got := newTestService(t, dir).Settings(); got != tc.want {
+				t.Fatalf("settings after reconstruction = %+v, want %+v", got, tc.want)
+			}
+		})
+	}
+}
+
+// A patch with one invalid field is rejected as a whole: the valid field
+// next to it is not applied, in memory or on disk.
+func TestService_Update_InvalidFieldChangesNothing(t *testing.T) {
+	dir := t.TempDir()
+	svc := newTestService(t, dir)
+	_, err := svc.Update(Patch{AlwaysShowToc: ptr(true), ContentWidth: ptr("huge")})
+	loc, ok := sharederrors.AsLocalizedError(err)
+	if !ok || loc.Code != ErrCodeInvalidContentWidth {
+		t.Fatalf("Update error = %v, want code %q", err, ErrCodeInvalidContentWidth)
+	}
+	want := Settings{AlwaysShowToc: false, ContentWidth: ContentWidthDefault}
+	if got := svc.Settings(); got != want {
+		t.Fatalf("in-memory settings after rejected patch = %+v, want %+v", got, want)
+	}
+	if _, err := os.Stat(filepath.Join(dir, FileName)); !os.IsNotExist(err) {
+		t.Fatalf("expected no file written for a rejected patch, stat err = %v", err)
+	}
+}
+
+func TestIsInvalidInput_ClassifiesErrorCodes(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+		want bool
+	}{
+		{name: "invalid content width", code: ErrCodeInvalidContentWidth, want: true},
+		{name: "persist failure", code: ErrCodeUpdateFailed, want: false},
+		{name: "historical toc persist failure", code: "toc_display_update_failed", want: false},
+		{name: "empty", code: "", want: false},
+		{name: "foreign code", code: "page_not_found", want: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsInvalidInput(tc.code); got != tc.want {
+				t.Fatalf("IsInvalidInput(%q) = %v, want %v", tc.code, got, tc.want)
+			}
+		})
+	}
+}
+
+// Each write path keeps the persist error code its callers already know:
+// the old toc-display route returns toc_display_update_failed, everything
+// else page_display_update_failed. A failed write leaves memory unchanged.
+func TestService_WriteFailure_KeepsHistoricalErrorCodes(t *testing.T) {
+	tests := []struct {
+		name     string
+		write    func(*Service) error
+		wantCode string
+	}{
+		{name: "SetAlwaysShow", write: func(s *Service) error { return s.SetAlwaysShow(true) }, wantCode: "toc_display_update_failed"},
+		{name: "SetContentWidth", write: func(s *Service) error { return s.SetContentWidth(ContentWidthWide) }, wantCode: ErrCodeUpdateFailed},
+		{name: "Update", write: func(s *Service) error {
+			_, err := s.Update(Patch{AlwaysShowToc: ptr(true), ContentWidth: ptr(ContentWidthWide)})
+			return err
+		}, wantCode: ErrCodeUpdateFailed},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			svc := newTestService(t, dir)
+			// A directory where the file should be makes the atomic rename
+			// fail on every OS.
+			if err := os.Mkdir(filepath.Join(dir, FileName), 0o700); err != nil {
+				t.Fatalf("mkdir: %v", err)
+			}
+			err := tc.write(svc)
+			loc, ok := sharederrors.AsLocalizedError(err)
+			if !ok || loc.Code != tc.wantCode {
+				t.Fatalf("error = %v, want code %q", err, tc.wantCode)
+			}
+			want := Settings{AlwaysShowToc: false, ContentWidth: ContentWidthDefault}
+			if got := svc.Settings(); got != want {
+				t.Fatalf("in-memory settings after failed write = %+v, want %+v", got, want)
 			}
 		})
 	}
