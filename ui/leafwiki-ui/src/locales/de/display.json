@@ -16,5 +16,11 @@
   },
   "contentWidthDescription": "Standard hält den Text in einer schmalen, gut lesbaren Spalte. Breit nutzt die ganze Breite des Seitenbereichs. Die Editor-Vorschau und der Seitenverlauf behalten die schmale Spalte.",
   "contentWidthSavedToast": "Seitenbreite gespeichert",
-  "contentWidthUpdateError": "Seitenbreite konnte nicht geändert werden"
+  "contentWidthUpdateError": "Seitenbreite konnte nicht geändert werden",
+  "subpageCountSectionTitle": "Anzahl der Unterseiten",
+  "subpageCountSectionDescription": "Zeigt im Navigationsbaum und in der Bereichsübersicht, wie viele Unterseiten ein Bereich enthält. Gilt für alle, auch für nicht angemeldete Besucher.",
+  "subpageCountCheckboxLabel": "Anzahl der Unterseiten anzeigen",
+  "subpageCountCheckboxDescription": "Jeder Bereich zeigt die Zahl der Seiten und Bereiche, die direkt darin liegen. Seiten, die ein Besucher nicht sehen kann, werden nicht mitgezählt.",
+  "subpageCountSavedToast": "Einstellung für die Anzahl der Unterseiten gespeichert",
+  "subpageCountUpdateError": "Einstellung für die Anzahl der Unterseiten konnte nicht geändert werden"
 }

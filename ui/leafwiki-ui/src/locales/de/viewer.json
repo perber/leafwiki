@@ -20,7 +20,9 @@
     "subpagesAriaLabel": "Unterseiten von {{title}}",
     "sectionSuffix": "(Bereich)",
     "updatedByLabel": "Aktualisiert von {{editor}} · {{time}}",
-    "updatedLabel": "Aktualisiert {{time}}"
+    "updatedLabel": "Aktualisiert {{time}}",
+    "subpageCount_one": "{{count}} Unterseite",
+    "subpageCount_other": "{{count}} Unterseiten"
   },
   "markdownPreview": {
     "renderError": "Diese Seite enthält Markdown, das nicht sicher gerendert werden konnte.",

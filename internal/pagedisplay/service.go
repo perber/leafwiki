@@ -2,7 +2,8 @@
 // sets on the "Display" settings page: the "always show table of contents"
 // flag (whether the page viewer's TOC panel/dropdown is shown for every
 // page, regardless of PageViewer.tsx's default >3-heading threshold) and the
-// page content width (see content_width.go).
+// page content width (see content_width.go) and whether sections show their
+// subpage count.
 //
 // Unlike internal/publicaccess, this has no env/CLI-flag-pinned variant —
 // these are cosmetic display preferences, not security decisions, so they
@@ -26,8 +27,9 @@ const FileName = "toc-display.json"
 
 // fileConfig is the on-disk shape of toc-display.json.
 type fileConfig struct {
-	AlwaysShow   bool   `json:"alwaysShow"`
-	ContentWidth string `json:"contentWidth,omitempty"`
+	AlwaysShow       bool   `json:"alwaysShow"`
+	ContentWidth     string `json:"contentWidth,omitempty"`
+	ShowSubpageCount bool   `json:"showSubpageCount,omitempty"`
 }
 
 // Service is the process-wide holder of the current page display settings.
@@ -54,8 +56,9 @@ func New(storageDir string) (*Service, error) {
 func (s *Service) Settings() Settings {
 	cfg := s.store.Get()
 	return Settings{
-		AlwaysShowToc: cfg.AlwaysShow,
-		ContentWidth:  normalizeContentWidth(cfg.ContentWidth),
+		AlwaysShowToc:    cfg.AlwaysShow,
+		ContentWidth:     normalizeContentWidth(cfg.ContentWidth),
+		ShowSubpageCount: cfg.ShowSubpageCount,
 	}
 }
 
@@ -132,6 +135,9 @@ func (s *Service) update(patch Patch, onPersistErr persistError) error {
 	}
 	if patch.ContentWidth != nil {
 		cfg.ContentWidth = *patch.ContentWidth
+	}
+	if patch.ShowSubpageCount != nil {
+		cfg.ShowSubpageCount = *patch.ShowSubpageCount
 	}
 	if err := s.store.Put(cfg); err != nil {
 		return sharederrors.NewLocalizedError(onPersistErr.code, onPersistErr.message, onPersistErr.template, err)

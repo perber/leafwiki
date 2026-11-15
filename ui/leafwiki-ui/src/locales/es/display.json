@@ -16,5 +16,11 @@
   },
   "contentWidthDescription": "El modo predeterminado mantiene el texto en una columna estrecha y fácil de leer. Ancho usa todo el ancho del área de la página. La vista previa del editor y el historial de la página mantienen la columna estrecha.",
   "contentWidthSavedToast": "Ancho de página guardado",
-  "contentWidthUpdateError": "No se pudo actualizar el ancho de página"
+  "contentWidthUpdateError": "No se pudo actualizar el ancho de página",
+  "subpageCountSectionTitle": "Número de subpáginas",
+  "subpageCountSectionDescription": "Muestra cuántas subpáginas contiene una sección, en el árbol de navegación y en la vista general de la sección. Se aplica a todos, incluidos los visitantes que no han iniciado sesión.",
+  "subpageCountCheckboxLabel": "Mostrar el número de subpáginas",
+  "subpageCountCheckboxDescription": "Cada sección muestra el número de páginas y secciones que contiene directamente. Las páginas que un visitante no puede ver no se cuentan.",
+  "subpageCountSavedToast": "Configuración del número de subpáginas guardada",
+  "subpageCountUpdateError": "No se pudo actualizar la configuración del número de subpáginas"
 }

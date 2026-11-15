@@ -78,10 +78,11 @@ func TestDisplaySettings_Put_AppliesGivenFieldsAndReturnsAllSettings(t *testing.
 		body string
 		want string
 	}{
-		{name: "both fields", body: `{"alwaysShowToc":true,"contentWidth":"wide"}`, want: `{"alwaysShowToc":true,"contentWidth":"wide"}`},
-		{name: "only alwaysShowToc keeps the width", body: `{"alwaysShowToc":false}`, want: `{"alwaysShowToc":false,"contentWidth":"wide"}`},
-		{name: "only contentWidth keeps the toc flag", body: `{"contentWidth":"default"}`, want: `{"alwaysShowToc":false,"contentWidth":"default"}`},
-		{name: "null field is left untouched", body: `{"alwaysShowToc":true,"contentWidth":null}`, want: `{"alwaysShowToc":true,"contentWidth":"default"}`},
+		{name: "all fields", body: `{"alwaysShowToc":true,"contentWidth":"wide","showSubpageCount":true}`, want: `{"alwaysShowToc":true,"contentWidth":"wide","showSubpageCount":true}`},
+		{name: "only alwaysShowToc keeps the others", body: `{"alwaysShowToc":false}`, want: `{"alwaysShowToc":false,"contentWidth":"wide","showSubpageCount":true}`},
+		{name: "only contentWidth keeps the others", body: `{"contentWidth":"default"}`, want: `{"alwaysShowToc":false,"contentWidth":"default","showSubpageCount":true}`},
+		{name: "only showSubpageCount keeps the others", body: `{"showSubpageCount":false}`, want: `{"alwaysShowToc":false,"contentWidth":"default","showSubpageCount":false}`},
+		{name: "null field is left untouched", body: `{"alwaysShowToc":true,"contentWidth":null}`, want: `{"alwaysShowToc":true,"contentWidth":"default","showSubpageCount":false}`},
 	}
 	for _, step := range steps {
 		rec := authenticatedRequest(t, router, http.MethodPut, displaySettingsURL, strings.NewReader(step.body))
@@ -125,7 +126,7 @@ func TestDisplaySettings_Put_BadPayload_Returns400AndChangesNothing(t *testing.T
 		wantCode string
 	}{
 		{name: "empty object", body: `{}`, wantCode: invalidPayload},
-		{name: "all fields null", body: `{"alwaysShowToc":null,"contentWidth":null}`, wantCode: invalidPayload},
+		{name: "all fields null", body: `{"alwaysShowToc":null,"contentWidth":null,"showSubpageCount":null}`, wantCode: invalidPayload},
 		{name: "empty body", body: ``, wantCode: invalidPayload},
 		{name: "json null", body: `null`, wantCode: invalidPayload},
 		{name: "not json", body: `not json`, wantCode: invalidPayload},
@@ -135,6 +136,8 @@ func TestDisplaySettings_Put_BadPayload_Returns400AndChangesNothing(t *testing.T
 		{name: "trailing garbage", body: `{"alwaysShowToc":true} x`, wantCode: invalidPayload},
 		{name: "bool as string", body: `{"alwaysShowToc":"yes"}`, wantCode: invalidPayload},
 		{name: "width as number", body: `{"contentWidth":1}`, wantCode: invalidPayload},
+		{name: "subpage count as string", body: `{"showSubpageCount":"true"}`, wantCode: invalidPayload},
+		{name: "subpage count as number", body: `{"showSubpageCount":1}`, wantCode: invalidPayload},
 		{name: "width as array", body: `{"contentWidth":["wide"]}`, wantCode: invalidPayload},
 		{name: "old toc-display field name", body: `{"alwaysShow":true}`, wantCode: invalidPayload},
 		{name: "unknown field next to a valid one", body: `{"alwaysShowToc":true,"futureSetting":1}`, wantCode: invalidPayload},
@@ -144,6 +147,7 @@ func TestDisplaySettings_Put_BadPayload_Returns400AndChangesNothing(t *testing.T
 		{name: "huge trailing value", body: `{"alwaysShowToc":true}"` + strings.Repeat("x", 64<<10) + `"`, wantCode: invalidPayload},
 		{name: "unknown width", body: `{"contentWidth":"huge"}`, wantCode: pagedisplay.ErrCodeInvalidContentWidth},
 		{name: "unknown width next to a valid flag", body: `{"alwaysShowToc":true,"contentWidth":"huge"}`, wantCode: pagedisplay.ErrCodeInvalidContentWidth},
+		{name: "unknown width next to a valid subpage count", body: `{"showSubpageCount":true,"contentWidth":"huge"}`, wantCode: pagedisplay.ErrCodeInvalidContentWidth},
 		{name: "empty width", body: `{"contentWidth":""}`, wantCode: pagedisplay.ErrCodeInvalidContentWidth},
 		{name: "html in width", body: `{"contentWidth":"<script>alert(1)</script>"}`, wantCode: pagedisplay.ErrCodeInvalidContentWidth},
 	}
@@ -160,6 +164,36 @@ func TestDisplaySettings_Put_BadPayload_Returns400AndChangesNothing(t *testing.T
 	}
 	if got, want := svc.Settings(), (pagedisplay.Settings{ContentWidth: pagedisplay.ContentWidthDefault}); got != want {
 		t.Fatalf("settings changed by rejected requests: %+v", got)
+	}
+}
+
+// Anonymous visitors see the subpage count too: /api/config carries the
+// setting whether public access is on or off.
+func TestDisplaySettings_ShowSubpageCount_ReachesAnonymousConfig(t *testing.T) {
+	w := createWikiTestInstance(t)
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(w.Close, t) })
+	svc, err := pagedisplay.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("pagedisplay.New: %v", err)
+	}
+	for _, public := range []bool{false, true} {
+		t.Run(fmt.Sprintf("public=%v", public), func(t *testing.T) {
+			router := newTestRouter(w, func(o *httpinternal.RouterOptions) {
+				o.PublicAccess = publicaccess.Fixed(public)
+				o.PageDisplay = svc
+			})
+			if cfg := readConfigJSON(t, router); cfg["showSubpageCount"] != false {
+				t.Fatalf("default config: want showSubpageCount=false, got %v", cfg["showSubpageCount"])
+			}
+			on, off := true, false
+			if _, err := svc.Update(pagedisplay.Patch{ShowSubpageCount: &on}); err != nil {
+				t.Fatalf("Update: %v", err)
+			}
+			t.Cleanup(func() { _, _ = svc.Update(pagedisplay.Patch{ShowSubpageCount: &off}) })
+			if cfg := readConfigJSON(t, router); cfg["showSubpageCount"] != true || cfg["publicAccess"] != public {
+				t.Fatalf("anonymous config: want showSubpageCount=true publicAccess=%v, got %v / %v", public, cfg["showSubpageCount"], cfg["publicAccess"])
+			}
+		})
 	}
 }
 
@@ -254,9 +288,9 @@ func TestDisplaySettings_Put_SeesChangesFromPerSettingRoutes(t *testing.T) {
 		name, url, body, want string
 	}{
 		{name: "old toc route on", url: "/api/admin/settings/toc-display", body: `{"alwaysShow":true}`, want: `{"alwaysShow":true}`},
-		{name: "new route changes width only", url: displaySettingsURL, body: `{"contentWidth":"wide"}`, want: `{"alwaysShowToc":true,"contentWidth":"wide"}`},
+		{name: "new route changes width only", url: displaySettingsURL, body: `{"contentWidth":"wide"}`, want: `{"alwaysShowToc":true,"contentWidth":"wide","showSubpageCount":false}`},
 		{name: "old width route back to default", url: "/api/admin/settings/content-width", body: `{"contentWidth":"default"}`, want: `{"contentWidth":"default"}`},
-		{name: "new route turns toc off", url: displaySettingsURL, body: `{"alwaysShowToc":false}`, want: `{"alwaysShowToc":false,"contentWidth":"default"}`},
+		{name: "new route turns toc off", url: displaySettingsURL, body: `{"alwaysShowToc":false}`, want: `{"alwaysShowToc":false,"contentWidth":"default","showSubpageCount":false}`},
 	}
 	for _, step := range steps {
 		rec := sess.do(router, http.MethodPut, step.url, step.body)

@@ -14,8 +14,16 @@ describe('parsePageDisplay', () => {
 
   it('keeps valid values', () => {
     expect(
-      parsePageDisplay({ alwaysShowToc: true, contentWidth: 'wide' }),
-    ).toEqual({ alwaysShowToc: true, contentWidth: 'wide' })
+      parsePageDisplay({
+        alwaysShowToc: true,
+        contentWidth: 'wide',
+        showSubpageCount: true,
+      }),
+    ).toEqual({
+      alwaysShowToc: true,
+      contentWidth: 'wide',
+      showSubpageCount: true,
+    })
   })
 
   it('ignores fields that are not display settings', () => {
@@ -25,7 +33,11 @@ describe('parsePageDisplay', () => {
         contentWidth: 'wide',
         publicAccess: true,
       }),
-    ).toEqual({ alwaysShowToc: true, contentWidth: 'wide' })
+    ).toEqual({
+      alwaysShowToc: true,
+      contentWidth: 'wide',
+      showSubpageCount: false,
+    })
   })
 
   it.each([
@@ -34,6 +46,14 @@ describe('parsePageDisplay', () => {
     { name: 'a null flag', alwaysShowToc: null },
   ])('treats $name as false', ({ alwaysShowToc }) => {
     expect(parsePageDisplay({ alwaysShowToc }).alwaysShowToc).toBe(false)
+  })
+
+  it.each([
+    { name: 'a string flag', showSubpageCount: 'true' },
+    { name: 'a number flag', showSubpageCount: 1 },
+    { name: 'a null flag', showSubpageCount: null },
+  ])('treats $name for the subpage count as false', ({ showSubpageCount }) => {
+    expect(parsePageDisplay({ showSubpageCount }).showSubpageCount).toBe(false)
   })
 
   it.each([

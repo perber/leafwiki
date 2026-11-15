@@ -16,5 +16,11 @@
   },
   "contentWidthDescription": "The default keeps text in a narrow column that is easy to read. Wide uses the full width of the page area. The editor preview and page history keep the narrow column.",
   "contentWidthSavedToast": "Page width saved",
-  "contentWidthUpdateError": "Could not update the page width"
+  "contentWidthUpdateError": "Could not update the page width",
+  "subpageCountSectionTitle": "Subpage count",
+  "subpageCountSectionDescription": "Shows how many subpages a section contains, in the navigation tree and in the section overview. Applies to everyone, including visitors who are not signed in.",
+  "subpageCountCheckboxLabel": "Show the number of subpages",
+  "subpageCountCheckboxDescription": "Each section shows the number of pages and sections directly inside it. Pages a visitor cannot see are not counted.",
+  "subpageCountSavedToast": "Subpage count setting saved",
+  "subpageCountUpdateError": "Could not update the subpage count setting"
 }

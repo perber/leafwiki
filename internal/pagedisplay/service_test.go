@@ -183,7 +183,7 @@ func TestService_ConcurrentAccess_IsRaceFree(t *testing.T) {
 		wg.Add(1)
 		go func(v int) {
 			defer wg.Done()
-			_, _ = svc.Update(Patch{AlwaysShowToc: ptr(v%3 == 0), ContentWidth: ptr(ContentWidthDefault)})
+			_, _ = svc.Update(Patch{AlwaysShowToc: ptr(v%3 == 0), ContentWidth: ptr(ContentWidthDefault), ShowSubpageCount: ptr(v%2 == 0)})
 		}(i)
 		// Reload shares the setters' lock; this also guards against a
 		// lock-order deadlock between it and the store's own lock.
@@ -194,12 +194,15 @@ func TestService_ConcurrentAccess_IsRaceFree(t *testing.T) {
 }
 
 func TestSettings_ConfigFields_UsesTheConfigAPINames(t *testing.T) {
-	got := Settings{AlwaysShowToc: true, ContentWidth: ContentWidthWide}.ConfigFields()
+	got := Settings{AlwaysShowToc: true, ContentWidth: ContentWidthWide, ShowSubpageCount: true}.ConfigFields()
 	if got["alwaysShowToc"] != true {
 		t.Fatalf("ConfigFields()[alwaysShowToc] = %v, want true (all fields: %v)", got["alwaysShowToc"], got)
 	}
 	if got["contentWidth"] != ContentWidthWide {
 		t.Fatalf("ConfigFields()[contentWidth] = %v, want %q (all fields: %v)", got["contentWidth"], ContentWidthWide, got)
+	}
+	if got["showSubpageCount"] != true {
+		t.Fatalf("ConfigFields()[showSubpageCount] = %v, want true (all fields: %v)", got["showSubpageCount"], got)
 	}
 }
 
@@ -323,6 +326,52 @@ func TestService_Reload_PicksUpExternalContentWidth(t *testing.T) {
 	}
 }
 
+// A missing showSubpageCount (a file from before the setting existed) means off.
+func TestService_ShowSubpageCount_ReadsFileValueOrDefaultsOff(t *testing.T) {
+	tests := []struct {
+		name string
+		file string // "" = no file
+		want bool
+	}{
+		{name: "no file", file: "", want: false},
+		{name: "file written before the setting existed", file: `{"alwaysShow":true,"contentWidth":"wide"}`, want: false},
+		{name: "off", file: `{"showSubpageCount":false}`, want: false},
+		{name: "on", file: `{"showSubpageCount":true}`, want: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if tc.file != "" {
+				if err := os.WriteFile(filepath.Join(dir, FileName), []byte(tc.file), 0o600); err != nil {
+					t.Fatalf("write file: %v", err)
+				}
+			}
+			if got := newTestService(t, dir).Settings().ShowSubpageCount; got != tc.want {
+				t.Fatalf("ShowSubpageCount = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// The on-disk key is the one older files and backups will carry from now on.
+func TestService_Update_WritesShowSubpageCountToFile(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := newTestService(t, dir).Update(Patch{ShowSubpageCount: ptr(true)}); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, FileName))
+	if err != nil {
+		t.Fatalf("read file: %v", err)
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if cfg["showSubpageCount"] != true {
+		t.Fatalf("file = %s, want showSubpageCount true", data)
+	}
+}
+
 func TestContentWidths_StartWithTheDefault(t *testing.T) {
 	got := ContentWidths()
 	if len(got) < 2 || got[0] != ContentWidthDefault {
@@ -413,23 +462,24 @@ func ptr[T any](v T) *T { return &v }
 
 // Update changes exactly the fields the patch carries and keeps the rest.
 func TestService_Update_AppliesOnlyGivenFields(t *testing.T) {
-	start := Settings{AlwaysShowToc: true, ContentWidth: ContentWidthWide}
+	start := Settings{AlwaysShowToc: true, ContentWidth: ContentWidthWide, ShowSubpageCount: true}
 	tests := []struct {
 		name  string
 		patch Patch
 		want  Settings
 	}{
 		{name: "empty patch changes nothing", patch: Patch{}, want: start},
-		{name: "only alwaysShowToc", patch: Patch{AlwaysShowToc: ptr(false)}, want: Settings{AlwaysShowToc: false, ContentWidth: ContentWidthWide}},
-		{name: "only contentWidth", patch: Patch{ContentWidth: ptr(ContentWidthDefault)}, want: Settings{AlwaysShowToc: true, ContentWidth: ContentWidthDefault}},
-		{name: "both fields", patch: Patch{AlwaysShowToc: ptr(false), ContentWidth: ptr(ContentWidthDefault)}, want: Settings{AlwaysShowToc: false, ContentWidth: ContentWidthDefault}},
-		{name: "same values", patch: Patch{AlwaysShowToc: ptr(true), ContentWidth: ptr(ContentWidthWide)}, want: start},
+		{name: "only alwaysShowToc", patch: Patch{AlwaysShowToc: ptr(false)}, want: Settings{AlwaysShowToc: false, ContentWidth: ContentWidthWide, ShowSubpageCount: true}},
+		{name: "only contentWidth", patch: Patch{ContentWidth: ptr(ContentWidthDefault)}, want: Settings{AlwaysShowToc: true, ContentWidth: ContentWidthDefault, ShowSubpageCount: true}},
+		{name: "only showSubpageCount", patch: Patch{ShowSubpageCount: ptr(false)}, want: Settings{AlwaysShowToc: true, ContentWidth: ContentWidthWide, ShowSubpageCount: false}},
+		{name: "all fields", patch: Patch{AlwaysShowToc: ptr(false), ContentWidth: ptr(ContentWidthDefault), ShowSubpageCount: ptr(false)}, want: Settings{AlwaysShowToc: false, ContentWidth: ContentWidthDefault}},
+		{name: "same values", patch: Patch{AlwaysShowToc: ptr(true), ContentWidth: ptr(ContentWidthWide), ShowSubpageCount: ptr(true)}, want: start},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			svc := newTestService(t, dir)
-			if _, err := svc.Update(Patch{AlwaysShowToc: ptr(start.AlwaysShowToc), ContentWidth: ptr(start.ContentWidth)}); err != nil {
+			if _, err := svc.Update(Patch{AlwaysShowToc: ptr(start.AlwaysShowToc), ContentWidth: ptr(start.ContentWidth), ShowSubpageCount: ptr(start.ShowSubpageCount)}); err != nil {
 				t.Fatalf("Update(start): %v", err)
 			}
 			got, err := svc.Update(tc.patch)
@@ -454,7 +504,7 @@ func TestService_Update_AppliesOnlyGivenFields(t *testing.T) {
 func TestService_Update_InvalidFieldChangesNothing(t *testing.T) {
 	dir := t.TempDir()
 	svc := newTestService(t, dir)
-	_, err := svc.Update(Patch{AlwaysShowToc: ptr(true), ContentWidth: ptr("huge")})
+	_, err := svc.Update(Patch{AlwaysShowToc: ptr(true), ContentWidth: ptr("huge"), ShowSubpageCount: ptr(true)})
 	loc, ok := sharederrors.AsLocalizedError(err)
 	if !ok || loc.Code != ErrCodeInvalidContentWidth {
 		t.Fatalf("Update error = %v, want code %q", err, ErrCodeInvalidContentWidth)
@@ -538,6 +588,8 @@ func TestService_Update_AfterReload_KeepsRestoredFields(t *testing.T) {
 	}{
 		{name: "width patch keeps restored toc flag", restored: `{"alwaysShow":true}`, patch: Patch{ContentWidth: ptr(ContentWidthWide)}, want: Settings{AlwaysShowToc: true, ContentWidth: ContentWidthWide}},
 		{name: "toc patch keeps restored width", restored: `{"contentWidth":"wide"}`, patch: Patch{AlwaysShowToc: ptr(true)}, want: Settings{AlwaysShowToc: true, ContentWidth: ContentWidthWide}},
+		{name: "toc patch keeps restored subpage count", restored: `{"showSubpageCount":true}`, patch: Patch{AlwaysShowToc: ptr(true)}, want: Settings{AlwaysShowToc: true, ContentWidth: ContentWidthDefault, ShowSubpageCount: true}},
+		{name: "subpage count patch keeps restored toc flag and width", restored: `{"alwaysShow":true,"contentWidth":"wide"}`, patch: Patch{ShowSubpageCount: ptr(true)}, want: Settings{AlwaysShowToc: true, ContentWidth: ContentWidthWide, ShowSubpageCount: true}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

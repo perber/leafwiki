@@ -11,6 +11,10 @@ type Settings struct {
 	AlwaysShowToc bool `json:"alwaysShowToc"`
 	// ContentWidth is the page reading-column width, one of ContentWidths().
 	ContentWidth string `json:"contentWidth"`
+	// ShowSubpageCount reports whether the tree and the section overview
+	// show how many direct subpages a section has. The frontend counts the
+	// children of its own (already visibility-filtered) tree.
+	ShowSubpageCount bool `json:"showSubpageCount"`
 }
 
 // ConfigFields returns the settings as the flat key/value pairs that

@@ -16,5 +16,11 @@
   },
   "contentWidthDescription": "Le mode par défaut garde le texte dans une colonne étroite et facile à lire. Large utilise toute la largeur de la zone de page. L'aperçu de l'éditeur et l'historique de la page conservent la colonne étroite.",
   "contentWidthSavedToast": "Largeur de page enregistrée",
-  "contentWidthUpdateError": "Impossible de mettre à jour la largeur de page"
+  "contentWidthUpdateError": "Impossible de mettre à jour la largeur de page",
+  "subpageCountSectionTitle": "Nombre de sous-pages",
+  "subpageCountSectionDescription": "Affiche le nombre de sous-pages d'une section, dans l'arborescence de navigation et dans la vue d'ensemble de la section. S'applique à tous, y compris aux visiteurs non connectés.",
+  "subpageCountCheckboxLabel": "Afficher le nombre de sous-pages",
+  "subpageCountCheckboxDescription": "Chaque section affiche le nombre de pages et de sections qu'elle contient directement. Les pages qu'un visiteur ne peut pas voir ne sont pas comptées.",
+  "subpageCountSavedToast": "Paramètre du nombre de sous-pages enregistré",
+  "subpageCountUpdateError": "Impossible de mettre à jour le paramètre du nombre de sous-pages"
 }

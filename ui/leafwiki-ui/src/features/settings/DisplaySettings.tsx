@@ -19,6 +19,7 @@ export default function DisplaySettings() {
 
   const alwaysShowToc = useConfigStore((s) => s.pageDisplay.alwaysShowToc)
   const contentWidth = useConfigStore((s) => s.pageDisplay.contentWidth)
+  const showSubpageCount = useConfigStore((s) => s.pageDisplay.showSubpageCount)
   const toc = useDisplaySettingSave({
     saved: t('savedToast'),
     failed: t('updateError'),
@@ -26,6 +27,10 @@ export default function DisplaySettings() {
   const width = useDisplaySettingSave({
     saved: t('contentWidthSavedToast'),
     failed: t('contentWidthUpdateError'),
+  })
+  const subpageCount = useDisplaySettingSave({
+    saved: t('subpageCountSavedToast'),
+    failed: t('subpageCountUpdateError'),
   })
 
   const applyWidth = (value: string) => {
@@ -101,6 +106,36 @@ export default function DisplaySettings() {
           </Select>
           <p className="settings__section-description">
             {t('contentWidthDescription')}
+          </p>
+        </div>
+      </div>
+
+      <div className="settings__section">
+        <h2 className="settings__section-title">
+          {t('subpageCountSectionTitle')}
+        </h2>
+        <p className="settings__section-description">
+          {t('subpageCountSectionDescription')}
+        </p>
+
+        <div className="settings__field">
+          <label className="settings__checkbox-label">
+            <Checkbox
+              data-testid="display-subpage-count-checkbox"
+              checked={showSubpageCount}
+              disabled={subpageCount.saving}
+              onCheckedChange={(checked) => {
+                if (!!checked !== showSubpageCount)
+                  void subpageCount.save({ showSubpageCount: !!checked })
+              }}
+            />
+            {subpageCount.saving && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
+            {t('subpageCountCheckboxLabel')}
+          </label>
+          <p className="settings__section-description">
+            {t('subpageCountCheckboxDescription')}
           </p>
         </div>
       </div>

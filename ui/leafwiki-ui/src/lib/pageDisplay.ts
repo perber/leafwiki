@@ -13,6 +13,8 @@ export type PageDisplay = {
   alwaysShowToc: boolean
   // Page reading-column width.
   contentWidth: ContentWidth
+  // Show how many direct subpages a section has (tree, section overview).
+  showSubpageCount: boolean
 }
 
 // The fields of a PUT /api/admin/settings/display request; a missing field
@@ -22,6 +24,7 @@ export type PageDisplayPatch = Partial<PageDisplay>
 export const DEFAULT_PAGE_DISPLAY: PageDisplay = {
   alwaysShowToc: false,
   contentWidth: DEFAULT_CONTENT_WIDTH,
+  showSubpageCount: false,
 }
 
 // Reads the display settings from a server response (/api/config or the
@@ -38,5 +41,9 @@ export function parsePageDisplay(raw: unknown): PageDisplay {
         ? fields.alwaysShowToc
         : DEFAULT_PAGE_DISPLAY.alwaysShowToc,
     contentWidth: toContentWidth(fields.contentWidth),
+    showSubpageCount:
+      typeof fields.showSubpageCount === 'boolean'
+        ? fields.showSubpageCount
+        : DEFAULT_PAGE_DISPLAY.showSubpageCount,
   }
 }

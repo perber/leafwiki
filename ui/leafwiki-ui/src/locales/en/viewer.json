@@ -20,7 +20,9 @@
     "subpagesAriaLabel": "Subpages of {{title}}",
     "sectionSuffix": "(Section)",
     "updatedByLabel": "Updated by {{editor}} · {{time}}",
-    "updatedLabel": "Updated {{time}}"
+    "updatedLabel": "Updated {{time}}",
+    "subpageCount_one": "{{count}} subpage",
+    "subpageCount_other": "{{count}} subpages"
   },
   "markdownPreview": {
     "renderError": "This page contains Markdown that could not be rendered safely.",

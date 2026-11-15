@@ -1,3 +1,4 @@
+import { SubpageCount } from '@/components/SubpageCount'
 import { TreeViewActionButton } from '@/features/tree/TreeViewActionButton'
 import { NODE_KIND_SECTION, PageNode } from '@/lib/api/pages'
 import {
@@ -120,6 +121,12 @@ export const TreeNode = React.memo(function TreeNode({
         >
           {node.title || t('treeActions.untitledPage')}
         </span>
+        {node.kind === NODE_KIND_SECTION && (
+          <SubpageCount
+            count={node.children?.length ?? 0}
+            testId={`tree-node-subpage-count-${node.id}`}
+          />
+        )}
       </Link>
     </div>
   )
