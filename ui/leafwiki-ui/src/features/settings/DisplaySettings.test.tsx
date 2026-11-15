@@ -1,5 +1,5 @@
-import '@/lib/i18n'
 import { ApiLocalizedError } from '@/lib/api/errors'
+import i18next from '@/lib/i18n'
 import { useConfigStore } from '@/stores/config'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -26,6 +26,19 @@ function setConfig(
     ...overrides,
   })
 }
+
+// Server-side template for a failed write (internal/pagedisplay/service.go);
+// the service test pins the same string.
+const PERSIST_FAILED_TEMPLATE = 'failed to persist toc-display config'
+
+const errorLocales = import.meta.glob<{ default: Record<string, string> }>(
+  '../../locales/*/errors.json',
+  { eager: true },
+)
+const errorsByLang = Object.entries(errorLocales).map(([path, mod]) => ({
+  lang: /locales\/([^/]+)\/errors\.json$/.exec(path)![1],
+  translation: mod.default[PERSIST_FAILED_TEMPLATE],
+}))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -157,4 +170,32 @@ describe('DisplaySettings', () => {
       expect.stringContaining('Invalid page width'),
     )
   })
+
+  it.each(errorsByLang)(
+    'toasts the translated persist failure in $lang',
+    async ({ lang, translation }) => {
+      expect(
+        translation,
+        `locales/${lang}/errors.json lacks the TOC display persist failure`,
+      ).toBeTruthy()
+      await i18next.changeLanguage(lang)
+      try {
+        const user = userEvent.setup({ pointerEventsCheck: 0 })
+        setAlwaysShowToc.mockRejectedValueOnce(
+          new ApiLocalizedError({
+            code: 'toc_display_update_failed',
+            message: 'raw server message',
+            template: PERSIST_FAILED_TEMPLATE,
+          }),
+        )
+        setConfig({ alwaysShowToc: false })
+        render(<DisplaySettings />)
+
+        await user.click(screen.getByTestId('display-toc-checkbox'))
+        expect(toast.error).toHaveBeenCalledWith(translation)
+      } finally {
+        await i18next.changeLanguage('en')
+      }
+    },
+  )
 })

@@ -17,6 +17,7 @@
   "failed to decode avatar image": "Impossible de décoder l'image d'avatar",
   "failed to delete avatar": "Impossible de supprimer l'avatar",
   "failed to encode avatar image": "Impossible d'encoder l'image d'avatar",
+  "failed to persist toc-display config": "Impossible d'enregistrer le paramètre de la table des matières",
   "failed to save avatar file": "Impossible d'enregistrer le fichier d'avatar",
   "invalid avatar file type %s (allowed: %s)": "Type de fichier d'avatar invalide %s (autorisés : %s)",
   "invalid user id for avatar delete": "Requête d'avatar invalide",

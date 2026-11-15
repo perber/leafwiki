@@ -2,6 +2,7 @@ package pagedisplay
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -82,6 +83,44 @@ func TestService_SetAlwaysShow_WritesModeSixHundredJSON(t *testing.T) {
 	}
 	if !cfg.AlwaysShow {
 		t.Fatalf("expected {\"alwaysShow\": true} on disk, got %s", data)
+	}
+}
+
+// The frontend looks the template up verbatim in locales/*/errors.json
+// (DisplaySettings.test.tsx checks every locale for this exact key).
+func TestService_SetAlwaysShow_WriteFailure_ReturnsTranslatableError(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "data")
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	svc, err := New(dir)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	// A regular file where the data directory was makes every write under it
+	// fail, on every OS and regardless of the user running the test.
+	if err := os.Remove(dir); err != nil {
+		t.Fatalf("remove dir: %v", err)
+	}
+	if err := os.WriteFile(dir, []byte("not a directory"), 0o600); err != nil {
+		t.Fatalf("write placeholder file: %v", err)
+	}
+
+	err = svc.SetAlwaysShow(true)
+
+	var localized *sharederrors.LocalizedError
+	if !errors.As(err, &localized) {
+		t.Fatalf("SetAlwaysShow err = %v, want a LocalizedError", err)
+	}
+	if localized.Code != "toc_display_update_failed" {
+		t.Errorf("code = %q, want %q", localized.Code, "toc_display_update_failed")
+	}
+	const wantTemplate = "failed to persist toc-display config"
+	if localized.Template != wantTemplate {
+		t.Errorf("template = %q, want %q", localized.Template, wantTemplate)
+	}
+	if svc.Settings().AlwaysShowToc {
+		t.Error("AlwaysShowToc = true after a failed write, want the old value false")
 	}
 }
 

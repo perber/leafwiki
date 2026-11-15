@@ -17,6 +17,7 @@
   "failed to decode avatar image": "Failed to decode avatar image",
   "failed to delete avatar": "Failed to delete avatar",
   "failed to encode avatar image": "Failed to encode avatar image",
+  "failed to persist toc-display config": "Failed to save the table of contents setting",
   "failed to save avatar file": "Failed to save avatar file",
   "invalid avatar file type %s (allowed: %s)": "Invalid avatar file type %s (allowed: %s)",
   "invalid user id for avatar delete": "Invalid avatar request",

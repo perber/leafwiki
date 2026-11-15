@@ -17,6 +17,7 @@
   "failed to decode avatar image": "头像图片解码失败",
   "failed to delete avatar": "删除头像失败",
   "failed to encode avatar image": "头像图片编码失败",
+  "failed to persist toc-display config": "无法保存目录设置",
   "failed to save avatar file": "头像文件保存失败",
   "invalid avatar file type %s (allowed: %s)": "无效的头像文件类型 %s（允许：%s）",
   "invalid user id for avatar delete": "无效的头像请求",

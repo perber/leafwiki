@@ -17,6 +17,7 @@
   "failed to decode avatar image": "No se pudo descodificar la imagen del avatar",
   "failed to delete avatar": "No se pudo eliminar el avatar",
   "failed to encode avatar image": "No se pudo codificar la imagen del avatar",
+  "failed to persist toc-display config": "No se pudo guardar la configuración del índice de contenidos",
   "failed to save avatar file": "No se pudo guardar el archivo del avatar",
   "invalid avatar file type %s (allowed: %s)": "Tipo de archivo de avatar no válido: %s (permitidos: %s)",
   "invalid user id for avatar delete": "Solicitud de avatar no válida",
