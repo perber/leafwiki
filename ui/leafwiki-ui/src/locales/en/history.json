@@ -98,8 +98,10 @@
   "chips": {
     "revisionSlug": "Revision slug: {{slug}}",
     "currentSlug": "Current slug: {{slug}}",
-    "assetChangesCount": "{{count}} asset changes",
-    "assetsCount": "{{count}} Assets"
+    "assetChangesCount_one": "{{count}} asset changed",
+    "assetChangesCount_other": "{{count}} assets changed",
+    "assetsCount_one": "{{count}} asset",
+    "assetsCount_other": "{{count}} assets"
   },
   "toasts": {
     "restoreSuccess": "Revision restored",

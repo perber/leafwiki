@@ -98,8 +98,10 @@
   "chips": {
     "revisionSlug": "Revisions-Slug: {{slug}}",
     "currentSlug": "Aktueller Slug: {{slug}}",
-    "assetChangesCount": "{{count}} Dateiänderungen",
-    "assetsCount": "{{count}} Dateien"
+    "assetChangesCount_one": "{{count}} Dateiänderung",
+    "assetChangesCount_other": "{{count}} Dateiänderungen",
+    "assetsCount_one": "{{count}} Datei",
+    "assetsCount_other": "{{count}} Dateien"
   },
   "toasts": {
     "restoreSuccess": "Revision wiederhergestellt",

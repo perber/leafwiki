@@ -98,8 +98,10 @@
   "chips": {
     "revisionSlug": "Slug de la révision : {{slug}}",
     "currentSlug": "Slug actuel : {{slug}}",
-    "assetChangesCount": "{{count}} modifications de ressources",
-    "assetsCount": "{{count}} ressources"
+    "assetChangesCount_one": "{{count}} modification de ressource",
+    "assetChangesCount_other": "{{count}} modifications de ressources",
+    "assetsCount_one": "{{count}} ressource",
+    "assetsCount_other": "{{count}} ressources"
   },
   "toasts": {
     "restoreSuccess": "Révision restaurée",

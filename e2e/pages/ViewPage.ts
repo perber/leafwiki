@@ -293,11 +293,6 @@ export default class ViewPage {
     await this.page.locator('[data-testid="page-history-page-list"]').waitFor({ state: 'visible' });
   }
 
-  // Kept for backward compatibility — alias of expectRevisionListVisible.
-  async expectRevisionsSidebarOpen() {
-    await this.expectRevisionListVisible();
-  }
-
   async openFirstRevision() {
     const firstRevision = this.page
       .locator('button[data-testid^="history-sidebar-revision-"]')
@@ -312,21 +307,6 @@ export default class ViewPage {
       .nth(index);
     await revision.waitFor({ state: 'visible' });
     await revision.click();
-  }
-
-  async expectRevisionViewOpen() {
-    await this.page
-      .locator('[data-testid="page-history-page-content"]')
-      .waitFor({ state: 'visible' });
-    await this.expectRevisionsSidebarOpen();
-    await this.page.locator('button[data-testid="back-to-page-button"]').waitFor({
-      state: 'visible',
-    });
-  }
-
-  async returnToPage() {
-    const backButton = this.page.locator('button[data-testid="back-to-page-button"]');
-    await backButton.click();
   }
 
   async switchToHistoryPreviewTab() {
