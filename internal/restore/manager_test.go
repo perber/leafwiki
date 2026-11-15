@@ -285,7 +285,7 @@ func TestManager_Restore_HappyPath(t *testing.T) {
 	if !f.publicAccess.Enabled() {
 		t.Error("expected public access reloaded from the restored public-access.json")
 	}
-	if !f.pageDisplay.AlwaysShow() {
+	if !f.pageDisplay.Settings().AlwaysShowToc {
 		t.Error("expected always-show-TOC reloaded from the restored toc-display.json")
 	}
 }

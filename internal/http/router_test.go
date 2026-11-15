@@ -18,6 +18,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/perber/wiki/internal/core/assets"
+	coreauth "github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/core/revision"
 	"github.com/perber/wiki/internal/core/tree"
 	httpinternal "github.com/perber/wiki/internal/http"
@@ -3497,8 +3498,24 @@ func routerWithTocDisplay(t *testing.T, w *wiki.Wiki, svc *pagedisplay.Service) 
 	w.SetInstanceSettingsRoutes(wikiinstancesettings.NewRoutes(paSvc, svc, w.AuthService(), slog.Default()))
 	return newTestRouter(w, func(o *httpinternal.RouterOptions) {
 		o.PublicAccess = paSvc
-		o.AlwaysShowToc = svc
+		o.PageDisplay = svc
 	})
+}
+
+// readConfigJSON fetches GET /api/config anonymously and decodes the body.
+func readConfigJSON(t *testing.T, router http.Handler) map[string]any {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/config: %d", rec.Code)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &m); err != nil {
+		t.Fatalf("decode /api/config: %v", err)
+	}
+	return m
 }
 
 func anonStatus(router http.Handler, method, path string) int {
@@ -3552,21 +3569,7 @@ func TestPublicAccessToggle_ConfigEndpointReflectsTheChange(t *testing.T) {
 	}
 	router := routerWithPublicAccess(t, w, svc)
 
-	readConfig := func() map[string]any {
-		req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
-		rec := httptest.NewRecorder()
-		router.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("GET /api/config: %d", rec.Code)
-		}
-		var m map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &m); err != nil {
-			t.Fatalf("decode /api/config: %v", err)
-		}
-		return m
-	}
-
-	cfg := readConfig()
+	cfg := readConfigJSON(t, router)
 	if cfg["publicAccess"] != false || cfg["publicAccessEnvManaged"] != false {
 		t.Fatalf("initial config: want publicAccess=false envManaged=false, got %v / %v", cfg["publicAccess"], cfg["publicAccessEnvManaged"])
 	}
@@ -3576,7 +3579,7 @@ func TestPublicAccessToggle_ConfigEndpointReflectsTheChange(t *testing.T) {
 		t.Fatalf("enable: %d %s", rec.Code, rec.Body.String())
 	}
 
-	if cfg := readConfig(); cfg["publicAccess"] != true {
+	if cfg := readConfigJSON(t, router); cfg["publicAccess"] != true {
 		t.Fatalf("after enable: want publicAccess=true, got %v", cfg["publicAccess"])
 	}
 }
@@ -3648,21 +3651,7 @@ func TestTocDisplayToggle_ConfigEndpointReflectsTheChangeOnTheSameEngine(t *test
 	}
 	router := routerWithTocDisplay(t, w, svc)
 
-	readConfig := func() map[string]any {
-		req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
-		rec := httptest.NewRecorder()
-		router.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("GET /api/config: %d", rec.Code)
-		}
-		var m map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &m); err != nil {
-			t.Fatalf("decode /api/config: %v", err)
-		}
-		return m
-	}
-
-	if cfg := readConfig(); cfg["alwaysShowToc"] != false {
+	if cfg := readConfigJSON(t, router); cfg["alwaysShowToc"] != false {
 		t.Fatalf("initial config: want alwaysShowToc=false, got %v", cfg["alwaysShowToc"])
 	}
 
@@ -3671,7 +3660,7 @@ func TestTocDisplayToggle_ConfigEndpointReflectsTheChangeOnTheSameEngine(t *test
 		t.Fatalf("enable: want 200 {\"alwaysShow\":true}, got %d %s", rec.Code, rec.Body.String())
 	}
 
-	if cfg := readConfig(); cfg["alwaysShowToc"] != true {
+	if cfg := readConfigJSON(t, router); cfg["alwaysShowToc"] != true {
 		t.Fatalf("after enable: want alwaysShowToc=true, got %v", cfg["alwaysShowToc"])
 	}
 
@@ -3680,7 +3669,7 @@ func TestTocDisplayToggle_ConfigEndpointReflectsTheChangeOnTheSameEngine(t *test
 		t.Fatalf("disable: want 200, got %d %s", rec.Code, rec.Body.String())
 	}
 
-	if cfg := readConfig(); cfg["alwaysShowToc"] != false {
+	if cfg := readConfigJSON(t, router); cfg["alwaysShowToc"] != false {
 		t.Fatalf("after disable: want alwaysShowToc=false, got %v", cfg["alwaysShowToc"])
 	}
 }
@@ -3722,6 +3711,190 @@ func TestTocDisplayToggle_BadPayload_Returns400(t *testing.T) {
 		if rec.Code != http.StatusBadRequest {
 			t.Errorf("payload %q: want 400, got %d %s", body, rec.Code, rec.Body.String())
 		}
+	}
+}
+
+func TestContentWidthSetting_ConfigEndpointReflectsTheChange(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	svc, err := pagedisplay.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("pagedisplay.New: %v", err)
+	}
+	router := routerWithTocDisplay(t, w, svc)
+
+	if cfg := readConfigJSON(t, router); cfg["contentWidth"] != "default" || cfg["alwaysShowToc"] != false {
+		t.Fatalf("initial config: want contentWidth=default alwaysShowToc=false, got %v / %v", cfg["contentWidth"], cfg["alwaysShowToc"])
+	}
+
+	rec := authenticatedRequest(t, router, http.MethodPut, "/api/admin/settings/content-width", strings.NewReader(`{"contentWidth":"wide"}`))
+	if rec.Code != http.StatusOK || rec.Body.String() != `{"contentWidth":"wide"}` {
+		t.Fatalf("set wide: want 200 {\"contentWidth\":\"wide\"}, got %d %s", rec.Code, rec.Body.String())
+	}
+	if cfg := readConfigJSON(t, router); cfg["contentWidth"] != "wide" {
+		t.Fatalf("after set: want contentWidth=wide, got %v", cfg["contentWidth"])
+	}
+}
+
+func TestContentWidthSetting_RequiresAdmin(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	svc, err := pagedisplay.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("pagedisplay.New: %v", err)
+	}
+	router := routerWithTocDisplay(t, w, svc)
+
+	if code := anonStatus(router, http.MethodPut, "/api/admin/settings/content-width"); code != http.StatusUnauthorized {
+		t.Fatalf("anon PUT: want 401, got %d", code)
+	}
+
+	authenticatedRequest(t, router, http.MethodPost, "/api/users",
+		strings.NewReader(`{"username":"ed3","email":"ed3@example.com","password":"editorpass","role":"editor"}`))
+	rec := authenticatedRequestAs(t, router, "ed3", "editorpass", http.MethodPut, "/api/admin/settings/content-width", strings.NewReader(`{"contentWidth":"wide"}`))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("editor PUT: want 403, got %d %s", rec.Code, rec.Body.String())
+	}
+	if got := svc.Settings().ContentWidth; got != pagedisplay.ContentWidthDefault {
+		t.Fatalf("content width changed by a rejected request: %q", got)
+	}
+}
+
+func TestContentWidthSetting_BadPayload_Returns400(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	svc, err := pagedisplay.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("pagedisplay.New: %v", err)
+	}
+	router := routerWithTocDisplay(t, w, svc)
+
+	tests := []struct {
+		name     string
+		body     string
+		wantCode string
+	}{
+		{name: "missing field", body: `{}`, wantCode: "instance_settings_invalid_payload"},
+		{name: "wrong type", body: `{"contentWidth":true}`, wantCode: "instance_settings_invalid_payload"},
+		{name: "not json", body: `not json`, wantCode: "instance_settings_invalid_payload"},
+		{name: "unknown width", body: `{"contentWidth":"huge"}`, wantCode: pagedisplay.ErrCodeInvalidContentWidth},
+		{name: "empty width", body: `{"contentWidth":""}`, wantCode: pagedisplay.ErrCodeInvalidContentWidth},
+		{name: "null width", body: `{"contentWidth":null}`, wantCode: "instance_settings_invalid_payload"},
+		{name: "capitalised width", body: `{"contentWidth":"Wide"}`, wantCode: pagedisplay.ErrCodeInvalidContentWidth},
+		{name: "leading space", body: `{"contentWidth":" wide"}`, wantCode: pagedisplay.ErrCodeInvalidContentWidth},
+		{name: "trailing newline", body: `{"contentWidth":"wide\n"}`, wantCode: pagedisplay.ErrCodeInvalidContentWidth},
+		{name: "html in width", body: `{"contentWidth":"<script>alert(1)</script>"}`, wantCode: pagedisplay.ErrCodeInvalidContentWidth},
+		{name: "array", body: `{"contentWidth":["wide"]}`, wantCode: "instance_settings_invalid_payload"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := authenticatedRequest(t, router, http.MethodPut, "/api/admin/settings/content-width", strings.NewReader(tc.body))
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("payload %q: want 400, got %d %s", tc.body, rec.Code, rec.Body.String())
+			}
+			if !strings.Contains(rec.Body.String(), `"code":"`+tc.wantCode+`"`) {
+				t.Fatalf("payload %q: want error code %q, got %s", tc.body, tc.wantCode, rec.Body.String())
+			}
+		})
+	}
+	if got := svc.Settings().ContentWidth; got != pagedisplay.ContentWidthDefault {
+		t.Fatalf("content width changed by rejected requests: %q", got)
+	}
+}
+
+// Bearer API keys follow role(user) ∩ role(key) on the display-settings
+// routes too: only an admin-scoped key owned by an admin may change them,
+// and the content-width route answers exactly like its toc-display sibling.
+func TestContentWidthSetting_APIKey_OnlyAdminKeyOfAdminMayChange(t *testing.T) {
+	w, err := wiki.NewWiki(&wiki.WikiOptions{
+		StorageDir:             t.TempDir(),
+		AdminPassword:          "adminpassword",
+		JWTSecret:              "secretkey",
+		AccessTokenTimeout:     15 * time.Minute,
+		RefreshTokenTimeout:    7 * 24 * time.Hour,
+		EnableAPIKeyManagement: true,
+	})
+	if err != nil {
+		t.Fatalf("NewWiki: %v", err)
+	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(w.Close, t) })
+	svc, err := pagedisplay.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("pagedisplay.New: %v", err)
+	}
+	paSvc, err := publicaccess.NewSettingsManaged(t.TempDir())
+	if err != nil {
+		t.Fatalf("publicaccess.NewSettingsManaged: %v", err)
+	}
+	w.SetInstanceSettingsRoutes(wikiinstancesettings.NewRoutes(paSvc, svc, w.AuthService(), slog.Default()))
+	router := newTestRouter(w, func(o *httpinternal.RouterOptions) {
+		o.APIKeyService = w.APIKeyService()
+		o.EnableAPIKeyManagement = true
+		o.PublicAccess = paSvc
+		o.PageDisplay = svc
+	})
+
+	tests := []struct {
+		name     string
+		userRole string
+		keyRole  string
+		want     int
+	}{
+		{name: "viewer key of a viewer", userRole: coreauth.RoleViewer, keyRole: coreauth.RoleViewer, want: http.StatusForbidden},
+		{name: "editor key of an editor", userRole: coreauth.RoleEditor, keyRole: coreauth.RoleEditor, want: http.StatusForbidden},
+		{name: "viewer key of an admin", userRole: coreauth.RoleAdmin, keyRole: coreauth.RoleViewer, want: http.StatusForbidden},
+		{name: "editor key of an admin", userRole: coreauth.RoleAdmin, keyRole: coreauth.RoleEditor, want: http.StatusForbidden},
+		{name: "admin key of an admin", userRole: coreauth.RoleAdmin, keyRole: coreauth.RoleAdmin, want: http.StatusOK},
+	}
+	for i, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			secret := createAPIKeyFor(t, w, router, fmt.Sprintf("cwkey%d", i), tc.userRole, tc.keyRole)
+
+			tocRec := httptest.NewRecorder()
+			router.ServeHTTP(tocRec, bearerJSONRequest(http.MethodPut, "/api/admin/settings/toc-display", secret, `{"alwaysShow":false}`))
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, bearerJSONRequest(http.MethodPut, "/api/admin/settings/content-width", secret, `{"contentWidth":"wide"}`))
+
+			if rec.Code != tc.want {
+				t.Fatalf("content-width: want %d, got %d %s", tc.want, rec.Code, rec.Body.String())
+			}
+			if rec.Code != tocRec.Code {
+				t.Fatalf("content-width answered %d, toc-display %d for the same key", rec.Code, tocRec.Code)
+			}
+			wantWidth := pagedisplay.ContentWidthDefault
+			if tc.want == http.StatusOK {
+				wantWidth = pagedisplay.ContentWidthWide
+			}
+			if got := svc.Settings().ContentWidth; got != wantWidth {
+				t.Fatalf("content width after request = %q, want %q", got, wantWidth)
+			}
+		})
+	}
+}
+
+// Anonymous visitors of a public wiki render pages with the admin's width:
+// /api/config must carry it whether public access is on or off.
+func TestContentWidthSetting_AnonymousConfig_CarriesWidthWithOrWithoutPublicAccess(t *testing.T) {
+	w := createWikiTestInstance(t)
+	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
+	svc, err := pagedisplay.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("pagedisplay.New: %v", err)
+	}
+	if err := svc.SetContentWidth(pagedisplay.ContentWidthWide); err != nil {
+		t.Fatalf("SetContentWidth: %v", err)
+	}
+	for _, public := range []bool{false, true} {
+		t.Run(fmt.Sprintf("public=%v", public), func(t *testing.T) {
+			router := newTestRouter(w, func(o *httpinternal.RouterOptions) {
+				o.PublicAccess = publicaccess.Fixed(public)
+				o.PageDisplay = svc
+			})
+			cfg := readConfigJSON(t, router)
+			if cfg["contentWidth"] != pagedisplay.ContentWidthWide || cfg["publicAccess"] != public {
+				t.Fatalf("anonymous config: want contentWidth=wide publicAccess=%v, got %v / %v", public, cfg["contentWidth"], cfg["publicAccess"])
+			}
+		})
 	}
 }
 

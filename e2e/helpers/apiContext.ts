@@ -55,3 +55,14 @@ export async function setAlwaysShowToc(alwaysShow: boolean) {
   expect(resp.status(), `set alwaysShowToc=${alwaysShow}`).toBe(200);
   await api.dispose();
 }
+
+// setContentWidth sets the instance-wide page content width as admin.
+export async function setContentWidth(contentWidth: string) {
+  const api = await loggedIn();
+  const resp = await api.put('/api/admin/settings/content-width', {
+    headers: await csrfHeader(api),
+    data: { contentWidth },
+  });
+  expect(resp.status(), `set contentWidth=${contentWidth}`).toBe(200);
+  await api.dispose();
+}

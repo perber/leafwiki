@@ -109,5 +109,7 @@
   "user not found": "User not found",
   "zip entry exceeds the per-file size limit": "A file inside the uploaded archive is too large",
   "decompressed zip contents exceed the total size limit": "The uploaded archive is too large once decompressed",
-  "zip entry's decompression ratio exceeds the allowed maximum": "The uploaded archive looks like a decompression bomb"
+  "zip entry's decompression ratio exceeds the allowed maximum": "The uploaded archive looks like a decompression bomb",
+  "invalid page content width": "Invalid page width",
+  "failed to update page display setting": "Failed to update the display setting"
 }

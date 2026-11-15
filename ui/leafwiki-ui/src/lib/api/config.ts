@@ -1,3 +1,4 @@
+import type { ContentWidth } from '@/lib/contentWidth'
 import type { ApiLocalizedErrorResponse } from './errors'
 import i18next from '@/lib/i18n'
 import { API_BASE_URL } from '../config'
@@ -19,9 +20,11 @@ export type Config = {
   // status view instead of a toggle.
   publicAccessEnvManaged: boolean
   // Whether the TOC panel/dropdown should always be shown, regardless of
-  // heading count (instance-wide admin toggle, see Settings > Table of
-  // Contents).
+  // heading count (instance-wide admin toggle, see Settings > Display).
   alwaysShowToc: boolean
+  // Page reading-column width (instance-wide, see Settings > Display).
+  // Missing on servers that predate the setting.
+  contentWidth?: ContentWidth
   editorLimit: number
   hideLinkMetadataSection: boolean
   authDisabled: boolean

@@ -1,4 +1,5 @@
 import * as configApi from '@/lib/api/config'
+import * as instanceSettingsApi from '@/lib/api/instanceSettings'
 import i18next from '@/lib/i18n'
 import {
   afterEach,
@@ -13,6 +14,10 @@ import { useConfigStore } from './config'
 
 vi.mock('@/lib/api/config', () => ({
   getConfig: vi.fn(),
+}))
+
+vi.mock('@/lib/api/instanceSettings', () => ({
+  setContentWidth: vi.fn(),
 }))
 
 const baseConfig = {
@@ -124,5 +129,71 @@ describe('loadConfig defaultLanguage', () => {
 
     expect(i18next.language).toBe('en')
     expect(useConfigStore.getState().defaultLanguage).toBe('xx')
+  })
+})
+
+describe('contentWidth', () => {
+  it.each([
+    { name: 'a known width', contentWidth: 'wide', want: 'wide' },
+    {
+      name: 'a missing field (older server)',
+      contentWidth: undefined,
+      want: 'default',
+    },
+    { name: 'an unknown width', contentWidth: 'huge', want: 'default' },
+    // Same rule as the backend (exact match, no case folding or trimming).
+    { name: 'a capitalised width', contentWidth: 'Wide', want: 'default' },
+    { name: 'a padded width', contentWidth: ' wide', want: 'default' },
+    { name: 'a null width', contentWidth: null, want: 'default' },
+    { name: 'a non-string width', contentWidth: 1, want: 'default' },
+    {
+      name: 'an Object.prototype key',
+      contentWidth: 'constructor',
+      want: 'default',
+    },
+  ])('loadConfig keeps $name as $want', async ({ contentWidth, want }) => {
+    ;(configApi.getConfig as Mock).mockResolvedValueOnce({
+      ...baseConfig,
+      contentWidth,
+    })
+
+    await useConfigStore.getState().loadConfig()
+
+    expect(useConfigStore.getState().contentWidth).toBe(want)
+  })
+
+  it('setContentWidth stores the width the server confirmed', async () => {
+    useConfigStore.setState({ contentWidth: 'default' })
+    ;(instanceSettingsApi.setContentWidth as Mock).mockResolvedValueOnce({
+      contentWidth: 'wide',
+    })
+
+    await useConfigStore.getState().setContentWidth('wide')
+
+    expect(instanceSettingsApi.setContentWidth).toHaveBeenCalledWith('wide')
+    expect(useConfigStore.getState().contentWidth).toBe('wide')
+  })
+
+  it('setContentWidth falls back to the default for an unknown confirmed width', async () => {
+    useConfigStore.setState({ contentWidth: 'wide' })
+    ;(instanceSettingsApi.setContentWidth as Mock).mockResolvedValueOnce({
+      contentWidth: 'huge',
+    })
+
+    await useConfigStore.getState().setContentWidth('wide')
+
+    expect(useConfigStore.getState().contentWidth).toBe('default')
+  })
+
+  it('setContentWidth keeps the old width when the request fails', async () => {
+    useConfigStore.setState({ contentWidth: 'default' })
+    ;(instanceSettingsApi.setContentWidth as Mock).mockRejectedValueOnce(
+      new Error('boom'),
+    )
+
+    await expect(
+      useConfigStore.getState().setContentWidth('wide'),
+    ).rejects.toThrow('boom')
+    expect(useConfigStore.getState().contentWidth).toBe('default')
   })
 })

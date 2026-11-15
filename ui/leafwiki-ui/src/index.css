@@ -2334,6 +2334,30 @@
       margin-inline: auto;
     }
 
+    /* Admin page width "wide" (Settings > Display, PageViewer.tsx sets
+       data-content-width on .page-viewer, its subheader and metadata bar):
+       lifts the 680px reading column in the page view only, back to the
+       layout before #1696 — content, prose, backlinks and the header rows
+       use .page-viewer's full max-w-5xl width with its px-4/sm:px-8 gutters,
+       so their edges line up. Editor and history previews keep 680px.
+       A new width gets its own [data-content-width] block here. */
+    .page-viewer[data-content-width='wide'] .page-viewer__content,
+    .page-viewer[data-content-width='wide']
+      .page-viewer__body
+      > .backlinks__pane,
+    .page-viewer[data-content-width='wide']
+      .page-viewer__content
+      :where(p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, dl) {
+      max-inline-size: none;
+    }
+
+    .page-viewer__subheader[data-content-width='wide']
+      .page-viewer__subheader-inner,
+    .page-viewer__metadata-bar[data-content-width='wide']
+      .page-viewer__metadata-bar-inner {
+      @apply w-full max-w-5xl px-4 sm:px-8;
+    }
+
     .page-viewer__metadata-bar .page-metadata__properties {
       min-inline-size: 0;
     }

@@ -109,5 +109,7 @@
   "user not found": "No se encontró el usuario",
   "zip entry exceeds the per-file size limit": "Un archivo dentro del archivo comprimido subido es demasiado grande",
   "decompressed zip contents exceed the total size limit": "El archivo comprimido subido es demasiado grande una vez descomprimido",
-  "zip entry's decompression ratio exceeds the allowed maximum": "El archivo comprimido subido parece ser una bomba de descompresión"
+  "zip entry's decompression ratio exceeds the allowed maximum": "El archivo comprimido subido parece ser una bomba de descompresión",
+  "invalid page content width": "Ancho de página no válido",
+  "failed to update page display setting": "No se pudo actualizar la configuración de visualización"
 }

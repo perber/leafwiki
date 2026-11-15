@@ -6,5 +6,15 @@
   "checkboxLabel": "始终显示目录",
   "checkboxDescription": "默认情况下，页面超过 3 个标题时才显示目录。开启后即使只有一两个标题也始终显示。",
   "savedToast": "目录显示设置已保存",
-  "updateError": "无法更新目录显示设置"
+  "updateError": "无法更新目录显示设置",
+  "contentWidthSectionTitle": "页面宽度",
+  "contentWidthSectionDescription": "控制查看页面时正文的宽度。对所有人生效，包括未登录的访客。",
+  "contentWidthLabel": "页面内容宽度",
+  "contentWidthOptions": {
+    "default": "默认（窄阅读栏）",
+    "wide": "宽"
+  },
+  "contentWidthDescription": "默认将正文保持在易于阅读的窄栏中。“宽”使用页面区域的全部宽度。编辑器预览和页面历史仍保持窄栏。",
+  "contentWidthSavedToast": "页面宽度已保存",
+  "contentWidthUpdateError": "无法更新页面宽度"
 }

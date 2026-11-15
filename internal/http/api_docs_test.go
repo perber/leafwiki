@@ -877,7 +877,7 @@ func newAPIDocsRouterWith(t *testing.T, override func(*httpinternal.RouterOption
 
 	router := newTestRouter(w, func(o *httpinternal.RouterOptions) {
 		o.PublicAccess = publicAccess
-		o.AlwaysShowToc = pageDisplay
+		o.PageDisplay = pageDisplay
 		o.EnableRevision = true
 		o.EnableLinkRefactor = true
 		o.EnableAPIKeyManagement = true
@@ -904,6 +904,7 @@ func TestAPIDocs_RouterFixture_IncludesOptionalOperations(t *testing.T) {
 		{"POST", "/api/admin/restore/self-restart"},
 		{"PUT", "/api/admin/settings/public-access"},
 		{"PUT", "/api/admin/settings/toc-display"},
+		{"PUT", "/api/admin/settings/content-width"},
 		{"PUT", "/api/users/me/password"},
 		{"POST", "/api/auth/password/forgot"},
 		{"GET", "/api/user-settings"},

@@ -6,5 +6,15 @@
   "checkboxLabel": "Inhaltsverzeichnis immer anzeigen",
   "checkboxDescription": "Standardmäßig erscheint das Inhaltsverzeichnis erst, wenn eine Seite mehr als 3 Überschriften hat. Aktiviere diese Option, um es immer anzuzeigen, auch bei Seiten mit nur ein oder zwei Überschriften.",
   "savedToast": "Einstellung für das Inhaltsverzeichnis gespeichert",
-  "updateError": "Einstellung für das Inhaltsverzeichnis konnte nicht geändert werden"
+  "updateError": "Einstellung für das Inhaltsverzeichnis konnte nicht geändert werden",
+  "contentWidthSectionTitle": "Seitenbreite",
+  "contentWidthSectionDescription": "Legt fest, wie breit der Text einer Seite beim Anzeigen ist. Gilt für alle, auch für nicht angemeldete Besucher.",
+  "contentWidthLabel": "Breite des Seiteninhalts",
+  "contentWidthOptions": {
+    "default": "Standard (schmale Lesespalte)",
+    "wide": "Breit"
+  },
+  "contentWidthDescription": "Standard hält den Text in einer schmalen, gut lesbaren Spalte. Breit nutzt die ganze Breite des Seitenbereichs. Die Editor-Vorschau und der Seitenverlauf behalten die schmale Spalte.",
+  "contentWidthSavedToast": "Seitenbreite gespeichert",
+  "contentWidthUpdateError": "Seitenbreite konnte nicht geändert werden"
 }

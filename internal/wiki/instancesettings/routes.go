@@ -1,7 +1,8 @@
 // Package instancesettings exposes admin-only instance settings that can be
-// changed at runtime instead of only via flags/env + a restart. Today that is
-// just the public-access ("public mode") toggle; it is the natural home for
-// future runtime-reconfigurable RouterOptions.
+// changed at runtime instead of only via flags/env + a restart: the
+// public-access ("public mode") toggle and the page display settings
+// (always-show TOC, content width). It is the natural home for future
+// runtime-reconfigurable RouterOptions.
 package instancesettings
 
 import (
@@ -16,16 +17,25 @@ import (
 	"github.com/perber/wiki/internal/publicaccess"
 )
 
+// PageDisplaySettings is what the display-settings routes need from
+// internal/pagedisplay: read the current settings and change them.
+// *pagedisplay.Service implements it.
+type PageDisplaySettings interface {
+	Settings() pagedisplay.Settings
+	SetAlwaysShow(alwaysShow bool) error
+	SetContentWidth(width string) error
+}
+
 // Routes is the RouteRegistrar for runtime instance settings.
 type Routes struct {
 	publicAccess *publicaccess.Service
-	pageDisplay  *pagedisplay.Service
+	pageDisplay  PageDisplaySettings
 	authService  *coreauth.AuthService
 	log          *slog.Logger
 }
 
 // NewRoutes constructs the instance-settings RouteRegistrar.
-func NewRoutes(publicAccess *publicaccess.Service, pageDisplay *pagedisplay.Service, authService *coreauth.AuthService, log *slog.Logger) *Routes {
+func NewRoutes(publicAccess *publicaccess.Service, pageDisplay PageDisplaySettings, authService *coreauth.AuthService, log *slog.Logger) *Routes {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -47,6 +57,10 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 	adminGroup.PUT("/toc-display",
 		authmw.RequireAdmin(ctx.Opts.AuthDisabled),
 		r.handleSetTocDisplay,
+	)
+	adminGroup.PUT("/content-width",
+		authmw.RequireAdmin(ctx.Opts.AuthDisabled),
+		r.handleSetContentWidth,
 	)
 }
 
@@ -90,10 +104,33 @@ func (r *Routes) handleSetTocDisplay(c *gin.Context) {
 	}
 
 	r.log.Info("toc always-show setting changed",
-		"always_show", r.pageDisplay.AlwaysShow(),
+		"always_show", r.pageDisplay.Settings().AlwaysShowToc,
 		"actor_id", actorID(c),
 	)
-	c.JSON(http.StatusOK, gin.H{"alwaysShow": r.pageDisplay.AlwaysShow()})
+	c.JSON(http.StatusOK, gin.H{"alwaysShow": r.pageDisplay.Settings().AlwaysShowToc})
+}
+
+func (r *Routes) handleSetContentWidth(c *gin.Context) {
+	var req struct {
+		ContentWidth *string `json:"contentWidth"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.ContentWidth == nil {
+		respondWithStatusError(c, http.StatusBadRequest, ErrCodeInvalidPayload, "Invalid payload", "invalid payload")
+		return
+	}
+
+	if err := r.pageDisplay.SetContentWidth(*req.ContentWidth); err != nil {
+		respondWithError(c, err)
+		return
+	}
+
+	// camelCase fields per ADR-0008; the older handlers above still use
+	// snake_case.
+	r.log.Info("page content width changed",
+		"contentWidth", r.pageDisplay.Settings().ContentWidth,
+		"actorID", actorID(c),
+	)
+	c.JSON(http.StatusOK, gin.H{"contentWidth": r.pageDisplay.Settings().ContentWidth})
 }
 
 func actorID(c *gin.Context) string {

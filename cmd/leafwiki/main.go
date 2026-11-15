@@ -337,7 +337,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 			BrandingConfigFile: filepath.Join(cfg.server.dataDir, "branding.json"),
 			SettingsFiles: []string{
 				filepath.Join(cfg.server.dataDir, "public-access.json"),
-				filepath.Join(cfg.server.dataDir, "toc-display.json"),
+				filepath.Join(cfg.server.dataDir, pagedisplay.FileName),
 			},
 			SchemaFile:     filepath.Join(cfg.server.dataDir, "schema.json"),
 			UsersDBPath:    filepath.Join(cfg.server.dataDir, "users.db"),
@@ -372,7 +372,7 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 
 	router := httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            publicAccessService,
-		AlwaysShowToc:           pageDisplayService,
+		PageDisplay:             pageDisplayService,
 		EditorLimit:             cfg.auth.editorLimit,
 		InjectCodeInHeader:      cfg.frontend.injectCodeInHeader,
 		CustomStylesheet:        cfg.frontend.customStylesheet,
