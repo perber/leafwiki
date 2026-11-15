@@ -1,6 +1,7 @@
-import i18next from '@/lib/i18n'
+import i18next, { getAvailableLanguages } from '@/lib/i18n'
+import { enUS } from 'date-fns/locale'
 import { afterEach, describe, expect, it } from 'vitest'
-import { bcp47 } from './dateLocale'
+import { bcp47, dateFnsLocale } from './dateLocale'
 import {
   formatDateOnly,
   formatDateTime,
@@ -25,7 +26,22 @@ describe('bcp47', () => {
   })
 
   it('falls back to the raw value for unknown codes', () => {
-    expect(bcp47('fr')).toBe('fr')
+    expect(bcp47('xx')).toBe('xx')
+  })
+})
+
+describe('every shipped UI language has a date locale', () => {
+  const nonEnglish = getAvailableLanguages()
+    .map((l) => l.code)
+    .filter((code) => code !== 'en')
+
+  it.each(nonEnglish)('%s maps to a full BCP-47 tag', (code) => {
+    expect(bcp47(code)).toMatch(new RegExp(`^${code}-[A-Z]{2}$`))
+  })
+
+  it.each(nonEnglish)('%s gets its own date-fns locale', (code) => {
+    expect(dateFnsLocale(code)).not.toBe(enUS)
+    expect(dateFnsLocale(code).code?.split('-')[0]).toBe(code)
   })
 })
 
