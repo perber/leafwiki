@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getAvailableLanguages } from './i18n'
+import i18next, { getAvailableLanguages } from './i18n'
 import de from '../locales/de/common.json'
 import en from '../locales/en/common.json'
 
@@ -82,4 +82,38 @@ describe('locale namespace key parity', () => {
       }
     },
   )
+})
+
+// The subpage count is the first plural key read with { count }; each
+// locale's Intl plural rules pick the _one/_other suffix (French treats 0 as
+// singular, Chinese has only "other"), so check the resolved text, not just
+// the key parity above.
+describe('section.subpageCount plural forms', () => {
+  it.each([
+    { lang: 'en', count: 0, want: '0 subpages' },
+    { lang: 'en', count: 1, want: '1 subpage' },
+    { lang: 'en', count: 12, want: '12 subpages' },
+    { lang: 'de', count: 0, want: '0 Unterseiten' },
+    { lang: 'de', count: 1, want: '1 Unterseite' },
+    { lang: 'de', count: 12, want: '12 Unterseiten' },
+    { lang: 'es', count: 1, want: '1 subpágina' },
+    { lang: 'es', count: 12, want: '12 subpáginas' },
+    { lang: 'fr', count: 0, want: '0 sous-page' },
+    { lang: 'fr', count: 1, want: '1 sous-page' },
+    { lang: 'fr', count: 12, want: '12 sous-pages' },
+    { lang: 'zh', count: 1, want: '1 个子页面' },
+    { lang: 'zh', count: 12, want: '12 个子页面' },
+  ])('$lang, $count -> "$want"', ({ lang, count, want }) => {
+    const t = i18next.getFixedT(lang, 'viewer')
+    expect(t('section.subpageCount', { count })).toBe(want)
+  })
+
+  it('covers every shipped locale', () => {
+    for (const { code } of getAvailableLanguages()) {
+      const t = i18next.getFixedT(code, 'viewer')
+      const text = t('section.subpageCount', { count: 3 })
+      expect(text, code).toContain('3')
+      expect(text, code).not.toContain('section.subpageCount')
+    }
+  })
 })
