@@ -370,6 +370,12 @@ A new dependency (Go module or npm package) needs a reason in the PR description
 A dependency with lasting weight (a runtime service, a database, a framework, a protocol) needs
 an ADR. Dependabot bumps are not new dependencies.
 
+npm installs only versions published at least 7 days ago (`min-release-age=7` in the `.npmrc`
+of `ui/leafwiki-ui` and `e2e`), so a compromised release has time to be caught. A security fix
+younger than that gets `min-release-age-exclude[]=<pkg>` in the same `.npmrc` (use array syntax
+for every exclusion so multiple packages are retained), with a comment naming the advisory and a
+TODO to remove it once the release is 7 days old.
+
 Toolchain versions have one source each: Go in the `toolchain` line of `go.mod`, Node in
 `.nvmrc`; CI reads both. Dependabot bumps only the `golang`/`node` base images in the
 Dockerfiles, so such a PR updates the matching file too. *Enforced by `make verify`
