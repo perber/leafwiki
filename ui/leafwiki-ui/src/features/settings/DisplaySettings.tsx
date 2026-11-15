@@ -19,10 +19,9 @@ export default function DisplaySettings() {
   const { t } = useTranslation('display')
   useSetTitle({ title: t('pageTitle') })
 
-  const alwaysShowToc = useConfigStore((s) => s.alwaysShowToc)
-  const setAlwaysShowToc = useConfigStore((s) => s.setAlwaysShowToc)
-  const contentWidth = useConfigStore((s) => s.contentWidth)
-  const setContentWidth = useConfigStore((s) => s.setContentWidth)
+  const alwaysShowToc = useConfigStore((s) => s.pageDisplay.alwaysShowToc)
+  const contentWidth = useConfigStore((s) => s.pageDisplay.contentWidth)
+  const updatePageDisplay = useConfigStore((s) => s.updatePageDisplay)
 
   const [saving, setSaving] = useState(false)
   const [savingWidth, setSavingWidth] = useState(false)
@@ -30,7 +29,7 @@ export default function DisplaySettings() {
   const apply = async (checked: boolean) => {
     setSaving(true)
     try {
-      await setAlwaysShowToc(checked)
+      await updatePageDisplay({ alwaysShowToc: checked })
       toast.success(t('savedToast'))
     } catch (err) {
       toast.error(mapApiError(err, t('updateError')).message)
@@ -43,7 +42,7 @@ export default function DisplaySettings() {
     if (!isContentWidth(value) || value === contentWidth) return
     setSavingWidth(true)
     try {
-      await setContentWidth(value)
+      await updatePageDisplay({ contentWidth: value })
       toast.success(t('contentWidthSavedToast'))
     } catch (err) {
       toast.error(mapApiError(err, t('contentWidthUpdateError')).message)

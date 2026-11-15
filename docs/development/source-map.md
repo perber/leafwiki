@@ -487,7 +487,9 @@ Per [ADR-0006: Zustand Feature-Local Stores](./adr/0006-zustand-feature-local-st
   every dialog in `lib/registries/dialogRegistry.ts` is opened through this single store.
 - **`config.ts`** — server-reported instance config/feature flags (`publicAccess`,
   `authDisabled`, `enableRevision`, `enableLinkRefactor`, `gitBackupEnabled`, `snapshotEnabled`,
-  `maxAssetUploadSizeBytes`, ...), fetched once from `GET /api/config`.
+  `maxAssetUploadSizeBytes`, ...), fetched once from `GET /api/config`. The page display
+  settings are grouped in `pageDisplay` (`lib/pageDisplay.ts`: type, defaults,
+  `parsePageDisplay`) and changed through `updatePageDisplay(patch)`.
 - **`sidebarPanels.ts`** — which sidebar accordion sections (Pinned/Favorites/Pages) are expanded,
   persisted.
 - **`sidebar.ts`** — sidebar visibility, active mode (tree vs. search), and width, persisted.
@@ -558,7 +560,8 @@ building new ones.
   `useIsReadOnly.ts`, `bootstrapAuth.ts`, `handleFieldErrors.ts`, `deferState.ts`,
   `scrollToHeadline.ts`, `pageContentRoot.ts` (selector of the viewer's rendered page),
   `useScrollRestoration.ts`, `useAutoCloseSidebarOnMobile.ts`,
-  `redirectToExternal.ts`, `navigationVisit.ts`, `dateLocale.ts`/`useDateTimeFormat.ts` (date
+  `redirectToExternal.ts`, `navigationVisit.ts`, `contentWidth.ts`/`pageDisplay.ts` (page
+  display settings, mirroring `internal/pagedisplay`), `dateLocale.ts`/`useDateTimeFormat.ts` (date
   formatting per user setting), `roles.ts`, `assetSrc.ts`, `dynamicImportError.ts` (recovery
   from stale lazy chunks after a deploy), `config.ts` (frontend-side constant defaults, e.g.
   `DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES`). `*.bench.ts` files are Vitest benchmarks.
