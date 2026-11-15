@@ -141,6 +141,16 @@ describe('contentWidth', () => {
       want: 'default',
     },
     { name: 'an unknown width', contentWidth: 'huge', want: 'default' },
+    // Same rule as the backend (exact match, no case folding or trimming).
+    { name: 'a capitalised width', contentWidth: 'Wide', want: 'default' },
+    { name: 'a padded width', contentWidth: ' wide', want: 'default' },
+    { name: 'a null width', contentWidth: null, want: 'default' },
+    { name: 'a non-string width', contentWidth: 1, want: 'default' },
+    {
+      name: 'an Object.prototype key',
+      contentWidth: 'constructor',
+      want: 'default',
+    },
   ])('loadConfig keeps $name as $want', async ({ contentWidth, want }) => {
     ;(configApi.getConfig as Mock).mockResolvedValueOnce({
       ...baseConfig,
@@ -162,6 +172,17 @@ describe('contentWidth', () => {
 
     expect(instanceSettingsApi.setContentWidth).toHaveBeenCalledWith('wide')
     expect(useConfigStore.getState().contentWidth).toBe('wide')
+  })
+
+  it('setContentWidth falls back to the default for an unknown confirmed width', async () => {
+    useConfigStore.setState({ contentWidth: 'wide' })
+    ;(instanceSettingsApi.setContentWidth as Mock).mockResolvedValueOnce({
+      contentWidth: 'huge',
+    })
+
+    await useConfigStore.getState().setContentWidth('wide')
+
+    expect(useConfigStore.getState().contentWidth).toBe('default')
   })
 
   it('setContentWidth keeps the old width when the request fails', async () => {

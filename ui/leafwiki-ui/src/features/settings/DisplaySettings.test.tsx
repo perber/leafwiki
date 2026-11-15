@@ -1,4 +1,5 @@
 import '@/lib/i18n'
+import { ApiLocalizedError } from '@/lib/api/errors'
 import { useConfigStore } from '@/stores/config'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -123,5 +124,37 @@ describe('DisplaySettings', () => {
     expect(
       screen.getByTestId('display-content-width-select'),
     ).toHaveTextContent('Default')
+  })
+  it('picking the width that is already set sends no request', async () => {
+    const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 })
+    setConfig({ contentWidth: 'wide' })
+    render(<DisplaySettings />)
+
+    await user.click(screen.getByTestId('display-content-width-select'))
+    await user.click(await screen.findByRole('option', { name: 'Wide' }))
+
+    expect(setContentWidth).not.toHaveBeenCalled()
+    expect(toast.success).not.toHaveBeenCalled()
+  })
+
+  it('translates the server rejection of an unknown width', async () => {
+    const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 })
+    setContentWidth.mockRejectedValueOnce(
+      new ApiLocalizedError({
+        code: 'page_display_invalid_content_width',
+        message: 'Invalid page content width',
+        template: 'invalid page content width',
+        args: ['wide'],
+      }),
+    )
+    setConfig({ contentWidth: 'default' })
+    render(<DisplaySettings />)
+
+    await user.click(screen.getByTestId('display-content-width-select'))
+    await user.click(await screen.findByRole('option', { name: 'Wide' }))
+
+    expect(toast.error).toHaveBeenCalledWith(
+      expect.stringContaining('Invalid page width'),
+    )
   })
 })
