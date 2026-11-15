@@ -6,14 +6,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { mapApiError } from '@/lib/api/errors'
 import { CONTENT_WIDTHS, isContentWidth } from '@/lib/contentWidth'
 import { useConfigStore } from '@/stores/config'
 import { Loader2 } from 'lucide-react'
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { toast } from 'sonner'
 import { useSetTitle } from '../viewer/setTitle'
+import { useDisplaySettingSave } from './useDisplaySettingSave'
 
 export default function DisplaySettings() {
   const { t } = useTranslation('display')
@@ -21,34 +19,18 @@ export default function DisplaySettings() {
 
   const alwaysShowToc = useConfigStore((s) => s.pageDisplay.alwaysShowToc)
   const contentWidth = useConfigStore((s) => s.pageDisplay.contentWidth)
-  const updatePageDisplay = useConfigStore((s) => s.updatePageDisplay)
+  const toc = useDisplaySettingSave({
+    saved: t('savedToast'),
+    failed: t('updateError'),
+  })
+  const width = useDisplaySettingSave({
+    saved: t('contentWidthSavedToast'),
+    failed: t('contentWidthUpdateError'),
+  })
 
-  const [saving, setSaving] = useState(false)
-  const [savingWidth, setSavingWidth] = useState(false)
-
-  const apply = async (checked: boolean) => {
-    setSaving(true)
-    try {
-      await updatePageDisplay({ alwaysShowToc: checked })
-      toast.success(t('savedToast'))
-    } catch (err) {
-      toast.error(mapApiError(err, t('updateError')).message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const applyWidth = async (value: string) => {
+  const applyWidth = (value: string) => {
     if (!isContentWidth(value) || value === contentWidth) return
-    setSavingWidth(true)
-    try {
-      await updatePageDisplay({ contentWidth: value })
-      toast.success(t('contentWidthSavedToast'))
-    } catch (err) {
-      toast.error(mapApiError(err, t('contentWidthUpdateError')).message)
-    } finally {
-      setSavingWidth(false)
-    }
+    void width.save({ contentWidth: value })
   }
 
   return (
@@ -65,12 +47,13 @@ export default function DisplaySettings() {
             <Checkbox
               data-testid="display-toc-checkbox"
               checked={alwaysShowToc}
-              disabled={saving}
+              disabled={toc.saving}
               onCheckedChange={(checked) => {
-                if (!!checked !== alwaysShowToc) void apply(!!checked)
+                if (!!checked !== alwaysShowToc)
+                  void toc.save({ alwaysShowToc: !!checked })
               }}
             />
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {toc.saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {t('checkboxLabel')}
           </label>
           <p className="settings__section-description">
@@ -93,16 +76,14 @@ export default function DisplaySettings() {
             className="settings__field-label"
           >
             {t('contentWidthLabel')}
-            {savingWidth && (
+            {width.saving && (
               <Loader2 className="ml-2 inline h-4 w-4 animate-spin" />
             )}
           </label>
           <Select
             value={contentWidth}
-            disabled={savingWidth}
-            onValueChange={(value) => {
-              void applyWidth(value)
-            }}
+            disabled={width.saving}
+            onValueChange={applyWidth}
           >
             <SelectTrigger
               data-testid="display-content-width-select"
