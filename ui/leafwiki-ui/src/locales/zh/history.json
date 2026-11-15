@@ -98,8 +98,10 @@
   "chips": {
     "revisionSlug": "版本路径：{{slug}}",
     "currentSlug": "当前路径：{{slug}}",
-    "assetChangesCount": "附件变更 {{count}} 处",
-    "assetsCount": "附件 {{count}} 个"
+    "assetChangesCount_one": "附件变更 {{count}} 处",
+    "assetChangesCount_other": "附件变更 {{count}} 处",
+    "assetsCount_one": "附件 {{count}} 个",
+    "assetsCount_other": "附件 {{count}} 个"
   },
   "toasts": {
     "restoreSuccess": "版本已恢复",
