@@ -59,46 +59,40 @@ func (s *Service) Settings() Settings {
 	}
 }
 
-// SetAlwaysShow persists a new value and updates the in-memory cache.
-func (s *Service) SetAlwaysShow(alwaysShow bool) error {
-	s.writeMu.Lock()
-	defer s.writeMu.Unlock()
-
-	cfg := s.store.Get()
-	cfg.AlwaysShow = alwaysShow
-	if err := s.store.Put(cfg); err != nil {
-		return sharederrors.NewLocalizedError(
-			"toc_display_update_failed",
-			"Failed to update TOC display setting",
-			"failed to persist toc-display config",
-			err,
-		)
+// Update validates every field of patch, then applies them all in one write.
+// An invalid field fails the whole patch (ErrCodeInvalidContentWidth) and
+// changes nothing; a failed write returns ErrCodeUpdateFailed. It returns
+// the settings after the update.
+func (s *Service) Update(patch Patch) (Settings, error) {
+	if err := s.update(patch, persistError{
+		code:     ErrCodeUpdateFailed,
+		message:  "Failed to update page display setting",
+		template: "failed to update page display setting",
+	}); err != nil {
+		return Settings{}, err
 	}
-	return nil
+	return s.Settings(), nil
+}
+
+// SetAlwaysShow persists a new value and updates the in-memory cache. A
+// failed write keeps its historical code toc_display_update_failed.
+func (s *Service) SetAlwaysShow(alwaysShow bool) error {
+	return s.update(Patch{AlwaysShowToc: &alwaysShow}, persistError{
+		code:     "toc_display_update_failed",
+		message:  "Failed to update TOC display setting",
+		template: "failed to persist toc-display config",
+	})
 }
 
 // SetContentWidth validates and persists a new page content width. A value
 // outside ContentWidths() fails with ErrCodeInvalidContentWidth and changes
 // nothing.
 func (s *Service) SetContentWidth(width string) error {
-	if !isValidContentWidth(width) {
-		return errInvalidContentWidth(width)
-	}
-
-	s.writeMu.Lock()
-	defer s.writeMu.Unlock()
-
-	cfg := s.store.Get()
-	cfg.ContentWidth = width
-	if err := s.store.Put(cfg); err != nil {
-		return sharederrors.NewLocalizedError(
-			ErrCodeUpdateFailed,
-			"Failed to update page display setting",
-			"failed to update page display setting",
-			err,
-		)
-	}
-	return nil
+	return s.update(Patch{ContentWidth: &width}, persistError{
+		code:     ErrCodeUpdateFailed,
+		message:  "Failed to update page display setting",
+		template: "failed to update page display setting",
+	})
 }
 
 // Reload re-reads toc-display.json into the in-memory cache. Called after a
@@ -112,6 +106,35 @@ func (s *Service) Reload() error {
 
 	if err := s.store.Reload(); err != nil {
 		return fmt.Errorf("failed to reload toc-display config: %w", err)
+	}
+	return nil
+}
+
+// persistError is the LocalizedError a caller reports when the write fails;
+// the setters keep the codes they returned before Update existed.
+type persistError struct {
+	code, message, template string
+}
+
+// update is the shared read-modify-write behind Update and the setters:
+// validate first, then one Put under writeMu, so nothing is half-applied.
+func (s *Service) update(patch Patch, onPersistErr persistError) error {
+	if patch.ContentWidth != nil && !isValidContentWidth(*patch.ContentWidth) {
+		return errInvalidContentWidth(*patch.ContentWidth)
+	}
+
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+
+	cfg := s.store.Get()
+	if patch.AlwaysShowToc != nil {
+		cfg.AlwaysShow = *patch.AlwaysShowToc
+	}
+	if patch.ContentWidth != nil {
+		cfg.ContentWidth = *patch.ContentWidth
+	}
+	if err := s.store.Put(cfg); err != nil {
+		return sharederrors.NewLocalizedError(onPersistErr.code, onPersistErr.message, onPersistErr.template, err)
 	}
 	return nil
 }

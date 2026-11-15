@@ -1,5 +1,6 @@
 import { ApiLocalizedError } from '@/lib/api/errors'
 import i18next from '@/lib/i18n'
+import { DEFAULT_PAGE_DISPLAY, type PageDisplay } from '@/lib/pageDisplay'
 import { useConfigStore } from '@/stores/config'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -12,24 +13,19 @@ vi.mock('sonner', () => ({
 
 import { toast } from 'sonner'
 
-const setAlwaysShowToc = vi.fn()
-const setContentWidth = vi.fn()
+const updatePageDisplay = vi.fn()
 
-function setConfig(
-  overrides: Partial<ReturnType<typeof useConfigStore.getState>>,
-) {
+function setConfig(overrides: Partial<PageDisplay>) {
   useConfigStore.setState({
-    alwaysShowToc: false,
-    setAlwaysShowToc,
-    contentWidth: 'default',
-    setContentWidth,
-    ...overrides,
+    pageDisplay: { ...DEFAULT_PAGE_DISPLAY, ...overrides },
+    updatePageDisplay,
   })
 }
 
-// Server-side template for a failed write (internal/pagedisplay/service.go);
-// the service test pins the same string.
-const PERSIST_FAILED_TEMPLATE = 'failed to persist toc-display config'
+// Server-side template for a failed write through PUT /display, which the
+// Display page uses for every setting (pagedisplay.Service.Update in
+// internal/pagedisplay/service.go).
+const PERSIST_FAILED_TEMPLATE = 'failed to update page display setting'
 
 const errorLocales = import.meta.glob<{ default: Record<string, string> }>(
   '../../locales/*/errors.json',
@@ -42,8 +38,7 @@ const errorsByLang = Object.entries(errorLocales).map(([path, mod]) => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
-  setAlwaysShowToc.mockResolvedValue(undefined)
-  setContentWidth.mockResolvedValue(undefined)
+  updatePageDisplay.mockResolvedValue(undefined)
   // jsdom has no real layout/pointer-capture engine, which Radix's Select
   // relies on when opening its popover — stub the bits it touches.
   window.HTMLElement.prototype.scrollIntoView = vi.fn()
@@ -77,14 +72,16 @@ describe('DisplaySettings', () => {
       render(<DisplaySettings />)
 
       await user.click(screen.getByTestId('display-toc-checkbox'))
-      expect(setAlwaysShowToc).toHaveBeenCalledWith(!from)
+      expect(updatePageDisplay).toHaveBeenCalledWith({
+        alwaysShowToc: !from,
+      })
       expect(toast.success).toHaveBeenCalled()
     },
   )
 
   it('shows an error toast when the update fails', async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 })
-    setAlwaysShowToc.mockRejectedValueOnce(new Error('boom'))
+    updatePageDisplay.mockRejectedValueOnce(new Error('boom'))
     setConfig({ alwaysShowToc: false })
     render(<DisplaySettings />)
 
@@ -119,13 +116,13 @@ describe('DisplaySettings', () => {
     await user.click(screen.getByTestId('display-content-width-select'))
     await user.click(await screen.findByRole('option', { name: 'Wide' }))
 
-    expect(setContentWidth).toHaveBeenCalledWith('wide')
+    expect(updatePageDisplay).toHaveBeenCalledWith({ contentWidth: 'wide' })
     expect(toast.success).toHaveBeenCalledWith('Page width saved')
   })
 
   it('shows an error toast and keeps the old width when saving the width fails', async () => {
     const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 })
-    setContentWidth.mockRejectedValueOnce(new Error('boom'))
+    updatePageDisplay.mockRejectedValueOnce(new Error('boom'))
     setConfig({ contentWidth: 'default' })
     render(<DisplaySettings />)
 
@@ -146,13 +143,13 @@ describe('DisplaySettings', () => {
     await user.click(screen.getByTestId('display-content-width-select'))
     await user.click(await screen.findByRole('option', { name: 'Wide' }))
 
-    expect(setContentWidth).not.toHaveBeenCalled()
+    expect(updatePageDisplay).not.toHaveBeenCalled()
     expect(toast.success).not.toHaveBeenCalled()
   })
 
   it('translates the server rejection of an unknown width', async () => {
     const user = userEvent.setup({ delay: null, pointerEventsCheck: 0 })
-    setContentWidth.mockRejectedValueOnce(
+    updatePageDisplay.mockRejectedValueOnce(
       new ApiLocalizedError({
         code: 'page_display_invalid_content_width',
         message: 'Invalid page content width',
@@ -176,14 +173,14 @@ describe('DisplaySettings', () => {
     async ({ lang, translation }) => {
       expect(
         translation,
-        `locales/${lang}/errors.json lacks the TOC display persist failure`,
+        `locales/${lang}/errors.json lacks the display settings persist failure`,
       ).toBeTruthy()
       await i18next.changeLanguage(lang)
       try {
         const user = userEvent.setup({ pointerEventsCheck: 0 })
-        setAlwaysShowToc.mockRejectedValueOnce(
+        updatePageDisplay.mockRejectedValueOnce(
           new ApiLocalizedError({
-            code: 'toc_display_update_failed',
+            code: 'page_display_update_failed',
             message: 'raw server message',
             template: PERSIST_FAILED_TEMPLATE,
           }),

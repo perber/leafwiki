@@ -1,28 +1,28 @@
 import { getConfig } from '@/lib/api/config'
 import {
-  setAlwaysShowToc as setAlwaysShowTocApi,
-  setContentWidth as setContentWidthApi,
   setPublicAccess as setPublicAccessApi,
+  updatePageDisplay as updatePageDisplayApi,
 } from '@/lib/api/instanceSettings'
 import {
   DEFAULT_AVATAR_ALLOWED_EXTS,
   DEFAULT_MAX_ASSET_UPLOAD_SIZE_BYTES,
   DEFAULT_MAX_AVATAR_UPLOAD_SIZE_BYTES,
 } from '@/lib/config'
-import {
-  DEFAULT_CONTENT_WIDTH,
-  toContentWidth,
-  type ContentWidth,
-} from '@/lib/contentWidth'
 import i18next, { getAvailableLanguages } from '@/lib/i18n'
+import {
+  DEFAULT_PAGE_DISPLAY,
+  parsePageDisplay,
+  type PageDisplay,
+  type PageDisplayPatch,
+} from '@/lib/pageDisplay'
 import { sleep } from '@/lib/sleep'
 import { create } from 'zustand'
 
 type ConfigStore = {
   publicAccess: boolean
   publicAccessEnvManaged: boolean
-  alwaysShowToc: boolean
-  contentWidth: ContentWidth
+  // Instance-wide page display settings (Settings > Display).
+  pageDisplay: PageDisplay
   editorLimit: number
   hideLinkMetadataSection: boolean
   authDisabled: boolean
@@ -62,12 +62,10 @@ type ConfigStore = {
   // other open tabs / anonymous visitors pick it up on their next
   // /api/config load.
   setPublicAccess: (enabled: boolean) => Promise<void>
-  // Runtime toggle of "always show TOC" (admin only). Updates the store in
-  // place on success, same as setPublicAccess.
-  setAlwaysShowToc: (alwaysShow: boolean) => Promise<void>
-  // Runtime change of the page content width (admin only). Updates the
-  // store in place on success, same as setPublicAccess.
-  setContentWidth: (contentWidth: ContentWidth) => Promise<void>
+  // Runtime change of any page display setting (admin only). Stores the
+  // server-confirmed values of the patched fields; on failure the old ones
+  // stay.
+  updatePageDisplay: (patch: PageDisplayPatch) => Promise<void>
 }
 
 // A single failed attempt would otherwise leave configLoadSucceeded false —
@@ -80,8 +78,7 @@ const CONFIG_LOAD_RETRY_DELAYS_MS = [500, 1000]
 export const useConfigStore = create<ConfigStore>((set) => ({
   publicAccess: false,
   publicAccessEnvManaged: false,
-  alwaysShowToc: false,
-  contentWidth: DEFAULT_CONTENT_WIDTH,
+  pageDisplay: DEFAULT_PAGE_DISPLAY,
   editorLimit: 0,
   hideLinkMetadataSection: false,
   authDisabled: false,
@@ -132,8 +129,7 @@ export const useConfigStore = create<ConfigStore>((set) => ({
         set({
           publicAccess: config.publicAccess,
           publicAccessEnvManaged: config.publicAccessEnvManaged ?? false,
-          alwaysShowToc: config.alwaysShowToc ?? false,
-          contentWidth: toContentWidth(config.contentWidth),
+          pageDisplay: parsePageDisplay(config),
           editorLimit: config.editorLimit ?? 0,
           hideLinkMetadataSection: config.hideLinkMetadataSection,
           authDisabled: config.authDisabled,
@@ -204,13 +200,16 @@ export const useConfigStore = create<ConfigStore>((set) => ({
     set({ publicAccess: res.enabled })
   },
 
-  setAlwaysShowToc: async (alwaysShow: boolean) => {
-    const res = await setAlwaysShowTocApi(alwaysShow)
-    set({ alwaysShowToc: res.alwaysShow })
-  },
-
-  setContentWidth: async (contentWidth: ContentWidth) => {
-    const res = await setContentWidthApi(contentWidth)
-    set({ contentWidth: toContentWidth(res.contentWidth) })
+  updatePageDisplay: async (patch: PageDisplayPatch) => {
+    const confirmed = parsePageDisplay(await updatePageDisplayApi(patch))
+    // Take only the patched fields from the reply. The settings page can
+    // have a TOC and a width save in flight at once; a reply that arrives
+    // late carries a stale copy of the other field and must not undo it.
+    const fromReply = Object.fromEntries(
+      (Object.keys(patch) as (keyof PageDisplay)[])
+        .filter((key) => patch[key] !== undefined)
+        .map((key) => [key, confirmed[key]]),
+    ) as PageDisplayPatch
+    set((state) => ({ pageDisplay: { ...state.pageDisplay, ...fromReply } }))
   },
 }))

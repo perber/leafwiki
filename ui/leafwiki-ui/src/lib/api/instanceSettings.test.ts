@@ -5,22 +5,31 @@ vi.mock('./auth', () => ({
   fetchWithAuth: (...args: unknown[]) => mockFetchWithAuth(...args),
 }))
 
-import { setContentWidth } from './instanceSettings'
+import { updatePageDisplay } from './instanceSettings'
 
-describe('setContentWidth', () => {
+describe('updatePageDisplay', () => {
   beforeEach(() => {
     mockFetchWithAuth.mockReset()
   })
 
-  it('PUTs the width to the admin content-width endpoint and returns the stored value', async () => {
-    mockFetchWithAuth.mockResolvedValueOnce({ contentWidth: 'wide' })
+  it.each([
+    { name: 'one field', patch: { contentWidth: 'wide' as const } },
+    { name: 'the other field', patch: { alwaysShowToc: true } },
+    {
+      name: 'both fields',
+      patch: { alwaysShowToc: false, contentWidth: 'default' as const },
+    },
+  ])(
+    'PUTs $name to the admin display endpoint and returns the server reply',
+    async ({ patch }) => {
+      const reply = { alwaysShowToc: true, contentWidth: 'wide' }
+      mockFetchWithAuth.mockResolvedValueOnce(reply)
 
-    await expect(setContentWidth('wide')).resolves.toEqual({
-      contentWidth: 'wide',
-    })
-    expect(mockFetchWithAuth).toHaveBeenCalledWith(
-      '/api/admin/settings/content-width',
-      { method: 'PUT', body: JSON.stringify({ contentWidth: 'wide' }) },
-    )
-  })
+      await expect(updatePageDisplay(patch)).resolves.toEqual(reply)
+      expect(mockFetchWithAuth).toHaveBeenCalledWith(
+        '/api/admin/settings/display',
+        { method: 'PUT', body: JSON.stringify(patch) },
+      )
+    },
+  )
 })

@@ -172,11 +172,11 @@ export default function PageViewer() {
     }
   }, [page?.id])
 
-  const alwaysShowToc = useConfigStore((s) => s.alwaysShowToc)
+  const alwaysShowToc = useConfigStore((s) => s.pageDisplay.alwaysShowToc)
   // Set on the subheader, metadata bar and viewer alike: the first two are
   // portaled/rendered outside .page-viewer and must follow the same width
   // (index.css, [data-content-width]).
-  const contentWidth = useConfigStore((s) => s.contentWidth)
+  const contentWidth = useConfigStore((s) => s.pageDisplay.contentWidth)
   const showToc = shouldShowToc(tocEntries.length, alwaysShowToc)
   const visibleTocEntries = useMemo(
     () => (showToc ? tocEntries : []),

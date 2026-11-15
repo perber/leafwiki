@@ -17,7 +17,7 @@ vi.mock('@/lib/api/config', () => ({
 }))
 
 vi.mock('@/lib/api/instanceSettings', () => ({
-  setContentWidth: vi.fn(),
+  updatePageDisplay: vi.fn(),
 }))
 
 const baseConfig = {
@@ -132,7 +132,7 @@ describe('loadConfig defaultLanguage', () => {
   })
 })
 
-describe('contentWidth', () => {
+describe('pageDisplay', () => {
   it.each([
     { name: 'a known width', contentWidth: 'wide', want: 'wide' },
     {
@@ -159,41 +159,128 @@ describe('contentWidth', () => {
 
     await useConfigStore.getState().loadConfig()
 
-    expect(useConfigStore.getState().contentWidth).toBe(want)
+    expect(useConfigStore.getState().pageDisplay.contentWidth).toBe(want)
   })
 
-  it('setContentWidth stores the width the server confirmed', async () => {
-    useConfigStore.setState({ contentWidth: 'default' })
-    ;(instanceSettingsApi.setContentWidth as Mock).mockResolvedValueOnce({
+  it.each([
+    { name: 'true', alwaysShowToc: true, want: true },
+    { name: 'false', alwaysShowToc: false, want: false },
+    { name: 'a missing flag', alwaysShowToc: undefined, want: false },
+  ])(
+    'loadConfig reads alwaysShowToc $name as $want',
+    async ({ alwaysShowToc, want }) => {
+      ;(configApi.getConfig as Mock).mockResolvedValueOnce({
+        ...baseConfig,
+        alwaysShowToc,
+      })
+
+      await useConfigStore.getState().loadConfig()
+
+      expect(useConfigStore.getState().pageDisplay.alwaysShowToc).toBe(want)
+    },
+  )
+
+  it('updatePageDisplay sends the patch and takes only the patched fields from the reply', async () => {
+    useConfigStore.setState({
+      pageDisplay: { alwaysShowToc: false, contentWidth: 'default' },
+    })
+    ;(instanceSettingsApi.updatePageDisplay as Mock).mockResolvedValueOnce({
+      alwaysShowToc: true,
       contentWidth: 'wide',
     })
 
-    await useConfigStore.getState().setContentWidth('wide')
+    await useConfigStore.getState().updatePageDisplay({ contentWidth: 'wide' })
 
-    expect(instanceSettingsApi.setContentWidth).toHaveBeenCalledWith('wide')
-    expect(useConfigStore.getState().contentWidth).toBe('wide')
+    expect(instanceSettingsApi.updatePageDisplay).toHaveBeenCalledWith({
+      contentWidth: 'wide',
+    })
+    // alwaysShowToc was not in the patch: the reply's copy of it is ignored.
+    expect(useConfigStore.getState().pageDisplay).toEqual({
+      alwaysShowToc: false,
+      contentWidth: 'wide',
+    })
   })
 
-  it('setContentWidth falls back to the default for an unknown confirmed width', async () => {
-    useConfigStore.setState({ contentWidth: 'wide' })
-    ;(instanceSettingsApi.setContentWidth as Mock).mockResolvedValueOnce({
+  it('updatePageDisplay falls back to the default for an unknown confirmed width', async () => {
+    useConfigStore.setState({
+      pageDisplay: { alwaysShowToc: false, contentWidth: 'wide' },
+    })
+    ;(instanceSettingsApi.updatePageDisplay as Mock).mockResolvedValueOnce({
+      alwaysShowToc: false,
       contentWidth: 'huge',
     })
 
-    await useConfigStore.getState().setContentWidth('wide')
+    await useConfigStore.getState().updatePageDisplay({ contentWidth: 'wide' })
 
-    expect(useConfigStore.getState().contentWidth).toBe('default')
+    expect(useConfigStore.getState().pageDisplay.contentWidth).toBe('default')
   })
 
-  it('setContentWidth keeps the old width when the request fails', async () => {
-    useConfigStore.setState({ contentWidth: 'default' })
-    ;(instanceSettingsApi.setContentWidth as Mock).mockRejectedValueOnce(
+  it('updatePageDisplay keeps the old settings when the request fails', async () => {
+    const before = { alwaysShowToc: true, contentWidth: 'default' as const }
+    useConfigStore.setState({ pageDisplay: before })
+    ;(instanceSettingsApi.updatePageDisplay as Mock).mockRejectedValueOnce(
       new Error('boom'),
     )
 
     await expect(
-      useConfigStore.getState().setContentWidth('wide'),
+      useConfigStore
+        .getState()
+        .updatePageDisplay({ alwaysShowToc: false, contentWidth: 'wide' }),
     ).rejects.toThrow('boom')
-    expect(useConfigStore.getState().contentWidth).toBe('default')
+    expect(useConfigStore.getState().pageDisplay).toEqual(before)
+  })
+
+  it('updatePageDisplay leaves unrelated config fields alone', async () => {
+    useConfigStore.setState({
+      publicAccess: true,
+      editorLimit: 7,
+      defaultLanguage: 'de',
+      pageDisplay: { alwaysShowToc: false, contentWidth: 'default' },
+    })
+    ;(instanceSettingsApi.updatePageDisplay as Mock).mockResolvedValueOnce({
+      alwaysShowToc: true,
+      contentWidth: 'default',
+      // A reply carrying a non-display field must not leak into the store.
+      publicAccess: false,
+    })
+
+    await useConfigStore.getState().updatePageDisplay({ alwaysShowToc: true })
+
+    const state = useConfigStore.getState()
+    expect(state.publicAccess).toBe(true)
+    expect(state.editorLimit).toBe(7)
+    expect(state.defaultLanguage).toBe('de')
+  })
+
+  // The TOC checkbox and the width picker have separate saving flags, so an
+  // admin can have both requests in flight. Each reply carries all display
+  // settings as of its own write; the store must end up with what the
+  // server holds after both writes, whatever order the replies arrive in.
+  it('two in-flight updates keep both changes when the replies arrive out of order', async () => {
+    useConfigStore.setState({
+      pageDisplay: { alwaysShowToc: false, contentWidth: 'default' },
+    })
+    let resolveToc: (v: unknown) => void = () => {}
+    let resolveWidth: (v: unknown) => void = () => {}
+    ;(instanceSettingsApi.updatePageDisplay as Mock)
+      .mockImplementationOnce(() => new Promise((r) => (resolveToc = r)))
+      .mockImplementationOnce(() => new Promise((r) => (resolveWidth = r)))
+
+    const toc = useConfigStore
+      .getState()
+      .updatePageDisplay({ alwaysShowToc: true })
+    const width = useConfigStore
+      .getState()
+      .updatePageDisplay({ contentWidth: 'wide' })
+    // Server order: toc write first, then width write.
+    resolveWidth({ alwaysShowToc: true, contentWidth: 'wide' })
+    await width
+    resolveToc({ alwaysShowToc: true, contentWidth: 'default' })
+    await toc
+
+    expect(useConfigStore.getState().pageDisplay).toEqual({
+      alwaysShowToc: true,
+      contentWidth: 'wide',
+    })
   })
 })
