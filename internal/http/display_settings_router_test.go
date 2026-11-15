@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -203,5 +204,64 @@ func TestDisplaySettings_Put_APIKey_OnlyAdminKeyOfAdminMayChange(t *testing.T) {
 				t.Fatalf("content width after request = %q, want %q", got, wantWidth)
 			}
 		})
+	}
+}
+
+// Two admins saving at the same time, one through the new display route and
+// one through the older per-setting routes, must not drop each other's
+// change: every route goes through the same serialized read-modify-write.
+func TestDisplaySettings_Put_ConcurrentWithPerSettingRoutes_KeepsBothChanges(t *testing.T) {
+	router, svc := newDisplaySettingsRouter(t)
+	newClient := loginSession(t, router, "admin", "adminpassword")
+	oldClient := loginSession(t, router, "admin", "adminpassword")
+
+	const rounds = 40
+	var wg sync.WaitGroup
+	errs := make(chan string, 2*rounds)
+	for i := 0; i < rounds; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			if rec := newClient.do(router, http.MethodPut, displaySettingsURL, `{"alwaysShowToc":true}`); rec.Code != http.StatusOK {
+				errs <- fmt.Sprintf("display PUT: %d %s", rec.Code, rec.Body.String())
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			if rec := oldClient.do(router, http.MethodPut, "/api/admin/settings/content-width", `{"contentWidth":"wide"}`); rec.Code != http.StatusOK {
+				errs <- fmt.Sprintf("content-width PUT: %d %s", rec.Code, rec.Body.String())
+			}
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for e := range errs {
+		t.Error(e)
+	}
+	want := pagedisplay.Settings{AlwaysShowToc: true, ContentWidth: pagedisplay.ContentWidthWide}
+	if got := svc.Settings(); got != want {
+		t.Fatalf("settings after concurrent saves = %+v, want %+v", got, want)
+	}
+}
+
+// The old toc-display route and the new display route write the same field:
+// a change through one is visible in the other's reply.
+func TestDisplaySettings_Put_SeesChangesFromPerSettingRoutes(t *testing.T) {
+	router, _ := newDisplaySettingsRouter(t)
+	sess := loginSession(t, router, "admin", "adminpassword")
+
+	steps := []struct {
+		name, url, body, want string
+	}{
+		{name: "old toc route on", url: "/api/admin/settings/toc-display", body: `{"alwaysShow":true}`, want: `{"alwaysShow":true}`},
+		{name: "new route changes width only", url: displaySettingsURL, body: `{"contentWidth":"wide"}`, want: `{"alwaysShowToc":true,"contentWidth":"wide"}`},
+		{name: "old width route back to default", url: "/api/admin/settings/content-width", body: `{"contentWidth":"default"}`, want: `{"contentWidth":"default"}`},
+		{name: "new route turns toc off", url: displaySettingsURL, body: `{"alwaysShowToc":false}`, want: `{"alwaysShowToc":false,"contentWidth":"default"}`},
+	}
+	for _, step := range steps {
+		rec := sess.do(router, http.MethodPut, step.url, step.body)
+		if rec.Code != http.StatusOK || rec.Body.String() != step.want {
+			t.Fatalf("%s: want 200 %s, got %d %s", step.name, step.want, rec.Code, rec.Body.String())
+		}
 	}
 }
