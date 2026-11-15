@@ -39,6 +39,18 @@ async function createLongPage() {
 // text must line up with it. The header rows carry the page gutter as their
 // own padding, so their border boxes start further left by design.
 async function measureViewer(page: Page) {
+  // The TOC pane and the subheader's reserved padding animate their width
+  // (200ms, index.css). Measuring while that runs puts the header rows and
+  // the content at different points of the animation, so wait until no CSS
+  // transition is running. getAnimations() flushes pending style changes, so
+  // a transition started by the last click is already listed.
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every(
+        (animation) => !(animation instanceof CSSTransition) || animation.playState !== 'running',
+      ),
+  );
   return page.evaluate(() => {
     const contentBox = (selector: string) => {
       const el = document.querySelector(selector);
