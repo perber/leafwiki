@@ -75,22 +75,35 @@ describe('createLeafWikiRouter /settings route', () => {
     expect(routeElement(router, ['/settings']).type).toBe(Navigate)
   })
 
-  it.each([
-    ['the compat /users route', ['/users'], '/settings/users'],
-    [
-      'the old /settings/toc-display bookmark',
-      ['/settings', 'toc-display'],
-      '/settings/display',
-    ],
-  ])('redirects %s to %s', (_name, paths, target) => {
+  it('redirects the compat /users route to /settings/users', () => {
     const router = createLeafWikiRouter(false, false, false, '', true)
-    const element = routeElement(router, paths)
+    const element = routeElement(router, ['/users'])
     expect(element.type).toBe(Navigate)
-    expect(element.props).toMatchObject({ to: target, replace: true })
+    expect(element.props).toMatchObject({
+      to: '/settings/users',
+      replace: true,
+    })
   })
 
+  // Structural check for every registered redirectFrom entry; the behaviour
+  // of a redirect (roles, trailing slash, query) is in settingsRedirects.test.tsx.
+  it.each(
+    settingsSections.flatMap((section) =>
+      (section.redirectFrom ?? []).map((oldPath) => [oldPath, section.path]),
+    ),
+  )('redirects /settings/%s to /settings/%s', (oldPath, path) => {
+    const router = createLeafWikiRouter(false, false, false, '', true)
+    const element = routeElement(router, ['/settings', oldPath])
+    expect(element.type).toBe(Navigate)
+    expect(element.props).toMatchObject({
+      to: `/settings/${path}`,
+      replace: true,
+    })
+  })
+
+  // Regression for the pre-registry backup/snapshots direct-URL bypass.
   it.each(settingsSections.map((section) => [section.path]))(
-    'gates /settings/%s through SettingsSectionGuard — regression for the pre-registry backup/snapshots direct-URL bypass',
+    'gates /settings/%s through SettingsSectionGuard',
     (path) => {
       const router = createLeafWikiRouter(false, false, false, '', true)
       expect(routeElement(router, ['/settings', path]).type).toBe(
