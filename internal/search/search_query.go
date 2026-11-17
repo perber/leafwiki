@@ -4,9 +4,35 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
+// minSubstringTermRunes is the shortest literal word that also counts as a
+// substring term: a trigram index cannot match anything shorter.
+const minSubstringTermRunes = 3
+
+// searchQuery is raw user search input parsed into an FTS5 MATCH argument
+// plus the literal words it was built from.
+type searchQuery struct {
+	// fts is the FTS5 MATCH argument; "" when there is nothing to match.
+	fts string
+	// literalOnly is true when every field went through the literal path:
+	// no trusted operator, keyword, quoted phrase, column filter or NEAR
+	// call. An empty query is not literalOnly.
+	literalOnly bool
+	// substringTerms are the literal words of at least
+	// minSubstringTermRunes runes, in query order.
+	substringTerms []string
+	// shortTerms are the literal words shorter than that, in query order.
+	shortTerms []string
+}
+
 // buildFuzzyQuery turns raw user search input into an FTS5 MATCH argument.
+func buildFuzzyQuery(q string) string {
+	return parseSearchQuery(q).fts
+}
+
+// parseSearchQuery turns raw user search input into a searchQuery.
 //
 // It classifies each whitespace-separated field independently rather than
 // making one all-or-nothing trust decision for the whole query string. The
@@ -17,10 +43,10 @@ import (
 // comma or apostrophe in the other field and failed with an FTS5 syntax
 // error. Classifying field-by-field means one field's operator syntax can
 // no longer vouch for a different field's stray punctuation.
-func buildFuzzyQuery(q string) string {
+func parseSearchQuery(q string) searchQuery {
 	q = strings.TrimSpace(q)
 	if q == "" {
-		return q
+		return searchQuery{}
 	}
 
 	// A NEAR(...) proximity call is the one FTS5 construct whose syntax
@@ -33,15 +59,42 @@ func buildFuzzyQuery(q string) string {
 	// already-supported case exactly as it worked before this function
 	// existed.
 	if isNearFunctionCall(q) {
-		return q
+		return searchQuery{fts: q}
 	}
 
+	parsed := searchQuery{literalOnly: true}
 	fields := splitFTS5AwareFields(q)
 	sanitized := make([]string, len(fields))
 	for i := range fields {
-		sanitized[i] = sanitizeFTS5Field(fields, i)
+		if trusted, ok := trustedFTS5Field(fields, i); ok {
+			sanitized[i] = trusted
+			parsed.literalOnly = false
+			continue
+		}
+
+		// Literal text: split it into the same "words" the pages table's
+		// tokenizer would (see splitIntoIndexWords) and AND together a
+		// quoted-prefix match for each one, rather than quoting the whole
+		// field as a single phrase. A single quoted phrase would need FTS5 to
+		// treat the words on either side of the dropped punctuation as
+		// consecutive token positions, which does not hold for every
+		// separator character — SQLite's unicode61 tokenizer does not leave
+		// "it" and "s" (from "it's") at adjacent positions the way it does
+		// for, say, a comma, so a `"it's"` phrase query fails to match
+		// content containing "it's" even though both tokenize the same way.
+		// AND-ing independent terms doesn't depend on that adjacency at all.
+		words := splitIntoIndexWords(fields[i])
+		for _, w := range words {
+			if utf8.RuneCountInString(w) >= minSubstringTermRunes {
+				parsed.substringTerms = append(parsed.substringTerms, w)
+			} else {
+				parsed.shortTerms = append(parsed.shortTerms, w)
+			}
+		}
+		sanitized[i] = quoteWordsAsPrefixTerms(words)
 	}
-	return strings.Join(sanitized, " ")
+	parsed.fts = strings.Join(sanitized, " ")
+	return parsed
 }
 
 // isNearFunctionCall reports whether q, trimmed, is shaped like a complete
@@ -60,7 +113,7 @@ func isNearFunctionCall(q string) bool {
 
 // splitFTS5AwareFields splits q on whitespace like strings.Fields, except
 // whitespace inside a "double-quoted span" doesn't split the field, so a
-// quoted phrase (balanced or not) reaches sanitizeFTS5Field as one field to
+// quoted phrase (balanced or not) reaches trustedFTS5Field as one field to
 // classify as a whole instead of being cut apart mid-phrase.
 func splitFTS5AwareFields(q string) []string {
 	var fields []string
@@ -86,25 +139,21 @@ func splitFTS5AwareFields(q string) []string {
 	return fields
 }
 
-// sanitizeFTS5Field decides whether fields[i] is trustworthy, deliberate
+// trustedFTS5Field decides whether fields[i] is trustworthy, deliberate
 // FTS5 syntax (an operator, a boolean keyword used between two real
 // operands, a column filter naming a real column, an already-quoted
-// phrase) or literal search text that needs quoting so it can't be misread
-// as syntax.
+// phrase) and returns it in the form to send to FTS5. ok is false for
+// literal search text that needs quoting so it can't be misread as syntax.
 //
 // A comma or apostrophe — never valid FTS5 syntax on their own — and an
 // unbalanced double quote always disqualify a field from the "trust it"
 // path, even if the same field also contains an operator character like *
 // or : (that combination is exactly what #1577's follow-up reports found:
 // "sometimes # and \"" alongside other punctuation).
-func sanitizeFTS5Field(fields []string, i int) string {
+func trustedFTS5Field(fields []string, i int) (string, bool) {
 	f := fields[i]
-	if f == "" {
-		return f
-	}
-
 	if isBalancedQuotedField(f) {
-		return f
+		return f, true
 	}
 
 	// A column filter is always rewritten (never trusted verbatim) into a
@@ -112,35 +161,23 @@ func sanitizeFTS5Field(fields []string, i int) string {
 	// rewriteColumnFilterField for why: the raw value can contain anything
 	// (a pasted URL's second ":", an apostrophe, ...) without needing its
 	// own escaping rules, because it's built from the same safe
-	// splitIntoIndexWords primitive as the plain-literal-text path below.
+	// splitIntoIndexWords primitive as the plain-literal-text path.
 	if rewritten, ok := rewriteColumnFilterField(f); ok {
-		return rewritten
+		return rewritten, true
 	}
 
 	// An operator field ("foo*", "(foo", "bar)") is only trusted when it is
 	// well-formed FTS5 syntax on its own and the query's parentheses balance
 	// overall. Anything else ("foo-bar*", "report.v2*", "(foo" without a
-	// partner, a bare "*") goes through the literal path below.
+	// partner, a bare "*") is literal text.
 	if strings.ContainsAny(f, "*()") {
 		if isWellFormedOperatorField(f) && (!strings.ContainsAny(f, "()") || operatorParensBalanced(fields)) {
-			return f
+			return f, true
 		}
 	} else if isFTS5Keyword(f) && hasRealOperandNeighbors(fields, i) {
-		return f
+		return f, true
 	}
-
-	// Literal text: split it into the same "words" the pages table's
-	// tokenizer would (see splitIntoIndexWords) and AND together a
-	// quoted-prefix match for each one, rather than quoting the whole field
-	// as a single phrase. A single quoted phrase would need FTS5 to treat
-	// the words on either side of the dropped punctuation as consecutive
-	// token positions, which does not hold for every separator character —
-	// SQLite's unicode61 tokenizer does not leave "it" and "s" (from "it's")
-	// at adjacent positions the way it does for, say, a comma, so a
-	// `"it's"` phrase query fails to match content containing "it's" even
-	// though both tokenize the same way. AND-ing independent terms doesn't
-	// depend on that adjacency at all.
-	return quoteWordsAsPrefixTerms(splitIntoIndexWords(f))
+	return "", false
 }
 
 // isBarewordRune reports whether r may appear in an unquoted FTS5 bareword.
