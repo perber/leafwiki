@@ -196,12 +196,17 @@ func (p *pageMeta) ContributeShell(ctx context.Context, req httpinternal.ShellRe
 
 // crawlerBody puts the rendered page into #root for search-engine crawlers,
 // so they see the content without running the SPA (ADR-0018). The SPA's
-// createRoot replaces it once it runs.
+// createRoot replaces it once it runs. The ?ssr parameter (any value) gives
+// the same body to any client, and the SPA then leaves it on screen.
 type crawlerBody struct {
 	body       *GetCrawlerBodyUseCase
 	log        *slog.Logger
 	busyLogged atomic.Bool
 }
+
+// ssrPreviewParam is the query parameter that shows the crawler body to any
+// client. The SPA reads the same name (src/main.tsx).
+const ssrPreviewParam = "ssr"
 
 // NewCrawlerBody returns the shell contributor for the crawler body.
 func NewCrawlerBody(body *GetCrawlerBodyUseCase, log *slog.Logger) httpinternal.ShellContributor {
@@ -216,6 +221,7 @@ func (c *crawlerBody) ContributeShell(ctx context.Context, req httpinternal.Shel
 		RoutePath: req.RoutePath,
 		BasePath:  req.BasePath,
 		UserAgent: req.Request.UserAgent(),
+		Preview:   req.Request.URL.Query().Has(ssrPreviewParam),
 	})
 	switch {
 	case errors.Is(err, errRendersBusy):

@@ -265,3 +265,12 @@ fixing that is a separate change.
     (`internal/scopedread`, [ADR-0015](./0015-scoped-read-boundary.md)), the reader must drop
     hidden children and resolve wikilinks against visible pages only, before ambiguity is
     counted; otherwise a link that is ambiguous only because of a hidden page would reveal it.
+- **2026-11 (#1292, `?ssr` preview):** a shell request with the `ssr` query parameter (any
+  value, also empty) gets the crawler body whatever its user agent, so site owners can see in
+  a browser what search engines get. The SPA (`src/lib/ssrPreview.ts`) then does not mount
+  while `#root` holds an element, so the server's markup stays on screen; without a body
+  (private wiki, unknown page, SPA route, permalink) it mounts as usual. Same public-access
+  gate, render cache and parallel-render cap as for crawlers; the URL differs, so caches need
+  no extra `Vary`. Anyone could already get the body by sending a crawler user agent.
+  `/?ssr` still gets the root redirect without the parameter, and the links inside the
+  preview carry no `?ssr`: following one leaves the preview and opens the SPA.

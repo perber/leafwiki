@@ -158,6 +158,33 @@ func TestGetCrawlerBodyUseCase_UserAgent_OnlySearchEnginesGetABody(t *testing.T)
 	}
 }
 
+// Preview (the shell's ?ssr parameter) shows anyone the body a crawler gets,
+// so site owners can check it in a browser.
+func TestGetCrawlerBodyUseCase_Preview_GivesBodyToAnyUserAgent(t *testing.T) {
+	tests := []struct {
+		name string
+		ua   string
+	}{
+		{name: "Chrome", ua: chromeUA},
+		{name: "empty", ua: ""},
+		{name: "Googlebot", ua: googlebotUA},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			uc, _ := crawlerBodyUseCase(pageAt("docs/setup", setupPage()), &fakeCrawlerBodyReader{})
+
+			out, err := uc.Execute(context.Background(), seo.GetCrawlerBodyInput{RoutePath: "/docs/setup", UserAgent: tc.ua, Preview: true})
+			if err != nil {
+				t.Fatalf("Execute failed: %v", err)
+			}
+			want := "<article><h1>Setup</h1><p>Install it.</p>\n</article>"
+			if out == nil || out.HTML != want {
+				t.Fatalf("body = %+v, want %q", out, want)
+			}
+		})
+	}
+}
+
 func TestGetCrawlerBodyUseCase_Page_BuildsArticleWithLinksAndChildren(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -215,20 +242,31 @@ func TestGetCrawlerBodyUseCase_NoPage_ReturnsNothing(t *testing.T) {
 		{name: "unknown page", routePath: "/docs/missing", pages: pageAt("docs/setup", setupPage()), wantReads: 1},
 		{name: "tree not loaded", routePath: "/docs/setup", pages: &fakePageReader{notLoaded: true}, wantReads: 1},
 	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			reader := &fakeCrawlerBodyReader{}
-			uc, counter := crawlerBodyUseCase(tc.pages, reader)
+	// A ?ssr preview from a browser gets nothing where a crawler gets
+	// nothing, so the SPA mounts as usual there.
+	inputs := map[string]func(routePath string) seo.GetCrawlerBodyInput{
+		"crawler": func(routePath string) seo.GetCrawlerBodyInput { return crawlerInput("", routePath) },
+		"preview": func(routePath string) seo.GetCrawlerBodyInput {
+			return seo.GetCrawlerBodyInput{RoutePath: routePath, UserAgent: chromeUA, Preview: true}
+		},
+	}
+	for inputName, input := range inputs {
+		for _, tc := range tests {
+			t.Run(inputName+"/"+tc.name, func(t *testing.T) {
+				pages := &fakePageReader{pages: tc.pages.pages, notLoaded: tc.pages.notLoaded}
+				reader := &fakeCrawlerBodyReader{}
+				uc, counter := crawlerBodyUseCase(pages, reader)
 
-			out, err := uc.Execute(context.Background(), crawlerInput("", tc.routePath))
-			if out != nil || err != nil {
-				t.Fatalf("Execute = %+v, %v, want nothing", out, err)
-			}
-			if tc.pages.reads != tc.wantReads || reader.reads != 0 || counter.count() != 0 {
-				t.Errorf("page reads = %d (want %d), child reads = %d, renders = %d, want no child read or render",
-					tc.pages.reads, tc.wantReads, reader.reads, counter.count())
-			}
-		})
+				out, err := uc.Execute(context.Background(), input(tc.routePath))
+				if out != nil || err != nil {
+					t.Fatalf("Execute = %+v, %v, want nothing", out, err)
+				}
+				if pages.reads != tc.wantReads || reader.reads != 0 || counter.count() != 0 {
+					t.Errorf("page reads = %d (want %d), child reads = %d, renders = %d, want no child read or render",
+						pages.reads, tc.wantReads, reader.reads, counter.count())
+				}
+			})
+		}
 	}
 }
 

@@ -61,6 +61,31 @@ test('crawler gets the rendered page in #root, the SPA shows it once', async ({ 
       await context.close();
     }
 
+    // ?ssr shows a browser what crawlers get; the SPA stays off so the
+    // server's article stays on screen. A mounted SPA would call the API.
+    const preview = await browser.newContext({ baseURL, userAgent: chrome });
+    try {
+      const page = await preview.newPage();
+      const apiCalls: string[] = [];
+      page.on('request', (req) => {
+        if (new URL(req.url()).pathname.startsWith('/api/')) apiCalls.push(req.url());
+      });
+      await page.goto(`/${slug}?ssr=1`);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('#root > article h1')).toHaveText(title);
+      await expect(page.locator('#root > article p')).toHaveText(paragraph);
+      expect(apiCalls, 'the SPA must not mount').toEqual([]);
+
+      // Without a server body (unknown page) the SPA mounts as usual, so
+      // ?ssr never leaves a blank page.
+      await page.goto(`/${slug}-missing?ssr=1`);
+      await page.waitForLoadState('networkidle');
+      expect(apiCalls.length, 'the SPA mounts').toBeGreaterThan(0);
+      await expect(page.locator('#root > article')).toHaveCount(0);
+    } finally {
+      await preview.close();
+    }
+
     await setPublicAccess(admin, false);
     const privateSource = await pageSource(googlebot);
     expect(privateSource.html).toContain('<div id="root"></div>');

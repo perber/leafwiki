@@ -349,7 +349,8 @@ shape for that domain.
   `markdown.go` (`GetPageMarkdownUseCase` and the `Accept` negotiation); `robots.go`:
   `GetRobotsUseCase` and `PrivateRobots`; `sitemap.go`: `BuildSitemapUseCase` behind
   `PageRouteLister`, streamed by `WriteXML`; `crawler_body.go`: `GetCrawlerBodyUseCase`
-  (title, `internal/render` HTML and child links for search-engine user agents, behind
+  (title, `internal/render` HTML and child links for search-engine user agents and for
+  any client with the `?ssr` preview parameter, behind
   `PageReader` and `CrawlerBodyReader`; renders cached per page version, parallel renders
   capped, least recently used dropped first). The readers are implemented in
   `internal/wiki/seo_adapter.go` with the pages slice's read use cases.
@@ -581,9 +582,10 @@ Preferences) is generated from the discovered locales. Steps to add a language:
 
 ### Other top-level `src/` files
 
-`main.tsx` (React root mount), `App.tsx` (top-level layout/providers, session-driven
-favorites load/clear), `App.css`/`index.css` (global styles), `useApplyDesignMode.tsx`
-(applies persisted light/dark mode to the document root), `test-setup.ts` (Vitest setup),
+`main.tsx` (React root mount; skipped for the `?ssr` preview, `lib/ssrPreview.ts`), `App.tsx`
+(top-level layout/providers, session-driven favorites load/clear), `App.css`/`index.css`
+(global styles), `useApplyDesignMode.tsx` (applies persisted light/dark mode to the document
+root), `test-setup.ts` (Vitest setup),
 `vite-env.d.ts`. `layout/AppLayout.tsx` is the single shared page chrome (toolbar + sidebar +
 content area) wrapping all routes.
 
