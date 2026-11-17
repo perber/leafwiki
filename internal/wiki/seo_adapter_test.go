@@ -1613,6 +1613,13 @@ func TestWiki_CrawlerBody_PageForCrawlersOnly(t *testing.T) {
 			t.Errorf("#root =\n%s\nwant\n%s", parts, want)
 		}
 	})
+	t.Run("browser with ?ssr gets the crawler's #root", func(t *testing.T) {
+		browser := map[string]string{"User-Agent": "Mozilla/5.0 Chrome/130.0"}
+		if got, want := crawlerRoot(t, router, "/wiki/docs/setup?ssr=1", browser), crawlerRoot(t, router, "/wiki/docs/setup", ua); got != want || got == "" {
+			t.Errorf("#root =\n%s\nwant the crawler's\n%s", got, want)
+		}
+	})
+
 	for _, tc := range []struct {
 		name    string
 		path    string

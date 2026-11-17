@@ -581,6 +581,45 @@ func TestCrawlerBody_ContributesBodyOnlyToCrawlers(t *testing.T) {
 	}
 }
 
+// ?ssr (any value, also empty) gives a browser the crawler's body, so the
+// server-rendered page can be checked without a crawler user agent.
+func TestCrawlerBody_SSRParam_ContributesBodyToBrowsers(t *testing.T) {
+	tests := []struct {
+		name     string
+		query    string
+		wantBody string
+	}{
+		{name: "no parameter", query: ""},
+		{name: "empty value", query: "?ssr=", wantBody: "<article><h1>Setup</h1><p>Install it.</p>\n</article>"},
+		{name: "any value", query: "?ssr=1", wantBody: "<article><h1>Setup</h1><p>Install it.</p>\n</article>"},
+		{name: "bare name", query: "?ssr", wantBody: "<article><h1>Setup</h1><p>Install it.</p>\n</article>"},
+		{name: "other parameter", query: "?ssrx=1"},
+	}
+	// Where a crawler gets no body (unknown page), ?ssr gets none either.
+	t.Run("unknown page", func(t *testing.T) {
+		req := requestWithUA("/docs/missing", chromeUA)
+		req.Request = httptest.NewRequest(http.MethodGet, "/docs/missing?ssr=1", nil)
+		got := crawlerBody(pageAt("docs/setup", setupPage()), &fakeCrawlerBodyReader{}, discardLogger()).ContributeShell(context.Background(), req)
+		if !reflect.DeepEqual(got, crawlerVaryParts) {
+			t.Errorf("parts = %+v, want %+v", got, crawlerVaryParts)
+		}
+	})
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := requestWithUA("/docs/setup", chromeUA)
+			req.Request = httptest.NewRequest(http.MethodGet, "/docs/setup"+tc.query, nil)
+			req.Request.Header.Set("User-Agent", chromeUA)
+
+			got := crawlerBody(pageAt("docs/setup", setupPage()), &fakeCrawlerBodyReader{}, discardLogger()).ContributeShell(context.Background(), req)
+			want := crawlerVaryParts
+			want.Body = template.HTML(tc.wantBody)
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("parts = %+v, want %+v", got, want)
+			}
+		})
+	}
+}
+
 func TestPublicOnly_CrawlerBodyPublicAccessOff_ContributesAndReadsNothing(t *testing.T) {
 	pages := pageAt("docs/setup", setupPage())
 	reader := &fakeCrawlerBodyReader{}
@@ -588,6 +627,11 @@ func TestPublicOnly_CrawlerBodyPublicAccessOff_ContributesAndReadsNothing(t *tes
 
 	if got := contributor.ContributeShell(context.Background(), requestWithUA("/docs/setup", googlebotUA)); !reflect.DeepEqual(got, wikihttp.ShellParts{}) {
 		t.Errorf("parts = %+v, want empty (no Vary either)", got)
+	}
+	preview := requestWithUA("/docs/setup", chromeUA)
+	preview.Request = httptest.NewRequest(http.MethodGet, "/docs/setup?ssr=1", nil)
+	if got := contributor.ContributeShell(context.Background(), preview); !reflect.DeepEqual(got, wikihttp.ShellParts{}) {
+		t.Errorf("?ssr parts = %+v, want empty", got)
 	}
 	if pages.reads != 0 || reader.reads != 0 {
 		t.Errorf("page reads %d, child reads %d; want nothing read", pages.reads, reader.reads)

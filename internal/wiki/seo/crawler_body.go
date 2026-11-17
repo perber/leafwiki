@@ -41,6 +41,9 @@ type GetCrawlerBodyInput struct {
 	// BasePath is the URL prefix the wiki is served under ("" or e.g. "/wiki").
 	BasePath  string
 	UserAgent string
+	// Preview gives the body to any user agent (the shell's ?ssr parameter),
+	// so site owners can see what crawlers get.
+	Preview bool
 }
 
 // GetCrawlerBodyOutput is the page as HTML for #root.
@@ -87,13 +90,13 @@ func NewGetCrawlerBodyUseCase(pages PageReader, reader CrawlerBodyReader) *GetCr
 }
 
 // Execute returns the page's body, or nil when the user agent is no search
-// engine, the route is the root or a permalink (then nothing is read), no
-// page is there, the page failed to render before, or the client went away
-// before the render. The first render
-// failure and a refused render (too many running) are returned as errors.
+// engine and Preview is off, the route is the root or a permalink (then
+// nothing is read), no page is there, the page failed to render before, or
+// the client went away before the render. The first render failure and a
+// refused render (too many running) are returned as errors.
 func (uc *GetCrawlerBodyUseCase) Execute(ctx context.Context, in GetCrawlerBodyInput) (*GetCrawlerBodyOutput, error) {
 	routePath := pageRoutePath(in.RoutePath)
-	if routePath == "" || !isSearchEngineCrawler(in.UserAgent) {
+	if routePath == "" || (!in.Preview && !isSearchEngineCrawler(in.UserAgent)) {
 		return nil, nil
 	}
 	// A permalink shows its target page in the SPA; its canonical link sends
