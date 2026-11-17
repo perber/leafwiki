@@ -44,6 +44,12 @@ func TestBuildFuzzyQuery_TranslatesFieldsToFTS5(t *testing.T) {
 		{name: "colon without a real column is literal", input: "http://example.com", want: `"http"* "//example.com"*`},
 		{name: "column filter without words is literal", input: "title:,", want: `"title"*`},
 		{name: "NEAR call is trusted verbatim", input: "NEAR(foo bar, 5)", want: "NEAR(foo bar, 5)"},
+		{name: "lowercase keyword between operands is passed through", input: "foo and bar", want: `"foo"* and "bar"*`},
+		{name: "trailing keyword is literal", input: "foo NOT", want: `"foo"* "NOT"*`},
+		{name: "combining mark splits the word", input: "e\u0301clair", want: `"e"* "clair"*`},
+		{name: "emoji-only query is empty", input: "🙂🙂🙂", want: ""},
+		{name: "no-break space separates words", input: "foo\u00a0bar", want: `"foo"* "bar"*`},
+		{name: "quote inside a word splits it", input: `abc"def`, want: `"abc"* "def"*`},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -76,6 +82,10 @@ func TestParseSearchQuery_LiteralOnlyPerFieldKind(t *testing.T) {
 		{name: "quoted phrase", input: `"foo bar"`, want: false},
 		{name: "column filter", input: "content:search", want: false},
 		{name: "NEAR call", input: "NEAR(foo bar, 5)", want: false},
+		{name: "whitespace-only query", input: " \t ", want: false},
+		{name: "emoji-only query has no words but is literal", input: "🙂", want: true},
+		{name: "lowercase keyword between operands", input: "foo and bar", want: false},
+		{name: "quote inside a word", input: `abc"def`, want: true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -107,6 +117,13 @@ func TestParseSearchQuery_SplitsLiteralWordsByLength(t *testing.T) {
 		{name: "quoted phrase contributes no terms", input: `"foo bar" baz`, wantSubstring: []string{"baz"}},
 		{name: "column filter contributes no terms", input: "content:search page", wantSubstring: []string{"page"}},
 		{name: "NEAR call contributes no terms", input: "NEAR(foo bar, 5)"},
+		{name: "whitespace only", input: " \t\n "},
+		{name: "two-rune CJK word is a short term", input: "日本 日本語", wantSubstring: []string{"日本語"}, wantShort: []string{"日本"}},
+		{name: "combining mark splits the word", input: "e\u0301clair", wantSubstring: []string{"clair"}, wantShort: []string{"e"}},
+		{name: "token punctuation counts as word characters", input: "c++ ... #", wantSubstring: []string{"c++", "..."}, wantShort: []string{"#"}},
+		{name: "emoji is dropped", input: "🙂 abc", wantSubstring: []string{"abc"}},
+		{name: "literals around an operator field keep their order", input: "it's foo* barbaz", wantSubstring: []string{"barbaz"}, wantShort: []string{"it", "s"}},
+		{name: "column filter value contributes no terms", input: "title:abc def", wantSubstring: []string{"def"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
