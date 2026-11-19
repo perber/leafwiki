@@ -98,6 +98,9 @@ describe('SlugInputWithSuggestion', () => {
     })
 
     it('calls suggestSlug when title differs from initialTitle', async () => {
+      mockSuggestSlug.mockImplementation(async (_p: string, title: string) =>
+        title === 'Grafana' ? 'grafana-1' : 'suggested-slug',
+      )
       render(
         <SlugInputWithSuggestion
           {...defaultProps}
@@ -115,6 +118,35 @@ describe('SlugInputWithSuggestion', () => {
         'Grafana New',
         'page-123',
       )
+    })
+
+    it('keeps a hand-picked slug when the title changes', async () => {
+      mockSuggestSlug.mockResolvedValue('ai-llm-for-coding')
+      const onSlugChange = vi.fn()
+      const onSlugTouchedChange = vi.fn()
+      render(
+        <SlugInputWithSuggestion
+          {...defaultProps}
+          title="AI LLM for Coding 2"
+          slug="AI_LLM_for_Coding"
+          initialTitle="AI LLM for Coding"
+          onSlugChange={onSlugChange}
+          onSlugTouchedChange={onSlugTouchedChange}
+        />,
+      )
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 400))
+      })
+
+      expect(mockSuggestSlug).toHaveBeenCalledTimes(1)
+      expect(mockSuggestSlug).toHaveBeenCalledWith(
+        'root',
+        'AI LLM for Coding',
+        'page-123',
+      )
+      expect(onSlugChange).not.toHaveBeenCalled()
+      expect(onSlugTouchedChange).toHaveBeenCalledWith(true)
     })
   })
 

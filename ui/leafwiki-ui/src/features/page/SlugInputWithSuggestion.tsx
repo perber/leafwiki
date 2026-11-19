@@ -47,6 +47,10 @@ export function SlugInputWithSuggestion({
   const debouncedTitle = useDebounce(title, 300)
   // Tracks whether we have already processed the initial unchanged-title case.
   const initialHandledRef = useRef(false)
+  // Edit mode: on the first title change, check whether the existing slug was
+  // derived from the old title or picked by hand (e.g. "AI_LLM_for_Coding").
+  const customSlugCheckRef = useRef(initialTitle !== undefined)
+  const initialSlugRef = useRef(slug)
 
   useEffect(() => {
     if (!enableSlugSuggestion || slugTouched || debouncedTitle.trim() === '') {
@@ -71,6 +75,15 @@ export function SlugInputWithSuggestion({
     const generateSlug = async () => {
       try {
         onSlugLoadingChange?.(true)
+        if (customSlugCheckRef.current && initialTitle !== undefined) {
+          customSlugCheckRef.current = false
+          const derived = await suggestSlug(parentId, initialTitle, currentId)
+          if (derived !== initialSlugRef.current) {
+            setSlugTouched(true)
+            onSlugTouchedChange?.(true)
+            return
+          }
+        }
         const suggestion = await suggestSlug(
           parentId,
           debouncedTitle,
@@ -98,6 +111,7 @@ export function SlugInputWithSuggestion({
     initialTitle,
     onSlugLoadingChange,
     onSlugChange,
+    onSlugTouchedChange,
     onLastSlugTitleChange,
     enableSlugSuggestion,
   ])
