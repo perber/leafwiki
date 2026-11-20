@@ -15,6 +15,7 @@ import { PageFrontmatterPanel } from './PageFrontmatterPanel'
 import { usePageEditorStore } from './pageEditorStore'
 import { isDirtyState } from './pageEditorStore'
 import { useAutoSave } from './useAutoSave'
+import { formatDocument } from './editorCommands'
 import useNavigationGuard from './useNavigationGuard'
 import { useToolbarActions } from './useToolbarActions'
 
@@ -82,7 +83,10 @@ export default function PageEditor() {
 
   // callbacks to save / close
   const handleSave = useCallback(() => {
-    savePage()
+    const view = editorRef.current?.editorViewRef.current
+    if (view) formatDocument(view)
+    // format again in the store so the payload never depends on the view sync
+    savePage({ format: true })
       .then(async (page) => {
         if (page) {
           window.history.replaceState(

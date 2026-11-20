@@ -229,11 +229,13 @@ export function useAutoSave(): { status: AutoSaveStatus } {
     try {
       const result = await usePageEditorStore
         .getState()
-        .savePage({ silent: true })
+        .savePage({ silent: true, format: true })
       if (result === undefined && isDirtyState(usePageEditorStore.getState())) {
         await new Promise((resolve) => setTimeout(resolve, 300))
         if (isDirtyState(usePageEditorStore.getState())) {
-          await usePageEditorStore.getState().savePage({ silent: true })
+          await usePageEditorStore
+            .getState()
+            .savePage({ silent: true, format: true })
         }
       }
     } catch (err) {

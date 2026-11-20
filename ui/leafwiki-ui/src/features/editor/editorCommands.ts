@@ -2,6 +2,7 @@ import { indentLess, insertTab } from '@codemirror/commands'
 import { indentUnit, syntaxTree } from '@codemirror/language'
 import { EditorState, Extension, SelectionRange } from '@codemirror/state'
 import { Command, EditorView, KeyBinding } from '@codemirror/view'
+import { formatMarkdown } from './formatMarkdown'
 
 // Everything up to the cursor when it sits right behind a list marker: indent
 // or blockquote markers, the marker, and an optional task checkbox.
@@ -180,4 +181,31 @@ export function insertHeadingAtStart(view: EditorView, level: 1 | 2 | 3) {
   })
   view.dispatch(transaction)
   view.focus()
+}
+
+// Applies formatMarkdown as one change spanning only what differs, so the
+// cursor and undo history stay usable.
+export function formatDocument(view: EditorView) {
+  const before = view.state.doc.toString()
+  const after = formatMarkdown(before)
+  if (after === before) return
+
+  let start = 0
+  while (start < before.length && before[start] === after[start]) start++
+  let end = 0
+  while (
+    end < before.length - start &&
+    end < after.length - start &&
+    before[before.length - 1 - end] === after[after.length - 1 - end]
+  ) {
+    end++
+  }
+
+  view.dispatch({
+    changes: {
+      from: start,
+      to: before.length - end,
+      insert: after.slice(start, after.length - end),
+    },
+  })
 }
