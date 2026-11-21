@@ -1,4 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  vi,
+} from 'vitest'
 import {
   findSearchQueryRange,
   scrollToSearchQuery,
@@ -17,8 +25,13 @@ class FakeHighlight {
   }
 }
 
+// jsdom has neither method; vi.spyOn needs them on the prototype first, and
+// restoreAllMocks puts these placeholders back after each test.
+Range.prototype.getBoundingClientRect = () => new DOMRect()
+Element.prototype.scrollTo = () => {}
+
 let highlights: Map<string, FakeHighlight>
-let scrollTo: ReturnType<typeof vi.fn>
+let scrollTo: MockInstance
 
 function content(): HTMLElement {
   return document.querySelector('.page-viewer__content') as HTMLElement
@@ -43,9 +56,12 @@ beforeEach(() => {
   vi.stubGlobal('CSS', { highlights })
   vi.stubGlobal('Highlight', FakeHighlight)
   // The match sits 400px below the container's top edge and is 20px tall.
-  Range.prototype.getBoundingClientRect = () => new DOMRect(0, 400, 50, 20)
-  scrollTo = vi.fn()
-  Element.prototype.scrollTo = scrollTo as unknown as Element['scrollTo']
+  vi.spyOn(Range.prototype, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(0, 400, 50, 20),
+  )
+  scrollTo = vi
+    .spyOn(Element.prototype, 'scrollTo')
+    .mockImplementation(() => {})
 })
 
 afterEach(() => {
@@ -116,6 +132,27 @@ describe('scrollToSearchQuery', () => {
     // (400 + 20 / 2) at the container's top.
     expect(scrollTo).toHaveBeenCalledWith({ top: 410, behavior: 'smooth' })
     expect(content().innerHTML).toBe(CONTENT_HTML)
+  })
+
+  it('centres the match in a scrolled container', () => {
+    const container = document.getElementById('scroll-container')!
+    vi.spyOn(container, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(0, 100, 800, 600),
+    )
+    vi.spyOn(container, 'clientHeight', 'get').mockReturnValue(600)
+    vi.spyOn(container, 'scrollTop', 'get').mockReturnValue(250)
+    vi.spyOn(Range.prototype, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(0, 900, 50, 20),
+    )
+
+    scrollToSearchQuery('keyword', {
+      behavior: 'auto',
+      waitForStableLayout: false,
+    })
+
+    // The match is 800px into the visible area; centring leaves
+    // (600 - 20) / 2 = 290px above it: 250 + 800 - 290.
+    expect(scrollTo).toHaveBeenCalledWith({ top: 760, behavior: 'auto' })
   })
 
   it.each([
