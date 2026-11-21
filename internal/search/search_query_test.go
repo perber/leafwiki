@@ -137,3 +137,50 @@ func TestParseSearchQuery_SplitsLiteralWordsByLength(t *testing.T) {
 		})
 	}
 }
+
+// TestSearchTiers_MatchExpressions pins the MATCH arguments of the rank
+// tiers, best tier first. They are built only from splitIntoIndexWords output,
+// so quotes, apostrophes and SQL punctuation can never reach them as syntax.
+func TestSearchTiers_MatchExpressions(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{name: "empty query has no tier", input: ""},
+		{name: "single word has only the whole-word tier", input: "pi", want: []string{`"pi"`}},
+		{name: "two words add the last-word-prefix tier", input: "pi setup", want: []string{`"pi" "setup"`, `"pi" "setup"*`}},
+		{name: "only the last word gets the prefix", input: "a b c", want: []string{`"a" "b" "c"`, `"a" "b" "c"*`}},
+		// FTS5 ANDs a repeated term, so a page needs the word only once:
+		// "Raspberry Pi Setup" has set only as a prefix of setup, which
+		// leaves it in the last tier.
+		{name: "a repeated word stays in every tier", input: "set pi set", want: []string{`"set" "pi" "set"`, `"set" "pi" "set"*`}},
+		{name: "apostrophe splits words", input: "it's", want: []string{`"it" "s"`, `"it" "s"*`}},
+		{name: "quote inside a word splits it", input: `abc"def`, want: []string{`"abc" "def"`, `"abc" "def"*`}},
+		{name: "unbalanced quote is literal", input: `"pi`, want: []string{`"pi"`}},
+		{name: "SQL punctuation is dropped", input: `pi'); DROP TABLE pages;--`,
+			want: []string{`"pi" "DROP" "TABLE" "pages" "--"`, `"pi" "DROP" "TABLE" "pages" "--"*`}},
+		{name: "emoji is not a word", input: "pi 🚀", want: []string{`"pi"`}},
+		{name: "punctuation-only query has no tier", input: ","},
+		{name: "prefix operator has no tier", input: "pi*"},
+		{name: "quoted phrase has no tier", input: `"pi"`},
+		{name: "column filter has no tier", input: "title:pi"},
+		{name: "keyword between operands has no tier", input: "pi OR x"},
+		{name: "one operator field disables the tier for the whole query", input: "pi* setup"},
+		{name: "NEAR call has no tier", input: "NEAR(pi setup, 5)"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var got []string
+			for _, tier := range searchTiers(parseSearchQuery(tc.input)) {
+				if len(tier.args) != 1 {
+					t.Fatalf("searchTiers(%q): tier %q has %d args, want its one MATCH expression", tc.input, tier.cond, len(tier.args))
+				}
+				got = append(got, tier.args[0].(string))
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("searchTiers(%q) MATCH expressions = %q, want %q", tc.input, got, tc.want)
+			}
+		})
+	}
+}

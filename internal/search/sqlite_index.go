@@ -621,7 +621,8 @@ func (s *SQLiteIndex) Search(query string, pageIDs []string, offset, limit int) 
 	// raw query wasn't empty, and `pages MATCH ''` is itself an FTS5 syntax
 	// error — the same crash class #1577 reported, for the simplest
 	// possible input.
-	ftsQuery := buildFuzzyQuery(query)
+	parsed := parseSearchQuery(query)
+	ftsQuery := parsed.fts
 
 	if len(pageIDs) == 0 && pageIDs != nil {
 		return &SearchResult{
@@ -655,6 +656,7 @@ func (s *SQLiteIndex) Search(query string, pageIDs []string, offset, limit int) 
 		}
 		sr.Count = total
 
+		orderBy, orderArgs := searchOrderBy(parsed)
 		searchQuery := fmt.Sprintf(`
 		SELECT 
 			pageID,
@@ -673,10 +675,10 @@ func (s *SQLiteIndex) Search(query string, pageIDs []string, offset, limit int) 
 			searchExcerptExpr(ftsQuery != ""),
 			searchRankExpr(ftsQuery != ""),
 			whereClause,
-			searchOrderByExpr(ftsQuery != ""),
+			orderBy,
 		)
 
-		queryArgs := append(append([]interface{}{}, whereArgs...), limit, offset)
+		queryArgs := append(append(append([]interface{}{}, whereArgs...), orderArgs...), limit, offset)
 		rows, err := db.Query(searchQuery, queryArgs...)
 		if err != nil {
 			return err
