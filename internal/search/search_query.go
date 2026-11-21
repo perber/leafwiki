@@ -306,13 +306,15 @@ func splitIntoIndexWords(f string) []string {
 	return words
 }
 
-// isFTS5Keyword reports whether f is a boolean-operator keyword. Callers
+// isFTS5Keyword reports whether f is a boolean-operator keyword. Only the
+// upper-case forms count, because FTS5 itself only accepts upper-case
+// operators: a lowercase "and" or "or" is an ordinary word to search for. Callers
 // must also confirm it sits between two real operands (see
 // hasRealOperandNeighbors) before trusting it — FTS5's AND/OR/NOT are binary
 // operators, so a dangling "AND"/"OR"/"NOT" with no left or right neighbor
 // is itself a syntax error, not valid-but-unusual syntax.
 func isFTS5Keyword(f string) bool {
-	switch strings.ToUpper(f) {
+	switch f {
 	case "AND", "OR", "NOT":
 		return true
 	default:

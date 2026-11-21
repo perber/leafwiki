@@ -874,7 +874,7 @@ func bm25Order(t *testing.T, index *SQLiteIndex, query string) []string {
 func TestSQLiteIndex_Search_OperatorQueriesKeepBM25Order(t *testing.T) {
 	index := newPiIndex(t)
 
-	for _, query := range []string{"title:pi", "pi*", `"pi"`, "pi OR x", "pi* setup"} {
+	for _, query := range []string{"title:pi", "pi*", `"pi"`, "pi OR x", "pi* setup", "pi AND setup"} {
 		t.Run(query, func(t *testing.T) {
 			result, err := index.Search(query, nil, 0, 10)
 			if err != nil {
@@ -888,6 +888,50 @@ func TestSQLiteIndex_Search_OperatorQueriesKeepBM25Order(t *testing.T) {
 				t.Errorf("Search(%q) = %q, want the bm25 order %q", query, got, want)
 			}
 		})
+	}
+}
+
+// TestSQLiteIndex_Search_LowercaseKeywordIsAnOrdinaryWord pins that only
+// upper-case AND/OR/NOT are operators, as the search help says. A lowercase
+// "and" is one more literal word: ANDed as the prefix "and"*, so the result
+// is the pages that match "pi setup" and also contain a word starting with
+// "and", ranked by the whole-word tiers. Before, FTS5 read the unquoted "and"
+// as the exact token and the query lost its tiers.
+func TestSQLiteIndex_Search_LowercaseKeywordIsAnOrdinaryWord(t *testing.T) {
+	index := newTestIndex(t)
+	pages := []struct{ id, title, body string }{
+		{id: "noAnd", title: "Raspberry Pi Setup", body: "Install it on a board."},
+		{id: "wholeAnd", title: "Pi and Setup Guide", body: "Notes."},
+		{id: "prefixAnd", title: "Pipeline Setup", body: "Builds the Android app."},
+		{id: "andOnly", title: "Salt and Pepper", body: "Kitchen."},
+	}
+	for _, p := range pages {
+		if err := index.IndexPage("docs/"+p.id, "docs/"+p.id+".md", p.id, p.title, tree.NodeKindPage, p.body); err != nil {
+			t.Fatalf("failed to index %s: %v", p.id, err)
+		}
+	}
+
+	search := func(query string) []string {
+		t.Helper()
+		result, err := index.Search(query, nil, 0, 10)
+		if err != nil {
+			t.Fatalf("Search(%q) failed: %v", query, err)
+		}
+		if ids := resultPageIDs(result); result.Count != len(ids) {
+			t.Fatalf("Search(%q): count %d, but %d items", query, result.Count, len(ids))
+		}
+		return resultPageIDs(result)
+	}
+
+	withoutAnd := search("pi setup")
+	slices.Sort(withoutAnd)
+	if want := []string{"noAnd", "prefixAnd", "wholeAnd"}; !slices.Equal(withoutAnd, want) {
+		t.Fatalf("Search(pi setup) = %q, want the pages %q", withoutAnd, want)
+	}
+	// AND narrows: the pi setup pages that also have a word starting with
+	// "and", whole words first. "Salt and Pepper" has no pi or setup.
+	if got, want := search("pi and setup"), []string{"wholeAnd", "prefixAnd"}; !slices.Equal(got, want) {
+		t.Errorf("Search(pi and setup) = %q, want %q in this order", got, want)
 	}
 }
 
