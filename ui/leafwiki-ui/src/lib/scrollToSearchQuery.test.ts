@@ -66,6 +66,35 @@ describe('findSearchQueryRange', () => {
   it('returns null when no match exists', () => {
     expect(findSearchQueryRange(content(), 'missing')).toBeNull()
   })
+
+  it.each([
+    // A match only exists per text node; one split by inline markup is not found.
+    [
+      'across an element boundary',
+      '<p>foo <strong>bar</strong></p>',
+      'foo bar',
+      null,
+    ],
+    [
+      'inside a code block',
+      '<pre><code>let needle = 1</code></pre>',
+      'needle',
+      'needle',
+    ],
+    [
+      'inside a collapsed details element',
+      '<details><summary>s</summary><p>hidden needle</p></details>',
+      'needle',
+      'needle',
+    ],
+    ['in a script', '<script>needle</script><p>x</p>', 'needle', null],
+    ['with Unicode in the query', '<p>Grüße aus Köln</p>', 'KÖLN', 'Köln'],
+  ])('handles a match %s', (_name, html, query, expected) => {
+    const root = document.createElement('div')
+    root.innerHTML = html
+
+    expect(findSearchQueryRange(root, query)?.toString() ?? null).toBe(expected)
+  })
 })
 
 describe('scrollToSearchQuery', () => {
@@ -117,6 +146,35 @@ describe('scrollToSearchQuery', () => {
     cancelFirst()
 
     expect(highlightedTexts()).toEqual(['Hello'])
+  })
+
+  it('cleanup does not throw after the content re-rendered under the highlight', () => {
+    const cancel = scrollToSearchQuery('keyword', {
+      waitForStableLayout: false,
+    })
+    // React replaces the text nodes the range points into.
+    content().innerHTML = '<p>Different page</p>'
+
+    expect(cancel).not.toThrow()
+    expect(highlights.has(SEARCH_QUERY_HIGHLIGHT)).toBe(false)
+  })
+
+  it('cancelling before the layout settles neither highlights nor scrolls', () => {
+    vi.useFakeTimers()
+    try {
+      const cancelFirst = scrollToSearchQuery('keyword')
+      cancelFirst()
+      const cancelSecond = scrollToSearchQuery('Hello')
+      cancelSecond()
+      scrollToSearchQuery('again')
+
+      vi.runAllTimers()
+
+      expect(highlightedTexts()).toEqual(['again'])
+      expect(scrollTo).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('only scrolls when the browser lacks CSS custom highlights', () => {

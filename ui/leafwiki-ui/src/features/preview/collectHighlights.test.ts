@@ -29,8 +29,8 @@ describe('collectHighlights', () => {
       ['kept'],
     ],
     [
-      'no search-query or raw HTML marks',
-      `<mark class="search-query-highlight">query</mark><mark>raw</mark>${marker('kept')}`,
+      'no raw HTML marks, with or without a class',
+      `<mark class="custom">classed</mark><mark>raw</mark>${marker('kept')}`,
       ['kept'],
     ],
   ])('collects %s', (_name, html, expected) => {
