@@ -101,7 +101,7 @@ export function LinkInsertDialog({
       },
     )
     registerHotkey(cancelHotkey)
-    return () => unregisterHotkey(cancelHotkey.keyCombo)
+    return () => unregisterHotkey(cancelHotkey)
   }, [open, closeDialog, registerHotkey, unregisterHotkey])
 
   return (

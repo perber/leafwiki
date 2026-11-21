@@ -118,8 +118,8 @@ export default function BaseDialog({
     registerHotkey(cancelHotkey)
 
     return () => {
-      unregisterHotkey(confirmHotkey.keyCombo)
-      unregisterHotkey(cancelHotkey.keyCombo)
+      unregisterHotkey(confirmHotkey)
+      unregisterHotkey(cancelHotkey)
     }
   }, [
     open,

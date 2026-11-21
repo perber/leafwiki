@@ -73,4 +73,33 @@ describe('useExitModeButton', () => {
       useHotKeysStore.getState().registeredHotkeys['Escape'],
     ).toBeUndefined()
   })
+
+  it('keeps an Escape registered above it when onExit changes', () => {
+    const { rerender } = renderHook(
+      ({ onExit }) =>
+        useExitModeButton({
+          id: 'close-history',
+          labelKey: 'exit',
+          ns: 'settings',
+          hotkeyId: 'history.page.close',
+          onExit,
+        }),
+      { initialProps: { onExit: vi.fn() } },
+    )
+    const above = vi.fn()
+    useHotKeysStore.getState().registerHotkey({
+      keyCombo: 'Escape',
+      enabled: true,
+      mode: ['history'],
+      action: above,
+    })
+
+    const nextOnExit = vi.fn()
+    rerender({ onExit: nextOnExit })
+
+    const actions = useHotKeysStore
+      .getState()
+      .registeredHotkeys['Escape'].map((entry) => entry.action)
+    expect(actions).toEqual([above, nextOnExit])
+  })
 })

@@ -32,7 +32,7 @@ export function PageQuickSwitcherTrigger() {
     )
 
     registerHotkey(hotkey)
-    return () => unregisterHotkey(hotkey.keyCombo)
+    return () => unregisterHotkey(hotkey)
   }, [openDialog, registerHotkey, unregisterHotkey])
 
   if (appMode !== 'view') {

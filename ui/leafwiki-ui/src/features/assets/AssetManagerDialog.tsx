@@ -47,7 +47,7 @@ export function AssetManagerDialog(props: AssetManagerDialogProps) {
 
     registerHotkey(cancelHotkey)
     return () => {
-      unregisterHotkey(cancelHotkey.keyCombo)
+      unregisterHotkey(cancelHotkey)
     }
   }, [open, isRenamingRef, registerHotkey, unregisterHotkey, closeDialog])
 

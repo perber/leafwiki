@@ -110,7 +110,7 @@ export default function Sidebar() {
     })
     return () => {
       hotKeyDefs.forEach((hotKeyDef) => {
-        unregisterHotkey(hotKeyDef.keyCombo)
+        unregisterHotkey(hotKeyDef)
       })
     }
   }, [hotKeyDefs, registerHotkey, unregisterHotkey])

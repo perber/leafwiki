@@ -213,7 +213,7 @@ export default function PageViewer() {
     )
     registerHotkey(tocToggleHotkey)
 
-    return () => unregisterHotkey(tocToggleHotkey.keyCombo)
+    return () => unregisterHotkey(tocToggleHotkey)
   }, [showRightPane, toggleTocCollapsed, registerHotkey, unregisterHotkey])
 
   const editorName = displayUser(page?.metadata?.lastAuthor)
