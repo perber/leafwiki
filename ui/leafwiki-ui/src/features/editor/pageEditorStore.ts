@@ -17,6 +17,7 @@ import { useLinkStatusStore } from '../links/linkStatusStore'
 import { confirmPageRefactor } from '../page/pageRefactorDialogState'
 import { useProgressbarStore } from '../progressbar/progressbarStore'
 import { useViewerStore } from '../viewer/viewer'
+import { formatMarkdown } from './formatMarkdown'
 import {
   EditorFrontmatterField,
   validateEditorFrontmatterMetadata,
@@ -43,7 +44,10 @@ export interface PageEditorState {
   setFrontmatterErrors: (errors: Record<string, string>) => void
   setError: (error: string | null) => void // set the error message
   setPage: (page: Page | null) => void // set the current page
-  savePage: (options?: { silent?: boolean }) => Promise<Page | null | undefined> // save the current page
+  savePage: (options?: {
+    silent?: boolean
+    format?: boolean // run formatMarkdown on the content before sending it
+  }) => Promise<Page | null | undefined> // save the current page
   forceOverwrite: () => Promise<Page | null | undefined> // re-fetch server version, then save
   loadPageData: (path: string) => Promise<void> // load page data by path
   resetEditorState: () => void // clear the store back to its pristine (no page loaded) shape
@@ -143,9 +147,14 @@ export const usePageEditorStore = create<PageEditorState>((set, get) => ({
   setFrontmatterErrors: (frontmatterErrors) => set({ frontmatterErrors }),
   setError: (error) => set({ error }),
   setPage: (page) => set({ page }),
-  savePage: async (options?: { silent?: boolean }) => {
-    const { page, title, slug, content, tags, frontmatterFields } = get()
+  savePage: async (options) => {
+    const { page, title, slug, tags, frontmatterFields } = get()
+    let { content } = get()
     if (!page || !isDirtyState(get())) return
+    if (options?.format) {
+      content = formatMarkdown(content)
+      set({ content })
+    }
     const session = editorSession
 
     const frontmatterErrors = validateEditorFrontmatterMetadata(

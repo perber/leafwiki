@@ -121,6 +121,27 @@ describe('pageEditorStore.savePage', () => {
     useLinkStatusStore.setState({ fetchLinkStatusForPage: vi.fn() })
   })
 
+  it.each([
+    ['formats the content with format: true', { format: true }, 'A edited\n'],
+    [
+      'sends the content raw without format',
+      { silent: true },
+      'A edited\t\n\n\n',
+    ],
+  ])('%s', async (_name, options, expected) => {
+    editPage(pageA, 'A edited\t\n\n\n')
+    vi.mocked(updatePage).mockResolvedValueOnce({
+      ...pageA,
+      content: expected,
+      version: 'a2',
+    })
+
+    await usePageEditorStore.getState().savePage(options)
+
+    expect(vi.mocked(updatePage).mock.calls[0][4]).toBe(expected)
+    expect(usePageEditorStore.getState().content).toBe(expected)
+  })
+
   it('applies the response to the page it saved and keeps edits typed meanwhile', async () => {
     editPage(pageA, 'A edited')
     const resolveSave = deferUpdatePage()
