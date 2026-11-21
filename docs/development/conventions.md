@@ -401,6 +401,9 @@ A change to how pages, frontmatter, folders or links are stored on disk:
 
 Starting an older binary on a newer schema fails with a clear error; keep that behaviour.
 Derived indexes (SQLite) don't need a migration: bump their schema and rebuild via resync.
+`search.db`: bump `searchSchemaVersion` for any change to its tables, tokenizer options or the
+text written into them; `ensureSchema` then rebuilds it empty on the next open
+([ADR-0022](./adr/0022-versioned-derived-search-index.md)).
 
 A new SQLite store chooses a `CorruptionPolicy` at its constructor
 ([ADR-0013](./adr/0013-per-store-sqlite-corruption-policy.md)): derived index →

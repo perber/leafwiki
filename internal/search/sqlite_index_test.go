@@ -1552,3 +1552,125 @@ func TestSQLiteIndex_Search_BalancedParenGroupAcrossFieldsStillWorks(t *testing.
 		t.Errorf("expected both pages for a grouped OR query, got %d", result.Count)
 	}
 }
+
+// search.db is a derived index (ADR-0022): opening it keeps its rows only when
+// the stored schema version and DDL match this binary; anything else, and a
+// corrupt file (ADR-0013), leaves empty tables at the current version.
+func TestNewSQLiteIndex_OpenKeepsOrRebuildsTheSchema(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func(t *testing.T, dir string)
+		wantRows int
+	}{
+		{
+			name:     "fresh database gets the schema version",
+			setup:    func(t *testing.T, dir string) {},
+			wantRows: 0,
+		},
+		{
+			name:     "reopening keeps the indexed rows",
+			setup:    indexOnePageAndClose,
+			wantRows: 1,
+		},
+		{
+			name: "other schema version rebuilds",
+			setup: func(t *testing.T, dir string) {
+				indexOnePageAndClose(t, dir)
+				execRawSearchDB(t, dir, fmt.Sprintf(`PRAGMA user_version = %d`, searchSchemaVersion+1))
+			},
+			wantRows: 0,
+		},
+		{
+			// An older binary drops and recreates pages in its own shape but
+			// leaves user_version alone, so the version alone can't tell.
+			name: "older pages DDL with the current version rebuilds",
+			setup: func(t *testing.T, dir string) {
+				execRawSearchDB(t, dir,
+					`CREATE VIRTUAL TABLE pages USING fts5(path UNINDEXED, pageID, title, content)`,
+					`INSERT INTO pages (path, pageID, title, content) VALUES ('old', 'old', 'Old', 'old content')`,
+					fmt.Sprintf(`PRAGMA user_version = %d`, searchSchemaVersion),
+				)
+			},
+			wantRows: 0,
+		},
+		{
+			name: "unexpected extra table rebuilds",
+			setup: func(t *testing.T, dir string) {
+				indexOnePageAndClose(t, dir)
+				execRawSearchDB(t, dir, `CREATE TABLE leftover (id INTEGER)`)
+			},
+			wantRows: 0,
+		},
+		{
+			name: "corrupt file rebuilds",
+			setup: func(t *testing.T, dir string) {
+				test_utils.WriteCorruptSQLiteDB(t, filepath.Join(dir, "search.db"))
+			},
+			wantRows: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			tt.setup(t, dir)
+
+			index, err := NewSQLiteIndex(dir)
+			if err != nil {
+				t.Fatalf("NewSQLiteIndex: %v", err)
+			}
+			defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+
+			var version, rows, extra int
+			if err := index.withDB(func(db *sql.DB) error {
+				if err := db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
+					return err
+				}
+				if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE name = 'leftover'`).Scan(&extra); err != nil {
+					return err
+				}
+				// Selecting every current column fails on an older shape.
+				return db.QueryRow(`SELECT count(*) FROM (SELECT path, filepath, pageID, kind, title, headings, content FROM pages)`).Scan(&rows)
+			}); err != nil {
+				t.Fatalf("read reopened index: %v", err)
+			}
+			if version != searchSchemaVersion {
+				t.Errorf("user_version = %d, want %d", version, searchSchemaVersion)
+			}
+			if rows != tt.wantRows {
+				t.Errorf("rows = %d, want %d", rows, tt.wantRows)
+			}
+			if extra != 0 {
+				t.Errorf("unexpected table survived the rebuild")
+			}
+		})
+	}
+}
+
+func indexOnePageAndClose(t *testing.T, dir string) {
+	t.Helper()
+	index, err := NewSQLiteIndex(dir)
+	if err != nil {
+		t.Fatalf("NewSQLiteIndex: %v", err)
+	}
+	if err := index.IndexPage("docs/a", "docs/a.md", "a", "A", tree.NodeKindPage, "persisted content"); err != nil {
+		t.Fatalf("IndexPage: %v", err)
+	}
+	if err := index.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+}
+
+func execRawSearchDB(t *testing.T, dir string, statements ...string) {
+	t.Helper()
+	db, err := sql.Open("sqlite", filepath.Join(dir, "search.db"))
+	if err != nil {
+		t.Fatalf("open search.db: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(db.Close, t)
+	for _, stmt := range statements {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("exec %q: %v", stmt, err)
+		}
+	}
+}
