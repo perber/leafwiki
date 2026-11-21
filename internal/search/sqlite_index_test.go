@@ -354,63 +354,53 @@ func TestSQLiteIndex_Search_NoMatch_ReturnsEmptyItems(t *testing.T) {
 	}
 }
 
-func TestSQLiteIndex_Search_RanksTitleMatchHigherThanContent(t *testing.T) {
-	index := newTestIndex(t)
-
-	// page with match in title
-	err := index.IndexPage(
-		"docs/titleMatch",
-		"docs/titleMatch.md",
-		"titleMatch",
-		"Search term in title",
-		tree.NodeKindPage,
-		"Lorem ipsum dolor sit amet.",
-	)
-	if err != nil {
-		t.Fatalf("failed to index titleMatch page: %v", err)
+// TestSQLiteIndex_Search_RanksFieldMatchAboveContentOnlyMatch checks the
+// bm25 column weights: a hit in the title or a heading outranks a hit only in
+// the body text. "search" becomes "search"*, which matches both pages.
+func TestSQLiteIndex_Search_RanksFieldMatchAboveContentOnlyMatch(t *testing.T) {
+	tests := []struct {
+		name         string
+		fieldTitle   string
+		fieldContent string
+		contentTitle string
+	}{
+		{name: "title", fieldTitle: "Search term in title", fieldContent: "Lorem ipsum dolor sit amet.", contentTitle: "Content only match"},
+		{name: "heading", fieldTitle: "No search in title", fieldContent: "## Search term in heading\n\nSome additional body text.", contentTitle: "No search in title"},
 	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			index := newTestIndex(t)
+			if err := index.IndexPage("docs/fieldMatch", "docs/fieldMatch.md", "fieldMatch", tc.fieldTitle, tree.NodeKindPage, tc.fieldContent); err != nil {
+				t.Fatalf("failed to index fieldMatch page: %v", err)
+			}
+			if err := index.IndexPage("docs/contentMatch", "docs/contentMatch.md", "contentMatch", tc.contentTitle, tree.NodeKindPage,
+				"This page has the search term only in the content."); err != nil {
+				t.Fatalf("failed to index contentMatch page: %v", err)
+			}
 
-	// page with match only in content
-	err = index.IndexPage(
-		"docs/contentMatch",
-		"docs/contentMatch.md",
-		"contentMatch",
-		"Content only match",
-		tree.NodeKindPage,
-		"This page has the search term only in the content.",
-	)
-	if err != nil {
-		t.Fatalf("failed to index contentMatch page: %v", err)
-	}
-
-	// "search" is converted by buildFuzzyQuery to "search*", matching both
-	result, err := index.Search("search", nil, 0, 10)
-	if err != nil {
-		t.Fatalf("search failed: %v", err)
-	}
-
-	if result.Count != 2 {
-		t.Fatalf("expected 2 results, got %d", result.Count)
-	}
-	if len(result.Items) != 2 {
-		t.Fatalf("expected 2 result items, got %d", len(result.Items))
-	}
-
-	// Title match should be ranked higher than content match
-	if result.Items[0].PageID != "titleMatch" {
-		t.Errorf("expected titleMatch to be ranked first, got %s", result.Items[0].PageID)
-	}
-
-	// and the rank value should be higher (because 1/(1+score), score smaller)
-	if result.Items[0].Rank < result.Items[1].Rank {
-		t.Errorf("expected higher rank for titleMatch (got %f, %f)", result.Items[0].Rank, result.Items[1].Rank)
-	}
-
-	// sanity check: Ranks should be > 0 and <= 1
-	for i, item := range result.Items {
-		if item.Rank <= 0 || item.Rank > 1 {
-			t.Errorf("expected rank for item %d to be in (0,1], got %f", i, item.Rank)
-		}
+			result, err := index.Search("search", nil, 0, 10)
+			if err != nil {
+				t.Fatalf("search failed: %v", err)
+			}
+			if result.Count != 2 {
+				t.Fatalf("expected 2 results, got %d", result.Count)
+			}
+			if len(result.Items) != 2 {
+				t.Fatalf("expected 2 result items, got %d", len(result.Items))
+			}
+			if result.Items[0].PageID != "fieldMatch" {
+				t.Errorf("expected the %s match to be ranked first, got %s", tc.name, result.Items[0].PageID)
+			}
+			// Rank is 1/(1+score), so the better match must not have the lower rank.
+			if result.Items[0].Rank < result.Items[1].Rank {
+				t.Errorf("expected higher rank for the %s match (got %f, %f)", tc.name, result.Items[0].Rank, result.Items[1].Rank)
+			}
+			for i, item := range result.Items {
+				if item.Rank <= 0 || item.Rank > 1 {
+					t.Errorf("expected rank for item %d to be in (0,1], got %f", i, item.Rank)
+				}
+			}
+		})
 	}
 }
 
@@ -691,57 +681,6 @@ func TestSQLiteIndex_Search_HighlightMarkerEdgeCases_NeverFakeAHighlight(t *test
 				t.Errorf("stored headings %q still contain a marker character", headings)
 			}
 		})
-	}
-}
-
-func TestSQLiteIndex_Search_RanksHeadingHigherThanContent(t *testing.T) {
-	index := newTestIndex(t)
-
-	// page with match in heading (Markdown heading)
-	err := index.IndexPage(
-		"docs/headingMatch",
-		"docs/headingMatch.md",
-		"headingMatch",
-		"No search in title",
-		tree.NodeKindPage,
-		"## Search term in heading\n\nSome additional body text.",
-	)
-	if err != nil {
-		t.Fatalf("failed to index headingMatch page: %v", err)
-	}
-
-	// page with match only in content
-	err = index.IndexPage(
-		"docs/contentOnly",
-		"docs/contentOnly.md",
-		"contentOnly",
-		"No search in title",
-		tree.NodeKindPage,
-		"This page has the search term only in the content.",
-	)
-	if err != nil {
-		t.Fatalf("failed to index contentOnly page: %v", err)
-	}
-
-	result, err := index.Search("search", nil, 0, 10)
-	if err != nil {
-		t.Fatalf("search failed: %v", err)
-	}
-
-	if result.Count != 2 {
-		t.Fatalf("expected 2 results, got %d", result.Count)
-	}
-	if len(result.Items) != 2 {
-		t.Fatalf("expected 2 result items, got %d", len(result.Items))
-	}
-
-	// Heading match should be ranked higher than content match
-	if result.Items[0].PageID != "headingMatch" {
-		t.Errorf("expected headingMatch to be ranked first, got %s", result.Items[0].PageID)
-	}
-
-	if result.Items[0].Rank < result.Items[1].Rank {
-		t.Errorf("expected higher rank for headingMatch (got %f, %f)", result.Items[0].Rank, result.Items[1].Rank)
 	}
 }
 
