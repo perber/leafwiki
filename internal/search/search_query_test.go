@@ -44,7 +44,8 @@ func TestBuildFuzzyQuery_TranslatesFieldsToFTS5(t *testing.T) {
 		{name: "colon without a real column is literal", input: "http://example.com", want: `"http"* "//example.com"*`},
 		{name: "column filter without words is literal", input: "title:,", want: `"title"*`},
 		{name: "NEAR call is trusted verbatim", input: "NEAR(foo bar, 5)", want: "NEAR(foo bar, 5)"},
-		{name: "lowercase keyword between operands is passed through", input: "foo and bar", want: `"foo"* and "bar"*`},
+		{name: "lowercase keyword is an ordinary word", input: "foo and bar", want: `"foo"* "and"* "bar"*`},
+		{name: "mixed-case keyword is an ordinary word", input: "foo Or bar", want: `"foo"* "Or"* "bar"*`},
 		{name: "trailing keyword is literal", input: "foo NOT", want: `"foo"* "NOT"*`},
 		{name: "combining mark splits the word", input: "e\u0301clair", want: `"e"* "clair"*`},
 		{name: "emoji-only query is empty", input: "🙂🙂🙂", want: ""},
@@ -84,7 +85,7 @@ func TestParseSearchQuery_LiteralOnlyPerFieldKind(t *testing.T) {
 		{name: "NEAR call", input: "NEAR(foo bar, 5)", want: false},
 		{name: "whitespace-only query", input: " \t ", want: false},
 		{name: "emoji-only query has no words but is literal", input: "🙂", want: true},
-		{name: "lowercase keyword between operands", input: "foo and bar", want: false},
+		{name: "lowercase keyword is an ordinary word", input: "foo and bar", want: true},
 		{name: "quote inside a word", input: `abc"def`, want: true},
 	}
 	for _, tc := range tests {
@@ -166,6 +167,7 @@ func TestSearchTiers_MatchExpressions(t *testing.T) {
 		{name: "quoted phrase has no tier", input: `"pi"`},
 		{name: "column filter has no tier", input: "title:pi"},
 		{name: "keyword between operands has no tier", input: "pi OR x"},
+		{name: "lowercase keyword is a tier word", input: "pi and setup", want: []string{`"pi" "and" "setup"`, `"pi" "and" "setup"*`}},
 		{name: "one operator field disables the tier for the whole query", input: "pi* setup"},
 		{name: "NEAR call has no tier", input: "NEAR(pi setup, 5)"},
 	}
