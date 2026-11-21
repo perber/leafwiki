@@ -157,7 +157,7 @@ func (s *SQLiteIndex) withDBRead(fn func(db *sql.DB) error) error {
 // whenever the columns of a search table change, or the text written into
 // them does, so an existing search.db is rebuilt instead of read in a shape
 // or normalisation this binary doesn't expect (ADR-0022).
-const searchSchemaVersion = 1
+const searchSchemaVersion = 2
 
 // searchSchema creates every table of search.db. ensureSchema compares the
 // schema SQLite stores for it against the one in the file, so it is the
@@ -484,12 +484,12 @@ func (s *SQLiteIndex) IndexPages(inputs []IndexPageInput) ([]IndexFailure, error
 			failures = append(failures, IndexFailure{PageID: in.PageID, Err: err})
 			continue
 		}
-		content = excerpt.NormalizeMarkdownBody(content)
+		content = excerpt.NormalizeMarkdownBody(stripHighlightMarkers(content))
 		prepped = append(prepped, prepared{
 			path:          in.Path,
 			filePath:      in.FilePath,
 			pageID:        in.PageID,
-			title:         in.Title,
+			title:         stripHighlightMarkers(in.Title),
 			kind:          in.Kind,
 			headings:      extractHeadings(content),
 			sanitizedBody: excerpt.PlainTextForSearch(content),
@@ -774,10 +774,27 @@ func (s *SQLiteIndex) SearchPageIDs(query string, pageIDs []string) ([]string, e
 	return result, err
 }
 
+// hitStart and hitEnd are the single-byte markers highlight() puts around a
+// hit in the title (searchTitleExpr); sanitizeSearchTitle turns them into
+// <b>/</b>.
+const (
+	hitStart = "\u0002"
+	hitEnd   = "\u0003"
+)
+
+// highlightMarkerReplacer replaces the hit markers in page text with a
+// space, so page text can never fake a highlight. A space rather than
+// nothing keeps the words on either side apart.
+var highlightMarkerReplacer = strings.NewReplacer(hitStart, " ", hitEnd, " ")
+
+func stripHighlightMarkers(text string) string {
+	return highlightMarkerReplacer.Replace(text)
+}
+
 func sanitizeSearchTitle(title string) string {
 	return htmlutil.EscapeTextWithAllowedMarkers(
 		title,
-		htmlutil.AllowedMarker{Marker: "\u0002", HTML: "<b>"},
-		htmlutil.AllowedMarker{Marker: "\u0003", HTML: "</b>"},
+		htmlutil.AllowedMarker{Marker: hitStart, HTML: "<b>"},
+		htmlutil.AllowedMarker{Marker: hitEnd, HTML: "</b>"},
 	)
 }

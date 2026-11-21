@@ -398,7 +398,7 @@ func buildSearchWhereClause(ftsQuery string, pageIDs []string) (string, []interf
 
 func searchTitleExpr(hasQuery bool) string {
 	if hasQuery {
-		return "highlight(pages, 4, char(2), char(3))"
+		return fmt.Sprintf("highlight(pages, 4, char(%d), char(%d))", hitStart[0], hitEnd[0])
 	}
 	return "title"
 }
