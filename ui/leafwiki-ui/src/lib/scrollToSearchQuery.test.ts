@@ -89,6 +89,16 @@ describe('findSearchQueryRange', () => {
     ],
     ['in a script', '<script>needle</script><p>x</p>', 'needle', null],
     ['with Unicode in the query', '<p>Grüße aus Köln</p>', 'KÖLN', 'Köln'],
+    // Lowercasing İ (U+0130) yields two UTF-16 units; offsets must not shift.
+    ['after a dotted capital I', '<p>İab xyz</p>', 'xyz', 'xyz'],
+    ['right after a dotted capital I', '<p>İstanbul</p>', 'stan', 'stan'],
+    ['with a final sigma', '<p>ΟΔΟΣ</p>', 'οδος', 'ΟΔΟΣ'],
+    [
+      'with regex characters in the query',
+      '<p>use a+b (c)</p>',
+      'A+B (C)',
+      'a+b (c)',
+    ],
   ])('handles a match %s', (_name, html, query, expected) => {
     const root = document.createElement('div')
     root.innerHTML = html
