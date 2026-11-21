@@ -594,6 +594,105 @@ func TestSQLiteIndex_Search_HighlightMarkersInPageTextDoNotFakeAHighlight(t *tes
 	}
 }
 
+// Marker characters in odd places: only in a heading, glued to words, as the
+// whole title, and other C0 controls next to them. None may fake a highlight,
+// and the words around a replaced marker must stay findable on their own.
+func TestSQLiteIndex_Search_HighlightMarkerEdgeCases_NeverFakeAHighlight(t *testing.T) {
+	tests := []struct {
+		name           string
+		title          string
+		content        string
+		query          string
+		wantTitleHits  int
+		wantExcerptHit string
+	}{
+		{
+			name:           "markers only in a heading",
+			title:          "Plain",
+			content:        "# Head\u0002fake\u0003ing\n\nbody keyword",
+			query:          "fake",
+			wantTitleHits:  0,
+			wantExcerptHit: "<b>fake</b>",
+		},
+		{
+			name:           "word before a marker in the title",
+			title:          "foo\u0002bar",
+			content:        "foo\u0003bar",
+			query:          "foo",
+			wantTitleHits:  1,
+			wantExcerptHit: "<b>foo</b> bar",
+		},
+		{
+			name:           "word after a marker in the title",
+			title:          "foo\u0002bar",
+			content:        "foo\u0003bar",
+			query:          "bar",
+			wantTitleHits:  1,
+			wantExcerptHit: "foo <b>bar</b>",
+		},
+		{
+			name:           "title made only of markers",
+			title:          "\u0002\u0003\u0002",
+			content:        "keyword",
+			query:          "keyword",
+			wantTitleHits:  0,
+			wantExcerptHit: "<b>keyword</b>",
+		},
+		{
+			name:           "other C0 and DEL controls around the hit",
+			title:          "a\u0001b\u001fc\u007f keyword",
+			content:        "x\u0001\u001fkeyword\u007fy \u001b[31m",
+			query:          "keyword",
+			wantTitleHits:  1,
+			wantExcerptHit: "<b>keyword</b>",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			index := newTestIndex(t)
+			if err := index.IndexPage("docs/a", "docs/a.md", "a", tt.title, tree.NodeKindPage, tt.content); err != nil {
+				t.Fatalf("IndexPage: %v", err)
+			}
+
+			result, err := index.Search(tt.query, nil, 0, 10)
+			if err != nil {
+				t.Fatalf("Search(%q): %v", tt.query, err)
+			}
+			if len(result.Items) != 1 {
+				t.Fatalf("Search(%q): got %d items, want 1", tt.query, len(result.Items))
+			}
+			item := result.Items[0]
+
+			if n := strings.Count(item.Title, "<b>"); n != tt.wantTitleHits {
+				t.Errorf("title %q has %d highlights, want %d", item.Title, n, tt.wantTitleHits)
+			}
+			if n := strings.Count(item.Excerpt, "<b>"); n != 1 {
+				t.Errorf("excerpt %q has %d highlights, want 1", item.Excerpt, n)
+			}
+			if !strings.Contains(item.Excerpt, tt.wantExcerptHit) {
+				t.Errorf("excerpt %q does not contain %q", item.Excerpt, tt.wantExcerptHit)
+			}
+			for name, value := range map[string]string{"title": item.Title, "excerpt": item.Excerpt} {
+				if strings.ContainsAny(value, "\u0002\u0003") {
+					t.Errorf("%s %q still contains a marker character", name, value)
+				}
+			}
+
+			// Headings are never returned, so check the stored column.
+			var headings string
+			if err := index.withDBRead(func(db *sql.DB) error {
+				return db.QueryRow(`SELECT headings FROM pages WHERE pageID = 'a'`).Scan(&headings)
+			}); err != nil {
+				t.Fatalf("read stored headings: %v", err)
+			}
+			if strings.ContainsAny(headings, "\u0002\u0003") {
+				t.Errorf("stored headings %q still contain a marker character", headings)
+			}
+		})
+	}
+}
+
 func TestSQLiteIndex_Search_RanksHeadingHigherThanContent(t *testing.T) {
 	index := newTestIndex(t)
 
@@ -1610,6 +1709,55 @@ func TestNewSQLiteIndex_OpenKeepsOrRebuildsTheSchema(t *testing.T) {
 				t.Errorf("schema after open differs from searchSchema:\ngot:\n%s\nwant:\n%s", got, want)
 			}
 		})
+	}
+}
+
+// An index from before the searchSchemaVersion bump is rebuilt on the first
+// open only: what is indexed after that rebuild survives the next open.
+func TestNewSQLiteIndex_RebuildsAnOlderVersionOnceAndThenKeepsIt(t *testing.T) {
+	dir := t.TempDir()
+	indexOnePageAndClose(t, dir)
+	execRawSearchDB(t, dir, fmt.Sprintf(`PRAGMA user_version = %d`, searchSchemaVersion-1))
+
+	countRows := func(index *SQLiteIndex) int {
+		t.Helper()
+		var rows int
+		if err := index.withDBRead(func(db *sql.DB) error {
+			return db.QueryRow(`SELECT count(*) FROM pages`).Scan(&rows)
+		}); err != nil {
+			t.Fatalf("count rows: %v", err)
+		}
+		return rows
+	}
+
+	index, err := NewSQLiteIndex(dir)
+	if err != nil {
+		t.Fatalf("first NewSQLiteIndex: %v", err)
+	}
+	if rows := countRows(index); rows != 0 {
+		t.Errorf("first open kept %d rows of the older index, want 0", rows)
+	}
+	if err := index.IndexPage("docs/b", "docs/b.md", "b", "B", tree.NodeKindPage, "reindexed content"); err != nil {
+		t.Fatalf("IndexPage: %v", err)
+	}
+	if err := index.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	index, err = NewSQLiteIndex(dir)
+	if err != nil {
+		t.Fatalf("second NewSQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	if rows := countRows(index); rows != 1 {
+		t.Errorf("second open has %d rows, want the 1 reindexed row", rows)
+	}
+	result, err := index.Search("reindexed", nil, 0, 10)
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if result.Count != 1 {
+		t.Errorf("Search after second open: got %d results, want 1", result.Count)
 	}
 }
 
