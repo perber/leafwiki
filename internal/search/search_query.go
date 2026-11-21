@@ -25,6 +25,9 @@ type searchQuery struct {
 	substringTerms []string
 	// shortTerms are the literal words shorter than that, in query order.
 	shortTerms []string
+	// literalWords are all literal words, in query order, whatever their
+	// length. searchTiers builds the rank tiers from them.
+	literalWords []string
 }
 
 // buildFuzzyQuery turns raw user search input into an FTS5 MATCH argument.
@@ -84,6 +87,7 @@ func parseSearchQuery(q string) searchQuery {
 		// content containing "it's" even though both tokenize the same way.
 		// AND-ing independent terms doesn't depend on that adjacency at all.
 		words := splitIntoIndexWords(fields[i])
+		parsed.literalWords = append(parsed.literalWords, words...)
 		for _, w := range words {
 			if utf8.RuneCountInString(w) >= minSubstringTermRunes {
 				parsed.substringTerms = append(parsed.substringTerms, w)
@@ -423,6 +427,82 @@ func searchRankExpr(hasQuery bool) string {
 			)`
 	}
 	return "0.0"
+}
+
+// searchTier is one rank tier: cond is an SQL boolean over the current pages
+// row (rowid, columns), args are its bound arguments. A tier is a predicate
+// rather than a MATCH string so that tiers on other tables or on plain
+// equality can join the list.
+type searchTier struct {
+	cond string
+	args []interface{}
+}
+
+// matchTier is the tier of the pages that match the FTS5 expression expr.
+// The subquery is not correlated, so SQLite runs the MATCH once.
+func matchTier(expr string) searchTier {
+	return searchTier{
+		cond: "rowid IN (SELECT rowid FROM pages WHERE pages MATCH ?)",
+		args: []interface{}{expr},
+	}
+}
+
+// searchTiers returns the rank tiers of q, best first; a page ranks in the
+// first tier whose cond it meets and after all of them if it meets none.
+// This is the one place that decides on tiers. Only a literal-only query has
+// them: in an operator query the user chose the matching, so it keeps the
+// plain bm25 order.
+//
+// The tiers of a literal-only query: every word as a whole word, then every
+// word but the last as a whole word and the last as a prefix (search as you
+// type: the last word is the one still being typed), then, implicitly, all
+// other matches ("pi" only in "Pipeline"). One word gets only the first tier,
+// since its second would equal the plain prefix query. Like
+// quoteWordsAsPrefixTerms the terms need no escaping, because the words come
+// from splitIntoIndexWords and can't contain a quote.
+//
+// Tiers only order coarse match quality. Scores within a tier (proximity,
+// backlinks, recency) belong in the rank expression (searchRankExpr), not in
+// more tiers.
+//
+// Known limitation: the index keeps a sentence's final period on the last
+// word ("voll."), so such a word never matches as a whole word and its page
+// only reaches the last tier.
+func searchTiers(q searchQuery) []searchTier {
+	if q.fts == "" || !q.literalOnly || len(q.literalWords) == 0 {
+		return nil
+	}
+	quoted := make([]string, len(q.literalWords))
+	for i, w := range q.literalWords {
+		quoted[i] = `"` + w + `"`
+	}
+	tiers := []searchTier{matchTier(strings.Join(quoted, " "))}
+	if len(quoted) > 1 {
+		quoted[len(quoted)-1] += "*"
+		tiers = append(tiers, matchTier(strings.Join(quoted, " ")))
+	}
+	return tiers
+}
+
+// searchOrderBy is the ORDER BY clause of Search and its bound arguments,
+// which go after the WHERE arguments: the tier from searchTiers, then the
+// bm25 order. Without tiers a short query lists prefix hits with short
+// titles above pages that contain the word itself.
+func searchOrderBy(q searchQuery) (string, []interface{}) {
+	orderBy := searchOrderByExpr(q.fts != "")
+	tiers := searchTiers(q)
+	if len(tiers) == 0 {
+		return orderBy, nil
+	}
+	var tier strings.Builder
+	tier.WriteString("CASE")
+	var args []interface{}
+	for i, t := range tiers {
+		fmt.Fprintf(&tier, " WHEN %s THEN %d", t.cond, i)
+		args = append(args, t.args...)
+	}
+	fmt.Fprintf(&tier, " ELSE %d END", len(tiers))
+	return tier.String() + ", " + orderBy, args
 }
 
 func searchOrderByExpr(hasQuery bool) string {

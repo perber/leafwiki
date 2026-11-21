@@ -65,6 +65,8 @@ var qualityCorpus = []qualityPage{
 		body: "# Snippets\n\nC++ Templates und C# LINQ Beispiele.\n\n```cpp\nstd::vector<int> v;\n```"},
 	{path: "entwicklung/release-prozess", title: "Release-Prozess", kind: tree.NodeKindPage, tags: []string{"release"},
 		body: "# Release\n\nVersionen folgen SemVer, z. B. v1.2.3 oder 0.14.2.\n\nDas Changelog steht in CHANGELOG.md."},
+	{path: "entwicklung/pipeline", title: "Pipeline", kind: tree.NodeKindPage, tags: []string{"ci"},
+		body: "# Pipeline\n\nDie Build-Pipeline läuft bei jedem Push auf main."},
 	{path: "entwicklung/kubernetes", title: "Kubernetes Deployment", kind: tree.NodeKindPage, tags: []string{"k8s", "deployment"},
 		body: "# Kubernetes\n\nWe deploy with Helm charts. The ingress-nginx controller terminates TLS.\n\nPods are restarted via `kubectl rollout restart deployment/leafwiki`."},
 	{path: "entwicklung/meeting-notes-q3", title: "Meeting Notes Q3", kind: tree.NodeKindPage, tags: []string{"meeting"},
@@ -185,6 +187,9 @@ var qualityCases = []qualityCase{
 
 	{category: "Ranking", query: "markdown", want: []string{"Markdown-Syntax", "Markdown Syntax Cheatsheet"}},
 	{category: "Ranking", query: "backup", want: []string{"Backup und Wiederherstellung"}},
+	// "Pipeline" matches pi only as a prefix and has the shorter title, so
+	// bm25 alone ranks it first.
+	{category: "Ranking", query: "pi", want: []string{"Raspberry Pi einrichten"}},
 	{category: "Ranking", query: "logbuch", want: []string{"Logbuch August", "Logbuch November"}, maxRank: 2},
 
 	{category: "Sonstiges", query: "日本語", want: []string{"日本語ページ"}},

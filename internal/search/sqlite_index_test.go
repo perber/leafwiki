@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -741,6 +742,145 @@ func TestSQLiteIndex_Search_RanksHeadingHigherThanContent(t *testing.T) {
 
 	if result.Items[0].Rank < result.Items[1].Rank {
 		t.Errorf("expected higher rank for headingMatch (got %f, %f)", result.Items[0].Rank, result.Items[1].Rank)
+	}
+}
+
+// newPiIndex indexes pages where "pi" is a whole word (raspberry, circles)
+// next to pages where it is only a prefix (pipeline, pipelineSetup). The
+// prefix-only pages have the shorter titles, so bm25 alone ranks them first.
+func newPiIndex(t *testing.T) *SQLiteIndex {
+	t.Helper()
+	index := newTestIndex(t)
+	pages := []struct{ id, title, body string }{
+		{id: "pipeline", title: "Pipeline Notes", body: "Build pipeline steps."},
+		{id: "pipelineSetup", title: "Pipeline Setup", body: "Configure the pipeline first."},
+		{id: "raspberry", title: "Raspberry Pi Setup", body: "Install it on a Raspberry Pi 4 board."},
+		{id: "circles", title: "Pi and Circles", body: "The number pi relates a circle to its diameter, pi is irrational."},
+	}
+	for _, p := range pages {
+		if err := index.IndexPage("docs/"+p.id, "docs/"+p.id+".md", p.id, p.title, tree.NodeKindPage, p.body); err != nil {
+			t.Fatalf("failed to index %s: %v", p.id, err)
+		}
+	}
+	return index
+}
+
+func resultPageIDs(result *SearchResult) []string {
+	ids := make([]string, len(result.Items))
+	for i, item := range result.Items {
+		ids[i] = item.PageID
+	}
+	return ids
+}
+
+func TestSQLiteIndex_Search_RanksWholeWordMatchesAbovePrefixOnlyMatches(t *testing.T) {
+	index := newPiIndex(t)
+
+	// The groups are the tiers in order: every word whole, every word but
+	// the last whole and the last one only a prefix, everything else.
+	tests := []struct {
+		name           string
+		query          string
+		pageIDs        []string
+		wholeWord      []string
+		lastWordPrefix []string
+		prefixOnly     []string
+	}{
+		{name: "single word", query: "pi", wholeWord: []string{"raspberry", "circles"}, prefixOnly: []string{"pipeline", "pipelineSetup"}},
+		{name: "every word must be whole", query: "pi setup", wholeWord: []string{"raspberry"}, prefixOnly: []string{"pipelineSetup"}},
+		{name: "case does not matter", query: "PI", wholeWord: []string{"raspberry", "circles"}, prefixOnly: []string{"pipeline", "pipelineSetup"}},
+		{name: "page filter binds before the tier", query: "pi", pageIDs: []string{"pipeline", "circles"}, wholeWord: []string{"circles"}, prefixOnly: []string{"pipeline"}},
+		// Search as you type: the word being typed is the last one.
+		{name: "the last word may be typed partly", query: "pi set", lastWordPrefix: []string{"raspberry"}, prefixOnly: []string{"pipelineSetup"}},
+		{name: "only the last word may be partial", query: "set pi", prefixOnly: []string{"raspberry", "pipelineSetup"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := index.Search(tc.query, tc.pageIDs, 0, 10)
+			if err != nil {
+				t.Fatalf("Search(%q) failed: %v", tc.query, err)
+			}
+			got := resultPageIDs(result)
+			tiers := [][]string{tc.wholeWord, tc.lastWordPrefix, tc.prefixOnly}
+			want := len(tc.wholeWord) + len(tc.lastWordPrefix) + len(tc.prefixOnly)
+			if result.Count != want || len(got) != want {
+				t.Fatalf("Search(%q): count %d, items %q, want %d results", tc.query, result.Count, got, want)
+			}
+			start := 0
+			for tier, ids := range tiers {
+				for _, id := range ids {
+					if rank := slices.Index(got, id); rank < start || rank >= start+len(ids) {
+						t.Errorf("Search(%q) = %q: %q must rank in tier %d, places %d to %d", tc.query, got, id, tier, start+1, start+len(ids))
+					}
+				}
+				start += len(ids)
+			}
+		})
+	}
+}
+
+// bm25Order is the order Search had before the whole-word tier: the same
+// MATCH and bm25 weights, nothing else.
+func bm25Order(t *testing.T, index *SQLiteIndex, query string) []string {
+	t.Helper()
+	var ids []string
+	err := index.withDBRead(func(db *sql.DB) error {
+		rows, err := db.Query(fmt.Sprintf(`SELECT pageID FROM pages WHERE pages MATCH ? ORDER BY %s ASC`, searchRankExpr(true)), buildFuzzyQuery(query))
+		if err != nil {
+			return err
+		}
+		defer func() { _ = rows.Close() }()
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				return err
+			}
+			ids = append(ids, id)
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		t.Fatalf("bm25 reference query for %q failed: %v", query, err)
+	}
+	return ids
+}
+
+func TestSQLiteIndex_Search_OperatorQueriesKeepBM25Order(t *testing.T) {
+	index := newPiIndex(t)
+
+	for _, query := range []string{"title:pi", "pi*", `"pi"`, "pi OR x", "pi* setup"} {
+		t.Run(query, func(t *testing.T) {
+			result, err := index.Search(query, nil, 0, 10)
+			if err != nil {
+				t.Fatalf("Search(%q) failed: %v", query, err)
+			}
+			got, want := resultPageIDs(result), bm25Order(t, index, query)
+			if len(want) == 0 {
+				t.Fatalf("bm25 reference for %q is empty, the case checks nothing", query)
+			}
+			if !slices.Equal(got, want) {
+				t.Errorf("Search(%q) = %q, want the bm25 order %q", query, got, want)
+			}
+		})
+	}
+}
+
+// TestSQLiteIndex_Search_WholeWordTierIsInjectionSafe sends input that would
+// break the exact-word expression if it were spliced into the SQL or kept
+// its quotes: it must neither fail nor touch the table.
+func TestSQLiteIndex_Search_WholeWordTierIsInjectionSafe(t *testing.T) {
+	index := newPiIndex(t)
+
+	for _, query := range []string{`pi'); DROP TABLE pages;--`, `pi" OR "x`, `pi"*`, `"pi`, `pi''`, `pi?`} {
+		t.Run(query, func(t *testing.T) {
+			if _, err := index.Search(query, nil, 0, 10); err != nil {
+				t.Fatalf("Search(%q) failed: %v", query, err)
+			}
+		})
+	}
+	result, err := index.Search("pi", nil, 0, 10)
+	if err != nil || result.Count != 4 {
+		t.Fatalf("after the hostile queries Search(pi) = %v, %v; want all 4 pages", result, err)
 	}
 }
 
