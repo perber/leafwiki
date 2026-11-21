@@ -17,6 +17,7 @@ func TestCorruptDatabaseMessage(t *testing.T) {
 
 	stranded := dbPath + ".corrupt-20261017T143005Z"
 	partial := &sqliteutil.CorruptDatabaseError{Path: dbPath, Err: errors.New("file is not a database"), Stranded: []string{stranded}}
+	unusable := &sqliteutil.CorruptDatabaseError{Path: dbPath, Err: fmt.Errorf("%w: no such module", sqliteutil.ErrUnusableDatabase)}
 
 	tests := []struct {
 		name       string
@@ -37,6 +38,13 @@ func TestCorruptDatabaseMessage(t *testing.T) {
 			wantOK:     true,
 			wantPart:   []string{dbPath, stranded, "move them back", "restore-snapshot"},
 			wantAbsent: []string{"left untouched"},
+		},
+		{
+			name:       "a store-reported unusable database has no SQLite code to name",
+			err:        fmt.Errorf("failed to init search index: %w", unusable),
+			wantOK:     true,
+			wantPart:   []string{dbPath, "corrupt or unusable", "restore-snapshot"},
+			wantAbsent: []string{"SQLite code"},
 		},
 		{name: "other errors are not described", err: errors.New("boom")},
 	}

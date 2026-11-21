@@ -24,9 +24,9 @@ func corruptDatabaseMessage(err error) (string, bool) {
 		state = fmt.Sprintf("could only partly be moved aside: %s now carry a .corrupt-* name, the rest is in place; move them back by hand before anything else",
 			strings.Join(corrupt.Stranded, ", "))
 	}
-	return fmt.Sprintf("%s is unreadable (SQLite code %d) and %s. "+
+	return fmt.Sprintf("%s is %s and %s. "+
 		"Restore it from a snapshot with `leafwiki restore-snapshot <path-to-zip>` while the server is stopped, "+
 		"or move the file and its -wal/-shm/-journal sidecars aside by hand and start again "+
 		"(for users.db this starts with no users and creates the admin from the startup flags).",
-		corrupt.Path, corrupt.SQLiteCode(), state), true
+		corrupt.Path, corrupt.Problem(), state), true
 }

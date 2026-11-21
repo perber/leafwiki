@@ -155,3 +155,12 @@ It is not a `LocalizedError`: it is a startup error with no HTTP response and no
 - Lazy reopen paths (`UserStore.Connect`, the stores' `withDB` helpers) do not go through the
   policy; an error there surfaces as a failed request and touches no files. Stores rebuilt after
   a restore go through their constructor and so through their policy.
+
+## Later changes
+
+- 2026-11-21: `sqliteutil.ErrUnusableDatabase` lets a store's open function report a file that
+  SQLite can read but the store cannot bring to a working state. Wrapped into open's error, it
+  counts as recoverable, so the store's policy decides exactly as for corruption: a derived
+  index is rebuilt, `FailOnCorruption` and `QuarantineOnCorruption` still never delete real
+  state. The policies' log lines and `CorruptDatabaseError` say "corrupt or unusable" and only
+  name a SQLite code when there is one. First use: the search index (follow-up PR).
