@@ -3,7 +3,15 @@ import { searchPages } from '@/lib/api/search'
 import { useHotKeysStore } from '@/stores/hotkeys'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from 'vitest'
 import Search from './Search'
 
 vi.mock('@/lib/api/search', () => ({
@@ -56,6 +64,33 @@ async function typeQuery(query: string) {
   })
 }
 
+const twoResults = {
+  count: 2,
+  items: [
+    {
+      page_id: 'p1',
+      path: 'docs/pi',
+      title: 'Raspberry Pi',
+      kind: 'page' as const,
+      excerpt: '',
+      rank: 1,
+      tags: [],
+    },
+    {
+      page_id: 'p2',
+      path: 'docs/pin',
+      title: 'Pinning',
+      kind: 'page' as const,
+      excerpt: '',
+      rank: 0.5,
+      tags: [],
+    },
+  ],
+  limit: 10,
+  offset: 0,
+  tag_facets: [],
+}
+
 describe('Search', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -80,6 +115,9 @@ describe('Search', () => {
     { name: 'two-letter word', query: 'Pi' },
     { name: 'two characters with a symbol', query: 'C#' },
     { name: 'longer word', query: 'install' },
+    { name: 'two non-ASCII letters', query: 'üb' },
+    { name: 'two CJK characters', query: '搜索' },
+    { name: 'pasted long query', query: 'backup '.repeat(200).trim() },
   ])('sends a search request for a $name', async ({ query }) => {
     renderSearch()
 
@@ -92,6 +130,8 @@ describe('Search', () => {
   it.each([
     { name: 'a single character', query: 'a' },
     { name: 'a single character surrounded by spaces', query: ' a ' },
+    { name: 'a single non-ASCII letter', query: 'ü' },
+    { name: 'a single CJK character', query: '中' },
   ])(
     'shows the minimum length hint and sends no request for $name',
     async ({ query }) => {
@@ -175,13 +215,101 @@ describe('Search', () => {
     expect(searchPagesMock).toHaveBeenLastCalledWith('', 0, 10, ['howto'])
   })
 
-  it('shows no hint for an empty query', async () => {
+  it.each([
+    { name: 'an empty query', query: '' },
+    { name: 'a whitespace-only query', query: '   ' },
+  ])('shows no hint for $name', async ({ query }) => {
     renderSearch()
 
-    await typeQuery('')
+    await typeQuery(query)
 
     expect(screen.queryByTestId('search-min-length-hint')).toBeNull()
     expect(searchPagesMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    { name: 'a one-character', url: '/?q=a', sent: false },
+    { name: 'a two-character', url: '/?q=ab', sent: true },
+  ])('handles $name query in a deep link', async ({ url, sent }) => {
+    renderSearch(url)
+    await act(async () => {
+      vi.advanceTimersByTime(PAST_DEBOUNCE_MS)
+    })
+
+    expect(screen.getByTestId('search-input')).toHaveValue(
+      new URLSearchParams(url.slice(1)).get('q'),
+    )
+    if (sent) {
+      expect(searchPagesMock).toHaveBeenCalledWith('ab', 0, 10, [])
+      expect(screen.queryByTestId('search-min-length-hint')).toBeNull()
+    } else {
+      expect(searchPagesMock).not.toHaveBeenCalled()
+      expect(screen.getByTestId('search-min-length-hint')).toBeInTheDocument()
+      expect(screen.queryByText('Loading results...')).toBeNull()
+    }
+  })
+
+  it('ignores an in-flight response once the query is cut down below the minimum', async () => {
+    let resolveSearch: (value: typeof twoResults) => void = () => {}
+    searchPagesMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSearch = resolve
+      }),
+    )
+    renderSearch()
+
+    await typeQuery('Pin')
+    expect(searchPagesMock).toHaveBeenCalledTimes(1)
+    fireEvent.change(screen.getByTestId('search-input'), {
+      target: { value: 'P' },
+    })
+    await act(async () => {
+      resolveSearch(twoResults)
+    })
+
+    expect(screen.queryByTestId('search-results-list')).toBeNull()
+    expect(screen.getByTestId('search-min-length-hint')).toBeInTheDocument()
+  })
+
+  // Known bug, also on main with the old threshold: the debounced query
+  // never changes, so no request settles the loading state. Flip to it()
+  // once fixed.
+  it.fails(
+    'searches again when a too-short query is typed back within the debounce',
+    async () => {
+      searchPagesMock.mockResolvedValue(twoResults)
+      renderSearch()
+      const input = screen.getByTestId('search-input')
+
+      await typeQuery('Pi')
+      expect(screen.getByTestId('search-results-list')).toBeInTheDocument()
+
+      fireEvent.change(input, { target: { value: 'P' } })
+      fireEvent.change(input, { target: { value: 'Pi' } })
+      await act(async () => {
+        vi.advanceTimersByTime(PAST_DEBOUNCE_MS)
+      })
+
+      expect(screen.queryByText('Loading results...')).toBeNull()
+      expect(screen.getByTestId('search-results-list')).toBeInTheDocument()
+    },
+  )
+
+  it('moves the selection with ArrowDown from the input', async () => {
+    searchPagesMock.mockResolvedValue(twoResults)
+    renderSearch()
+
+    await typeQuery('Pi')
+    fireEvent.keyDown(screen.getByTestId('search-input'), {
+      key: 'ArrowDown',
+    })
+
+    expect(screen.getByTestId('search-result-card-p2')).toHaveClass(
+      'search-result-card--selected',
+    )
+    expect(screen.getByTestId('search-result-card-p1')).not.toHaveClass(
+      'search-result-card--selected',
+    )
   })
 
   describe('syntax help', () => {
@@ -238,6 +366,27 @@ describe('Search', () => {
       expect(getHelpPanel()).not.toBeVisible()
     })
 
+    it('keeps the query when Escape closes the panel', async () => {
+      renderSearch()
+      await typeQuery('install')
+      fireEvent.click(getHelpButton())
+
+      fireEvent.keyDown(getHelpPanel(), { key: 'Escape' })
+
+      expect(screen.getByTestId('search-input')).toHaveValue('install')
+      expect(getHelpButton()).toHaveFocus()
+    })
+
+    it('closes on Escape on a page that also exits on Escape, without exiting it', () => {
+      const { exitHistory } = renderOnHistoryPage()
+      fireEvent.click(getHelpButton())
+
+      fireEvent.keyDown(getHelpPanel(), { key: 'Escape' })
+
+      expect(getHelpPanel()).not.toBeVisible()
+      expect(exitHistory).not.toHaveBeenCalled()
+    })
+
     it('closes on Escape while focus is outside the search panel', () => {
       renderSearch()
       fireEvent.click(getHelpButton())
@@ -267,6 +416,25 @@ describe('Search', () => {
       },
     )
 
+    it('keeps the page Escape registered after the panel opened when the button closes it', () => {
+      renderSearch('/history/docs/page')
+      fireEvent.click(getHelpButton())
+      // The history page registers its Escape above the open panel, e.g.
+      // when navigating there with the panel open.
+      const exitHistory = vi.fn()
+      useHotKeysStore.getState().registerHotkey({
+        keyCombo: 'Escape',
+        enabled: true,
+        mode: ['history'],
+        action: exitHistory,
+      })
+
+      fireEvent.click(getHelpButton())
+      fireEvent.keyDown(document.body, { key: 'Escape' })
+
+      expect(exitHistory).toHaveBeenCalledTimes(1)
+    })
+
     it('leaves Escape to the page while the sidebar shows another panel', () => {
       const { exitHistory, setActive } = renderOnHistoryPage()
       fireEvent.click(getHelpButton())
@@ -278,6 +446,24 @@ describe('Search', () => {
       expect(getHelpButton()).toHaveAttribute('aria-expanded', 'true')
     })
 
+    it('leaves Escape to CodeMirror while focus is in the editor', () => {
+      renderSearch('/e/docs/page')
+      const editor = document.createElement('div')
+      editor.className = 'cm-editor'
+      const content = document.createElement('div')
+      content.tabIndex = 0
+      editor.appendChild(content)
+      document.body.appendChild(editor)
+      onTestFinished(() => editor.remove())
+      fireEvent.click(getHelpButton())
+      content.focus()
+
+      const notPrevented = fireEvent.keyDown(content, { key: 'Escape' })
+
+      expect(notPrevented).toBe(true)
+      expect(getHelpPanel()).toBeVisible()
+    })
+
     it('removes its Escape hotkey when unmounted while open', () => {
       const { exitHistory, unmount } = renderOnHistoryPage()
       fireEvent.click(getHelpButton())
@@ -287,6 +473,36 @@ describe('Search', () => {
       expect(useHotKeysStore.getState().registeredHotkeys.Escape).toEqual([
         expect.objectContaining({ action: exitHistory }),
       ])
+    })
+
+    it('ignores Escape on the button while the panel is closed', () => {
+      renderSearch()
+      const helpButton = getHelpButton()
+
+      fireEvent.keyDown(helpButton, { key: 'Escape' })
+
+      expect(helpButton).toHaveAttribute('aria-expanded', 'false')
+    })
+
+    it('comes after the input and clear button and before the panel in focus order', async () => {
+      renderSearch()
+      await typeQuery('install')
+      fireEvent.click(getHelpButton())
+
+      const order = [
+        screen.getByTestId('search-input'),
+        screen.getByTestId('search-clear-button'),
+        getHelpButton(),
+        getHelpPanel(),
+      ]
+      for (let i = 1; i < order.length; i++) {
+        expect(
+          order[i - 1].compareDocumentPosition(order[i]) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy()
+      }
+      // The panel is a programmatic focus target, not a tab stop.
+      expect(getHelpPanel()).toHaveAttribute('tabindex', '-1')
     })
 
     it('stays open while typing a query', async () => {
