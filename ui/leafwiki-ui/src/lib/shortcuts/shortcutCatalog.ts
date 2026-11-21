@@ -25,6 +25,7 @@ export type ShortcutId =
   | 'editor.heading.three'
   | 'editor.format.inlineCode'
   | 'editor.link.insert'
+  | 'search.syntaxHelp.close'
   | 'history.page.close'
   | 'settings.exit'
   | 'asset.rename.confirm'
@@ -259,6 +260,18 @@ export const shortcutDefinitions: ShortcutDefinition[] = [
     macDisplayLabel: 'Cmd+K',
     modes: ['edit'],
     customizable: true,
+  },
+  {
+    // Contextual: only registered while the search syntax help is open, so
+    // it sits above the page's own Escape (e.g. history.page.close).
+    id: 'search.syntaxHelp.close',
+    labelKey: 'shortcutsHelp.items.closeSearchSyntaxHelp.action',
+    categoryKey: 'shortcutsHelp.categories.navigation',
+    keyCombo: 'Escape',
+    defaultDisplayLabel: 'Esc',
+    modes: ['view', 'edit', 'history'],
+    customizable: false,
+    showInShortcutsDialog: false,
   },
   {
     id: 'history.page.close',

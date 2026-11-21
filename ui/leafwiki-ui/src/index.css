@@ -1434,8 +1434,32 @@
     @apply px-0 py-1;
   }
 
+  .search__input-row {
+    @apply mt-3 flex items-center gap-1;
+  }
+
   .search__input-wrapper {
-    @apply relative mt-3;
+    @apply relative flex-1;
+  }
+
+  .search__help-panel {
+    @apply border-surface-border bg-surface text-interface-text mt-2 rounded-md border px-3 py-2 text-xs outline-none;
+  }
+
+  .search__help-title {
+    @apply mb-1 font-semibold;
+  }
+
+  .search__help-list {
+    @apply flex flex-col gap-1;
+  }
+
+  .search__help-row code {
+    @apply font-mono font-semibold;
+  }
+
+  .search__min-length-hint {
+    @apply text-muted mb-1 text-sm empty:mb-0;
   }
 
   .search__input {

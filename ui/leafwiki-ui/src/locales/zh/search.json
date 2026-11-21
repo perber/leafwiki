@@ -1,7 +1,9 @@
 {
   "input": {
     "placeholder": "搜索…",
-    "clearButton": "清空"
+    "clearButton": "清空",
+    "minLengthHint_one": "请至少输入 {{count}} 个字符进行搜索。",
+    "minLengthHint_other": "请至少输入 {{count}} 个字符进行搜索。"
   },
   "tags": {
     "accordionTitle": "全部标签",
@@ -28,5 +30,37 @@
   "resultCard": {
     "kindPage": "页面",
     "kindSection": "章节"
+  },
+  "help": {
+    "buttonLabel": "搜索语法帮助",
+    "title": "搜索技巧",
+    "prefix": {
+      "example": "install",
+      "description": "匹配词的开头，例如可找到 Installation"
+    },
+    "allWords": {
+      "example": "wiki backup",
+      "description": "所有词都必须出现"
+    },
+    "phrase": {
+      "example": "\"exact phrase\"",
+      "description": "词语按此顺序完全匹配"
+    },
+    "column": {
+      "example": "title:word",
+      "description": "仅在标题中搜索；也可用 headings: 和 content:"
+    },
+    "or": {
+      "example": "docker OR podman",
+      "description": "任一词即可；OR 须大写，小写 or 视为普通词"
+    },
+    "not": {
+      "example": "wiki NOT draft",
+      "description": "排除包含第二个词的页面；NOT 须大写"
+    },
+    "wildcard": {
+      "example": "instal*",
+      "description": "显式前缀搜索"
+    }
   }
 }
