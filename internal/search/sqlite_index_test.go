@@ -687,6 +687,8 @@ func TestSQLiteIndex_Search_HighlightMarkerEdgeCases_NeverFakeAHighlight(t *test
 // newPiIndex indexes pages where "pi" is a whole word (raspberry, circles)
 // next to pages where it is only a prefix (pipeline, pipelineSetup). The
 // prefix-only pages have the shorter titles, so bm25 alone ranks them first.
+// The same pattern repeats for an umlaut word (mueller, mullerStreet) and a
+// CJK word (japanese, japanesePage); none of those contain "pi".
 func newPiIndex(t *testing.T) *SQLiteIndex {
 	t.Helper()
 	index := newTestIndex(t)
@@ -695,6 +697,10 @@ func newPiIndex(t *testing.T) *SQLiteIndex {
 		{id: "pipelineSetup", title: "Pipeline Setup", body: "Configure the pipeline first."},
 		{id: "raspberry", title: "Raspberry Pi Setup", body: "Install it on a Raspberry Pi 4 board."},
 		{id: "circles", title: "Pi and Circles", body: "The number pi relates a circle to its diameter, pi is irrational."},
+		{id: "mullerStreet", title: "Mullerstrasse", body: "Office address."},
+		{id: "mueller", title: "Notes from the call with Frau Müller", body: "Müller asked for the quarterly report."},
+		{id: "japanesePage", title: "日本語ページ", body: "日本語ページ です"},
+		{id: "japanese", title: "Sprachen im Team", body: "Wir sprechen 日本語 und Deutsch."},
 	}
 	for _, p := range pages {
 		if err := index.IndexPage("docs/"+p.id, "docs/"+p.id+".md", p.id, p.title, tree.NodeKindPage, p.body); err != nil {
@@ -729,9 +735,14 @@ func TestSQLiteIndex_Search_RanksWholeWordMatchesAbovePrefixOnlyMatches(t *testi
 		{name: "every word must be whole", query: "pi setup", wholeWord: []string{"raspberry"}, prefixOnly: []string{"pipelineSetup"}},
 		{name: "case does not matter", query: "PI", wholeWord: []string{"raspberry", "circles"}, prefixOnly: []string{"pipeline", "pipelineSetup"}},
 		{name: "page filter binds before the tier", query: "pi", pageIDs: []string{"pipeline", "circles"}, wholeWord: []string{"circles"}, prefixOnly: []string{"pipeline"}},
+		{name: "page filter with only prefix matches", query: "pi", pageIDs: []string{"pipeline", "pipelineSetup", "mueller"}, prefixOnly: []string{"pipeline", "pipelineSetup"}},
 		// Search as you type: the word being typed is the last one.
 		{name: "the last word may be typed partly", query: "pi set", lastWordPrefix: []string{"raspberry"}, prefixOnly: []string{"pipelineSetup"}},
 		{name: "only the last word may be partial", query: "set pi", prefixOnly: []string{"raspberry", "pipelineSetup"}},
+		{name: "diacritics fold for the tier", query: "muller", wholeWord: []string{"mueller"}, prefixOnly: []string{"mullerStreet"}},
+		{name: "umlaut and upper case in the query", query: "MÜLLER", wholeWord: []string{"mueller"}, prefixOnly: []string{"mullerStreet"}},
+		{name: "CJK word", query: "日本語", wholeWord: []string{"japanese"}, prefixOnly: []string{"japanesePage"}},
+		{name: "emoji next to a word is ignored", query: "pi 🚀", wholeWord: []string{"raspberry", "circles"}, prefixOnly: []string{"pipeline", "pipelineSetup"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -753,6 +764,82 @@ func TestSQLiteIndex_Search_RanksWholeWordMatchesAbovePrefixOnlyMatches(t *testi
 					}
 				}
 				start += len(ids)
+			}
+		})
+	}
+}
+
+// TestSQLiteIndex_Search_PaginatesAcrossTheWholeWordTier pages through a
+// result whose tier boundary falls inside a page and whose pages tie on bm25
+// within each tier: every page reports the full count, and the pages together
+// list every match exactly once, whole-word matches first.
+func TestSQLiteIndex_Search_PaginatesAcrossTheWholeWordTier(t *testing.T) {
+	index := newTestIndex(t)
+	const perTier = 23
+	var wholeWord, all []string
+	for i := 0; i < perTier; i++ {
+		whole, prefix := fmt.Sprintf("whole%02d", i), fmt.Sprintf("prefix%02d", i)
+		if err := index.IndexPage("docs/"+whole, "docs/"+whole+".md", whole, "Board", tree.NodeKindPage, "Runs on a pi board."); err != nil {
+			t.Fatalf("failed to index %s: %v", whole, err)
+		}
+		if err := index.IndexPage("docs/"+prefix, "docs/"+prefix+".md", prefix, "Board", tree.NodeKindPage, "Runs a pipeline board."); err != nil {
+			t.Fatalf("failed to index %s: %v", prefix, err)
+		}
+		wholeWord = append(wholeWord, whole)
+		all = append(all, whole, prefix)
+	}
+	subset := append(append([]string{}, all[:10]...), "missing")
+
+	// For "pi boa" the whole-word pages sit in the middle tier and the
+	// prefix pages in the last one, so the boundary is the same.
+	tests := []struct {
+		name      string
+		query     string
+		pageIDs   []string
+		limit     int
+		want      []string
+		wholeWord int
+	}{
+		{name: "limit 1", limit: 1, want: all, wholeWord: perTier},
+		{name: "middle tier, limit 7", query: "pi boa", limit: 7, want: all, wholeWord: perTier},
+		{name: "limit 7", limit: 7, want: all, wholeWord: perTier},
+		{name: "limit 10", limit: 10, want: all, wholeWord: perTier},
+		{name: "page filter, limit 3", pageIDs: subset, limit: 3, want: all[:10], wholeWord: 5},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			query := tc.query
+			if query == "" {
+				query = "pi"
+			}
+			var got []string
+			for offset := 0; offset < len(tc.want)+tc.limit; offset += tc.limit {
+				result, err := index.Search(query, tc.pageIDs, offset, tc.limit)
+				if err != nil {
+					t.Fatalf("Search(%q, offset %d) failed: %v", query, offset, err)
+				}
+				if result.Count != len(tc.want) {
+					t.Fatalf("Search(%q, offset %d): count %d, want %d", query, offset, result.Count, len(tc.want))
+				}
+				got = append(got, resultPageIDs(result)...)
+			}
+			if len(got) != len(tc.want) {
+				t.Fatalf("pages listed %d items, want %d: %q", len(got), len(tc.want), got)
+			}
+			seen := map[string]bool{}
+			for i, id := range got {
+				if seen[id] {
+					t.Errorf("%q listed twice", id)
+				}
+				seen[id] = true
+				if isWhole := slices.Contains(wholeWord, id); isWhole != (i < tc.wholeWord) {
+					t.Errorf("item %d is %q: whole-word matches must fill exactly the first %d places", i, id, tc.wholeWord)
+				}
+			}
+			for _, id := range tc.want {
+				if !seen[id] {
+					t.Errorf("%q is missing from the pages", id)
+				}
 			}
 		})
 	}
