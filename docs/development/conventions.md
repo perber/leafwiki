@@ -303,6 +303,12 @@ the slice you are in, don't invent a new one.
   `document.write`, `srcDoc`, `eval`, `new Function`); the ESLint XSS guard enforces it. HTML
   reaches the DOM only through the sanitized Markdown pipeline in `features/preview`. A justified
   exception gets `eslint-disable-next-line` plus a comment explaining why the input is safe.
+- Never mutate the DOM React renders for page content (wrapping text in `<mark>`, splitting
+  or moving nodes). React still holds the original nodes, so the next reconcile throws
+  `NotFoundError` (`insertBefore`/`removeChild`) and the preview error boundary replaces the
+  page. Decorate with the CSS Custom Highlight API (`CSS.highlights` plus `::highlight()`, as
+  [`lib/scrollToSearchQuery.ts`](../../ui/leafwiki-ui/src/lib/scrollToSearchQuery.ts) does for
+  the search match), or render the decoration through the Markdown pipeline.
 - Reuse `components/` (`BaseDialog`, `ListView`, `FormInput`, …) and `components/ui/` before
   building something new. Strings via i18n, form controls via shadcn (see `AGENTS.md`).
 
