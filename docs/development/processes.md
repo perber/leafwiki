@@ -201,9 +201,11 @@ A context cancellation (shutdown) between or during phases ends the resync with
 `ctx.Err()`.
 
 **Known limitation:** boot-time indexing always does a full rebuild rather than trusting the
-already-persisted SQLite indexes, because `search.SQLiteIndex`'s `ensureSchema()`
-unconditionally drops the FTS5 `pages` table on every process start. Any fix for that must
-leave the admin-triggered and signal-triggered resync flows described above untouched.
+already-persisted SQLite indexes. `search.db` itself now survives a restart
+(`search.SQLiteIndex`'s `ensureSchema()` only rebuilds it on a schema version or DDL mismatch
+or when it is corrupt, [ADR-0022](./adr/0022-versioned-derived-search-index.md)), but the boot goroutine still clears
+and refills it. Any fix for that must leave the admin-triggered and signal-triggered resync
+flows described above untouched.
 
 ## Editor auto-save
 

@@ -163,4 +163,5 @@ It is not a `LocalizedError`: it is a startup error with no HTTP response and no
   counts as recoverable, so the store's policy decides exactly as for corruption: a derived
   index is rebuilt, `FailOnCorruption` and `QuarantineOnCorruption` still never delete real
   state. The policies' log lines and `CorruptDatabaseError` say "corrupt or unusable" and only
-  name a SQLite code when there is one. First use: the search index (follow-up PR).
+  name a SQLite code when there is one. First use: the search index, see
+  [ADR-0022](./0022-versioned-derived-search-index.md).

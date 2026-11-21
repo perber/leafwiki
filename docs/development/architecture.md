@@ -80,7 +80,10 @@ This is currently a mix of synchronous work (tree, links, tags/properties all bl
 returning) and one asynchronous exception (search runs its full reindex in a background goroutine).
 That asymmetry, and the fact that *all* of these rebuild unconditionally on every boot
 regardless of whether the on-disk indexes already match, is a known optimization target: boot
-could skip the rebuild when the persisted indexes are trustworthy.
+could skip the rebuild when the persisted indexes are trustworthy. `search.db` already keeps its
+tables across restarts and is only rebuilt when its schema version or DDL doesn't match the
+binary or the file is corrupt ([ADR-0022](./adr/0022-versioned-derived-search-index.md)); the boot reindex still
+clears and refills it.
 
 `Wiki.Close()` (`wiki.go`) cancels the shutdown context and drains in-flight reload goroutines
 (`reloadWG`) first, then closes the stores (auth, users, API keys, email tokens, links, user

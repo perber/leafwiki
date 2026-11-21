@@ -66,3 +66,4 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Deprecated`, `Superseded by 
 | [0019](./0019-capability-routes-without-identity.md) | Capability-URL routes run without identity, in their own route group | Proposed |
 | [0020](./0020-server-rendered-page-html-for-crawlers.md) | Page HTML for crawlers is rendered in `internal/render` and sanitized by a stricter server policy | Accepted |
 | [0021](./0021-page-side-panel-sections.md) | The page side panel renders sections composed by the page viewer | Proposed |
+| [0022](./0022-versioned-derived-search-index.md) | The search index persists across restarts and is rebuilt on a schema version or DDL mismatch or on corruption | Proposed |
