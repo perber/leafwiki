@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/test_utils"
@@ -1756,10 +1757,11 @@ func TestNewSQLiteIndex_CrashInTheMiddleOfARebuildRecoversOnNextOpen(t *testing.
 	}
 }
 
-// If the rebuild transaction fails (here: another writer holds the lock),
-// nothing of it is applied: the old version and rows stay, and the next open
-// rebuilds.
-func TestNewSQLiteIndex_FailedRebuildTransactionLeavesFileUntouched(t *testing.T) {
+// While another writer holds the lock, opening an outdated file waits
+// (busy_timeout) instead of failing, and applies nothing of its rebuild until
+// it gets the lock: the old version and rows stay. Once the lock is released,
+// the open rebuilds the file.
+func TestNewSQLiteIndex_RebuildWaitsForAnotherWriterAndAppliesNothingMeanwhile(t *testing.T) {
 	dir := t.TempDir()
 	indexOnePageAndClose(t, dir)
 	execRawSearchDB(t, dir, `PRAGMA user_version = 99`)
@@ -1768,22 +1770,36 @@ func TestNewSQLiteIndex_FailedRebuildTransactionLeavesFileUntouched(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer test_utils.WrapCloseWithErrorCheck(locker.Close, t)
 	conn, err := locker.Conn(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer test_utils.WrapCloseWithErrorCheck(conn.Close, t)
 	if _, err := conn.ExecContext(t.Context(), `BEGIN IMMEDIATE`); err != nil {
 		t.Fatalf("BEGIN IMMEDIATE: %v", err)
 	}
 
-	if index, err := NewSQLiteIndex(dir); err == nil {
-		_ = index.Close()
-		t.Fatalf("NewSQLiteIndex succeeded while another writer held the lock")
+	type opened struct {
+		index *SQLiteIndex
+		err   error
+	}
+	done := make(chan opened, 1)
+	go func() {
+		index, err := NewSQLiteIndex(dir)
+		done <- opened{index, err}
+	}()
+
+	// Well below the 5s busy_timeout: the open must still be waiting.
+	select {
+	case o := <-done:
+		if o.index != nil {
+			_ = o.index.Close()
+		}
+		t.Fatalf("NewSQLiteIndex returned while another writer held the lock: err=%v", o.err)
+	case <-time.After(200 * time.Millisecond):
 	}
 
-	if _, err := conn.ExecContext(t.Context(), `ROLLBACK`); err != nil {
-		t.Fatal(err)
-	}
 	var version, rows int
 	if err := conn.QueryRowContext(t.Context(), `PRAGMA user_version`).Scan(&version); err != nil {
 		t.Fatal(err)
@@ -1792,17 +1808,18 @@ func TestNewSQLiteIndex_FailedRebuildTransactionLeavesFileUntouched(t *testing.T
 		t.Fatal(err)
 	}
 	if version != 99 || rows != 1 {
-		t.Errorf("after failed rebuild: version=%d rows=%d, want 99 and 1 (tx must not partially apply)", version, rows)
+		t.Errorf("while waiting: version=%d rows=%d, want 99 and 1 (nothing of the rebuild may apply)", version, rows)
 	}
-	_ = conn.Close()
-	_ = locker.Close()
+	if _, err := conn.ExecContext(t.Context(), `ROLLBACK`); err != nil {
+		t.Fatal(err)
+	}
 
-	index, err := NewSQLiteIndex(dir)
-	if err != nil {
-		t.Fatalf("NewSQLiteIndex after the lock is released: %v", err)
+	o := <-done
+	if o.err != nil {
+		t.Fatalf("NewSQLiteIndex after the lock is released: %v", o.err)
 	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-	if err := index.withDB(func(db *sql.DB) error {
+	defer test_utils.WrapCloseWithErrorCheck(o.index.Close, t)
+	if err := o.index.withDB(func(db *sql.DB) error {
 		if err := db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 			return err
 		}
@@ -1812,5 +1829,69 @@ func TestNewSQLiteIndex_FailedRebuildTransactionLeavesFileUntouched(t *testing.T
 	}
 	if version != searchSchemaVersion || rows != 0 {
 		t.Errorf("after rebuild: version=%d rows=%d", version, rows)
+	}
+}
+
+// Running ANALYZE (by hand, or a future PRAGMA optimize) adds sqlite_stat1.
+// The file must still be kept on the next open instead of being rebuilt on
+// every start.
+func TestNewSQLiteIndex_AnalyzeStatsDoNotForceARebuildOnEveryOpen(t *testing.T) {
+	dir := t.TempDir()
+	indexOnePageAndClose(t, dir)
+	execRawSearchDB(t, dir, `ANALYZE`)
+
+	for i := range 2 {
+		index, err := NewSQLiteIndex(dir)
+		if err != nil {
+			t.Fatalf("open %d: %v", i, err)
+		}
+		if i == 0 {
+			if err := index.IndexPage("docs/b", "docs/b.md", "b", "B", tree.NodeKindPage, "second"); err != nil {
+				t.Fatal(err)
+			}
+		}
+		var rows int
+		if err := index.withDB(func(db *sql.DB) error {
+			return db.QueryRow(`SELECT count(*) FROM pages`).Scan(&rows)
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := index.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if i == 1 && rows == 0 {
+			t.Errorf("open %d: rows = 0, the index was rebuilt although nothing about it changed", i)
+		}
+	}
+}
+
+// Two SQLiteIndex instances opening the same outdated file at once must both
+// come up with a usable index.
+func TestNewSQLiteIndex_ConcurrentOpensOfAnOutdatedFile(t *testing.T) {
+	dir := t.TempDir()
+	indexOnePageAndClose(t, dir)
+	execRawSearchDB(t, dir, `PRAGMA user_version = 0`)
+
+	const n = 4
+	var wg sync.WaitGroup
+	errs := make([]error, n)
+	indexes := make([]*SQLiteIndex, n)
+	for i := range n {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			indexes[i], errs[i] = NewSQLiteIndex(dir)
+		}()
+	}
+	wg.Wait()
+	for i := range n {
+		if errs[i] != nil {
+			t.Errorf("open %d: %v", i, errs[i])
+			continue
+		}
+		if err := indexes[i].IndexPage("docs/x", "docs/x.md", fmt.Sprintf("x%d", i), "X", tree.NodeKindPage, "x"); err != nil {
+			t.Errorf("IndexPage on instance %d: %v", i, err)
+		}
+		test_utils.WrapCloseWithErrorCheck(indexes[i].Close, t)
 	}
 }
