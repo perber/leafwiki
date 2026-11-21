@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -1378,6 +1379,55 @@ func TestNewSQLiteIndex_OpenKeepsOrRebuildsTheSchema(t *testing.T) {
 			wantRows: 0,
 		},
 		{
+			// The upgrade path: a binary from before ADR-0022 wrote the
+			// current DDL but never set user_version.
+			name: "current DDL without a schema version rebuilds",
+			setup: func(t *testing.T, dir string) {
+				indexOnePageAndClose(t, dir)
+				execRawSearchDB(t, dir, `PRAGMA user_version = 0`)
+			},
+			wantRows: 0,
+		},
+		{
+			name: "negative schema version rebuilds",
+			setup: func(t *testing.T, dir string) {
+				indexOnePageAndClose(t, dir)
+				execRawSearchDB(t, dir, `PRAGMA user_version = -1`)
+			},
+			wantRows: 0,
+		},
+		{
+			name: "unexpected view rebuilds",
+			setup: func(t *testing.T, dir string) {
+				indexOnePageAndClose(t, dir)
+				execRawSearchDB(t, dir, `CREATE VIEW leftover AS SELECT pageID FROM pages`)
+			},
+			wantRows: 0,
+		},
+		{
+			name: "unexpected table with quotes and Unicode in its name rebuilds",
+			setup: func(t *testing.T, dir string) {
+				indexOnePageAndClose(t, dir)
+				execRawSearchDB(t, dir,
+					`CREATE TABLE "left""over ä 🌿" (id INTEGER)`,
+					`CREATE INDEX "idx ""x""" ON "left""over ä 🌿"(id)`,
+					`CREATE TRIGGER trg AFTER INSERT ON "left""over ä 🌿" BEGIN SELECT 1; END`,
+				)
+			},
+			wantRows: 0,
+		},
+		{
+			name: "unexpected second FTS5 table and its shadow tables rebuild",
+			setup: func(t *testing.T, dir string) {
+				indexOnePageAndClose(t, dir)
+				execRawSearchDB(t, dir,
+					`CREATE VIRTUAL TABLE old_trigram USING fts5(content, tokenize = 'trigram')`,
+					`INSERT INTO old_trigram (content) VALUES ('leftover')`,
+				)
+			},
+			wantRows: 0,
+		},
+		{
 			name: "corrupt file rebuilds",
 			setup: func(t *testing.T, dir string) {
 				test_utils.WriteCorruptSQLiteDB(t, filepath.Join(dir, "search.db"))
@@ -1418,6 +1468,21 @@ func TestNewSQLiteIndex_OpenKeepsOrRebuildsTheSchema(t *testing.T) {
 			}
 			if extra != 0 {
 				t.Errorf("unexpected table survived the rebuild")
+			}
+			want, err := expectedSearchSchema()
+			if err != nil {
+				t.Fatalf("expectedSearchSchema: %v", err)
+			}
+			var got string
+			if err := index.withDB(func(db *sql.DB) error {
+				var err error
+				got, err = readSchema(db)
+				return err
+			}); err != nil {
+				t.Fatalf("readSchema: %v", err)
+			}
+			if got != want {
+				t.Errorf("schema after open differs from searchSchema:\ngot:\n%s\nwant:\n%s", got, want)
 			}
 		})
 	}
@@ -1460,5 +1525,292 @@ func execRawSearchDB(t *testing.T, dir string, statements ...string) {
 		if _, err := db.Exec(stmt); err != nil {
 			t.Fatalf("exec %q: %v", stmt, err)
 		}
+	}
+}
+
+// A reopened index must answer queries exactly as before the restart: same
+// hits, bm25 order, ranks and highlighted excerpts, and an intact FTS5 index.
+func TestNewSQLiteIndex_ReopenKeepsSearchResultsAndRanking(t *testing.T) {
+	dir := t.TempDir()
+	pages := []IndexPageInput{
+		{Path: "docs/title", FilePath: "docs/title.md", PageID: "title", Title: "Leaf term in title", Kind: tree.NodeKindPage, Raw: "Lorem ipsum."},
+		{Path: "docs/heading", FilePath: "docs/heading.md", PageID: "heading", Title: "Heading page", Kind: tree.NodeKindPage, Raw: "# Leaf heading\nbody"},
+		{Path: "docs/content", FilePath: "docs/content.md", PageID: "content", Title: "Content page", Kind: tree.NodeKindPage, Raw: "Only the body mentions leaf here."},
+		{Path: "docs/übersicht", FilePath: "docs/übersicht.md", PageID: "unicode", Title: "Übersicht 🌿", Kind: tree.NodeKindPage, Raw: "Grüße an die Blätter, leaf."},
+	}
+	queries := []string{"leaf", "übersicht", "Grüße", "title:leaf"}
+
+	first, err := NewSQLiteIndex(dir)
+	if err != nil {
+		t.Fatalf("NewSQLiteIndex: %v", err)
+	}
+	if failures, err := first.IndexPages(pages); err != nil || len(failures) != 0 {
+		t.Fatalf("IndexPages: failures=%v err=%v", failures, err)
+	}
+	before := map[string]*SearchResult{}
+	for _, q := range queries {
+		res, err := first.Search(q, nil, 0, 10)
+		if err != nil {
+			t.Fatalf("Search(%q) before reopen: %v", q, err)
+		}
+		if res.Count == 0 {
+			t.Fatalf("Search(%q) before reopen found nothing", q)
+		}
+		before[q] = res
+	}
+	if err := first.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	reopened, err := NewSQLiteIndex(dir)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(reopened.Close, t)
+
+	for _, q := range queries {
+		got, err := reopened.Search(q, nil, 0, 10)
+		if err != nil {
+			t.Fatalf("Search(%q) after reopen: %v", q, err)
+		}
+		if !reflect.DeepEqual(got, before[q]) {
+			t.Errorf("Search(%q) changed across reopen:\ngot  %+v\nwant %+v", q, got, before[q])
+		}
+	}
+	if got := before["leaf"].Items[0].PageID; got != "title" {
+		t.Errorf("bm25 order: first hit for leaf = %q, want title", got)
+	}
+	if err := reopened.withDB(func(db *sql.DB) error {
+		_, err := db.Exec(`INSERT INTO pages(pages) VALUES('integrity-check')`)
+		return err
+	}); err != nil {
+		t.Errorf("FTS5 integrity-check after reopen: %v", err)
+	}
+}
+
+// Boot runs Clear and a full reindex on the reopened file; doing that twice
+// must leave exactly one row per page.
+func TestNewSQLiteIndex_ClearAndReindexAfterReopenLeavesNoDuplicates(t *testing.T) {
+	dir := t.TempDir()
+	for range 3 {
+		index, err := NewSQLiteIndex(dir)
+		if err != nil {
+			t.Fatalf("NewSQLiteIndex: %v", err)
+		}
+		if err := index.Clear(); err != nil {
+			t.Fatalf("Clear: %v", err)
+		}
+		for _, id := range []string{"a", "b"} {
+			if err := index.IndexPage("docs/"+id, "docs/"+id+".md", id, "Page "+id, tree.NodeKindPage, "shared body"); err != nil {
+				t.Fatalf("IndexPage: %v", err)
+			}
+		}
+		if err := index.Close(); err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+	}
+
+	index, err := NewSQLiteIndex(dir)
+	if err != nil {
+		t.Fatalf("NewSQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	res, err := index.Search("shared", nil, 0, 10)
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if res.Count != 2 {
+		t.Errorf("Search count = %d, want 2", res.Count)
+	}
+	var rows int
+	if err := index.withDB(func(db *sql.DB) error {
+		return db.QueryRow(`SELECT count(*) FROM pages`).Scan(&rows)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if rows != 2 {
+		t.Errorf("rows = %d, want 2", rows)
+	}
+}
+
+// copySearchDBFiles copies search.db and its sidecars as they are on disk
+// right now, like the state an unclean shutdown leaves behind.
+func copySearchDBFiles(t *testing.T, from, to string) {
+	t.Helper()
+	for _, suffix := range []string{"", "-wal"} {
+		data, err := os.ReadFile(filepath.Join(from, "search.db"+suffix))
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			t.Fatalf("read: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(to, "search.db"+suffix), data, 0o644); err != nil {
+			t.Fatalf("write: %v", err)
+		}
+	}
+}
+
+// Rows committed only to the -wal (no checkpoint, no Close) survive the next
+// open, because the version and schema in the WAL still match.
+func TestNewSQLiteIndex_UncheckpointedWALFromUncleanShutdownKeepsRows(t *testing.T) {
+	live := t.TempDir()
+	index, err := NewSQLiteIndex(live)
+	if err != nil {
+		t.Fatalf("NewSQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	if err := index.IndexPage("docs/a", "docs/a.md", "a", "A", tree.NodeKindPage, "walonly content"); err != nil {
+		t.Fatalf("IndexPage: %v", err)
+	}
+	if info, err := os.Stat(filepath.Join(live, "search.db-wal")); err != nil || info.Size() == 0 {
+		t.Fatalf("expected a non-empty -wal, err=%v", err)
+	}
+
+	crashed := t.TempDir()
+	copySearchDBFiles(t, live, crashed)
+
+	reopened, err := NewSQLiteIndex(crashed)
+	if err != nil {
+		t.Fatalf("open after unclean shutdown: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(reopened.Close, t)
+	res, err := reopened.Search("walonly", nil, 0, 10)
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if res.Count != 1 {
+		t.Errorf("Search count = %d, want 1 (rows from the -wal must survive)", res.Count)
+	}
+}
+
+// A rebuild interrupted before its commit (process killed with the drops
+// already spilled into the -wal) leaves the previous committed file; the next
+// open sees the old version and rebuilds it cleanly.
+func TestNewSQLiteIndex_CrashInTheMiddleOfARebuildRecoversOnNextOpen(t *testing.T) {
+	live := t.TempDir()
+	indexOnePageAndClose(t, live)
+	execRawSearchDB(t, live, `PRAGMA user_version = 99`)
+
+	db, err := sql.Open("sqlite", filepath.Join(live, "search.db")+"?_pragma=journal_mode(WAL)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(db.Close, t)
+	db.SetMaxOpenConns(1)
+	conn, err := db.Conn(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(conn.Close, t)
+	for _, stmt := range []string{
+		`PRAGMA cache_size = 1`, // spill uncommitted pages into the -wal
+		`BEGIN`,
+		`DROP TABLE pages`,
+		`CREATE TABLE filler (b BLOB)`,
+		`INSERT INTO filler SELECT randomblob(4096) FROM generate_series(1, 64)`,
+	} {
+		if _, err := conn.ExecContext(t.Context(), stmt); err != nil {
+			// generate_series may be missing; fall back to a recursive CTE.
+			if strings.Contains(stmt, "generate_series") {
+				if _, err := conn.ExecContext(t.Context(), `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM n WHERE i < 64) INSERT INTO filler SELECT randomblob(4096) FROM n`); err != nil {
+					t.Fatalf("fill: %v", err)
+				}
+				continue
+			}
+			t.Fatalf("exec %q: %v", stmt, err)
+		}
+	}
+
+	crashed := t.TempDir()
+	copySearchDBFiles(t, live, crashed)
+	if info, err := os.Stat(filepath.Join(crashed, "search.db-wal")); err != nil || info.Size() == 0 {
+		t.Fatalf("expected uncommitted frames in the copied -wal, err=%v", err)
+	}
+
+	reopened, err := NewSQLiteIndex(crashed)
+	if err != nil {
+		t.Fatalf("open after a crash mid-rebuild: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(reopened.Close, t)
+	var version, filler int
+	var got string
+	if err := reopened.withDB(func(db *sql.DB) error {
+		if err := db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
+			return err
+		}
+		if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE name = 'filler'`).Scan(&filler); err != nil {
+			return err
+		}
+		got, err = readSchema(db)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	want, err := expectedSearchSchema()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != searchSchemaVersion || filler != 0 || got != want {
+		t.Errorf("after recovery: version=%d filler=%d schemaMatches=%v", version, filler, got == want)
+	}
+}
+
+// If the rebuild transaction fails (here: another writer holds the lock),
+// nothing of it is applied: the old version and rows stay, and the next open
+// rebuilds.
+func TestNewSQLiteIndex_FailedRebuildTransactionLeavesFileUntouched(t *testing.T) {
+	dir := t.TempDir()
+	indexOnePageAndClose(t, dir)
+	execRawSearchDB(t, dir, `PRAGMA user_version = 99`)
+
+	locker, err := sql.Open("sqlite", filepath.Join(dir, "search.db")+"?_pragma=journal_mode(WAL)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn, err := locker.Conn(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.ExecContext(t.Context(), `BEGIN IMMEDIATE`); err != nil {
+		t.Fatalf("BEGIN IMMEDIATE: %v", err)
+	}
+
+	if index, err := NewSQLiteIndex(dir); err == nil {
+		_ = index.Close()
+		t.Fatalf("NewSQLiteIndex succeeded while another writer held the lock")
+	}
+
+	if _, err := conn.ExecContext(t.Context(), `ROLLBACK`); err != nil {
+		t.Fatal(err)
+	}
+	var version, rows int
+	if err := conn.QueryRowContext(t.Context(), `PRAGMA user_version`).Scan(&version); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.QueryRowContext(t.Context(), `SELECT count(*) FROM pages`).Scan(&rows); err != nil {
+		t.Fatal(err)
+	}
+	if version != 99 || rows != 1 {
+		t.Errorf("after failed rebuild: version=%d rows=%d, want 99 and 1 (tx must not partially apply)", version, rows)
+	}
+	_ = conn.Close()
+	_ = locker.Close()
+
+	index, err := NewSQLiteIndex(dir)
+	if err != nil {
+		t.Fatalf("NewSQLiteIndex after the lock is released: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	if err := index.withDB(func(db *sql.DB) error {
+		if err := db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
+			return err
+		}
+		return db.QueryRow(`SELECT count(*) FROM pages`).Scan(&rows)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if version != searchSchemaVersion || rows != 0 {
+		t.Errorf("after rebuild: version=%d rows=%d", version, rows)
 	}
 }
