@@ -123,3 +123,8 @@ table `pages` in `internal/search/sqlite_index.go`, filled from the Markdown fil
 
 <!-- Dated entries from the follow-up PRs (page_text and contentless tables, normaliser,
 fingerprint sync at boot, trigram table): what changed and which searchSchemaVersion it set. -->
+
+- **2026-11-21, `searchSchemaVersion` 2:** the index replaces char(2) and char(3) in title,
+  headings and content with a space before writing them. `highlight()` marks hits with these two
+  characters and `sanitizeSearchTitle` turns them into `<b>`/`</b>`, so the same characters in a
+  page title faked a highlight in the results (and showed up raw in excerpts).
