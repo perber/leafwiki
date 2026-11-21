@@ -1463,7 +1463,7 @@
   }
 
   .search__input {
-    @apply border-surface-border bg-surface text-interface-text w-full rounded-md border px-2 py-1 pr-8 text-sm;
+    @apply border-surface-border bg-surface text-interface-text w-full rounded-md border px-2 py-1 text-sm;
   }
 
   .search__clear-button {
