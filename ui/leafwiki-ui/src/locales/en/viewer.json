@@ -257,6 +257,9 @@
       },
       "cancelRename": {
         "action": "Cancel rename"
+      },
+      "closeSearchSyntaxHelp": {
+        "action": "Close search syntax help"
       }
     }
   }

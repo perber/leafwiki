@@ -1,7 +1,9 @@
 {
   "input": {
     "placeholder": "Search...",
-    "clearButton": "Clear"
+    "clearButton": "Clear",
+    "minLengthHint_one": "Type at least {{count}} character to search.",
+    "minLengthHint_other": "Type at least {{count}} characters to search."
   },
   "tags": {
     "accordionTitle": "All Tags",
@@ -28,5 +30,37 @@
   "resultCard": {
     "kindPage": "Page",
     "kindSection": "Section"
+  },
+  "help": {
+    "buttonLabel": "Search syntax help",
+    "title": "Search tips",
+    "prefix": {
+      "example": "install",
+      "description": "Matches the start of a word, e.g. finds Installation"
+    },
+    "allWords": {
+      "example": "wiki backup",
+      "description": "All words must appear"
+    },
+    "phrase": {
+      "example": "\"exact phrase\"",
+      "description": "Words in exactly this order"
+    },
+    "column": {
+      "example": "title:word",
+      "description": "Only in titles; also headings: and content:"
+    },
+    "or": {
+      "example": "docker OR podman",
+      "description": "Either word; OR in capitals, lowercase or is an ordinary word"
+    },
+    "not": {
+      "example": "wiki NOT draft",
+      "description": "Excludes pages with the second word; NOT in capitals"
+    },
+    "wildcard": {
+      "example": "instal*",
+      "description": "Explicit prefix search"
+    }
   }
 }
