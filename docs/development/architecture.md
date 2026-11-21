@@ -143,7 +143,8 @@ except from a backup — there's no filesystem walk that can regenerate a lost p
 revoked-but-still-listed API key.
 
 The "corruption policy" column says what a store's constructor does when SQLite reports
-`SQLITE_IOERR`, `SQLITE_CORRUPT` or `SQLITE_NOTADB` ([ADR-0013](./adr/0013-per-store-sqlite-corruption-policy.md)):
+`SQLITE_IOERR`, `SQLITE_CORRUPT` or `SQLITE_NOTADB`, or the store itself reports
+`sqliteutil.ErrUnusableDatabase` ([ADR-0013](./adr/0013-per-store-sqlite-corruption-policy.md)):
 `RebuildOnCorruption` deletes the file and its sidecars and starts empty (the next resync fills
 it); `QuarantineOnCorruption` renames the file and its sidecars to
 `<name>.corrupt-<UTC timestamp>`, logs an `Error` and starts empty; `FailOnCorruption` leaves the

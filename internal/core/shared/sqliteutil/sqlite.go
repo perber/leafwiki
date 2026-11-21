@@ -15,12 +15,21 @@ import (
 	sqlite "modernc.org/sqlite"
 )
 
+// ErrUnusableDatabase lets a store's open function report a file that SQLite
+// can read but that the store cannot bring to a working state (for example a
+// derived index holding a virtual table whose module this binary lacks).
+// Wrapped into the error open returns, it counts as recoverable, so the
+// store's CorruptionPolicy decides exactly as for corruption: a derived index
+// is rebuilt, real state is never deleted (ADR-0013).
+var ErrUnusableDatabase = errors.New("database cannot be used by this binary")
+
 // IsSQLiteRecoverableError reports whether err is a SQLite I/O or corruption
-// error that may be resolved by deleting the database files and retrying.
-// Transient errors (SQLITE_BUSY, SQLITE_LOCKED) and resource errors
-// (SQLITE_IOERR_NOMEM) are not considered recoverable.
+// error, or a store-reported ErrUnusableDatabase, that may be resolved by
+// deleting the database files and retrying. Transient errors (SQLITE_BUSY,
+// SQLITE_LOCKED) and resource errors (SQLITE_IOERR_NOMEM) are not considered
+// recoverable.
 func IsSQLiteRecoverableError(err error) bool {
-	if errors.Is(err, errEmptyWithSidecar) {
+	if errors.Is(err, errEmptyWithSidecar) || errors.Is(err, ErrUnusableDatabase) {
 		return true
 	}
 	var e *sqlite.Error
@@ -222,7 +231,7 @@ func needsWriteToRecover(err error) bool {
 // retry, since opening next to a leftover sidecar could mix stale pages into
 // the new database. Never use it for real state (ADR-0013).
 func RebuildOnCorruption(dbPath string, err error) (bool, error) {
-	slog.Default().Warn("database corrupt, removing and retrying", "path", dbPath, "sqliteCode", sqliteCode(err), "error", err)
+	slog.Default().Warn("database corrupt or unusable, removing and retrying", "path", dbPath, "sqliteCode", sqliteCode(err), "error", err)
 	if rmErr := RemoveSQLiteFiles(dbPath); rmErr != nil {
 		return false, fmt.Errorf("%w (removing the corrupt database for a rebuild failed: %v)", err, rmErr)
 	}
@@ -253,7 +262,7 @@ type CorruptDatabaseError struct {
 }
 
 func (e *CorruptDatabaseError) Error() string {
-	msg := fmt.Sprintf("database %s is unreadable (SQLite code %d): %v", e.Path, e.SQLiteCode(), e.Err)
+	msg := fmt.Sprintf("database %s is %s: %v", e.Path, e.Problem(), e.Err)
 	if len(e.Stranded) > 0 {
 		msg += "; left under quarantine names: " + strings.Join(e.Stranded, ", ")
 	}
@@ -261,6 +270,17 @@ func (e *CorruptDatabaseError) Error() string {
 }
 
 func (e *CorruptDatabaseError) Unwrap() error { return e.Err }
+
+// Problem says what is wrong with the database for an operator message:
+// "corrupt or unusable", plus the SQLite code when there is one. A
+// store-reported ErrUnusableDatabase has no code, and "SQLite code 0" would
+// only mislead.
+func (e *CorruptDatabaseError) Problem() string {
+	if code := e.SQLiteCode(); code != 0 {
+		return fmt.Sprintf("corrupt or unusable (SQLite code %d)", code)
+	}
+	return "corrupt or unusable"
+}
 
 // SQLiteCode returns the extended SQLite result code of the underlying
 // error, or 0 if it is not a SQLite error.
@@ -306,7 +326,7 @@ func QuarantineOnCorruption(dbPath string, err error) (bool, error) {
 	if stranded, mvErr := moveSQLiteFiles(dbPath, target); mvErr != nil {
 		return false, &CorruptDatabaseError{Path: dbPath, Err: fmt.Errorf("%w (moving it aside failed: %v)", err, mvErr), Stranded: stranded}
 	}
-	slog.Default().Error("database corrupt, moved aside and continuing with an empty one",
+	slog.Default().Error("database corrupt or unusable, moved aside and continuing with an empty one",
 		"path", dbPath, "quarantinedPath", target, "sqliteCode", sqliteCode(err), "error", err)
 	return true, nil
 }

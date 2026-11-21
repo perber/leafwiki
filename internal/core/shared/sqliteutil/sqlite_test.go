@@ -58,6 +58,11 @@ func TestIsSQLiteRecoverableError(t *testing.T) {
 			err:  errors.New("boom"),
 			want: false,
 		},
+		{
+			name: "store-reported unusable database",
+			err:  fmt.Errorf("%w: %w", ErrUnusableDatabase, sqliteErrorWithCode(1)),
+			want: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -275,6 +280,12 @@ func TestOpenWithPolicy_RebuildOnCorruption(t *testing.T) {
 		{
 			name:             "recoverable error removes files and retries once",
 			openErrs:         []error{sqliteErrorWithCode(11), nil},
+			wantOpenCalls:    2,
+			wantFilesRemoved: true,
+		},
+		{
+			name:             "store-reported unusable database removes files and retries once",
+			openErrs:         []error{fmt.Errorf("%w: no such module", ErrUnusableDatabase), nil},
 			wantOpenCalls:    2,
 			wantFilesRemoved: true,
 		},
@@ -751,6 +762,43 @@ func TestSQLiteCode(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := sqliteCode(tt.err); got != tt.want {
 				t.Fatalf("sqliteCode() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCorruptDatabaseError_Error(t *testing.T) {
+	tests := []struct {
+		name       string
+		err        *CorruptDatabaseError
+		wantPart   []string
+		wantAbsent []string
+	}{
+		{
+			name:     "SQLite error names its code",
+			err:      &CorruptDatabaseError{Path: "data/users.db", Err: sqliteErrorWithCode(26)},
+			wantPart: []string{"data/users.db", "corrupt or unusable", "(SQLite code 26)"},
+		},
+		{
+			name:       "store-reported unusable database has no SQLite code to name",
+			err:        &CorruptDatabaseError{Path: "data/search.db", Err: fmt.Errorf("%w: no such module", ErrUnusableDatabase)},
+			wantPart:   []string{"data/search.db", "corrupt or unusable", "no such module"},
+			wantAbsent: []string{"SQLite code"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.err.Error()
+			for _, part := range tt.wantPart {
+				if !strings.Contains(got, part) {
+					t.Errorf("Error() = %q, want it to contain %q", got, part)
+				}
+			}
+			for _, part := range tt.wantAbsent {
+				if strings.Contains(got, part) {
+					t.Errorf("Error() = %q, must not contain %q", got, part)
+				}
 			}
 		})
 	}
