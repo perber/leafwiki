@@ -1,6 +1,5 @@
 // remark-flexible-markers renders `==text==` and `=r=text==` as
-// <mark class="flexible-marker …">. Search-query marks
-// (lib/scrollToSearchQuery.ts) and raw HTML <mark> don't carry that class.
+// <mark class="flexible-marker …">. Raw HTML <mark> doesn't carry that class.
 const HIGHLIGHT_SELECTOR = 'mark.flexible-marker'
 
 export type Highlight = {

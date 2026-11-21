@@ -1,6 +1,7 @@
 import { PAGE_CONTENT_SELECTOR } from './pageContentRoot'
 
-const HIGHLIGHT_CLASS = 'search-query-highlight'
+// Name of the CSS custom highlight (styled via ::highlight() in index.css).
+export const SEARCH_QUERY_HIGHLIGHT = 'leafwiki-search-query'
 const SCROLL_CONTAINER_ID = 'scroll-container'
 
 export type ScrollToSearchQueryOptions = {
@@ -9,24 +10,15 @@ export type ScrollToSearchQueryOptions = {
   rootSelector?: string
 }
 
-export function clearSearchQueryHighlights(root: ParentNode = document): void {
-  root.querySelectorAll(`mark.${HIGHLIGHT_CLASS}`).forEach((mark) => {
-    const parent = mark.parentNode
-    if (!parent) return
-    while (mark.firstChild) {
-      parent.insertBefore(mark.firstChild, mark)
-    }
-    parent.removeChild(mark)
-    parent.normalize()
-  })
-}
-
+// Matches case-insensitively on the original text, so the offsets are valid
+// for a Range on the text node. Lowercasing first shifts them: "İ" (U+0130)
+// lowercases to two UTF-16 units.
 function findFirstTextMatch(
   root: HTMLElement,
   query: string,
-): { node: Text; index: number } | null {
-  const normalizedQuery = query.toLowerCase()
-  if (!normalizedQuery) return null
+): { node: Text; index: number; length: number } | null {
+  if (!query) return null
+  const pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'iu')
 
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
@@ -42,10 +34,13 @@ function findFirstTextMatch(
 
   let current = walker.nextNode()
   while (current) {
-    const text = current.textContent ?? ''
-    const index = text.toLowerCase().indexOf(normalizedQuery)
-    if (index >= 0) {
-      return { node: current as Text, index }
+    const match = pattern.exec(current.textContent ?? '')
+    if (match) {
+      return {
+        node: current as Text,
+        index: match.index,
+        length: match[0].length,
+      }
     }
     current = walker.nextNode()
   }
@@ -53,26 +48,51 @@ function findFirstTextMatch(
   return null
 }
 
-function wrapMatch(node: Text, index: number, length: number): HTMLElement {
-  const fullText = node.textContent ?? ''
-  const before = fullText.slice(0, index)
-  const matchText = fullText.slice(index, index + length)
-  const after = fullText.slice(index + length)
+// Returns a Range over the first case-insensitive occurrence of `query` in
+// the text under `root`, or null.
+export function findSearchQueryRange(
+  root: HTMLElement,
+  query: string,
+): Range | null {
+  const match = findFirstTextMatch(root, query)
+  if (!match) return null
+  const end = match.index + match.length
+  // Range.setEnd throws IndexSizeError past the node's end.
+  if (match.length === 0 || end > match.node.length) return null
+  const range = document.createRange()
+  range.setStart(match.node, match.index)
+  range.setEnd(match.node, end)
+  return range
+}
 
-  const mark = document.createElement('mark')
-  mark.className = HIGHLIGHT_CLASS
-  mark.textContent = matchText
-  mark.setAttribute('data-testid', 'search-query-highlight')
+// The CSS Custom Highlight API (Chrome/Edge 105+, Safari 17.2+, Firefox 140+)
+// paints the match without touching the DOM. Wrapping the match in a <mark>
+// replaced a text node React still owned, so the next reconcile of the page
+// content threw NotFoundError (insertBefore/removeChild) and tripped the
+// preview error boundary.
+function canHighlight(): boolean {
+  return (
+    typeof CSS !== 'undefined' &&
+    'highlights' in CSS &&
+    typeof Highlight === 'function'
+  )
+}
 
-  const parent = node.parentNode
-  if (!parent) return mark
-
-  const fragment = document.createDocumentFragment()
-  if (before) fragment.appendChild(document.createTextNode(before))
-  fragment.appendChild(mark)
-  if (after) fragment.appendChild(document.createTextNode(after))
-  parent.replaceChild(fragment, node)
-  return mark
+function scrollRangeIntoView(
+  range: Range,
+  scrollContainer: HTMLElement,
+  behavior: ScrollBehavior,
+) {
+  const rangeRect = range.getBoundingClientRect()
+  const containerRect = scrollContainer.getBoundingClientRect()
+  const offset =
+    rangeRect.top -
+    containerRect.top -
+    (scrollContainer.clientHeight - rangeRect.height) / 2
+  scrollContainer.scrollTo({
+    top: scrollContainer.scrollTop + offset,
+    behavior,
+  })
 }
 
 function waitUntilHeightStabilizes(
@@ -111,7 +131,8 @@ function waitUntilHeightStabilizes(
 
 /**
  * Finds the first case-insensitive occurrence of `query` in the page content,
- * wraps it in a highlight mark, and scrolls it into view.
+ * highlights it (where the browser supports CSS custom highlights), and
+ * scrolls it into view.
  */
 export function scrollToSearchQuery(
   query: string,
@@ -130,6 +151,7 @@ export function scrollToSearchQuery(
   if (!scrollContainer) return () => {}
 
   let cancelled = false
+  let highlight: Highlight | null = null
 
   const run = () => {
     if (cancelled) return
@@ -139,13 +161,14 @@ export function scrollToSearchQuery(
     ) as HTMLElement | null
     if (!contentRoot) return
 
-    clearSearchQueryHighlights(contentRoot)
+    const range = findSearchQueryRange(contentRoot, trimmed)
+    if (!range) return
 
-    const match = findFirstTextMatch(contentRoot, trimmed)
-    if (!match) return
-
-    const mark = wrapMatch(match.node, match.index, trimmed.length)
-    mark.scrollIntoView({ behavior, block: 'center', inline: 'nearest' })
+    if (canHighlight()) {
+      highlight = new Highlight(range)
+      CSS.highlights.set(SEARCH_QUERY_HIGHLIGHT, highlight)
+    }
+    scrollRangeIntoView(range, scrollContainer, behavior)
   }
 
   if (waitForStableLayout) {
@@ -156,7 +179,9 @@ export function scrollToSearchQuery(
 
   return () => {
     cancelled = true
-    const contentRoot = document.querySelector(rootSelector)
-    if (contentRoot) clearSearchQueryHighlights(contentRoot)
+    // Only remove our own entry; a newer call may have replaced it.
+    if (highlight && CSS.highlights.get(SEARCH_QUERY_HIGHLIGHT) === highlight) {
+      CSS.highlights.delete(SEARCH_QUERY_HIGHLIGHT)
+    }
   }
 }
