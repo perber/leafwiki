@@ -205,7 +205,8 @@
       "closeDialog": { "action": "关闭对话框" },
       "confirmDialog": { "action": "对话框默认操作" },
       "confirmRename": { "action": "确认重命名" },
-      "cancelRename": { "action": "取消重命名" }
+      "cancelRename": { "action": "取消重命名" },
+      "closeSearchSyntaxHelp": { "action": "关闭搜索语法帮助" }
     }
   }
 }

@@ -1,7 +1,9 @@
 {
   "input": {
     "placeholder": "Suchen...",
-    "clearButton": "Löschen"
+    "clearButton": "Löschen",
+    "minLengthHint_one": "Mindestens {{count}} Zeichen eingeben, um zu suchen.",
+    "minLengthHint_other": "Mindestens {{count}} Zeichen eingeben, um zu suchen."
   },
   "tags": {
     "accordionTitle": "Alle Schlagwörter",
@@ -28,5 +30,37 @@
   "resultCard": {
     "kindPage": "Seite",
     "kindSection": "Bereich"
+  },
+  "help": {
+    "buttonLabel": "Hilfe zur Suchsyntax",
+    "title": "Suchtipps",
+    "prefix": {
+      "example": "install",
+      "description": "Findet Wortanfänge, z. B. Installation"
+    },
+    "allWords": {
+      "example": "wiki backup",
+      "description": "Alle Wörter müssen vorkommen"
+    },
+    "phrase": {
+      "example": "\"genaue Phrase\"",
+      "description": "Wörter genau in dieser Reihenfolge"
+    },
+    "column": {
+      "example": "title:wort",
+      "description": "Nur im Titel; auch headings: und content:"
+    },
+    "or": {
+      "example": "docker OR podman",
+      "description": "Eines der Wörter; OR großschreiben, kleines or ist ein normales Wort"
+    },
+    "not": {
+      "example": "wiki NOT entwurf",
+      "description": "Schließt Seiten mit dem zweiten Wort aus; NOT großschreiben"
+    },
+    "wildcard": {
+      "example": "instal*",
+      "description": "Ausdrückliche Präfixsuche"
+    }
   }
 }

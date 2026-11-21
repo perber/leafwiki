@@ -1,7 +1,9 @@
 {
   "input": {
     "placeholder": "Rechercher…",
-    "clearButton": "Effacer"
+    "clearButton": "Effacer",
+    "minLengthHint_one": "Saisissez au moins {{count}} caractère pour rechercher.",
+    "minLengthHint_other": "Saisissez au moins {{count}} caractères pour rechercher."
   },
   "tags": {
     "accordionTitle": "Tous les tags",
@@ -28,5 +30,37 @@
   "resultCard": {
     "kindPage": "Page",
     "kindSection": "Section"
+  },
+  "help": {
+    "buttonLabel": "Aide sur la syntaxe de recherche",
+    "title": "Astuces de recherche",
+    "prefix": {
+      "example": "install",
+      "description": "Correspond au début d’un mot, p. ex. trouve Installation"
+    },
+    "allWords": {
+      "example": "wiki sauvegarde",
+      "description": "Tous les mots doivent apparaître"
+    },
+    "phrase": {
+      "example": "\"phrase exacte\"",
+      "description": "Mots exactement dans cet ordre"
+    },
+    "column": {
+      "example": "title:mot",
+      "description": "Uniquement dans les titres ; aussi headings: et content:"
+    },
+    "or": {
+      "example": "docker OR podman",
+      "description": "L’un ou l’autre mot ; OR en majuscules, or en minuscules est un mot ordinaire"
+    },
+    "not": {
+      "example": "wiki NOT brouillon",
+      "description": "Exclut les pages contenant le second mot ; NOT en majuscules"
+    },
+    "wildcard": {
+      "example": "instal*",
+      "description": "Recherche explicite par préfixe"
+    }
   }
 }

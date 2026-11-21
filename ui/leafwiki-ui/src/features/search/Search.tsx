@@ -21,12 +21,18 @@ import {
   startTransition,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
 } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import SearchResultCard from './SearchResultCard'
+import {
+  SearchSyntaxHelpButton,
+  SearchSyntaxHelpPanel,
+} from './SearchSyntaxHelp'
+import { useCloseSyntaxHelpOnEscape } from './useCloseSyntaxHelpOnEscape'
 
 type SearchProps = {
   active?: boolean
@@ -43,6 +49,14 @@ const SEARCH_INPUT_ALLOWED_HOTKEYS = [
   getShortcutDefinition('sidebar.search.open').keyCombo,
 ].join(' ')
 
+// Shorter queries are not sent: a single character would prefix-match
+// almost every page, while two already cover common wiki words (Pi, HR,
+// IP, Go, C#).
+const MIN_QUERY_LENGTH = 2
+
+const isSearchableQuery = (query: string) =>
+  query.trim().length >= MIN_QUERY_LENGTH
+
 export default function Search({ active = false }: SearchProps) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -54,7 +68,7 @@ export default function Search({ active = false }: SearchProps) {
   const debouncedActiveTagsKey = useDebounce(activeTagsKey, 180)
 
   const [loading, setLoading] = useState(
-    () => urlQuery.length >= 3 || activeTags.length > 0,
+    () => isSearchableQuery(urlQuery) || activeTags.length > 0,
   )
   const [results, setResults] = useState<SearchResultItem[]>([])
   const [totalCount, setTotalCount] = useState(0)
@@ -64,6 +78,16 @@ export default function Search({ active = false }: SearchProps) {
   const [availableTagsError, setAvailableTagsError] = useState(false)
   const [facetTags, setFacetTags] = useState<SearchTagFacet[]>([])
   const searchInputRef = useRef<HTMLInputElement | null>(null)
+  // Like the query and the tag accordion, the help panel keeps its state
+  // while the sidebar shows another panel (Search stays mounted, hidden).
+  const [syntaxHelpOpen, setSyntaxHelpOpen] = useState(false)
+  const syntaxHelpPanelId = useId()
+  const syntaxHelpButtonRef = useRef<HTMLButtonElement | null>(null)
+  useCloseSyntaxHelpOnEscape({
+    enabled: syntaxHelpOpen && active,
+    setOpen: setSyntaxHelpOpen,
+    buttonRef: syntaxHelpButtonRef,
+  })
   const searchFocusRequestId = useSidebarStore(
     (state) => state.searchFocusRequestId,
   )
@@ -77,11 +101,19 @@ export default function Search({ active = false }: SearchProps) {
       debouncedActiveTagsKey === '' ? [] : debouncedActiveTagsKey.split('\n'),
     [debouncedActiveTagsKey],
   )
-  const hasSearchQuery = debouncedQuery.length >= 3
+  const hasSearchQuery = isSearchableQuery(debouncedQuery)
   const trimmedQuery = inputQuery.trim()
-  const activeQueryLabel = hasSearchQuery ? debouncedQuery : trimmedQuery
+  const isQueryTooShort = trimmedQuery !== '' && !isSearchableQuery(inputQuery)
+  const activeQueryLabel = isQueryTooShort
+    ? ''
+    : hasSearchQuery
+      ? debouncedQuery
+      : trimmedQuery
   const isIdleMode = trimmedQuery === '' && activeTags.length === 0
-  const hasImmediateFilters = !isIdleMode
+  // A too-short query on its own filters nothing; the hint replaces the
+  // result list instead of an empty or stale one.
+  const hasImmediateFilters =
+    !isIdleMode && (!isQueryTooShort || activeTags.length > 0)
   const hasDebouncedFilters = hasSearchQuery || debouncedActiveTags.length > 0
   const hasResults = results.length > 0
   const clampedActiveIndex =
@@ -151,7 +183,7 @@ export default function Search({ active = false }: SearchProps) {
     )
     setPage(0)
     setActiveIndex(0)
-    if (urlQuery.trim().length < 3) {
+    if (!isSearchableQuery(urlQuery)) {
       setResults([])
       setTotalCount(0)
       setFacetTags([])
@@ -291,82 +323,91 @@ export default function Search({ active = false }: SearchProps) {
 
   return (
     <div className="search">
-      <div className="search__input-wrapper">
-        <Input
-          ref={searchInputRef}
-          autoFocus
-          type="text"
-          placeholder={t('input.placeholder')}
-          value={inputQuery}
-          data-testid="search-input"
-          data-allow-hotkeys={SEARCH_INPUT_ALLOWED_HOTKEYS}
-          onChange={(e) => {
-            const nextQuery = e.target.value
-            invalidatePendingRequests()
-            setInputQuery(nextQuery)
-            startTransition(() => {
-              setSearchParams(
-                (prev) => {
-                  const next = new URLSearchParams(prev)
-                  if (nextQuery) {
-                    next.set('q', nextQuery)
-                  } else {
-                    next.delete('q')
-                  }
-                  return next
-                },
-                { replace: true },
-              )
-            })
-            setPage(0)
-            setActiveIndex(0)
+      <div className="search__input-row">
+        <div className="search__input-wrapper">
+          <Input
+            ref={searchInputRef}
+            autoFocus
+            type="text"
+            placeholder={t('input.placeholder')}
+            value={inputQuery}
+            data-testid="search-input"
+            data-allow-hotkeys={SEARCH_INPUT_ALLOWED_HOTKEYS}
+            onChange={(e) => {
+              const nextQuery = e.target.value
+              invalidatePendingRequests()
+              setInputQuery(nextQuery)
+              startTransition(() => {
+                setSearchParams(
+                  (prev) => {
+                    const next = new URLSearchParams(prev)
+                    if (nextQuery) {
+                      next.set('q', nextQuery)
+                    } else {
+                      next.delete('q')
+                    }
+                    return next
+                  },
+                  { replace: true },
+                )
+              })
+              setPage(0)
+              setActiveIndex(0)
 
-            if (nextQuery.length >= 3 || activeTags.length > 0) {
-              setLoading(true)
-            } else {
-              setResults([])
-              setTotalCount(0)
-              setFacetTags([])
-              setLoading(false)
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowDown') {
-              if (!hasResults) return
+              if (isSearchableQuery(nextQuery) || activeTags.length > 0) {
+                setLoading(true)
+              } else {
+                setResults([])
+                setTotalCount(0)
+                setFacetTags([])
+                setLoading(false)
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown') {
+                if (!hasResults) return
 
-              e.preventDefault()
-              setActiveIndex((current) =>
-                Math.min(current + 1, Math.max(results.length - 1, 0)),
-              )
-            }
+                e.preventDefault()
+                setActiveIndex((current) =>
+                  Math.min(current + 1, Math.max(results.length - 1, 0)),
+                )
+              }
 
-            if (e.key === 'ArrowUp') {
-              if (!hasResults) return
+              if (e.key === 'ArrowUp') {
+                if (!hasResults) return
 
-              e.preventDefault()
-              setActiveIndex((current) => Math.max(current - 1, 0))
-            }
+                e.preventDefault()
+                setActiveIndex((current) => Math.max(current - 1, 0))
+              }
 
-            if (e.key === 'Enter') {
-              if (!hasResults) return
+              if (e.key === 'Enter') {
+                if (!hasResults) return
 
-              e.preventDefault()
-              openActiveResult()
-            }
-          }}
-          className="search__input"
+                e.preventDefault()
+                openActiveResult()
+              }
+            }}
+            className="search__input"
+          />
+          {inputQuery && (
+            <button
+              onClick={clearSearch}
+              className="search__clear-button"
+              title={t('input.clearButton')}
+              data-testid="search-clear-button"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+        <SearchSyntaxHelpButton
+          ref={syntaxHelpButtonRef}
+          open={syntaxHelpOpen}
+          panelId={syntaxHelpPanelId}
+          onToggle={() => setSyntaxHelpOpen((open) => !open)}
         />
-        {inputQuery && (
-          <button
-            onClick={clearSearch}
-            className="search__clear-button"
-            title={t('input.clearButton')}
-            data-testid="search-clear-button"
-          >
-            <X size={16} />
-          </button>
-        )}
       </div>
+      <SearchSyntaxHelpPanel id={syntaxHelpPanelId} open={syntaxHelpOpen} />
 
       {(visibleTags.length > 0 || availableTagsError) && (
         <Accordion
@@ -431,6 +472,17 @@ export default function Search({ active = false }: SearchProps) {
       )}
 
       <div className="search__body">
+        {/* Always rendered so screen readers announce the hint when its
+            text appears; a live region inserted with its text is often
+            missed. */}
+        <p role="status" className="search__min-length-hint">
+          {isQueryTooShort && (
+            <span data-testid="search-min-length-hint">
+              {t('input.minLengthHint', { count: MIN_QUERY_LENGTH })}
+            </span>
+          )}
+        </p>
+
         {hasImmediateFilters && (
           <div className="browse-results__toolbar">
             <ListViewStatus className="search__result-summary">
