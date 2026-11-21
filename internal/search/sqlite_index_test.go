@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -2172,5 +2173,162 @@ func TestSQLiteIndex_SearchDuringClearDoesNotFail(t *testing.T) {
 	close(errCh)
 	for err := range errCh {
 		t.Errorf("concurrent call failed: %v", err)
+	}
+}
+
+// addUnknownModuleTableLive inserts a virtual table whose module no binary
+// has into an index that is open right now, bumping schema_version so the
+// open connections see it, the way a write from outside would.
+func addUnknownModuleTableLive(t *testing.T, dir string) {
+	t.Helper()
+	db, err := sql.Open("sqlite", filepath.Join(dir, "search.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(db.Close, t)
+	db.SetMaxOpenConns(1)
+	var cookie int
+	if err := db.QueryRow(`PRAGMA schema_version`).Scan(&cookie); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(fmt.Sprintf(`
+		PRAGMA writable_schema = ON;
+		INSERT INTO sqlite_master (type, name, tbl_name, rootpage, sql)
+		VALUES ('table', 'zz_leftover', 'zz_leftover', 0, 'CREATE VIRTUAL TABLE zz_leftover USING no_such_module()');
+		PRAGMA schema_version = %d;
+		PRAGMA writable_schema = OFF;`, cookie+1)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A Clear that fails partway (pages already dropped, then the leftover's DROP
+// fails) rolls back as a whole: the caller gets ErrUnusableDatabase and the
+// index keeps answering with its previous rows instead of being half-dropped.
+func TestSQLiteIndex_ClearThatFailsPartwayKeepsTheIndexUsable(t *testing.T) {
+	dir := t.TempDir()
+	index, err := NewSQLiteIndex(dir)
+	if err != nil {
+		t.Fatalf("NewSQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	if err := index.IndexPage("docs/a", "docs/a.md", "a", "A", tree.NodeKindPage, "persisted content"); err != nil {
+		t.Fatalf("IndexPage: %v", err)
+	}
+	addUnknownModuleTableLive(t, dir)
+
+	err = index.Clear()
+	if !errors.Is(err, sqliteutil.ErrUnusableDatabase) {
+		t.Fatalf("Clear err = %v, want ErrUnusableDatabase", err)
+	}
+	res, err := index.Search("persisted", nil, 0, 10)
+	if err != nil {
+		t.Fatalf("Search after the failed Clear: %v", err)
+	}
+	if res.Count != 1 {
+		t.Errorf("Search count after the failed Clear = %d, want 1 (rolled back, not half-dropped)", res.Count)
+	}
+	if err := index.IndexPage("docs/b", "docs/b.md", "b", "B", tree.NodeKindPage, "persisted too"); err != nil {
+		t.Errorf("IndexPage after the failed Clear: %v", err)
+	}
+}
+
+// writeUnknownModuleTableIntoWAL leaves search.db with its leftover only in
+// an uncheckpointed -wal and returns the still-open writer, a second handle.
+func writeUnknownModuleTableIntoWAL(t *testing.T, dir string) *sql.DB {
+	t.Helper()
+	indexOnePageAndClose(t, dir)
+	db, err := sql.Open("sqlite", filepath.Join(dir, "search.db")+"?_pragma=journal_mode(WAL)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.SetMaxOpenConns(1)
+	if _, err := db.Exec(`PRAGMA wal_autocheckpoint = 0`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`
+		PRAGMA user_version = 99;
+		PRAGMA writable_schema = ON;
+		INSERT INTO sqlite_master (type, name, tbl_name, rootpage, sql)
+		VALUES ('table', 'zz_leftover', 'zz_leftover', 0, 'CREATE VIRTUAL TABLE zz_leftover USING no_such_module()');
+		PRAGMA writable_schema = OFF;`); err != nil {
+		t.Fatal(err)
+	}
+	if info, err := os.Stat(filepath.Join(dir, "search.db-wal")); err != nil || info.Size() == 0 {
+		t.Fatalf("expected the leftover in a non-empty -wal, err=%v", err)
+	}
+	return db
+}
+
+// The unknown-module rebuild also works when the leftover only exists in a
+// -wal from an unclean shutdown: the policy deletes the file with that -wal
+// and the open starts fresh.
+func TestNewSQLiteIndex_UnknownModuleOnlyInAnUncheckpointedWALRebuilds(t *testing.T) {
+	live := t.TempDir()
+	writer := writeUnknownModuleTableIntoWAL(t, live)
+	defer test_utils.WrapCloseWithErrorCheck(writer.Close, t)
+	crashed := t.TempDir()
+	copySearchDBFiles(t, live, crashed)
+
+	index, err := NewSQLiteIndex(crashed)
+	if err != nil {
+		t.Fatalf("NewSQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	var version, rows, leftover int
+	if err := index.withDB(func(db *sql.DB) error {
+		if err := db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
+			return err
+		}
+		if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE name = 'zz_leftover'`).Scan(&leftover); err != nil {
+			return err
+		}
+		return db.QueryRow(`SELECT count(*) FROM pages`).Scan(&rows)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if version != searchSchemaVersion || rows != 0 || leftover != 0 {
+		t.Errorf("after the open: version=%d rows=%d leftover=%d, want a fresh current file", version, rows, leftover)
+	}
+}
+
+// With a second handle still open when the policy deletes the file, Unix
+// unlinks it anyway: the new index works on a fresh file and the old handle
+// keeps reading the deleted one. Boot holds no other handle, so this only
+// pins that the new index is not disturbed by the ghost. On Windows the
+// delete fails instead and the open returns that error.
+func TestNewSQLiteIndex_UnknownModuleRebuildWithAnotherHandleOpen(t *testing.T) {
+	dir := t.TempDir()
+	other := writeUnknownModuleTableIntoWAL(t, dir)
+	defer test_utils.WrapCloseWithErrorCheck(other.Close, t)
+
+	index, err := NewSQLiteIndex(dir)
+	if runtime.GOOS == "windows" {
+		if err == nil {
+			_ = index.Close()
+			t.Fatal("NewSQLiteIndex succeeded although the file could not be deleted")
+		}
+		return
+	}
+	if err != nil {
+		t.Fatalf("NewSQLiteIndex: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	if err := index.IndexPage("docs/new", "docs/new.md", "new", "New", tree.NodeKindPage, "freshterm"); err != nil {
+		t.Fatalf("IndexPage on the rebuilt file: %v", err)
+	}
+	res, err := index.Search("freshterm", nil, 0, 10)
+	if err != nil || res.Count != 1 {
+		t.Fatalf("Search on the rebuilt file: count=%v err=%v", res, err)
+	}
+
+	var ghostVersion, ghostNew int
+	if err := other.QueryRow(`PRAGMA user_version`).Scan(&ghostVersion); err != nil {
+		t.Fatalf("old handle: %v", err)
+	}
+	if err := other.QueryRow(`SELECT count(*) FROM pages WHERE pageID = 'new'`).Scan(&ghostNew); err != nil {
+		t.Fatalf("old handle: %v", err)
+	}
+	if ghostVersion != 99 || ghostNew != 0 {
+		t.Errorf("old handle: version=%d newRows=%d, want 99 and 0 (it reads the deleted file)", ghostVersion, ghostNew)
 	}
 }
