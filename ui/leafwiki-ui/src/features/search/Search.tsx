@@ -93,6 +93,10 @@ export default function Search({ active = false }: SearchProps) {
   )
   const resultRefs = useRef<(HTMLAnchorElement | null)[]>([])
   const latestRequestIdRef = useRef(0)
+  // Bumped when a keystroke invalidates the pending request but leaves the
+  // debounced query unchanged ("Pi" -> "P" -> "Pi" within the debounce), so
+  // the request effect still runs and settles the loading state.
+  const [retypedQueryCount, setRetypedQueryCount] = useState(0)
 
   const limit = 10
   const debouncedQuery = useDebounce(inputQuery, 300)
@@ -283,6 +287,7 @@ export default function Search({ active = false }: SearchProps) {
     hasDebouncedFilters,
     hasSearchQuery,
     page,
+    retypedQueryCount,
   ])
 
   const clearSearch = () => {
@@ -356,6 +361,9 @@ export default function Search({ active = false }: SearchProps) {
 
               if (isSearchableQuery(nextQuery) || activeTags.length > 0) {
                 setLoading(true)
+                if (nextQuery === debouncedQuery) {
+                  setRetypedQueryCount((count) => count + 1)
+                }
               } else {
                 setResults([])
                 setTotalCount(0)

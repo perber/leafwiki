@@ -271,29 +271,25 @@ describe('Search', () => {
     expect(screen.getByTestId('search-min-length-hint')).toBeInTheDocument()
   })
 
-  // Known bug, also on main with the old threshold: the debounced query
-  // never changes, so no request settles the loading state. Flip to it()
-  // once fixed.
-  it.fails(
-    'searches again when a too-short query is typed back within the debounce',
-    async () => {
-      searchPagesMock.mockResolvedValue(twoResults)
-      renderSearch()
-      const input = screen.getByTestId('search-input')
+  // Regression: the debounced query never changed, so no request settled
+  // the loading state.
+  it('searches again when a too-short query is typed back within the debounce', async () => {
+    searchPagesMock.mockResolvedValue(twoResults)
+    renderSearch()
+    const input = screen.getByTestId('search-input')
 
-      await typeQuery('Pi')
-      expect(screen.getByTestId('search-results-list')).toBeInTheDocument()
+    await typeQuery('Pi')
+    expect(screen.getByTestId('search-results-list')).toBeInTheDocument()
 
-      fireEvent.change(input, { target: { value: 'P' } })
-      fireEvent.change(input, { target: { value: 'Pi' } })
-      await act(async () => {
-        vi.advanceTimersByTime(PAST_DEBOUNCE_MS)
-      })
+    fireEvent.change(input, { target: { value: 'P' } })
+    fireEvent.change(input, { target: { value: 'Pi' } })
+    await act(async () => {
+      vi.advanceTimersByTime(PAST_DEBOUNCE_MS)
+    })
 
-      expect(screen.queryByText('Loading results...')).toBeNull()
-      expect(screen.getByTestId('search-results-list')).toBeInTheDocument()
-    },
-  )
+    expect(screen.queryByText('Loading results...')).toBeNull()
+    expect(screen.getByTestId('search-results-list')).toBeInTheDocument()
+  })
 
   it('moves the selection with ArrowDown from the input', async () => {
     searchPagesMock.mockResolvedValue(twoResults)
