@@ -206,15 +206,15 @@ export function useToolbarActions({
     registerHotkey(linkHotkey)
 
     return () => {
-      unregisterHotkey(saveHotKey.keyCombo)
-      unregisterHotkey(closeHotkey.keyCombo)
-      unregisterHotkey(boldHotkey.keyCombo)
-      unregisterHotkey(italicHotkey.keyCombo)
-      unregisterHotkey(heading1Hotkey.keyCombo)
-      unregisterHotkey(heading2Hotkey.keyCombo)
-      unregisterHotkey(heading3Hotkey.keyCombo)
-      unregisterHotkey(inlineCodeHotkey.keyCombo)
-      unregisterHotkey(linkHotkey.keyCombo)
+      unregisterHotkey(saveHotKey)
+      unregisterHotkey(closeHotkey)
+      unregisterHotkey(boldHotkey)
+      unregisterHotkey(italicHotkey)
+      unregisterHotkey(heading1Hotkey)
+      unregisterHotkey(heading2Hotkey)
+      unregisterHotkey(heading3Hotkey)
+      unregisterHotkey(inlineCodeHotkey)
+      unregisterHotkey(linkHotkey)
     }
   }, [
     appMode,

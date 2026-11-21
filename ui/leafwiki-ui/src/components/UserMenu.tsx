@@ -64,7 +64,7 @@ export default function UserMenu() {
     )
 
     registerHotkey(hotkey)
-    return () => unregisterHotkey(hotkey.keyCombo)
+    return () => unregisterHotkey(hotkey)
   }, [
     authDisabled,
     openDialog,

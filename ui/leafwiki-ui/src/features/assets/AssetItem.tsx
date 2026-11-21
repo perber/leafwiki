@@ -156,8 +156,8 @@ export function AssetItem({
     registerHotkey(escapeHotkey)
 
     return () => {
-      unregisterHotkey(enterHotkey.keyCombo)
-      unregisterHotkey(escapeHotkey.keyCombo)
+      unregisterHotkey(enterHotkey)
+      unregisterHotkey(escapeHotkey)
     }
   }, [
     isEditing,

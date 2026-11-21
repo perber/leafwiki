@@ -39,7 +39,7 @@ export function ImagePreviewDialog({ src, alt }: Props) {
     registerHotkey(cancelHotkey)
 
     return () => {
-      unregisterHotkey(cancelHotkey.keyCombo)
+      unregisterHotkey(cancelHotkey)
     }
   }, [open, registerHotkey, unregisterHotkey, closeDialog])
 

@@ -55,7 +55,7 @@ export function useExitModeButton({
 
     return () => {
       setToolbarButtons([])
-      unregisterHotkey(hotkey.keyCombo)
+      unregisterHotkey(hotkey)
     }
   }, [
     id,

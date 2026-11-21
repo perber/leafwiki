@@ -171,14 +171,14 @@ export function useToolbarActions({
     registerHotkey(deleteHotkey)
 
     return () => {
-      unregisterHotkey(editHotkey.keyCombo)
-      unregisterHotkey(permalinkHotkey.keyCombo)
-      unregisterHotkey(copyHotkey.keyCombo)
-      unregisterHotkey(printHotkey.keyCombo)
+      unregisterHotkey(editHotkey)
+      unregisterHotkey(permalinkHotkey)
+      unregisterHotkey(copyHotkey)
+      unregisterHotkey(printHotkey)
       if (enableRevision) {
-        unregisterHotkey(historyHotkey.keyCombo)
+        unregisterHotkey(historyHotkey)
       }
-      unregisterHotkey(deleteHotkey.keyCombo)
+      unregisterHotkey(deleteHotkey)
     }
   }, [
     appMode,
