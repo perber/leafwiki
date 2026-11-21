@@ -308,6 +308,15 @@ describe('Search', () => {
     )
   })
 
+  // jsdom computes no layout, so this only proves the class survives
+  // tailwind-merge against the Input's px-3; whether text clears the button
+  // is checked visually.
+  it('reserves right padding on the input for the clear button', () => {
+    renderSearch()
+
+    expect(screen.getByTestId('search-input')).toHaveClass('pr-8')
+  })
+
   describe('syntax help', () => {
     const examples = [
       'install',

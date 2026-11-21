@@ -395,7 +395,10 @@ export default function Search({ active = false }: SearchProps) {
                 openActiveResult()
               }
             }}
-            className="search__input"
+            // pr-8 keeps long queries clear of the clear button. It is a
+            // utility here because the Input's own px-3 is one and would beat
+            // padding set in .search__input (components layer).
+            className="search__input pr-8"
           />
           {inputQuery && (
             <button
