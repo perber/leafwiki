@@ -23,7 +23,44 @@ export default class SearchView {
     return this.page.locator('[data-testid^="tags-filter-"]');
   }
 
+  getMinLengthHint() {
+    return this.page.getByTestId('search-min-length-hint');
+  }
+
+  getSyntaxHelpButton() {
+    return this.page.getByTestId('search-syntax-help-button');
+  }
+
+  getSyntaxHelpPanel() {
+    return this.page.getByTestId('search-syntax-help');
+  }
+
+  getResultCards() {
+    return this.page.locator('a[data-testid^="search-result-card-"]');
+  }
+
   async enterSearchQuery(query: string) {
+    await this.fillSearchInput(query);
+    await this.page
+      .locator('.search__result-summary, [data-testid="search-results-list"]')
+      .first()
+      .waitFor({ state: 'visible' });
+  }
+
+  // A query below the minimum length never shows a result summary, only the
+  // hint, so enterSearchQuery would wait forever.
+  async enterTooShortSearchQuery(query: string) {
+    await this.fillSearchInput(query);
+    await expect(this.getMinLengthHint()).toBeVisible();
+  }
+
+  async openSyntaxHelp() {
+    await this.getSyntaxHelpButton().click();
+    await expect(this.getSyntaxHelpButton()).toHaveAttribute('aria-expanded', 'true');
+    await expect(this.getSyntaxHelpPanel()).toBeVisible();
+  }
+
+  private async fillSearchInput(query: string) {
     const searchInput = this.getSearchInput();
     await searchInput.fill(query);
     await expect
@@ -36,10 +73,6 @@ export default class SearchView {
         return currentValue;
       })
       .toBe(query);
-    await this.page
-      .locator('.search__result-summary, [data-testid="search-results-list"]')
-      .first()
-      .waitFor({ state: 'visible' });
   }
 
   async clearSearch() {
