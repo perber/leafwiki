@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/perber/wiki/internal/core/shared/sqliteutil"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/test_utils"
 	_ "modernc.org/sqlite" // Import SQLite driver
@@ -1893,5 +1894,54 @@ func TestNewSQLiteIndex_ConcurrentOpensOfAnOutdatedFile(t *testing.T) {
 			t.Errorf("IndexPage on instance %d: %v", i, err)
 		}
 		test_utils.WrapCloseWithErrorCheck(indexes[i].Close, t)
+	}
+}
+
+// When another writer keeps the lock past busy_timeout, boot gets a plain
+// SQLITE_BUSY error. It is not a corruption error, so RebuildOnCorruption must
+// not delete the file, and nothing of the rebuild may be applied.
+func TestNewSQLiteIndex_LockHeldPastBusyTimeoutFailsWithoutTouchingTheFile(t *testing.T) {
+	dir := t.TempDir()
+	indexOnePageAndClose(t, dir)
+	execRawSearchDB(t, dir, `PRAGMA user_version = 99`)
+
+	locker, err := sql.Open("sqlite", filepath.Join(dir, "search.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(locker.Close, t)
+	conn, err := locker.Conn(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(conn.Close, t)
+	if _, err := conn.ExecContext(t.Context(), `BEGIN IMMEDIATE`); err != nil {
+		t.Fatalf("BEGIN IMMEDIATE: %v", err)
+	}
+
+	index, err := NewSQLiteIndex(dir)
+	if err == nil {
+		_ = index.Close()
+		t.Fatal("NewSQLiteIndex succeeded while another writer held the lock past busy_timeout")
+	}
+	if !strings.Contains(err.Error(), "SQLITE_BUSY") {
+		t.Errorf("err = %v, want SQLITE_BUSY", err)
+	}
+	if sqliteutil.IsSQLiteRecoverableError(err) {
+		t.Errorf("SQLITE_BUSY must not count as corruption: %v", err)
+	}
+
+	var version, rows int
+	if err := conn.QueryRowContext(t.Context(), `PRAGMA user_version`).Scan(&version); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.QueryRowContext(t.Context(), `SELECT count(*) FROM pages`).Scan(&rows); err != nil {
+		t.Fatal(err)
+	}
+	if version != 99 || rows != 1 {
+		t.Errorf("after the timed-out open: version=%d rows=%d, want 99 and 1 (file must stay untouched)", version, rows)
+	}
+	if _, err := conn.ExecContext(t.Context(), `ROLLBACK`); err != nil {
+		t.Fatal(err)
 	}
 }
