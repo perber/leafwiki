@@ -338,3 +338,36 @@ func TestSearchIndexSideEffect_Apply_Move_PageStillSearchableAtNewPath(t *testin
 		t.Errorf("expected path %q after move, got %q", wantPath, result.Items[0].Path)
 	}
 }
+
+// Boot reopens search.db, which now keeps its rows (ADR-0022), and then runs
+// IndexAllPagesContext. Repeating that must not duplicate any page.
+func TestSearchIndexSideEffect_IndexAllPages_AfterReopenDoesNotDuplicateRows(t *testing.T) {
+	tmp := t.TempDir()
+	treeSvc := tree.NewTreeService(tmp)
+	if err := treeSvc.LoadTree(); err != nil {
+		t.Fatalf("LoadTree: %v", err)
+	}
+	createPageWithContent(t, treeSvc, "First", "first", "reopenterm one")
+	createPageWithContent(t, treeSvc, "Second", "second", "reopenterm two")
+
+	for boot := range 3 {
+		index, err := search.NewSQLiteIndex(tmp)
+		if err != nil {
+			t.Fatalf("boot %d: NewSQLiteIndex: %v", boot, err)
+		}
+		effect := NewSearchIndexSideEffect(index, treeSvc, nil, nil)
+		if err := effect.IndexAllPagesContext(t.Context()); err != nil {
+			t.Fatalf("boot %d: IndexAllPagesContext: %v", boot, err)
+		}
+		result, err := index.Search("reopenterm", nil, 0, 10)
+		if err != nil {
+			t.Fatalf("boot %d: Search: %v", boot, err)
+		}
+		if result.Count != 2 {
+			t.Errorf("boot %d: Search count = %d, want 2", boot, result.Count)
+		}
+		if err := index.Close(); err != nil {
+			t.Fatalf("boot %d: Close: %v", boot, err)
+		}
+	}
+}
