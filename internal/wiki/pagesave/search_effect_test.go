@@ -1,6 +1,10 @@
 package pagesave
 
 import (
+	"database/sql"
+	"fmt"
+	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/perber/wiki/internal/core/tree"
@@ -369,5 +373,127 @@ func TestSearchIndexSideEffect_IndexAllPages_AfterReopenDoesNotDuplicateRows(t *
 		if err := index.Close(); err != nil {
 			t.Fatalf("boot %d: Close: %v", boot, err)
 		}
+	}
+}
+
+// Boot reopens a search.db whose FTS5 shadow tables are damaged (open does
+// not see it, ADR-0022) and runs IndexAllPagesContext; afterwards Search must
+// work again with exactly the tree's pages.
+func TestSearchIndexSideEffect_IndexAllPages_HealsDamagedShadowTablesAfterReopen(t *testing.T) {
+	tests := []struct {
+		name   string
+		damage string
+	}{
+		{name: "inverted index with missing segments", damage: `DELETE FROM pages_data WHERE id > 10`},
+		{name: "missing content rows", damage: `DELETE FROM pages_content`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmp := t.TempDir()
+			treeSvc := tree.NewTreeService(tmp)
+			if err := treeSvc.LoadTree(); err != nil {
+				t.Fatalf("LoadTree: %v", err)
+			}
+			createPageWithContent(t, treeSvc, "First", "first", "healterm one")
+			createPageWithContent(t, treeSvc, "Second", "second", "healterm two")
+
+			index, err := search.NewSQLiteIndex(tmp)
+			if err != nil {
+				t.Fatalf("NewSQLiteIndex: %v", err)
+			}
+			if err := NewSearchIndexSideEffect(index, treeSvc, nil, nil).IndexAllPagesContext(t.Context()); err != nil {
+				t.Fatalf("IndexAllPagesContext: %v", err)
+			}
+			if err := index.Close(); err != nil {
+				t.Fatalf("Close: %v", err)
+			}
+
+			raw, err := sql.Open("sqlite", filepath.Join(tmp, "search.db"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := raw.Exec(tt.damage); err != nil {
+				t.Fatalf("damage: %v", err)
+			}
+			if err := raw.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			index, err = search.NewSQLiteIndex(tmp)
+			if err != nil {
+				t.Fatalf("reopen: %v", err)
+			}
+			defer func() {
+				if err := index.Close(); err != nil {
+					t.Errorf("Close: %v", err)
+				}
+			}()
+			if _, err := index.Search("healterm", nil, 0, 10); err == nil {
+				t.Fatal("Search on the damaged index succeeded; the damage no longer reproduces")
+			}
+			if err := NewSearchIndexSideEffect(index, treeSvc, nil, nil).IndexAllPagesContext(t.Context()); err != nil {
+				t.Fatalf("IndexAllPagesContext on the damaged index: %v", err)
+			}
+			res, err := index.Search("healterm", nil, 0, 10)
+			if err != nil {
+				t.Fatalf("Search after boot reindex: %v", err)
+			}
+			if res.Count != 2 {
+				t.Errorf("Search count = %d, want 2", res.Count)
+			}
+		})
+	}
+}
+
+// A resync (Clear plus full reindex) while searches run must never make a
+// Search fail, and never return more hits than there are pages.
+func TestSearchIndexSideEffect_IndexAllPages_ConcurrentSearchesDuringResyncDoNotFail(t *testing.T) {
+	treeSvc, index, effect := setupSearchTest(t)
+	for i := range 10 {
+		createPageWithContent(t, treeSvc, fmt.Sprintf("Page %d", i), fmt.Sprintf("page-%d", i), "resyncterm body")
+	}
+	if err := effect.IndexAllPages(); err != nil {
+		t.Fatalf("IndexAllPages: %v", err)
+	}
+
+	stop := make(chan struct{})
+	errCh := make(chan error, 100)
+	var wg sync.WaitGroup
+	for range 4 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+				res, err := index.Search("resyncterm", nil, 0, 50)
+				if err != nil {
+					errCh <- fmt.Errorf("Search: %w", err)
+					return
+				}
+				if res.Count > 10 {
+					errCh <- fmt.Errorf("Search count = %d, more than the 10 pages", res.Count)
+					return
+				}
+			}
+		}()
+	}
+	for range 3 {
+		if err := effect.IndexAllPagesContext(t.Context()); err != nil {
+			t.Errorf("IndexAllPagesContext: %v", err)
+		}
+	}
+	close(stop)
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Error(err)
+	}
+	res, err := index.Search("resyncterm", nil, 0, 50)
+	if err != nil || res.Count != 10 {
+		t.Errorf("after resyncs: count=%v err=%v, want 10", res, err)
 	}
 }
