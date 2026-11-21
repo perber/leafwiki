@@ -15,13 +15,7 @@ import (
 )
 
 func TestSQLiteIndex_IndexPage(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	index := newTestIndex(t)
 
 	// Testdata
 	path := "docs/test.md"
@@ -30,7 +24,7 @@ func TestSQLiteIndex_IndexPage(t *testing.T) {
 	content := "This is a **test** page."
 	expectedContent := "This is a test page."
 
-	err = index.IndexPage(path, path, pageID, title, tree.NodeKindPage, content)
+	err := index.IndexPage(path, path, pageID, title, tree.NodeKindPage, content)
 	if err != nil {
 		t.Fatalf("IndexPage failed: %v", err)
 	}
@@ -66,13 +60,7 @@ func TestSQLiteIndex_IndexPage(t *testing.T) {
 }
 
 func TestSQLiteIndex_UsesWALJournalMode(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	index := newTestIndex(t)
 
 	var mode string
 	if err := index.withDB(func(db *sql.DB) error {
@@ -87,13 +75,7 @@ func TestSQLiteIndex_UsesWALJournalMode(t *testing.T) {
 }
 
 func TestSQLiteIndex_IndexPage_ReindexingExistingPageProducesExactlyOneRow(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	index := newTestIndex(t)
 
 	path := "docs/test.md"
 	pageID := "test123"
@@ -118,12 +100,7 @@ func TestSQLiteIndex_IndexPage_ReindexingExistingPageProducesExactlyOneRow(t *te
 }
 
 func TestSQLiteIndex_RemovePages_RemovesAllGivenIDs(t *testing.T) {
-	tmpDir := t.TempDir()
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	index := newTestIndex(t)
 
 	ids := []string{"page-a", "page-b", "page-c"}
 	for _, id := range ids {
@@ -157,12 +134,7 @@ func TestSQLiteIndex_RemovePages_RemovesAllGivenIDs(t *testing.T) {
 }
 
 func TestSQLiteIndex_IndexPages_IndexesAllGivenInputs(t *testing.T) {
-	tmpDir := t.TempDir()
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	index := newTestIndex(t)
 
 	inputs := make([]IndexPageInput, 0, 5)
 	for i := 0; i < 5; i++ {
@@ -194,12 +166,7 @@ func TestSQLiteIndex_IndexPages_IndexesAllGivenInputs(t *testing.T) {
 }
 
 func TestSQLiteIndex_IndexPages_SkipsUnparsableInputOthersStillCommit(t *testing.T) {
-	tmpDir := t.TempDir()
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	index := newTestIndex(t)
 
 	// Properly fenced (so it's recognized as frontmatter at all) but
 	// invalid YAML inside (unclosed flow sequence) that markdown's
@@ -251,12 +218,7 @@ func TestSQLiteIndex_IndexPages_SkipsUnparsableInputOthersStillCommit(t *testing
 // catch a regression (mirrors
 // internal/links/links_store_test.go's TestLinksStore_ConcurrentReadsDoNotRace).
 func TestSQLiteIndex_ConcurrentSearchesDoNotRace(t *testing.T) {
-	tmpDir := t.TempDir()
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	index := newTestIndex(t)
 
 	for i := 0; i < 20; i++ {
 		id := fmt.Sprintf("page-%d", i)
@@ -313,16 +275,10 @@ func TestSQLiteIndex_CreatesDatabaseInStorageDir(t *testing.T) {
 }
 
 func TestSQLiteIndex_Search(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	index := newTestIndex(t)
 
 	// Index two pages
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha Search Test", tree.NodeKindPage, "This content is about SQLite search.")
+	err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha Search Test", tree.NodeKindPage, "This content is about SQLite search.")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -391,16 +347,10 @@ func TestSQLiteIndex_Search_NoMatch_ReturnsEmptyItems(t *testing.T) {
 }
 
 func TestSQLiteIndex_Search_RanksTitleMatchHigherThanContent(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	index := newTestIndex(t)
 
 	// page with match in title
-	err = index.IndexPage(
+	err := index.IndexPage(
 		"docs/titleMatch",
 		"docs/titleMatch.md",
 		"titleMatch",
@@ -457,16 +407,10 @@ func TestSQLiteIndex_Search_RanksTitleMatchHigherThanContent(t *testing.T) {
 }
 
 func TestSQLiteIndex_Search_EscapesTitleForContentOnlyMatch(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	index := newTestIndex(t)
 
 	maliciousTitle := `<img src=x onerror="alert(1)">`
-	err = index.IndexPage(
+	err := index.IndexPage(
 		"docs/malicious",
 		"docs/malicious.md",
 		"malicious1",
@@ -497,16 +441,10 @@ func TestSQLiteIndex_Search_EscapesTitleForContentOnlyMatch(t *testing.T) {
 }
 
 func TestSQLiteIndex_Search_PreservesBoldHighlightsWhileEscapingTitle(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	index := newTestIndex(t)
 
 	maliciousTitle := `<script>alert(1)</script> Search`
-	err = index.IndexPage(
+	err := index.IndexPage(
 		"docs/highlighted",
 		"docs/highlighted.md",
 		"highlighted1",
@@ -540,16 +478,10 @@ func TestSQLiteIndex_Search_PreservesBoldHighlightsWhileEscapingTitle(t *testing
 }
 
 func TestSQLiteIndex_Search_EscapesTitleForFilteredResultsWithoutQuery(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	index := newTestIndex(t)
 
 	maliciousTitle := `<svg onload=alert(1)>`
-	err = index.IndexPage(
+	err := index.IndexPage(
 		"docs/tagged",
 		"docs/tagged.md",
 		"tagged1",
@@ -580,16 +512,10 @@ func TestSQLiteIndex_Search_EscapesTitleForFilteredResultsWithoutQuery(t *testin
 }
 
 func TestSQLiteIndex_Search_RanksHeadingHigherThanContent(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	index := newTestIndex(t)
 
 	// page with match in heading (Markdown heading)
-	err = index.IndexPage(
+	err := index.IndexPage(
 		"docs/headingMatch",
 		"docs/headingMatch.md",
 		"headingMatch",
@@ -637,15 +563,9 @@ func TestSQLiteIndex_Search_RanksHeadingHigherThanContent(t *testing.T) {
 }
 
 func TestSQLiteIndex_SearchPageIDs_RespectsQueryAndPageFilters(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage("docs/alpha", "docs/alpha.md", "alpha", "Alpha Page", tree.NodeKindPage, "Shared token in alpha.")
+	err := index.IndexPage("docs/alpha", "docs/alpha.md", "alpha", "Alpha Page", tree.NodeKindPage, "Shared token in alpha.")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -679,15 +599,9 @@ func TestSQLiteIndex_SearchPageIDs_RespectsQueryAndPageFilters(t *testing.T) {
 }
 
 func TestSQLiteIndex_Search_FiltersByPageIDs(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage(
+	err := index.IndexPage(
 		"docs/react-guide",
 		"docs/react-guide.md",
 		"react-guide",
@@ -728,15 +642,9 @@ func TestSQLiteIndex_Search_FiltersByPageIDs(t *testing.T) {
 }
 
 func TestSQLiteIndex_Search_ReturnsNoResultsWhenPageIDFilterIsEmpty(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage(
+	err := index.IndexPage(
 		"docs/react-guide",
 		"docs/react-guide.md",
 		"react-guide",
@@ -762,15 +670,9 @@ func TestSQLiteIndex_Search_ReturnsNoResultsWhenPageIDFilterIsEmpty(t *testing.T
 }
 
 func TestSQLiteIndex_IndexPage_StripsShoutoutFenceSyntaxButKeepsLabel(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage(
+	err := index.IndexPage(
 		"docs/shoutout",
 		"docs/shoutout.md",
 		"shoutout1",
@@ -805,15 +707,9 @@ func TestSQLiteIndex_IndexPage_StripsShoutoutFenceSyntaxButKeepsLabel(t *testing
 }
 
 func TestSQLiteIndex_IndexPage_StripsMarkdownFormattingFromIndexedContent(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage(
+	err := index.IndexPage(
 		"docs/markdown",
 		"docs/markdown.md",
 		"markdown1",
@@ -838,13 +734,7 @@ func TestSQLiteIndex_IndexPage_StripsMarkdownFormattingFromIndexedContent(t *tes
 }
 
 func TestSQLiteIndex_Search_FindsTermsInsideCodeBlocks(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	index := newTestIndex(t)
 
 	content := strings.Join([]string{
 		"# Example Test Page with a code block.",
@@ -858,7 +748,7 @@ func TestSQLiteIndex_Search_FindsTermsInsideCodeBlocks(t *testing.T) {
 		"```",
 	}, "\n")
 
-	err = index.IndexPage("docs/code-example", "docs/code-example.md", "code1", "Example Test Page with a code block.", tree.NodeKindPage, content)
+	err := index.IndexPage("docs/code-example", "docs/code-example.md", "code1", "Example Test Page with a code block.", tree.NodeKindPage, content)
 	if err != nil {
 		t.Fatalf("IndexPage failed: %v", err)
 	}
@@ -881,15 +771,9 @@ func TestSQLiteIndex_Search_FindsTermsInsideCodeBlocks(t *testing.T) {
 // surfacing to callers as a generic error instead of a normal (possibly
 // empty) result.
 func TestSQLiteIndex_Search_TolerateFTS5SpecialCharacters(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Hello World", tree.NodeKindPage, "hello world content")
+	err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Hello World", tree.NodeKindPage, "hello world content")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -917,15 +801,9 @@ func TestSQLiteIndex_Search_TolerateFTS5SpecialCharacters(t *testing.T) {
 // whenever punctuation is present) instead of actually searching: splitting
 // "hello,world" on the comma should still find a page containing both words.
 func TestSQLiteIndex_Search_CommaSeparatedTermsStillFindMatches(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Greeting", tree.NodeKindPage, "hello world, this page greets everyone")
+	err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Greeting", tree.NodeKindPage, "hello world, this page greets everyone")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -943,15 +821,9 @@ func TestSQLiteIndex_Search_CommaSeparatedTermsStillFindMatches(t *testing.T) {
 // existing prefix-search behavior for ordinary single-word queries: the fix
 // for #1577 must not change ranking/matching for the common case.
 func TestSQLiteIndex_Search_SingleWordPrefixMatchUnaffectedByQuoting(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "this page is about searching and searches")
+	err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "this page is about searching and searches")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -969,15 +841,9 @@ func TestSQLiteIndex_Search_SingleWordPrefixMatchUnaffectedByQuoting(t *testing.
 // existing "trust the user's FTS5 syntax" branch (column filters, boolean
 // operators): the #1577 fix only changes the plain-word fallback path.
 func TestSQLiteIndex_Search_ExplicitFTS5SyntaxStillPassesThrough(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha Search Test", tree.NodeKindPage, "This content is about SQLite search.")
+	err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha Search Test", tree.NodeKindPage, "This content is about SQLite search.")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -1004,15 +870,9 @@ func TestSQLiteIndex_Search_ExplicitFTS5SyntaxStillPassesThrough(t *testing.T) {
 // whole-query quoting is replaced by per-term quoting: a query matching an
 // indexed punctuation-bearing token should still be found.
 func TestSQLiteIndex_Search_HyphenatedQueryStillFindsPunctuationToken(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Report", tree.NodeKindPage, "see report-final.v2 for details")
+	err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Report", tree.NodeKindPage, "see report-final.v2 for details")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -1035,15 +895,9 @@ func TestSQLiteIndex_Search_HyphenatedQueryStillFindsPunctuationToken(t *testing
 // FTS5 table, not just asserted against buildFuzzyQuery's string output, so
 // a change that "looks" safe but is still invalid FTS5 syntax would fail.
 func TestBuildFuzzyQuery_NeverProducesSyntaxErrorForMixedPunctuationAndOperators(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Foo Bar", tree.NodeKindPage, "foo bar baz content")
+	err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Foo Bar", tree.NodeKindPage, "foo bar baz content")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -1074,15 +928,9 @@ func TestBuildFuzzyQuery_NeverProducesSyntaxErrorForMixedPunctuationAndOperators
 // against a fix that merely avoids the crash without still finding the
 // intended content: "it's" should still find a page containing "it's".
 func TestSQLiteIndex_Search_ApostropheWordStillMatchesIndexedContent(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Note", tree.NodeKindPage, "it's a great day today")
+	err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Note", tree.NodeKindPage, "it's a great day today")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -1102,15 +950,9 @@ func TestSQLiteIndex_Search_ApostropheWordStillMatchesIndexedContent(t *testing.
 // whether the text before the colon was a real column, so a pasted URL,
 // Windows path, or time crashed with "no such column: ...".
 func TestSQLiteIndex_Search_BareColonQueriesDoNotCrash(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Notes", tree.NodeKindPage, "see http example com for the schedule at 10 30")
+	err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Notes", tree.NodeKindPage, "see http example com for the schedule at 10 30")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -1134,15 +976,9 @@ func TestSQLiteIndex_Search_BareColonQueriesDoNotCrash(t *testing.T) {
 // validation: a genuine column filter naming a real column must still be
 // trusted and behave as before.
 func TestSQLiteIndex_Search_RealColumnFilterStillWorks(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha Search Test", tree.NodeKindPage, "This content is about SQLite search.")
+	err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha Search Test", tree.NodeKindPage, "This content is about SQLite search.")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -1165,15 +1001,9 @@ func TestSQLiteIndex_Search_RealColumnFilterStillWorks(t *testing.T) {
 // captured mid-typing) was trusted as a boolean operator regardless of
 // context and crashed with an FTS5 syntax error.
 func TestSQLiteIndex_Search_DanglingBooleanKeywordDoesNotCrash(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Notes", tree.NodeKindPage, "foo and bar or not baz")
+	err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Notes", tree.NodeKindPage, "foo and bar or not baz")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -1192,15 +1022,9 @@ func TestSQLiteIndex_Search_DanglingBooleanKeywordDoesNotCrash(t *testing.T) {
 // after adding the neighbor-context check: AND/OR sitting between two real
 // operands must still be trusted and behave as before.
 func TestSQLiteIndex_Search_BooleanOperatorBetweenRealOperandsStillWorks(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha Search Test", tree.NodeKindPage, "This content is about SQLite search.")
+	err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha Search Test", tree.NodeKindPage, "This content is about SQLite search.")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -1223,15 +1047,9 @@ func TestSQLiteIndex_Search_BooleanOperatorBetweenRealOperandsStillWorks(t *test
 // the simplest possible input. It should behave like any other query with
 // nothing to search on: an empty result, not an error.
 func TestSQLiteIndex_Search_PunctuationOnlyQueryReturnsEmptyResultNotError(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "some content")
+	err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "some content")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -1259,15 +1077,9 @@ func TestSQLiteIndex_Search_PunctuationOnlyQueryReturnsEmptyResultNotError(t *te
 // the filtered pages, no MATCH applied) rather than erroring or ignoring
 // the filter.
 func TestSQLiteIndex_Search_PunctuationOnlyQueryWithPageIDFilterStillFilters(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "some content")
+	err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "some content")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -1291,15 +1103,9 @@ func TestSQLiteIndex_Search_PunctuationOnlyQueryWithPageIDFilterStillFilters(t *
 // deliberate FTS5 syntax purely because it contained an operator
 // character, even though none of these are valid standalone FTS5 syntax.
 func TestSQLiteIndex_Search_BareOperatorCharacterDoesNotCrash(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "some content")
+	err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "some content")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -1318,15 +1124,9 @@ func TestSQLiteIndex_Search_BareOperatorCharacterDoesNotCrash(t *testing.T) {
 // (a plausible typo or fast-typing artifact) was trusted twice over and
 // reached SQLite as two adjacent, unconnected operators.
 func TestSQLiteIndex_Search_DoubledBooleanKeywordDoesNotCrash(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "foo bar content")
+	err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "foo bar content")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -1347,15 +1147,9 @@ func TestSQLiteIndex_Search_DoubledBooleanKeywordDoesNotCrash(t *testing.T) {
 // both: no crash, and the column scope from the user's `col:` filter is
 // preserved rather than dropped.
 func TestSQLiteIndex_Search_ColumnFilterWithPunctuationValueStaysScoped(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "don't forget the http example com link")
+	err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "don't forget the http example com link")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -1400,15 +1194,9 @@ func TestSQLiteIndex_Search_ColumnFilterWithPunctuationValueStaysScoped(t *testi
 // silently stripped the comma the NEAR grammar requires — no error, just
 // wrong (empty) results.
 func TestSQLiteIndex_Search_NearFunctionCallStillWorks(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "foo one two three bar")
+	err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "foo one two three bar")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -1489,15 +1277,9 @@ func TestExtractHeadings_HeadingWithCodeSpan(t *testing.T) {
 // parentheses. They used to be passed to MATCH verbatim and fail with a
 // syntax error.
 func TestSQLiteIndex_Search_OperatorFieldWithTokenPunctuationDoesNotError(t *testing.T) {
-	tmpDir := t.TempDir()
+	index := newTestIndex(t)
 
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-
-	err = index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "foo-bar-baz report.v2-final c#sharp a/b/c")
+	err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "foo-bar-baz report.v2-final c#sharp a/b/c")
 	if err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
@@ -1529,13 +1311,7 @@ func TestSQLiteIndex_Search_OperatorFieldWithTokenPunctuationDoesNotError(t *tes
 // TestSQLiteIndex_Search_BalancedParenGroupAcrossFieldsStillWorks makes sure
 // deliberate grouping spread over several fields is still trusted.
 func TestSQLiteIndex_Search_BalancedParenGroupAcrossFieldsStillWorks(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	index, err := NewSQLiteIndex(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to create SQLiteIndex: %v", err)
-	}
-	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
+	index := newTestIndex(t)
 
 	if err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alpha", tree.NodeKindPage, "apple banana"); err != nil {
 		t.Fatalf("failed to index alpha page: %v", err)
@@ -1645,6 +1421,18 @@ func TestNewSQLiteIndex_OpenKeepsOrRebuildsTheSchema(t *testing.T) {
 			}
 		})
 	}
+}
+
+// newTestIndex opens a fresh index in a temporary directory and closes it
+// when the test ends.
+func newTestIndex(t *testing.T) *SQLiteIndex {
+	t.Helper()
+	index, err := NewSQLiteIndex(t.TempDir())
+	if err != nil {
+		t.Fatalf("failed to create SQLiteIndex: %v", err)
+	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(index.Close, t) })
+	return index
 }
 
 func indexOnePageAndClose(t *testing.T, dir string) {
