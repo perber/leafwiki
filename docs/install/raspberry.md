@@ -71,3 +71,5 @@ Once the machine and the tunnel are connected, you must register the application
 Choose the `HTTP` protocol and enter `localhost:8080` to target LeafWiki.
 
 ![image-6](../assets/install/raspberry/image-6.png)
+
+`cloudflared` connects from the same machine, so add `LEAFWIKI_TRUSTED_PROXY_IPS=127.0.0.1` to `/etc/leafwiki/.env` and restart LeafWiki (`sudo systemctl restart leafwiki`). LeafWiki then reads the visitor's address from `X-Forwarded-For`; without it every visitor shares `127.0.0.1` in the access log, rate limits and login backoff.
