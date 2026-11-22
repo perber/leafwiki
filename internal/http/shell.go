@@ -140,8 +140,8 @@ func newShellHandler(cfg FrontendConfig, opts RouterOptions, customStylesheetPat
 	}
 	contributors := append([]ShellContributor{}, cfg.ShellContributors...)
 	contributors = append(contributors,
-		headContributor(template.HTML(buildCustomStylesheetTag(opts.BasePath, customStylesheetPath))), // basePath unescaped here, behaviour predates the seam
-		headContributor(template.HTML(opts.InjectCodeInHeader)),                                       // admin-provided header code is trusted by design
+		headContributor(template.HTML(buildCustomStylesheetTag(opts.BasePath, customStylesheetPath))),
+		headContributor(template.HTML(opts.InjectCodeInHeader)), // admin-provided header code is trusted by design
 	)
 	return &shellHandler{
 		basePath:       opts.BasePath,

@@ -60,13 +60,11 @@ func TestRenderShell_ExistingConfig_MatchesPreviousOutput(t *testing.T) {
 			want:     `<head><link rel="icon" href="/wiki/branding/f.png"><meta name="base-path" content="/wiki"><title>LeafWiki</title><script src="/wiki/static/a.js"></script></head><body><div id="root"></div></body>`,
 		},
 		{
-			// The stylesheet tag inserts the base path unescaped; known and
-			// tracked separately, pinned here so this refactor doesn't change it.
-			name:     "base path is escaped except in the custom stylesheet tag",
+			name:     "base path is escaped everywhere, the custom stylesheet tag included",
 			template: shellTestTemplate,
 			opts:     wikihttp.RouterOptions{BasePath: `/w"x`},
 			css:      "/data/custom.css",
-			want:     `<head><link rel="icon" href="/w&#34;x/favicon.svg"><meta name="base-path" content="/w&#34;x"><title>LeafWiki</title><script src="/w&#34;x/static/a.js"></script>  <link rel="stylesheet" href="/w"x/custom.css">` + "\n" + `  </head><body><div id="root"></div></body>`,
+			want:     `<head><link rel="icon" href="/w&#34;x/favicon.svg"><meta name="base-path" content="/w&#34;x"><title>LeafWiki</title><script src="/w&#34;x/static/a.js"></script>  <link rel="stylesheet" href="/w&#34;x/custom.css">` + "\n" + `  </head><body><div id="root"></div></body>`,
 		},
 		{
 			name:     "custom stylesheet before injected header code",

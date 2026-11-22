@@ -2,6 +2,7 @@ package http
 
 import (
 	"embed"
+	"html"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -392,7 +393,7 @@ func buildCustomStylesheetTag(basePath, customStylesheet string) string {
 	if strings.TrimSpace(customStylesheet) == "" {
 		return ""
 	}
-	return `<link rel="stylesheet" href="` + basePath + `/custom.css">`
+	return `<link rel="stylesheet" href="` + html.EscapeString(basePath+"/custom.css") + `">`
 }
 
 func injectIntoHead(html, snippet string) string {
