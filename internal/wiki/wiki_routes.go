@@ -156,7 +156,7 @@ func (w *Wiki) buildRevisionsRoutes() *wikirevisions.Routes {
 
 func (w *Wiki) buildSearchRoutes() *wikisearch.Routes {
 	return wikisearch.NewRoutes(wikisearch.RoutesConfig{
-		Search:            wikisearch.NewSearchUseCase(w.searchIndex, w.tags, w.tree),
+		Search:            wikisearch.NewSearchUseCase(w.searchIndex, w.tags, w.tree, w.log),
 		GetIndexingStatus: wikisearch.NewGetIndexingStatusUseCase(w.status),
 		AuthService:       w.auth,
 	})

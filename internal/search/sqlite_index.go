@@ -613,7 +613,10 @@ func (s *SQLiteIndex) RemovePageByFilePath(filePath string) (int64, error) {
 	return rows, err
 }
 
-func (s *SQLiteIndex) Search(query string, pageIDs []string, offset, limit int) (*SearchResult, error) {
+// Search returns one page of the hits for query, restricted to pageIDs when
+// that is non-nil. Every statement runs under ctx: once ctx ends, the running
+// statement is interrupted and Search returns ctx's error and no result.
+func (s *SQLiteIndex) Search(ctx context.Context, query string, pageIDs []string, offset, limit int) (*SearchResult, error) {
 	query = strings.TrimSpace(query)
 	// ftsQuery, not the raw query, decides whether there's anything to MATCH
 	// on: a query built entirely from characters outside the tokenizer's
@@ -651,7 +654,7 @@ func (s *SQLiteIndex) Search(query string, pageIDs []string, offset, limit int) 
 		whereClause, whereArgs := buildSearchWhereClause(ftsQuery, pageIDs)
 
 		countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM pages WHERE %s;`, whereClause)
-		if err := db.QueryRow(countQuery, whereArgs...).Scan(&total); err != nil {
+		if err := db.QueryRowContext(ctx, countQuery, whereArgs...).Scan(&total); err != nil {
 			return err
 		}
 		sr.Count = total
@@ -678,8 +681,14 @@ func (s *SQLiteIndex) Search(query string, pageIDs []string, offset, limit int) 
 			orderBy,
 		)
 
+		// ctx bounds this statement only because its heavy work (MATCH, bm25,
+		// highlight, snippet and the sort) runs in the first sqlite3_step,
+		// which the driver interrupts when ctx ends; later rows.Next steps
+		// only read the sorted rows and are not interrupted. An ORDER BY that
+		// an index satisfies under the LIMIT, or SQLITE_ENABLE_SORTER_REFERENCES,
+		// would move that work into those uninterruptible steps.
 		queryArgs := append(append(append([]interface{}{}, whereArgs...), orderArgs...), limit, offset)
-		rows, err := db.Query(searchQuery, queryArgs...)
+		rows, err := db.QueryContext(ctx, searchQuery, queryArgs...)
 		if err != nil {
 			return err
 		}
@@ -724,11 +733,15 @@ func (s *SQLiteIndex) Search(query string, pageIDs []string, offset, limit int) 
 		sr.Limit = limit
 		return nil
 	})
-
-	return sr, err
+	if err != nil {
+		return nil, err
+	}
+	return sr, nil
 }
 
-func (s *SQLiteIndex) SearchPageIDs(query string, pageIDs []string) ([]string, error) {
+// SearchPageIDs returns the IDs of all pages matching query, best first,
+// restricted to pageIDs when that is non-nil. It honours ctx like Search.
+func (s *SQLiteIndex) SearchPageIDs(ctx context.Context, query string, pageIDs []string) ([]string, error) {
 	query = strings.TrimSpace(query)
 	ftsQuery := buildFuzzyQuery(query)
 
@@ -751,7 +764,7 @@ func (s *SQLiteIndex) SearchPageIDs(query string, pageIDs []string) ([]string, e
 		ORDER BY %s;
 	`, searchRankExpr(ftsQuery != ""), whereClause, searchOrderByExpr(ftsQuery != ""))
 
-		rows, err := db.Query(searchQuery, whereArgs...)
+		rows, err := db.QueryContext(ctx, searchQuery, whereArgs...)
 		if err != nil {
 			return err
 		}
@@ -772,8 +785,10 @@ func (s *SQLiteIndex) SearchPageIDs(query string, pageIDs []string) ([]string, e
 
 		return rows.Err()
 	})
-
-	return result, err
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // hitStart and hitEnd are the single-byte markers highlight() puts around a

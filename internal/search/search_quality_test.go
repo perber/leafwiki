@@ -14,6 +14,7 @@ package search
 // run `go test -run TestSearchQuality -v ./internal/search/` to see the table.
 
 import (
+	"context"
 	"fmt"
 	"html"
 	"strings"
@@ -242,7 +243,7 @@ func newQualityIndex(t *testing.T) *SQLiteIndex {
 
 // searchTitles returns the plain titles of all results for query, best first.
 func searchTitles(index *SQLiteIndex, query string) ([]string, error) {
-	result, err := index.Search(query, nil, 0, len(qualityCorpus))
+	result, err := index.Search(context.Background(), query, nil, 0, len(qualityCorpus))
 	if err != nil {
 		return nil, err
 	}

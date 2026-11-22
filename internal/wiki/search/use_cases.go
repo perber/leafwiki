@@ -2,9 +2,12 @@ package search
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
@@ -24,6 +27,14 @@ const (
 	maxQueryRunes = 256
 	maxQueryTerms = 12
 )
+
+// searchTimeout bounds the index queries of one search. The query caps
+// bound a query's cost in terms, not in time; on a large wiki even a capped
+// query can run long, and without a deadline it holds a connection and the
+// index's read lock until it is done. A var so tests can shorten it. The
+// 503 description of handleSearch in routes.go names this value; keep them
+// in sync.
+var searchTimeout = 10 * time.Second
 
 var ErrSearchUnavailable = sharederrors.NewLocalizedError(
 	ErrCodeSearchUnavailable,
@@ -60,13 +71,14 @@ type SearchUseCase struct {
 	index *coresearch.SQLiteIndex
 	tags  *coretags.TagsService
 	tree  *tree.TreeService
+	log   *slog.Logger
 }
 
-func NewSearchUseCase(idx *coresearch.SQLiteIndex, tags *coretags.TagsService, tree *tree.TreeService) *SearchUseCase {
-	return &SearchUseCase{index: idx, tags: tags, tree: tree}
+func NewSearchUseCase(idx *coresearch.SQLiteIndex, tags *coretags.TagsService, tree *tree.TreeService, log *slog.Logger) *SearchUseCase {
+	return &SearchUseCase{index: idx, tags: tags, tree: tree, log: log.With("component", "SearchUseCase")}
 }
 
-func (uc *SearchUseCase) Execute(_ context.Context, in SearchInput) (*SearchOutput, error) {
+func (uc *SearchUseCase) Execute(ctx context.Context, in SearchInput) (*SearchOutput, error) {
 	query := strings.TrimSpace(in.Query)
 	if utf8.RuneCountInString(query) > maxQueryRunes || coresearch.QueryTermCount(query) > maxQueryTerms {
 		return nil, ErrSearchQueryTooLong
@@ -92,19 +104,42 @@ func (uc *SearchUseCase) Execute(_ context.Context, in SearchInput) (*SearchOutp
 		return uc.searchByTags(pageIDs, in.Offset, in.Limit)
 	}
 
-	result, err := uc.index.Search(in.Query, pageIDs, in.Offset, in.Limit)
+	ctx, cancel := context.WithTimeout(ctx, searchTimeout)
+	defer cancel()
+
+	result, err := uc.index.Search(ctx, in.Query, pageIDs, in.Offset, in.Limit)
 	if err != nil {
-		return nil, err
+		return nil, uc.searchQueryError(ctx, err, query)
 	}
 
-	fullMatchPageIDs, err := uc.index.SearchPageIDs(in.Query, pageIDs)
+	fullMatchPageIDs, err := uc.index.SearchPageIDs(ctx, in.Query, pageIDs)
 	if err != nil {
-		return nil, err
+		return nil, uc.searchQueryError(ctx, err, query)
 	}
 
 	uc.attachTags(result.Items)
 	result.TagFacets = uc.buildTagFacets(fullMatchPageIDs)
 	return &SearchOutput{Result: result}, nil
+}
+
+// searchQueryError maps an index error once ctx has ended: a timeout becomes
+// ErrSearchUnavailable and is logged here, where it stops propagating; the
+// log has the query's size, never its text, which may be private. A canceled
+// ctx (the client went away) comes back as context.Canceled and is not
+// logged; the handler answers it without a body. Checking ctx and not only
+// err also catches a driver error that doesn't wrap the context's error.
+func (uc *SearchUseCase) searchQueryError(ctx context.Context, err error, query string) error {
+	switch {
+	case errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded):
+		uc.log.Warn("search timed out",
+			"queryRunes", utf8.RuneCountInString(query),
+			"terms", coresearch.QueryTermCount(query))
+		return ErrSearchUnavailable
+	case ctx.Err() != nil:
+		return ctx.Err()
+	default:
+		return err
+	}
 }
 
 func (uc *SearchUseCase) searchByTags(pageIDs []string, offset, limit int) (*SearchOutput, error) {

@@ -434,6 +434,9 @@ func TestAPIDocs_Search_DescribeReadOperations(t *testing.T) {
 	search.okRef = "SearchResult"
 	search.okProps = map[string]string{"limit": "integer", "offset": "integer", "count": "integer", "items": "array", "tag_facets": "array"}
 	search.descriptionMentions = append(search.descriptionMentions, "limit", "offset")
+	// A search timeout is a localized 503 next to the API-key store's legacy one.
+	delete(search.refs, "503")
+	search.broad = map[string][]string{"500": {"ErrorResponse", "LegacyError"}, "503": {"ErrorResponse", "LegacyError"}}
 
 	// The handler cannot fail: no localized 400 and the only 500s come from the
 	// authentication middleware.
