@@ -431,7 +431,7 @@ func TestAvatarService_UploadAvatar_HugeDeclaredDimensions_RejectedBeforeDecode(
 			if !ok {
 				t.Fatalf("expected a LocalizedError, got %v", err)
 			}
-			if localized.Code != "avatar_decode_failed" || localized.Message != "Avatar image dimensions too large" {
+			if localized.Code != "avatar_invalid_dimensions" || localized.Message != "Avatar image dimensions too large" {
 				t.Fatalf("got code %q message %q, want the dimension-limit rejection", localized.Code, localized.Message)
 			}
 			if _, statErr := os.Stat(filepath.Join(dir, "avatars", "user-1.png")); !os.IsNotExist(statErr) {

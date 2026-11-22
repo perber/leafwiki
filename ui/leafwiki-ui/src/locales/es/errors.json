@@ -13,6 +13,7 @@
   "authentication is disabled": "La autenticación está desactivada",
   "authentication request failed": "La solicitud de autenticación ha fallado",
   "avatar file too large": "El archivo del avatar es demasiado grande",
+  "avatar image is %sx%s pixels (allowed: up to %s pixels in total)": "La imagen del avatar tiene %sx%s píxeles (permitido: hasta %s píxeles en total)",
   "avatar request failed": "La solicitud del avatar ha fallado",
   "failed to decode avatar image": "No se pudo descodificar la imagen del avatar",
   "failed to delete avatar": "No se pudo eliminar el avatar",

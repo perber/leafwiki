@@ -13,6 +13,7 @@
   "authentication is disabled": "Authentication is disabled",
   "authentication request failed": "Authentication request failed",
   "avatar file too large": "Avatar file too large",
+  "avatar image is %sx%s pixels (allowed: up to %s pixels in total)": "Avatar image is %sx%s pixels (allowed: up to %s pixels in total)",
   "avatar request failed": "Avatar request failed",
   "failed to decode avatar image": "Failed to decode avatar image",
   "failed to delete avatar": "Failed to delete avatar",

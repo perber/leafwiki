@@ -8,11 +8,12 @@ import (
 )
 
 const (
-	ErrCodeAvatarInvalidType   = "avatar_invalid_type"
-	ErrCodeAvatarDecodeFailed  = "avatar_decode_failed"
-	ErrCodeAvatarUploadFailed  = "avatar_upload_failed"
-	ErrCodeAvatarDeleteFailed  = "avatar_delete_failed"
-	ErrCodeAvatarInternalError = "avatar_internal_error"
+	ErrCodeAvatarInvalidType       = "avatar_invalid_type"
+	ErrCodeAvatarDecodeFailed      = "avatar_decode_failed"
+	ErrCodeAvatarInvalidDimensions = "avatar_invalid_dimensions"
+	ErrCodeAvatarUploadFailed      = "avatar_upload_failed"
+	ErrCodeAvatarDeleteFailed      = "avatar_delete_failed"
+	ErrCodeAvatarInternalError     = "avatar_internal_error"
 )
 
 // AvatarErrorResponse is the structured JSON error body returned by
@@ -52,7 +53,7 @@ func respondWithAvatarError(c *gin.Context, err error) {
 
 func avatarErrorStatus(code string) int {
 	switch code {
-	case ErrCodeAvatarInvalidType, ErrCodeAvatarDecodeFailed:
+	case ErrCodeAvatarInvalidType, ErrCodeAvatarDecodeFailed, ErrCodeAvatarInvalidDimensions:
 		return http.StatusBadRequest
 	case ErrCodeAvatarUploadFailed, ErrCodeAvatarDeleteFailed, ErrCodeAvatarInternalError:
 		return http.StatusInternalServerError

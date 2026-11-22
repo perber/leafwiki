@@ -13,6 +13,7 @@
   "authentication is disabled": "L'authentification est désactivée",
   "authentication request failed": "Échec de la requête d'authentification",
   "avatar file too large": "Fichier d'avatar trop volumineux",
+  "avatar image is %sx%s pixels (allowed: up to %s pixels in total)": "L'image d'avatar fait %sx%s pixels (autorisé : jusqu'à %s pixels au total)",
   "avatar request failed": "Échec de la requête d'avatar",
   "failed to decode avatar image": "Impossible de décoder l'image d'avatar",
   "failed to delete avatar": "Impossible de supprimer l'avatar",

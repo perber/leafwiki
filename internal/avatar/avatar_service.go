@@ -250,7 +250,7 @@ func checkDimensions(width, height int) error {
 		return nil
 	}
 	return sharederrors.NewLocalizedError(
-		"avatar_decode_failed",
+		"avatar_invalid_dimensions",
 		"Avatar image dimensions too large",
 		"avatar image is %sx%s pixels (allowed: up to %s pixels in total)",
 		nil,
