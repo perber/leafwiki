@@ -243,13 +243,13 @@ func TestSQLiteIndex_ConcurrentSearchesDoNotRace(t *testing.T) {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			if _, err := index.Search("searchable", nil, 0, 10); err != nil {
+			if _, err := index.Search(t.Context(), "searchable", nil, 0, 10); err != nil {
 				errCh <- err
 			}
 		}()
 		go func() {
 			defer wg.Done()
-			if _, err := index.SearchPageIDs("searchable", nil); err != nil {
+			if _, err := index.SearchPageIDs(t.Context(), "searchable", nil); err != nil {
 				errCh <- err
 			}
 		}()
@@ -299,7 +299,7 @@ func TestSQLiteIndex_Search(t *testing.T) {
 	}
 
 	// Perform search
-	result, err := index.Search("content:search*", nil, 0, 10)
+	result, err := index.Search(t.Context(), "content:search*", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
 	}
@@ -343,7 +343,7 @@ func TestSQLiteIndex_Search_NoMatch_ReturnsEmptyItems(t *testing.T) {
 		t.Fatalf("failed to index page: %v", err)
 	}
 
-	result, err := index.Search("zebra", nil, 0, 10)
+	result, err := index.Search(t.Context(), "zebra", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
 	}
@@ -380,7 +380,7 @@ func TestSQLiteIndex_Search_RanksFieldMatchAboveContentOnlyMatch(t *testing.T) {
 				t.Fatalf("failed to index contentMatch page: %v", err)
 			}
 
-			result, err := index.Search("search", nil, 0, 10)
+			result, err := index.Search(t.Context(), "search", nil, 0, 10)
 			if err != nil {
 				t.Fatalf("search failed: %v", err)
 			}
@@ -422,7 +422,7 @@ func TestSQLiteIndex_Search_EscapesTitleForContentOnlyMatch(t *testing.T) {
 		t.Fatalf("failed to index malicious page: %v", err)
 	}
 
-	result, err := index.Search("keyword", nil, 0, 10)
+	result, err := index.Search(t.Context(), "keyword", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
 	}
@@ -456,7 +456,7 @@ func TestSQLiteIndex_Search_PreservesBoldHighlightsWhileEscapingTitle(t *testing
 		t.Fatalf("failed to index highlighted page: %v", err)
 	}
 
-	result, err := index.Search("search", nil, 0, 10)
+	result, err := index.Search(t.Context(), "search", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
 	}
@@ -493,7 +493,7 @@ func TestSQLiteIndex_Search_EscapesTitleForFilteredResultsWithoutQuery(t *testin
 		t.Fatalf("failed to index tagged page: %v", err)
 	}
 
-	result, err := index.Search("", []string{"tagged1"}, 0, 10)
+	result, err := index.Search(t.Context(), "", []string{"tagged1"}, 0, 10)
 	if err != nil {
 		t.Fatalf("filtered search failed: %v", err)
 	}
@@ -523,7 +523,7 @@ func TestSQLiteIndex_Search_ExcerptIsEscapedOnceAndMarksOnlyTheHit(t *testing.T)
 		t.Fatalf("IndexPage: %v", err)
 	}
 
-	result, err := index.Search("keyword", nil, 0, 10)
+	result, err := index.Search(t.Context(), "keyword", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
 	}
@@ -548,7 +548,7 @@ func TestSQLiteIndex_Search_HighlightMarkersInPageTextDoNotFakeAHighlight(t *tes
 		t.Fatalf("IndexPage: %v", err)
 	}
 
-	result, err := index.Search("keyword", nil, 0, 10)
+	result, err := index.Search(t.Context(), "keyword", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
 	}
@@ -648,7 +648,7 @@ func TestSQLiteIndex_Search_HighlightMarkerEdgeCases_NeverFakeAHighlight(t *test
 				t.Fatalf("IndexPage: %v", err)
 			}
 
-			result, err := index.Search(tt.query, nil, 0, 10)
+			result, err := index.Search(t.Context(), tt.query, nil, 0, 10)
 			if err != nil {
 				t.Fatalf("Search(%q): %v", tt.query, err)
 			}
@@ -748,7 +748,7 @@ func TestSQLiteIndex_Search_RanksWholeWordMatchesAbovePrefixOnlyMatches(t *testi
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := index.Search(tc.query, tc.pageIDs, 0, 10)
+			result, err := index.Search(t.Context(), tc.query, tc.pageIDs, 0, 10)
 			if err != nil {
 				t.Fatalf("Search(%q) failed: %v", tc.query, err)
 			}
@@ -816,7 +816,7 @@ func TestSQLiteIndex_Search_PaginatesAcrossTheWholeWordTier(t *testing.T) {
 			}
 			var got []string
 			for offset := 0; offset < len(tc.want)+tc.limit; offset += tc.limit {
-				result, err := index.Search(query, tc.pageIDs, offset, tc.limit)
+				result, err := index.Search(t.Context(), query, tc.pageIDs, offset, tc.limit)
 				if err != nil {
 					t.Fatalf("Search(%q, offset %d) failed: %v", query, offset, err)
 				}
@@ -878,7 +878,7 @@ func TestSQLiteIndex_Search_OperatorQueriesKeepBM25Order(t *testing.T) {
 
 	for _, query := range []string{"title:pi", "pi*", `"pi"`, "pi OR x", "pi* setup", "pi AND setup"} {
 		t.Run(query, func(t *testing.T) {
-			result, err := index.Search(query, nil, 0, 10)
+			result, err := index.Search(t.Context(), query, nil, 0, 10)
 			if err != nil {
 				t.Fatalf("Search(%q) failed: %v", query, err)
 			}
@@ -915,7 +915,7 @@ func TestSQLiteIndex_Search_LowercaseKeywordIsAnOrdinaryWord(t *testing.T) {
 
 	search := func(query string) []string {
 		t.Helper()
-		result, err := index.Search(query, nil, 0, 10)
+		result, err := index.Search(t.Context(), query, nil, 0, 10)
 		if err != nil {
 			t.Fatalf("Search(%q) failed: %v", query, err)
 		}
@@ -945,12 +945,12 @@ func TestSQLiteIndex_Search_WholeWordTierIsInjectionSafe(t *testing.T) {
 
 	for _, query := range []string{`pi'); DROP TABLE pages;--`, `pi" OR "x`, `pi"*`, `"pi`, `pi''`, `pi?`} {
 		t.Run(query, func(t *testing.T) {
-			if _, err := index.Search(query, nil, 0, 10); err != nil {
+			if _, err := index.Search(t.Context(), query, nil, 0, 10); err != nil {
 				t.Fatalf("Search(%q) failed: %v", query, err)
 			}
 		})
 	}
-	result, err := index.Search("pi", nil, 0, 10)
+	result, err := index.Search(t.Context(), "pi", nil, 0, 10)
 	if err != nil || result.Count != 4 {
 		t.Fatalf("after the hostile queries Search(pi) = %v, %v; want all 4 pages", result, err)
 	}
@@ -974,7 +974,7 @@ func TestSQLiteIndex_SearchPageIDs_RespectsQueryAndPageFilters(t *testing.T) {
 		t.Fatalf("failed to index gamma page: %v", err)
 	}
 
-	pageIDs, err := index.SearchPageIDs("shared token", []string{"alpha"})
+	pageIDs, err := index.SearchPageIDs(t.Context(), "shared token", []string{"alpha"})
 	if err != nil {
 		t.Fatalf("SearchPageIDs failed: %v", err)
 	}
@@ -983,7 +983,7 @@ func TestSQLiteIndex_SearchPageIDs_RespectsQueryAndPageFilters(t *testing.T) {
 		t.Fatalf("expected only alpha page, got %#v", pageIDs)
 	}
 
-	noMatches, err := index.SearchPageIDs("shared token", []string{})
+	noMatches, err := index.SearchPageIDs(t.Context(), "shared token", []string{})
 	if err != nil {
 		t.Fatalf("SearchPageIDs with empty page filter failed: %v", err)
 	}
@@ -1019,7 +1019,7 @@ func TestSQLiteIndex_Search_FiltersByPageIDs(t *testing.T) {
 		t.Fatalf("failed to index plain-guide page: %v", err)
 	}
 
-	result, err := index.Search("search", []string{"react-guide"}, 0, 10)
+	result, err := index.Search(t.Context(), "search", []string{"react-guide"}, 0, 10)
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
 	}
@@ -1050,7 +1050,7 @@ func TestSQLiteIndex_Search_ReturnsNoResultsWhenPageIDFilterIsEmpty(t *testing.T
 		t.Fatalf("failed to index react-guide page: %v", err)
 	}
 
-	result, err := index.Search("search", []string{}, 0, 10)
+	result, err := index.Search(t.Context(), "search", []string{}, 0, 10)
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
 	}
@@ -1148,7 +1148,7 @@ func TestSQLiteIndex_Search_FindsTermsInsideCodeBlocks(t *testing.T) {
 	}
 
 	for _, term := range []string{"curl", "Fetch"} {
-		result, err := index.Search(term, nil, 0, 10)
+		result, err := index.Search(t.Context(), term, nil, 0, 10)
 		if err != nil {
 			t.Fatalf("search for %q failed: %v", term, err)
 		}
@@ -1181,10 +1181,10 @@ func TestSQLiteIndex_Search_TolerateFTS5SpecialCharacters(t *testing.T) {
 	}
 
 	for _, q := range queries {
-		if _, err := index.Search(q, nil, 0, 10); err != nil {
+		if _, err := index.Search(t.Context(), q, nil, 0, 10); err != nil {
 			t.Errorf("Search(%q) returned an error instead of a result: %v", q, err)
 		}
-		if _, err := index.SearchPageIDs(q, nil); err != nil {
+		if _, err := index.SearchPageIDs(t.Context(), q, nil); err != nil {
 			t.Errorf("SearchPageIDs(%q) returned an error instead of a result: %v", q, err)
 		}
 	}
@@ -1202,7 +1202,7 @@ func TestSQLiteIndex_Search_CommaSeparatedTermsStillFindMatches(t *testing.T) {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
 
-	result, err := index.Search("hello,world", nil, 0, 10)
+	result, err := index.Search(t.Context(), "hello,world", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("Search failed: %v", err)
 	}
@@ -1222,7 +1222,7 @@ func TestSQLiteIndex_Search_SingleWordPrefixMatchUnaffectedByQuoting(t *testing.
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
 
-	result, err := index.Search("search", nil, 0, 10)
+	result, err := index.Search(t.Context(), "search", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("Search failed: %v", err)
 	}
@@ -1242,7 +1242,7 @@ func TestSQLiteIndex_Search_ExplicitFTS5SyntaxStillPassesThrough(t *testing.T) {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
 
-	result, err := index.Search("content:search*", nil, 0, 10)
+	result, err := index.Search(t.Context(), "content:search*", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("Search failed: %v", err)
 	}
@@ -1250,7 +1250,7 @@ func TestSQLiteIndex_Search_ExplicitFTS5SyntaxStillPassesThrough(t *testing.T) {
 		t.Errorf("expected explicit FTS5 column-filter syntax to still work, got count=%d", result.Count)
 	}
 
-	result, err = index.Search("search AND content", nil, 0, 10)
+	result, err = index.Search(t.Context(), "search AND content", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("Search failed: %v", err)
 	}
@@ -1271,7 +1271,7 @@ func TestSQLiteIndex_Search_HyphenatedQueryStillFindsPunctuationToken(t *testing
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
 
-	result, err := index.Search("report-final.v2", nil, 0, 10)
+	result, err := index.Search(t.Context(), "report-final.v2", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("Search failed: %v", err)
 	}
@@ -1312,7 +1312,7 @@ func TestBuildFuzzyQuery_NeverProducesSyntaxErrorForMixedPunctuationAndOperators
 	}
 
 	for _, q := range queries {
-		if _, err := index.Search(q, nil, 0, 10); err != nil {
+		if _, err := index.Search(t.Context(), q, nil, 0, 10); err != nil {
 			t.Errorf("Search(%q) returned an error instead of a result: %v", q, err)
 		}
 	}
@@ -1329,7 +1329,7 @@ func TestSQLiteIndex_Search_ApostropheWordStillMatchesIndexedContent(t *testing.
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
 
-	result, err := index.Search("it's", nil, 0, 10)
+	result, err := index.Search(t.Context(), "it's", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("Search failed: %v", err)
 	}
@@ -1359,7 +1359,7 @@ func TestSQLiteIndex_Search_BareColonQueriesDoNotCrash(t *testing.T) {
 	}
 
 	for _, q := range queries {
-		if _, err := index.Search(q, nil, 0, 10); err != nil {
+		if _, err := index.Search(t.Context(), q, nil, 0, 10); err != nil {
 			t.Errorf("Search(%q) returned an error instead of a result: %v", q, err)
 		}
 	}
@@ -1378,7 +1378,7 @@ func TestSQLiteIndex_Search_RealColumnFilterStillWorks(t *testing.T) {
 	}
 
 	for _, q := range []string{"content:search*", "title:Alpha*", "PAGEID:alpha1"} {
-		result, err := index.Search(q, nil, 0, 10)
+		result, err := index.Search(t.Context(), q, nil, 0, 10)
 		if err != nil {
 			t.Fatalf("Search(%q) failed: %v", q, err)
 		}
@@ -1405,7 +1405,7 @@ func TestSQLiteIndex_Search_DanglingBooleanKeywordDoesNotCrash(t *testing.T) {
 	queries := []string{"AND", "OR", "NOT", "NOT foo", "foo AND", "AND foo"}
 
 	for _, q := range queries {
-		if _, err := index.Search(q, nil, 0, 10); err != nil {
+		if _, err := index.Search(t.Context(), q, nil, 0, 10); err != nil {
 			t.Errorf("Search(%q) returned an error instead of a result: %v", q, err)
 		}
 	}
@@ -1423,7 +1423,7 @@ func TestSQLiteIndex_Search_BooleanOperatorBetweenRealOperandsStillWorks(t *test
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
 
-	result, err := index.Search("search AND content", nil, 0, 10)
+	result, err := index.Search(t.Context(), "search AND content", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("Search failed: %v", err)
 	}
@@ -1451,7 +1451,7 @@ func TestSQLiteIndex_Search_PunctuationOnlyQueryReturnsEmptyResultNotError(t *te
 	queries := []string{",", "'", `"`, "::", "!!!", "😀"}
 
 	for _, q := range queries {
-		result, err := index.Search(q, nil, 0, 10)
+		result, err := index.Search(t.Context(), q, nil, 0, 10)
 		if err != nil {
 			t.Errorf("Search(%q) returned an error instead of a result: %v", q, err)
 			continue
@@ -1459,7 +1459,7 @@ func TestSQLiteIndex_Search_PunctuationOnlyQueryReturnsEmptyResultNotError(t *te
 		if result.Count != 0 {
 			t.Errorf("Search(%q): expected 0 results for a punctuation-only query, got %d", q, result.Count)
 		}
-		if _, err := index.SearchPageIDs(q, nil); err != nil {
+		if _, err := index.SearchPageIDs(t.Context(), q, nil); err != nil {
 			t.Errorf("SearchPageIDs(%q) returned an error instead of a result: %v", q, err)
 		}
 	}
@@ -1482,7 +1482,7 @@ func TestSQLiteIndex_Search_PunctuationOnlyQueryWithPageIDFilterStillFilters(t *
 		t.Fatalf("failed to index beta page: %v", err)
 	}
 
-	result, err := index.Search(",", []string{"alpha1"}, 0, 10)
+	result, err := index.Search(t.Context(), ",", []string{"alpha1"}, 0, 10)
 	if err != nil {
 		t.Fatalf("Search failed: %v", err)
 	}
@@ -1505,7 +1505,7 @@ func TestSQLiteIndex_Search_BareOperatorCharacterDoesNotCrash(t *testing.T) {
 	}
 
 	for _, q := range []string{"*", "(", ")", "foo * bar"} {
-		if _, err := index.Search(q, nil, 0, 10); err != nil {
+		if _, err := index.Search(t.Context(), q, nil, 0, 10); err != nil {
 			t.Errorf("Search(%q) returned an error instead of a result: %v", q, err)
 		}
 	}
@@ -1525,7 +1525,7 @@ func TestSQLiteIndex_Search_DoubledBooleanKeywordDoesNotCrash(t *testing.T) {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
 
-	if _, err := index.Search("foo AND AND bar", nil, 0, 10); err != nil {
+	if _, err := index.Search(t.Context(), "foo AND AND bar", nil, 0, 10); err != nil {
 		t.Errorf("Search(%q) returned an error instead of a result: %v", "foo AND AND bar", err)
 	}
 }
@@ -1557,12 +1557,12 @@ func TestSQLiteIndex_Search_ColumnFilterWithPunctuationValueStaysScoped(t *testi
 	}
 
 	for _, q := range []string{"content:http://example.com", "content:don't"} {
-		if _, err := index.Search(q, nil, 0, 10); err != nil {
+		if _, err := index.Search(t.Context(), q, nil, 0, 10); err != nil {
 			t.Errorf("Search(%q) returned an error instead of a result: %v", q, err)
 		}
 	}
 
-	result, err := index.Search("content:wobble", nil, 0, 10)
+	result, err := index.Search(t.Context(), "content:wobble", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("Search failed: %v", err)
 	}
@@ -1570,7 +1570,7 @@ func TestSQLiteIndex_Search_ColumnFilterWithPunctuationValueStaysScoped(t *testi
 		t.Errorf("content:wobble matched %d pages, want 0 (\"wobble\" only appears in beta's title) — a punctuation-value column filter must still be column-scoped, not silently searching every column", result.Count)
 	}
 
-	result, err = index.Search("content:don't", nil, 0, 10)
+	result, err = index.Search(t.Context(), "content:don't", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("Search failed: %v", err)
 	}
@@ -1595,7 +1595,7 @@ func TestSQLiteIndex_Search_NearFunctionCallStillWorks(t *testing.T) {
 		t.Fatalf("failed to index alpha page: %v", err)
 	}
 
-	result, err := index.Search("NEAR(foo bar, 5)", nil, 0, 10)
+	result, err := index.Search(t.Context(), "NEAR(foo bar, 5)", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("Search failed: %v", err)
 	}
@@ -1683,16 +1683,16 @@ func TestSQLiteIndex_Search_OperatorFieldWithTokenPunctuationDoesNotError(t *tes
 		"(foo", "foo)", "foo AND (bar", "NEAR(a b", "()", "(*)", "foo*bar",
 	}
 	for _, q := range queries {
-		if _, err := index.Search(q, nil, 0, 10); err != nil {
+		if _, err := index.Search(t.Context(), q, nil, 0, 10); err != nil {
 			t.Errorf("Search(%q) returned an error instead of a result: %v", q, err)
 		}
-		if _, err := index.SearchPageIDs(q, nil); err != nil {
+		if _, err := index.SearchPageIDs(t.Context(), q, nil); err != nil {
 			t.Errorf("SearchPageIDs(%q) returned an error instead of a result: %v", q, err)
 		}
 	}
 
 	for _, q := range []string{"foo-bar*", "report.v2*"} {
-		result, err := index.Search(q, nil, 0, 10)
+		result, err := index.Search(t.Context(), q, nil, 0, 10)
 		if err != nil {
 			t.Fatalf("Search(%q): %v", q, err)
 		}
@@ -1714,7 +1714,7 @@ func TestSQLiteIndex_Search_BalancedParenGroupAcrossFieldsStillWorks(t *testing.
 		t.Fatalf("failed to index beta page: %v", err)
 	}
 
-	result, err := index.Search("(apple OR cherry) AND banana", nil, 0, 10)
+	result, err := index.Search(t.Context(), "(apple OR cherry) AND banana", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("Search returned an error: %v", err)
 	}
@@ -1964,7 +1964,7 @@ func TestNewSQLiteIndex_RebuildsAnOlderVersionOnceAndThenKeepsIt(t *testing.T) {
 	if rows := countRows(index); rows != 1 {
 		t.Errorf("second open has %d rows, want the 1 reindexed row", rows)
 	}
-	result, err := index.Search("reindexed", nil, 0, 10)
+	result, err := index.Search(t.Context(), "reindexed", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -2034,7 +2034,7 @@ func TestNewSQLiteIndex_ReopenKeepsSearchResultsAndRanking(t *testing.T) {
 	}
 	before := map[string]*SearchResult{}
 	for _, q := range queries {
-		res, err := first.Search(q, nil, 0, 10)
+		res, err := first.Search(t.Context(), q, nil, 0, 10)
 		if err != nil {
 			t.Fatalf("Search(%q) before reopen: %v", q, err)
 		}
@@ -2054,7 +2054,7 @@ func TestNewSQLiteIndex_ReopenKeepsSearchResultsAndRanking(t *testing.T) {
 	defer test_utils.WrapCloseWithErrorCheck(reopened.Close, t)
 
 	for _, q := range queries {
-		got, err := reopened.Search(q, nil, 0, 10)
+		got, err := reopened.Search(t.Context(), q, nil, 0, 10)
 		if err != nil {
 			t.Fatalf("Search(%q) after reopen: %v", q, err)
 		}
@@ -2100,7 +2100,7 @@ func TestNewSQLiteIndex_ClearAndReindexAfterReopenLeavesNoDuplicates(t *testing.
 		t.Fatalf("NewSQLiteIndex: %v", err)
 	}
 	defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-	res, err := index.Search("shared", nil, 0, 10)
+	res, err := index.Search(t.Context(), "shared", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -2160,7 +2160,7 @@ func TestNewSQLiteIndex_UncheckpointedWALFromUncleanShutdownKeepsRows(t *testing
 		t.Fatalf("open after unclean shutdown: %v", err)
 	}
 	defer test_utils.WrapCloseWithErrorCheck(reopened.Close, t)
-	res, err := reopened.Search("walonly", nil, 0, 10)
+	res, err := reopened.Search(t.Context(), "walonly", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -2559,7 +2559,7 @@ func TestSQLiteIndex_ClearHealsFTS5ShadowTableDamage(t *testing.T) {
 				t.Fatalf("NewSQLiteIndex: %v", err)
 			}
 			defer test_utils.WrapCloseWithErrorCheck(index.Close, t)
-			if _, err := index.Search("persisted", nil, 0, 10); err == nil {
+			if _, err := index.Search(t.Context(), "persisted", nil, 0, 10); err == nil {
 				t.Fatal("Search on the damaged index succeeded; the damage no longer reproduces")
 			}
 
@@ -2569,7 +2569,7 @@ func TestSQLiteIndex_ClearHealsFTS5ShadowTableDamage(t *testing.T) {
 			if err := index.IndexPage("docs/a", "docs/a.md", "a", "A", tree.NodeKindPage, "persisted content"); err != nil {
 				t.Fatalf("IndexPage after Clear: %v", err)
 			}
-			res, err := index.Search("persisted", nil, 0, 10)
+			res, err := index.Search(t.Context(), "persisted", nil, 0, 10)
 			if err != nil {
 				t.Fatalf("Search after Clear and reindex: %v", err)
 			}
@@ -2604,13 +2604,13 @@ func TestSQLiteIndex_SearchDuringClearDoesNotFail(t *testing.T) {
 		}()
 		go func() {
 			defer wg.Done()
-			if _, err := index.Search("searchable", nil, 0, 10); err != nil {
+			if _, err := index.Search(t.Context(), "searchable", nil, 0, 10); err != nil {
 				errCh <- fmt.Errorf("Search: %w", err)
 			}
 		}()
 		go func() {
 			defer wg.Done()
-			if _, err := index.SearchPageIDs("searchable", nil); err != nil {
+			if _, err := index.SearchPageIDs(t.Context(), "searchable", nil); err != nil {
 				errCh <- fmt.Errorf("SearchPageIDs: %w", err)
 			}
 		}()
@@ -2666,7 +2666,7 @@ func TestSQLiteIndex_ClearThatFailsPartwayKeepsTheIndexUsable(t *testing.T) {
 	if !errors.Is(err, sqliteutil.ErrUnusableDatabase) {
 		t.Fatalf("Clear err = %v, want ErrUnusableDatabase", err)
 	}
-	res, err := index.Search("persisted", nil, 0, 10)
+	res, err := index.Search(t.Context(), "persisted", nil, 0, 10)
 	if err != nil {
 		t.Fatalf("Search after the failed Clear: %v", err)
 	}
@@ -2762,7 +2762,7 @@ func TestNewSQLiteIndex_UnknownModuleRebuildWithAnotherHandleOpen(t *testing.T) 
 	if err := index.IndexPage("docs/new", "docs/new.md", "new", "New", tree.NodeKindPage, "freshterm"); err != nil {
 		t.Fatalf("IndexPage on the rebuilt file: %v", err)
 	}
-	res, err := index.Search("freshterm", nil, 0, 10)
+	res, err := index.Search(t.Context(), "freshterm", nil, 0, 10)
 	if err != nil || res.Count != 1 {
 		t.Fatalf("Search on the rebuilt file: count=%v err=%v", res, err)
 	}
@@ -2988,7 +2988,7 @@ func TestSQLiteIndex_Search_QueryAtTheTermCapStillFindsThePage(t *testing.T) {
 			if got := QueryTermCount(tc.query); got != 12 {
 				t.Fatalf("QueryTermCount(%q) = %d, want 12", tc.query, got)
 			}
-			result, err := index.Search(tc.query, nil, 0, 10)
+			result, err := index.Search(t.Context(), tc.query, nil, 0, 10)
 			if err != nil {
 				t.Fatalf("Search(%q) failed: %v", tc.query, err)
 			}

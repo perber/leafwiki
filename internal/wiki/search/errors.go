@@ -1,6 +1,8 @@
 package search
 
 import (
+	"context"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -17,6 +19,11 @@ const (
 	ErrCodeSearchQueryTooLong  = "search_query_too_long"
 )
 
+// statusClientClosedRequest answers a search whose client went away before
+// it finished (nginx's 499). Nobody reads the response; the status only
+// keeps the access log from showing a disconnect as a 200 or a server error.
+const statusClientClosedRequest = 499
+
 func respondWithSearchStatusError(c *gin.Context, status int, code, message, template string, args ...string) {
 	c.JSON(status, dto.ErrorResponse{
 		Error: dto.ErrorDetail{
@@ -30,6 +37,10 @@ func respondWithSearchStatusError(c *gin.Context, status int, code, message, tem
 
 // respondWithSearchError maps errors to JSON responses for search endpoints.
 func respondWithSearchError(c *gin.Context, err error) {
+	if errors.Is(err, context.Canceled) {
+		c.AbortWithStatus(statusClientClosedRequest)
+		return
+	}
 	if loc, ok := sharederrors.AsLocalizedError(err); ok {
 		respondWithSearchStatusError(c, searchErrorStatus(loc.Code), loc.Code, loc.Message, loc.Template, loc.Args...)
 		return

@@ -62,7 +62,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 //	@Failure		401		{object}	dto.LegacyError		"No valid session while public access is off, an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)"
 //	@Failure		429		{object}	dto.LegacyError		"API-key attempts throttled"
 //	@Failure		500		{object}	object				"Index lookup failed: the body is an ErrorResponse (code search_internal_error). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object."
-//	@Failure		503		{object}	dto.LegacyError		"API-key store unavailable during a live restore (when API-key management is enabled)"
+//	@Failure		503		{object}	object				"The search took longer than 10 seconds or the index is not available: the body is an ErrorResponse (code search_unavailable). An API-key store unavailable during a live restore (when API-key management is enabled) returns a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object."
 //	@Router			/search [get]
 func (r *Routes) handleSearch(c *gin.Context) {
 	query := c.Query("q")

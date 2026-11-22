@@ -1,9 +1,13 @@
 package search
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"log/slog"
 	"strings"
 	"testing"
+	"time"
 
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
@@ -35,7 +39,7 @@ func setupSearchUseCaseForTags(t *testing.T) (*SearchUseCase, *coretags.TagsServ
 	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(tagsStore.Close, t) })
 
 	tagsSvc := coretags.NewTagsService(tagsStore)
-	return NewSearchUseCase(index, tagsSvc, treeSvc), tagsSvc, treeSvc
+	return NewSearchUseCase(index, tagsSvc, treeSvc, slog.Default()), tagsSvc, treeSvc
 }
 
 func pageKind() *tree.NodeKind {
@@ -127,7 +131,7 @@ func TestSearchUseCase_Execute_RejectsOverLongQueries(t *testing.T) {
 		{name: "boolean keywords don't count", query: "a OR b OR c OR d OR e OR f OR g OR h OR i OR j OR k OR l", wantCode: ErrCodeSearchUnavailable},
 		{name: "over-long query with tags is still rejected", query: strings.Repeat("pi ", 13), tags: []string{"docs"}, wantCode: ErrCodeSearchQueryTooLong},
 	}
-	uc := NewSearchUseCase(nil, nil, nil)
+	uc := NewSearchUseCase(nil, nil, nil, slog.Default())
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := uc.Execute(context.Background(), SearchInput{Query: tc.query, Tags: tc.tags, Limit: 10})
@@ -137,6 +141,105 @@ func TestSearchUseCase_Execute_RejectsOverLongQueries(t *testing.T) {
 			}
 			if loc.Code != tc.wantCode {
 				t.Errorf("Execute error code = %s, want %s", loc.Code, tc.wantCode)
+			}
+		})
+	}
+}
+
+// withSearchTimeout sets searchTimeout for the test and restores it after.
+func withSearchTimeout(t *testing.T, d time.Duration) {
+	t.Helper()
+	previous := searchTimeout
+	searchTimeout = d
+	t.Cleanup(func() { searchTimeout = previous })
+}
+
+// captureLogs sends the default logger to a buffer for the test, without
+// timestamps, and restores it after.
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey {
+				return slog.Attr{}
+			}
+			return a
+		},
+	})))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	return &logs
+}
+
+// TestSearchUseCase_Execute_ContextEnds pins what a search returns when its
+// context ends before the index answers: the search timeout and an expired
+// request deadline become search_unavailable and log one warning with the
+// query's size but not its text; a canceled request (the client is gone)
+// returns context.Canceled and logs nothing.
+func TestSearchUseCase_Execute_ContextEnds(t *testing.T) {
+	const query = "secret words"
+	tests := []struct {
+		name     string
+		timeout  time.Duration
+		ctx      func(t *testing.T) context.Context
+		wantCode string
+		wantErr  error
+		wantLog  string
+	}{
+		{
+			name:     "search timeout elapses",
+			timeout:  0,
+			ctx:      func(t *testing.T) context.Context { return t.Context() },
+			wantCode: ErrCodeSearchUnavailable,
+			wantLog:  "level=WARN msg=\"search timed out\" component=SearchUseCase queryRunes=12 terms=2\n",
+		},
+		{
+			name:    "request deadline has passed",
+			timeout: time.Minute,
+			ctx: func(t *testing.T) context.Context {
+				ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+				t.Cleanup(cancel)
+				return ctx
+			},
+			wantCode: ErrCodeSearchUnavailable,
+			wantLog:  "level=WARN msg=\"search timed out\" component=SearchUseCase queryRunes=12 terms=2\n",
+		},
+		{
+			name:    "client canceled the request",
+			timeout: time.Minute,
+			ctx: func(t *testing.T) context.Context {
+				ctx, cancel := context.WithCancel(t.Context())
+				cancel()
+				return ctx
+			},
+			wantErr: context.Canceled,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			withSearchTimeout(t, tc.timeout)
+			uc, _, _ := setupSearchUseCaseForTags(t)
+			if err := uc.index.IndexPage("docs/a", "docs/a.md", "a", "A", tree.NodeKindPage, query); err != nil {
+				t.Fatalf("IndexPage: %v", err)
+			}
+			logs := captureLogs(t)
+			uc = NewSearchUseCase(uc.index, uc.tags, uc.tree, slog.Default())
+
+			out, err := uc.Execute(tc.ctx(t), SearchInput{Query: query, Limit: 10})
+
+			if out != nil {
+				t.Errorf("Execute output = %#v, want nil", out)
+			}
+			if tc.wantErr != nil {
+				if !errors.Is(err, tc.wantErr) {
+					t.Errorf("Execute error = %v, want %v", err, tc.wantErr)
+				}
+			} else if loc, ok := sharederrors.AsLocalizedError(err); !ok || loc.Code != tc.wantCode {
+				t.Errorf("Execute error = %v, want a LocalizedError with code %s", err, tc.wantCode)
+			}
+			if got := logs.String(); got != tc.wantLog {
+				t.Errorf("logs = %q, want %q", got, tc.wantLog)
 			}
 		})
 	}

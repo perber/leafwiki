@@ -395,9 +395,9 @@
                         }
                     },
                     "503": {
-                        "description": "API-key store unavailable during a live restore (when API-key management is enabled)",
+                        "description": "The search took longer than 10 seconds or the index is not available: the body is an ErrorResponse (code search_unavailable). An API-key store unavailable during a live restore (when API-key management is enabled) returns a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object.",
                         "schema": {
-                            "$ref": "#/definitions/dto.LegacyError"
+                            "type": "object"
                         }
                     }
                 }

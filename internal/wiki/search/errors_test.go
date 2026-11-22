@@ -1,7 +1,9 @@
 package search
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -26,6 +28,12 @@ func TestRespondWithSearchError_WritesEnvelope(t *testing.T) {
 			err:        ErrSearchUnavailable,
 			wantStatus: http.StatusServiceUnavailable,
 			wantBody:   `{"error":{"code":"search_unavailable","message":"Search is currently unavailable","template":"search is currently unavailable"}}`,
+		},
+		{
+			name:       "client gone gets a status and no body",
+			err:        fmt.Errorf("search: %w", context.Canceled),
+			wantStatus: statusClientClosedRequest,
+			wantBody:   "",
 		},
 		{
 			name:       "internal error is sanitized",

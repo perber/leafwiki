@@ -1,11 +1,13 @@
 package search
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/perber/wiki/internal/core/tree"
 	httpinternal "github.com/perber/wiki/internal/http"
@@ -228,6 +230,55 @@ func TestSearchRoutes_Search_ErrorBodies(t *testing.T) {
 			}
 			if got := rec.Body.String(); got != tt.want {
 				t.Errorf("%s body = %s, want %s", tt.url, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestSearchRoutes_Search_ContextEnds pins the responses when a search's
+// context ends before the index answers: the search timeout is a 503 with the
+// search_unavailable body; a canceled request gets 499 and no body, which only
+// the access log sees, because the client is gone.
+func TestSearchRoutes_Search_ContextEnds(t *testing.T) {
+	tests := []struct {
+		name       string
+		timeout    time.Duration
+		cancel     bool
+		wantStatus int
+		wantBody   string
+	}{
+		{
+			name:       "search timeout elapses",
+			timeout:    0,
+			wantStatus: http.StatusServiceUnavailable,
+			wantBody:   `{"error":{"code":"search_unavailable","message":"Search is currently unavailable","template":"search is currently unavailable"}}`,
+		},
+		{
+			name:       "client canceled the request",
+			timeout:    time.Minute,
+			cancel:     true,
+			wantStatus: statusClientClosedRequest,
+			wantBody:   "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router, _ := newSearchRouter(t, signedIn, searchPages...)
+			withSearchTimeout(t, tt.timeout)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if tt.cancel {
+				cancel()
+			}
+
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, httptest.NewRequestWithContext(ctx, http.MethodGet, "/api/search?q=components", nil))
+
+			if rec.Code != tt.wantStatus {
+				t.Fatalf("status code = %d, want %d; body=%s", rec.Code, tt.wantStatus, rec.Body.String())
+			}
+			if got := rec.Body.String(); got != tt.wantBody {
+				t.Errorf("body = %s, want %s", got, tt.wantBody)
 			}
 		})
 	}
