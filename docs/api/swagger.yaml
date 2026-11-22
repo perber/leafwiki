@@ -669,9 +669,10 @@ paths:
           schema:
             $ref: '#/definitions/dto.SearchResult'
         "400":
-          description: Neither `q` nor a tag given (code search_missing_query), `q`
-            longer than 256 characters or 12 terms (code search_query_too_long), or
-            `offset` or `limit` is not an integer (codes search_invalid_offset, search_invalid_limit)
+          description: Neither `q` nor a tag given, a `q` of only whitespace counts
+            as not given (code search_missing_query), `q` longer than 256 characters
+            or 12 terms (code search_query_too_long), or `offset` or `limit` is not
+            an integer (codes search_invalid_offset, search_invalid_limit)
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
         "401":

@@ -58,7 +58,7 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 //	@Param			offset	query		integer				false	"Number of hits to skip; negative values mean 0, values above 10000 mean 10000"	default(0)
 //	@Param			limit	query		integer				false	"Maximum number of hits; values below 1 mean 20, values above 100 mean 100"	default(20)
 //	@Success		200		{object}	dto.SearchResult	"Hits and tag facets; empty lists when nothing matches"
-//	@Failure		400		{object}	dto.ErrorResponse	"Neither `q` nor a tag given (code search_missing_query), `q` longer than 256 characters or 12 terms (code search_query_too_long), or `offset` or `limit` is not an integer (codes search_invalid_offset, search_invalid_limit)"
+//	@Failure		400		{object}	dto.ErrorResponse	"Neither `q` nor a tag given, a `q` of only whitespace counts as not given (code search_missing_query), `q` longer than 256 characters or 12 terms (code search_query_too_long), or `offset` or `limit` is not an integer (codes search_invalid_offset, search_invalid_limit)"
 //	@Failure		401		{object}	dto.LegacyError		"No valid session while public access is off, an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)"
 //	@Failure		429		{object}	dto.LegacyError		"API-key attempts throttled"
 //	@Failure		500		{object}	object				"Index lookup failed: the body is an ErrorResponse (code search_internal_error). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object."
@@ -67,7 +67,9 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 func (r *Routes) handleSearch(c *gin.Context) {
 	query := c.Query("q")
 	tags := queryTags(c, "tags")
-	if query == "" && len(tags) == 0 {
+	// The use case trims the query, so one of only whitespace is as missing
+	// as an empty one.
+	if strings.TrimSpace(query) == "" && len(tags) == 0 {
 		respondWithSearchStatusError(c, http.StatusBadRequest, ErrCodeSearchMissingQuery, "Query parameter 'q' is required", "query parameter q is required")
 		return
 	}

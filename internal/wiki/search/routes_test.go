@@ -219,6 +219,7 @@ func TestSearchRoutes_Search_ErrorBodies(t *testing.T) {
 	tests := []struct{ name, url, want string }{
 		{"missing query", "/api/search", `{"error":{"code":"search_missing_query","message":"Query parameter 'q' is required","template":"query parameter q is required"}}`},
 		{"empty query and empty tags", "/api/search?q=&tags=,", `{"error":{"code":"search_missing_query","message":"Query parameter 'q' is required","template":"query parameter q is required"}}`},
+		{"whitespace-only query", "/api/search?q=%20%09%20", `{"error":{"code":"search_missing_query","message":"Query parameter 'q' is required","template":"query parameter q is required"}}`},
 		{"invalid offset", "/api/search?q=components&offset=x", `{"error":{"code":"search_invalid_offset","message":"Invalid offset value","template":"invalid offset value"}}`},
 		{"invalid limit", "/api/search?q=components&limit=x", `{"error":{"code":"search_invalid_limit","message":"Invalid limit value","template":"invalid limit value"}}`},
 		{"query with too many terms", "/api/search?q=" + strings.TrimSuffix(strings.Repeat("pi+", 13), "+"), `{"error":{"code":"search_query_too_long","message":"Search query is too long: at most 256 characters and 12 terms","template":"search query is too long: at most %s characters and %s terms","args":["256","12"]}}`},
