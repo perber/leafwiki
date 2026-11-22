@@ -327,10 +327,19 @@ func (w headWriter) WriteString(s string) (int, error) {
 	return len(s), nil
 }
 
+// shellReservedPrefixes are the path segments the shell never answers. They
+// are matched as whole segments: page slugs may start with them (api-guide,
+// static-ip), and a reload on such a page must still get the shell.
+var shellReservedPrefixes = []string{"/api", "/assets", "/static", "/branding"}
+
 func isShellRequest(method, routePath string) bool {
-	return (method == http.MethodGet || method == http.MethodHead) &&
-		!strings.HasPrefix(routePath, "/api") &&
-		!strings.HasPrefix(routePath, "/assets") &&
-		!strings.HasPrefix(routePath, "/static") &&
-		!strings.HasPrefix(routePath, "/branding")
+	if method != http.MethodGet && method != http.MethodHead {
+		return false
+	}
+	for _, prefix := range shellReservedPrefixes {
+		if routePath == prefix || strings.HasPrefix(routePath, prefix+"/") {
+			return false
+		}
+	}
+	return true
 }
