@@ -2,6 +2,7 @@ package search
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -178,6 +179,17 @@ func TestQueryTermCount_CountsSearchTermsPerFieldKind(t *testing.T) {
 		{name: "CJK runs count as one term each", input: "日本語 中文", want: 2},
 		{name: "emoji are separators", input: "🙂foo🙂bar🙂", want: 2},
 		{name: "NEAR with many words", input: "NEAR(a b c d e f g h i j k l m)", want: 13},
+		{name: "NEAR with many words and a distance", input: "NEAR(a b c d e f g h i j k l, 10)", want: 12},
+		{name: "phrase of circled numbers counts every token", input: `"① ② ③ ④ ⑤ ⑥ ⑦ ⑧ ⑨ ⑩ ⑪ ⑫ ⑬ ⑭ ⑮ ⑯ ⑰ ⑱ ⑲ ⑳"`, want: 20},
+		{name: "phrase with superscript digits is one token", input: `"x²y²z²"`, want: 1},
+		{name: "phrase with letter numbers and private use counts them", input: "\"Ⅻ \ue000\"", want: 2},
+		{name: "NEAR call with circled numbers counts them", input: "NEAR(① ② ③)", want: 3},
+		// U+19B0 is a letter in Go but a separator in SQLite's unicode61.
+		{name: "literal word split by a unicode61 separator counts its tokens", input: strings.Repeat("aᦰbᦰ", 63) + "a", want: 127},
+		{name: "quoted phrase split by a unicode61 separator counts its tokens", input: `"` + strings.Repeat("aᦰ", 126) + `a"`, want: 127},
+		{name: "column filter split by a unicode61 separator counts its tokens", input: "title:" + strings.Repeat("aᦰ", 124) + "a", want: 125},
+		{name: "operator field split by a unicode61 separator counts its tokens", input: "(" + strings.Repeat("aᦰ", 126) + "a*)", want: 127},
+		{name: "NEAR call split by a unicode61 separator counts its tokens", input: "NEAR(" + strings.Repeat("aᦰ", 120) + "a)", want: 121},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

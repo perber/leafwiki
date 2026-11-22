@@ -16,6 +16,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode"
 
 	"github.com/perber/wiki/internal/core/shared/sqliteutil"
 	"github.com/perber/wiki/internal/core/tree"
@@ -2835,6 +2836,16 @@ func TestQueryTermCount_MatchesTheTokensSentToFTS5(t *testing.T) {
 		{name: "CJK runs", input: "日本語 中文 한국어"},
 		{name: "emoji between words", input: "🙂foo🙂bar🙂"},
 		{name: "NEAR call without distance", input: "NEAR(a b c)"},
+		{name: "NEAR call with distance", input: "NEAR(a b c d e f g h i j k l, 10)"},
+		{name: "NEAR call with circled numbers", input: "NEAR(① ② ③)"},
+		{name: "quoted phrase of circled numbers", input: `"① ② ③ ④ ⑤ ⑥ ⑦ ⑧ ⑨ ⑩ ⑪ ⑫ ⑬ ⑭ ⑮ ⑯ ⑰ ⑱ ⑲ ⑳"`},
+		{name: "quoted phrase with superscript digits", input: `"x²y²z²"`},
+		{name: "quoted phrase with letter numbers and private use", input: "\"Ⅻ \ue000\""},
+		{name: "literal word split by a unicode61 separator", input: strings.Repeat("aᦰbᦰ", 63) + "a"},
+		{name: "quoted phrase split by a unicode61 separator", input: `"` + strings.Repeat("aᦰ", 126) + `a"`},
+		{name: "column filter split by a unicode61 separator", input: "title:" + strings.Repeat("aᦰ", 124) + "a"},
+		{name: "operator field split by a unicode61 separator", input: "(" + strings.Repeat("aᦰ", 126) + "a*)"},
+		{name: "NEAR call split by a unicode61 separator", input: "NEAR(" + strings.Repeat("aᦰ", 120) + "a)"},
 		{name: "dangling and doubled keywords", input: "AND a AND AND b NOT"},
 	}
 	for _, tc := range tests {
@@ -2844,6 +2855,110 @@ func TestQueryTermCount_MatchesTheTokensSentToFTS5(t *testing.T) {
 				t.Errorf("QueryTermCount(%q) = %d, but its MATCH expression %q holds %d tokens", tc.input, got, fts, want)
 			}
 		})
+	}
+}
+
+// TestIsTokenizerTokenRune_AgreesWithUnicode61 checks the term counter's
+// word-character predicate against the real tokenizer: every non-ASCII code
+// point the counter keeps inside a word must not split a token in SQLite.
+// Go's Unicode tables are newer than the ones compiled into SQLite's
+// unicode61, so a rune Go calls a letter can be a separator there; counting
+// it as part of a word would let one counted term expand into many MATCH
+// terms. A Go or modernc upgrade that shifts either table fails here instead
+// of silently reopening that bypass.
+//
+// The reverse (unicode61 keeps a rune the counter splits on) only makes the
+// count too high and is not checked: unicode61 keeps unassigned code points
+// and folds combining marks away, so it disagrees on hundreds of thousands
+// of runes that cannot make a query cheaper than counted.
+func TestIsTokenizerTokenRune_AgreesWithUnicode61(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	db.SetMaxOpenConns(1)
+	if _, err := db.Exec(`CREATE VIRTUAL TABLE probe USING fts5(c, tokenize = "unicode61 tokenchars '` + searchTokenChars + `'")`); err != nil {
+		t.Fatalf("create probe table: %v", err)
+	}
+	if _, err := db.Exec(`CREATE VIRTUAL TABLE probe_vocab USING fts5vocab(probe, instance)`); err != nil {
+		t.Fatalf("create vocab table: %v", err)
+	}
+
+	// Each rune r is written as "zz<r>zz" into a batch document: a token
+	// rune leaves one token, a separator the two tokens "zz" "zz".
+	const batchSize = 16384
+	var batches [][]rune
+	var batch []rune
+	for r := rune(0x80); r <= unicode.MaxRune; r++ {
+		if !isTokenizerTokenRune(r) {
+			continue
+		}
+		batch = append(batch, r)
+		if len(batch) == batchSize {
+			batches = append(batches, batch)
+			batch = nil
+		}
+	}
+	batches = append(batches, batch)
+
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("begin: %v", err)
+	}
+	for i, runes := range batches {
+		var doc strings.Builder
+		for _, r := range runes {
+			doc.WriteString("zz")
+			doc.WriteRune(r)
+			doc.WriteString("zz ")
+		}
+		if _, err := tx.Exec(`INSERT INTO probe(rowid, c) VALUES (?, ?)`, i, doc.String()); err != nil {
+			t.Fatalf("insert batch %d: %v", i, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+
+	terms := make([][]string, len(batches))
+	rows, err := db.Query(`SELECT doc, term FROM probe_vocab ORDER BY doc, offset`)
+	if err != nil {
+		t.Fatalf("read tokens: %v", err)
+	}
+	for rows.Next() {
+		var doc int
+		var term string
+		if err := rows.Scan(&doc, &term); err != nil {
+			t.Fatalf("scan token: %v", err)
+		}
+		terms[doc] = append(terms[doc], term)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("read tokens: %v", err)
+	}
+	_ = rows.Close()
+
+	var splitting []string
+	for i, runes := range batches {
+		next := 0
+		for _, r := range runes {
+			if next >= len(terms[i]) {
+				t.Fatalf("batch %d ran out of tokens at U+%04X", i, r)
+			}
+			if terms[i][next] == "zz" && next+1 < len(terms[i]) && terms[i][next+1] == "zz" {
+				splitting = append(splitting, fmt.Sprintf("U+%04X", r))
+				next += 2
+				continue
+			}
+			next++
+		}
+		if next != len(terms[i]) {
+			t.Fatalf("batch %d: %d tokens left over, the rune walk is out of step", i, len(terms[i])-next)
+		}
+	}
+	if len(splitting) > 0 {
+		t.Errorf("isTokenizerTokenRune keeps %d runes inside a word that unicode61 splits on: %s", len(splitting), strings.Join(splitting, " "))
 	}
 }
 
