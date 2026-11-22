@@ -368,6 +368,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--data-dir`                     | Directory where data is stored                                          | `./data`      | –       |
 | `--admin-username`               | Initial admin username (only applied if no admin exists yet)            | `admin`       | v0.12.0 |
 | `--admin-email`                  | Initial admin email (only applied if no admin exists yet)               | `admin@localhost` | v0.12.0 |
+| `--editor-limit`                 | Maximum number of admin and editor users; `0` = unlimited               | `0`           | v0.13.0 |
 | `--public-access`                | Allow public read-only access                                           | `false`       | –       |
 | `--base-path`                    | URL prefix for reverse proxy setups (e.g. `/wiki`)                      | `""`          | v0.8.2  |
 | `--public-url`                   | Public base URL of this wiki including `--base-path` (absolute `http(s)://`); used for links in outgoing email (required when `--smtp-host` is set) and for canonical links in public wikis | `""` | v0.13.0 |
@@ -441,6 +442,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_ADMIN_PASSWORD`               | Initial admin password *(required)*                  | –             | –       |
 | `LEAFWIKI_ADMIN_USERNAME`               | Initial admin username (only applied if no admin exists yet) | `admin`       | v0.12.0 |
 | `LEAFWIKI_ADMIN_EMAIL`                  | Initial admin email (only applied if no admin exists yet) | `admin@localhost` | v0.12.0 |
+| `LEAFWIKI_EDITOR_LIMIT`                 | Maximum number of admin and editor users; `0` = unlimited | `0`  | v0.13.0 |
 | `LEAFWIKI_JWT_SECRET`                   | JWT signing secret *(required)*                      | –             | –       |
 | `LEAFWIKI_PUBLIC_ACCESS`                | Allow public read-only access                        | `false`       | –       |
 | `LEAFWIKI_BASE_PATH`                    | URL prefix for reverse proxy                         | `""`          | v0.8.2  |
