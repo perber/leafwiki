@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"runtime"
 	"slices"
 	"strings"
@@ -2774,5 +2775,111 @@ func TestNewSQLiteIndex_UnknownModuleRebuildWithAnotherHandleOpen(t *testing.T) 
 	}
 	if ghostVersion != 99 || ghostNew != 0 {
 		t.Errorf("old handle: version=%d newRows=%d, want 99 and 0 (it reads the deleted file)", ghostVersion, ghostNew)
+	}
+}
+
+// TestQueryTermCount_MatchesTheTokensSentToFTS5 checks the term count the
+// search use case caps against the real tokenizer: the MATCH expression a
+// query parses into, minus its syntax (column names, boolean keywords, the
+// NEAR keyword and distance), holds exactly as many tokens as QueryTermCount
+// reports. An under-count would let a cheap-looking query expand into more
+// MATCH terms than the cap allows.
+func TestQueryTermCount_MatchesTheTokensSentToFTS5(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if _, err := db.Exec(`CREATE VIRTUAL TABLE probe USING fts5(c, tokenize = "unicode61 tokenchars '` + searchTokenChars + `'")`); err != nil {
+		t.Fatalf("create probe table: %v", err)
+	}
+	if _, err := db.Exec(`CREATE VIRTUAL TABLE probe_vocab USING fts5vocab(probe, instance)`); err != nil {
+		t.Fatalf("create vocab table: %v", err)
+	}
+	columnPrefix := regexp.MustCompile(`(?i)\b(path|filepath|pageid|kind|title|headings|content):`)
+	keyword := regexp.MustCompile(`(^|\s)(AND|OR|NOT)(\s|$)`)
+	nearCall := regexp.MustCompile(`^NEAR\((.*?)(,\s*\d+)?\)$`)
+	tokensSentToFTS5 := func(t *testing.T, fts string) int {
+		t.Helper()
+		fts = nearCall.ReplaceAllString(fts, "$1")
+		fts = columnPrefix.ReplaceAllString(fts, " ")
+		// Applied twice: adjacent keywords share the whitespace between them.
+		fts = keyword.ReplaceAllString(keyword.ReplaceAllString(fts, " "), " ")
+		if _, err := db.Exec(`DELETE FROM probe`); err != nil {
+			t.Fatalf("clear probe: %v", err)
+		}
+		if _, err := db.Exec(`INSERT INTO probe(c) VALUES (?)`, fts); err != nil {
+			t.Fatalf("insert probe: %v", err)
+		}
+		var n int
+		if err := db.QueryRow(`SELECT count(*) FROM probe_vocab`).Scan(&n); err != nil {
+			t.Fatalf("count tokens: %v", err)
+		}
+		return n
+	}
+
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{name: "plain words", input: "foo bar baz"},
+		{name: "comma-separated words", input: "a,b,c,d,e,f,g,h,i,j,k,l,m"},
+		{name: "token punctuation keeps one word", input: "foo-bar-baz.v2/x#y+z"},
+		{name: "apostrophes and quotes inside words", input: `it's abc"def`},
+		{name: "column filters", input: "title:a title:b content:c,d"},
+		{name: "unknown column", input: "nope:a,b"},
+		{name: "nested groups with prefixes", input: "((a OR b) AND (c OR d*))"},
+		{name: "quoted phrase", input: `"a b c d e f g h i j k l m"`},
+		{name: "quoted phrase with escaped quote", input: `"a""b c"`},
+		{name: "mixed operators, filters and phrases", input: `(a OR b) NOT title:c,d "e f" g*`},
+		{name: "CJK runs", input: "日本語 中文 한국어"},
+		{name: "emoji between words", input: "🙂foo🙂bar🙂"},
+		{name: "NEAR call without distance", input: "NEAR(a b c)"},
+		{name: "dangling and doubled keywords", input: "AND a AND AND b NOT"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fts := buildFuzzyQuery(tc.input)
+			if got, want := QueryTermCount(tc.input), tokensSentToFTS5(t, fts); got != want {
+				t.Errorf("QueryTermCount(%q) = %d, but its MATCH expression %q holds %d tokens", tc.input, got, fts, want)
+			}
+		})
+	}
+}
+
+// TestSQLiteIndex_Search_QueryAtTheTermCapStillFindsThePage: the use case
+// lets through queries of up to 12 terms; such a query, literal or mixed with
+// operators, must still match and rank normally rather than hit an FTS5 limit.
+func TestSQLiteIndex_Search_QueryAtTheTermCapStillFindsThePage(t *testing.T) {
+	index := newTestIndex(t)
+	content := "alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima"
+	if err := index.IndexPage("notes/alpha", "notes/alpha.md", "alpha1", "Alphabet", tree.NodeKindPage, content); err != nil {
+		t.Fatalf("failed to index alpha page: %v", err)
+	}
+	if err := index.IndexPage("notes/other", "notes/other.md", "other", "Other", tree.NodeKindPage, "alpha bravo"); err != nil {
+		t.Fatalf("failed to index other page: %v", err)
+	}
+
+	tests := []struct {
+		name  string
+		query string
+	}{
+		{name: "12 literal words", query: content},
+		{name: "12 comma-separated words", query: strings.ReplaceAll(content, " ", ",")},
+		{name: "12 terms mixing operators, filters and phrases", query: `(alpha OR zulu) AND content:bravo,charlie AND "delta echo" foxtrot* golf hotel india juliet kilo`},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := QueryTermCount(tc.query); got != 12 {
+				t.Fatalf("QueryTermCount(%q) = %d, want 12", tc.query, got)
+			}
+			result, err := index.Search(tc.query, nil, 0, 10)
+			if err != nil {
+				t.Fatalf("Search(%q) failed: %v", tc.query, err)
+			}
+			if result.Count != 1 || len(result.Items) != 1 || result.Items[0].PageID != "alpha1" {
+				t.Errorf("Search(%q) = count %d, want exactly the alpha page", tc.query, result.Count)
+			}
+		})
 	}
 }

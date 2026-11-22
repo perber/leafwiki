@@ -116,6 +116,16 @@ func TestSearchUseCase_Execute_RejectsOverLongQueries(t *testing.T) {
 		{name: "length counts runes, not bytes", query: strings.Repeat("ü", 256), wantCode: ErrCodeSearchUnavailable},
 		{name: "surrounding spaces don't count", query: "   " + strings.Repeat("a", 256) + "   ", wantCode: ErrCodeSearchUnavailable},
 		{name: "tag-only search is unaffected", tags: []string{"docs"}, wantCode: ErrCodeSearchUnavailable},
+		{name: "whitespace-only query is not too long", query: strings.Repeat(" ", 300), wantCode: ErrCodeSearchUnavailable},
+		{name: "257 multi-byte runes fail", query: strings.Repeat("ü", 257), wantCode: ErrCodeSearchQueryTooLong},
+		{name: "256 emoji pass the rune cap", query: strings.Repeat("🙂", 256), wantCode: ErrCodeSearchUnavailable},
+		{name: "257 emoji fail the rune cap", query: strings.Repeat("🙂", 257), wantCode: ErrCodeSearchQueryTooLong},
+		{name: "12 terms across field kinds pass", query: `(a OR b) NOT title:c,d "e f g" h* i,j k l`, wantCode: ErrCodeSearchUnavailable},
+		{name: "13 terms across field kinds fail", query: `(a OR b) NOT title:c,d "e f g" h* i,j k l m`, wantCode: ErrCodeSearchQueryTooLong},
+		{name: "13 column filter words fail", query: "title:a,b,c,d,e,f,g,h,i,j,k,l,m", wantCode: ErrCodeSearchQueryTooLong},
+		{name: "13 words in one quoted phrase fail", query: `"a b c d e f g h i j k l m"`, wantCode: ErrCodeSearchQueryTooLong},
+		{name: "boolean keywords don't count", query: "a OR b OR c OR d OR e OR f OR g OR h OR i OR j OR k OR l", wantCode: ErrCodeSearchUnavailable},
+		{name: "over-long query with tags is still rejected", query: strings.Repeat("pi ", 13), tags: []string{"docs"}, wantCode: ErrCodeSearchQueryTooLong},
 	}
 	uc := NewSearchUseCase(nil, nil, nil)
 	for _, tc := range tests {
