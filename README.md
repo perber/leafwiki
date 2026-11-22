@@ -391,7 +391,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--enable-http-remote-user-auto-create` | Auto-provision users the proxy asserts but LeafWiki doesn't know    | `false`    | v0.12.1 |
 | `--http-remote-user-email-header-name` | Header name carrying the email for auto-created users               | `""`        | v0.12.1 |
 | `--http-remote-user-default-role` | Role assigned to auto-created users; must not be `admin`               | `viewer`      | v0.12.1 |
-| `--trusted-proxy-ips`            | IPs/CIDRs of your reverse proxies; only they are believed for `X-Forwarded-For` (client address for the access log, rate limits and login backoff) and the remote-user header | `""` | v0.10.0 |
+| `--trusted-proxy-ips`            | IPs/CIDRs of your reverse proxies. Only requests from these addresses may pass the visitor's address in `X-Forwarded-For` (used for the access log, rate limits and login backoff) or a remote-user header. Behind a reverse proxy, list it here | `""` | v0.10.0 |
 | `--login-url`                    | Redirect to an external URL instead of the built-in login form          | `""`          | v0.12.0 |
 | `--logout-url`                   | Redirect to an external URL after logout                                | `""`          | v0.12.0 |
 | `--http-remote-user-logout-url`  | ⚠️ Deprecated, use `--logout-url` instead                               | `""`          | v0.10.0 |
@@ -466,7 +466,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_ENABLE_HTTP_REMOTE_USER_AUTO_CREATE` | Auto-provision users the proxy asserts but LeafWiki doesn't know | `false` | v0.12.1 |
 | `LEAFWIKI_HTTP_REMOTE_USER_EMAIL_HEADER_NAME` | Email header for auto-created users            | `""`          | v0.12.1 |
 | `LEAFWIKI_HTTP_REMOTE_USER_DEFAULT_ROLE` | Role assigned to auto-created users; must not be `admin` | `viewer`      | v0.12.1 |
-| `LEAFWIKI_TRUSTED_PROXY_IPS`            | IPs/CIDRs of your reverse proxies, believed for `X-Forwarded-For` and the remote-user header | `""` | v0.10.0 |
+| `LEAFWIKI_TRUSTED_PROXY_IPS`            | IPs/CIDRs of your reverse proxies whose `X-Forwarded-For` and remote-user headers LeafWiki trusts | `""` | v0.10.0 |
 | `LEAFWIKI_LOGIN_URL`                    | Redirect to an external URL instead of the login form | `""`          | v0.12.0 |
 | `LEAFWIKI_LOGOUT_URL`                   | Redirect to an external URL after logout             | `""`          | v0.12.0 |
 | `LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL`  | ⚠️ Deprecated, use `LEAFWIKI_LOGOUT_URL` instead     | `""`          | v0.10.0 |
