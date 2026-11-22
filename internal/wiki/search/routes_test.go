@@ -11,6 +11,7 @@ import (
 
 	"github.com/perber/wiki/internal/core/tree"
 	httpinternal "github.com/perber/wiki/internal/http"
+	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 	"github.com/perber/wiki/internal/publicaccess"
 	coresearch "github.com/perber/wiki/internal/search"
 	coretags "github.com/perber/wiki/internal/tags"
@@ -361,4 +362,70 @@ func TestSearchRoutes_ReadGroup_Access(t *testing.T) {
 			}
 		})
 	}
+}
+
+// headerCountingRecorder counts WriteHeader calls, so a test can tell a
+// response written once from one whose status was written twice.
+type headerCountingRecorder struct {
+	*httptest.ResponseRecorder
+	writeHeaders int
+}
+
+func (r *headerCountingRecorder) WriteHeader(code int) {
+	r.writeHeaders++
+	r.ResponseRecorder.WriteHeader(code)
+}
+
+// TestSearchRoutes_Search_CanceledRequest_PassesThroughMiddleware pins that
+// the 499 for a client that went away runs through the full middleware
+// chain: the status is written once, the access log and the request metrics
+// record 499, and nothing is logged as an error or a recovered panic.
+func TestSearchRoutes_Search_CanceledRequest_PassesThroughMiddleware(t *testing.T) {
+	uc, tagsSvc, ts := setupSearchUseCaseForTags(t)
+	for _, p := range searchPages {
+		addSearchPage(t, ts, tagsSvc, uc.index, p)
+	}
+	metrics := httpmetrics.NewHTTPMetrics("test")
+	opts := httpinternal.RouterOptions{AuthDisabled: true, Metrics: metrics}
+	routes := NewRoutes(RoutesConfig{Search: uc, GetIndexingStatus: NewGetIndexingStatusUseCase(coresearch.NewIndexingStatus())})
+	router := httpinternal.NewRouter([]httpinternal.RouteRegistrar{routes}, httpinternal.FrontendConfig{}, opts)
+	logs := captureLogs(t)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	rec := &headerCountingRecorder{ResponseRecorder: httptest.NewRecorder()}
+	router.ServeHTTP(rec, httptest.NewRequestWithContext(ctx, http.MethodGet, "/api/search?q=components", nil))
+
+	if rec.Code != statusClientClosedRequest {
+		t.Fatalf("status code = %d, want %d; body=%s", rec.Code, statusClientClosedRequest, rec.Body.String())
+	}
+	if rec.writeHeaders != 1 {
+		t.Errorf("WriteHeader called %d times, want 1", rec.writeHeaders)
+	}
+	if rec.Body.Len() != 0 {
+		t.Errorf("body = %q, want empty", rec.Body.String())
+	}
+	got := logs.String()
+	if !strings.Contains(got, "status=499") {
+		t.Errorf("access log does not record status 499:\n%s", got)
+	}
+	if strings.Contains(got, "level=ERROR") || strings.Contains(got, "level=WARN") {
+		t.Errorf("a canceled search logged a warning or an error:\n%s", got)
+	}
+
+	mrec := httptest.NewRecorder()
+	metrics.HTTPHandler().ServeHTTP(mrec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	if !strings.Contains(grepLines(mrec.Body.String(), "http_requests_total"), `"499"`) {
+		t.Errorf("request metrics do not record status 499:\n%s", grepLines(mrec.Body.String(), "http_requests_total"))
+	}
+}
+
+func grepLines(s, sub string) string {
+	var out []string
+	for _, line := range strings.Split(s, "\n") {
+		if strings.Contains(line, sub) {
+			out = append(out, line)
+		}
+	}
+	return strings.Join(out, "\n")
 }

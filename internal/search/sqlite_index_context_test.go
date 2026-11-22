@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -159,4 +160,77 @@ func TestSQLiteIndex_Search_DeadlineMidQuery_InterruptsAndKeepsIndexUsable(t *te
 	if strings.Contains(logs.String(), "level=ERROR") {
 		t.Errorf("an interrupted search logged an error:\n%s", logs.String())
 	}
+}
+
+// TestSQLiteIndex_Search_RepeatedInterrupts_KeepReadersAndWriterHealthy pins
+// that interrupting statements does not poison the pool: after many
+// interrupted queries in a row, and many contexts that end right after a
+// query has returned, a write and concurrent reads on the same index all
+// succeed, no SQLITE_INTERRUPT surfaces on an unrelated statement, and no
+// connection is left in use.
+func TestSQLiteIndex_Search_RepeatedInterrupts_KeepReadersAndWriterHealthy(t *testing.T) {
+	index, heavyQuery := newHeavyQueryIndex(t)
+
+	for i := range 10 {
+		call := searchCalls[i%len(searchCalls)]
+		ctx, cancel := context.WithTimeout(t.Context(), time.Duration(1+i)*time.Millisecond)
+		_, err := call.run(ctx, index, heavyQuery)
+		cancel()
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("interrupt %d (%s): err = %v, want context.DeadlineExceeded", i, call.name, err)
+		}
+	}
+
+	// A context that ends just after the statement has returned must not
+	// interrupt the next statement that gets the same connection.
+	for i := range 100 {
+		call := searchCalls[i%len(searchCalls)]
+		ctx, cancel := context.WithCancel(t.Context())
+		_, err := call.run(ctx, index, "title")
+		cancel()
+		if err != nil {
+			t.Fatalf("search %d (%s) with a context canceled after it: %v", i, call.name, err)
+		}
+	}
+
+	if err := index.IndexPage("fresh", "fresh.md", "fresh", "Fresh", tree.NodeKindPage, "freshword body"); err != nil {
+		t.Fatalf("IndexPage right after interrupted searches: %v", err)
+	}
+
+	const readers, rounds = 8, 10
+	errs := make(chan error, readers*rounds*len(searchCalls)+rounds)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := range rounds {
+			id := fmt.Sprintf("w%d", i)
+			if err := index.IndexPage(id, id+".md", id, "Writer "+id, tree.NodeKindPage, "freshword writer"); err != nil {
+				errs <- fmt.Errorf("concurrent IndexPage %d: %w", i, err)
+			}
+		}
+	}()
+	var wg sync.WaitGroup
+	for r := range readers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := range rounds {
+				for _, call := range searchCalls {
+					hits, err := call.run(t.Context(), index, "freshword")
+					if err != nil {
+						errs <- fmt.Errorf("reader %d round %d %s: %w", r, i, call.name, err)
+					} else if hits == 0 {
+						errs <- fmt.Errorf("reader %d round %d %s found nothing", r, i, call.name)
+					}
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	<-done
+	close(errs)
+	for err := range errs {
+		t.Error(err)
+	}
+	assertIndexStillSearchable(t, index, "freshword")
 }
