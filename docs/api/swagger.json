@@ -334,7 +334,7 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Search text; required unless `tags` is given",
+                        "description": "Search text; required unless `tags` is given. At most 256 characters (after trimming surrounding whitespace) and 12 search terms; AND, OR and NOT don't count as terms",
                         "name": "q",
                         "in": "query"
                     },
@@ -371,7 +371,7 @@
                         }
                     },
                     "400": {
-                        "description": "Neither `q` nor a tag given (code search_missing_query), or `offset` or `limit` is not an integer (codes search_invalid_offset, search_invalid_limit)",
+                        "description": "Neither `q` nor a tag given (code search_missing_query), `q` longer than 256 characters or 12 terms (code search_query_too_long), or `offset` or `limit` is not an integer (codes search_invalid_offset, search_invalid_limit)",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }

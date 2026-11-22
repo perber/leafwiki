@@ -2,8 +2,10 @@ package search
 
 import (
 	"context"
+	"strings"
 	"testing"
 
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/tree"
 	coresearch "github.com/perber/wiki/internal/search"
 	coretags "github.com/perber/wiki/internal/tags"
@@ -90,5 +92,42 @@ func TestSearchUseCase_Execute_TagOnlySearchEscapesTitle(t *testing.T) {
 	got := out.Result.Items[0].Title
 	if got != "&lt;img src=x onerror=&#34;alert(1)&#34;&gt;" {
 		t.Fatalf("escaped title = %q", got)
+	}
+}
+
+// TestSearchUseCase_Execute_RejectsOverLongQueries pins the query caps: at
+// most maxQueryRunes runes after trimming and maxQueryTerms search terms.
+// The use case runs without an index, so a query that passes the caps gets
+// search_unavailable and one that is rejected proves the check runs before
+// any SQL.
+func TestSearchUseCase_Execute_RejectsOverLongQueries(t *testing.T) {
+	tests := []struct {
+		name     string
+		query    string
+		tags     []string
+		wantCode string
+	}{
+		{name: "many short words", query: strings.Repeat("pi ", 50), wantCode: ErrCodeSearchQueryTooLong},
+		{name: "12 terms pass", query: strings.TrimSpace(strings.Repeat("pi ", 12)), wantCode: ErrCodeSearchUnavailable},
+		{name: "13 terms fail", query: strings.TrimSpace(strings.Repeat("pi ", 13)), wantCode: ErrCodeSearchQueryTooLong},
+		{name: "terms split by punctuation count", query: strings.Repeat("a,", 13), wantCode: ErrCodeSearchQueryTooLong},
+		{name: "256 runes pass", query: strings.Repeat("a", 256), wantCode: ErrCodeSearchUnavailable},
+		{name: "257 runes fail", query: strings.Repeat("a", 257), wantCode: ErrCodeSearchQueryTooLong},
+		{name: "length counts runes, not bytes", query: strings.Repeat("ü", 256), wantCode: ErrCodeSearchUnavailable},
+		{name: "surrounding spaces don't count", query: "   " + strings.Repeat("a", 256) + "   ", wantCode: ErrCodeSearchUnavailable},
+		{name: "tag-only search is unaffected", tags: []string{"docs"}, wantCode: ErrCodeSearchUnavailable},
+	}
+	uc := NewSearchUseCase(nil, nil, nil)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := uc.Execute(context.Background(), SearchInput{Query: tc.query, Tags: tc.tags, Limit: 10})
+			loc, ok := sharederrors.AsLocalizedError(err)
+			if !ok {
+				t.Fatalf("Execute error = %v, want a LocalizedError with code %s", err, tc.wantCode)
+			}
+			if loc.Code != tc.wantCode {
+				t.Errorf("Execute error code = %s, want %s", loc.Code, tc.wantCode)
+			}
+		})
 	}
 }

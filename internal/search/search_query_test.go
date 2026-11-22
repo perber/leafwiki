@@ -139,6 +139,40 @@ func TestParseSearchQuery_SplitsLiteralWordsByLength(t *testing.T) {
 	}
 }
 
+// TestQueryTermCount_CountsSearchTermsPerFieldKind pins how many terms each
+// kind of field adds to the count the search use case caps: every word that
+// reaches FTS5 as something to match counts once, boolean keywords and the
+// NEAR keyword itself don't.
+func TestQueryTermCount_CountsSearchTermsPerFieldKind(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  int
+	}{
+		{name: "empty", input: "", want: 0},
+		{name: "whitespace only", input: " \t ", want: 0},
+		{name: "plain words", input: "foo bar baz", want: 3},
+		{name: "comma splits words", input: "a,b", want: 2},
+		{name: "hyphenated word is one term", input: "foo-bar", want: 1},
+		{name: "keyword between operands counts nothing", input: "x OR y", want: 2},
+		{name: "dangling keyword is a literal word", input: "AND foo", want: 2},
+		{name: "column filter counts its value words", input: "title:foo", want: 1},
+		{name: "column filter with several value words", input: "title:foo,bar", want: 2},
+		{name: "quoted phrase counts its words", input: `"a b"`, want: 2},
+		{name: "operator field counts its barewords", input: "(apple OR cherry*) AND banana", want: 3},
+		{name: "NEAR call counts its words but not NEAR or the distance", input: "NEAR(a b, 5)", want: 2},
+		{name: "punctuation-only query", input: ",", want: 0},
+		{name: "one-letter words each count", input: "a b c d", want: 4},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := QueryTermCount(tc.input); got != tc.want {
+				t.Errorf("QueryTermCount(%q) = %d, want %d", tc.input, got, tc.want)
+			}
+		})
+	}
+}
+
 // TestSearchTiers_MatchExpressions pins the MATCH arguments of the rank
 // tiers, best tier first. They are built only from splitIntoIndexWords output,
 // so quotes, apostrophes and SQL punctuation can never reach them as syntax.

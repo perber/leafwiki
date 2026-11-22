@@ -1,4 +1,5 @@
 import { HotKeyHandler } from '@/components/HotKeyHandler'
+import { ApiLocalizedError } from '@/lib/api/errors'
 import { searchPages } from '@/lib/api/search'
 import { useHotKeysStore } from '@/stores/hotkeys'
 import { act, fireEvent, render, screen } from '@testing-library/react'
@@ -306,6 +307,52 @@ describe('Search', () => {
     expect(screen.getByTestId('search-result-card-p1')).not.toHaveClass(
       'search-result-card--selected',
     )
+  })
+
+  describe('over-long query', () => {
+    const tooLong = new ApiLocalizedError({
+      code: 'search_query_too_long',
+      message: 'Search query is too long: at most 256 characters and 12 terms',
+      template: 'search query is too long: at most %s characters and %s terms',
+      args: ['256', '12'],
+    })
+    const tooLongHint =
+      'Search query is too long: at most 256 characters and 12 terms'
+
+    it('caps the input at the backend limit of 256 characters', () => {
+      renderSearch()
+
+      expect(screen.getByTestId('search-input')).toHaveAttribute(
+        'maxLength',
+        '256',
+      )
+    })
+
+    it('shows the localized limit in the status region instead of no results', async () => {
+      const consoleError = vi.spyOn(console, 'error')
+      onTestFinished(() => consoleError.mockRestore())
+      searchPagesMock.mockRejectedValue(tooLong)
+      renderSearch()
+
+      await typeQuery('pi '.repeat(13).trim())
+
+      expect(screen.getByRole('status')).toHaveTextContent(tooLongHint)
+      expect(screen.queryByText('No results found.')).toBeNull()
+      expect(consoleError).not.toHaveBeenCalled()
+    })
+
+    it('clears the limit hint when the query changes', async () => {
+      searchPagesMock.mockRejectedValueOnce(tooLong)
+      renderSearch()
+
+      await typeQuery('pi '.repeat(13).trim())
+      expect(screen.getByRole('status')).toHaveTextContent(tooLongHint)
+
+      await typeQuery('pi')
+
+      expect(screen.getByRole('status')).toBeEmptyDOMElement()
+      expect(screen.getByText('No results found.')).toBeInTheDocument()
+    })
   })
 
   // jsdom computes no layout, so this only proves the class survives

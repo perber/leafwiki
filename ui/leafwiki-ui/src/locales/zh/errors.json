@@ -100,6 +100,7 @@
   "a sync is already in progress": "同步已在进行中",
   "resync request failed": "重新同步请求失败",
   "search is currently unavailable": "搜索当前不可用",
+  "search query is too long: at most %s characters and %s terms": "搜索查询过长：最多 %s 个字符和 %s 个词",
   "title query param is required": "需要 title 查询参数",
   "TOTP is already enabled for this account": "两步验证已启用",
   "TOTP is not enabled for this account": "两步验证未启用",
