@@ -212,6 +212,20 @@ func TestSearchRoutes_Search_TextQueryWithoutMatch(t *testing.T) {
 	}
 }
 
+// A q of only whitespace counts as missing, so with a tag the request is a
+// tag-only search, not a 400.
+func TestSearchRoutes_Search_WhitespaceQueryWithTag_IsTagOnlySearch(t *testing.T) {
+	router, _ := newSearchRouter(t, signedIn, searchPages...)
+
+	rec := get(router, "/api/search?q=%20%09&tags=react")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); !strings.Contains(body, `"count":1`) || !strings.Contains(body, "React Guide") {
+		t.Errorf(`body = %s, want the one page tagged react`, body)
+	}
+}
+
 // TestSearchRoutes_Search_ErrorBodies pins the exact error bodies so the
 // localized envelope stays wire-compatible (args omitted when empty).
 func TestSearchRoutes_Search_ErrorBodies(t *testing.T) {
