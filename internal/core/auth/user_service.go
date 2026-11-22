@@ -65,10 +65,17 @@ func (s *UserService) checkEditorLimit(role string) error {
 
 func (s *UserService) InitDefaultAdmin(username, email, newPassword string) error {
 	// Check if admin user already exists
-
-	if _, err := s.store.GetAdminUser(); err == nil {
+	_, err := s.store.GetAdminUser()
+	if err == nil {
 		// Admin user already exists, no need to create a new one
 		return nil
+	}
+	if !errors.Is(err, ErrUserNotFound) {
+		return fmt.Errorf("failed to check existing admin user: %w", err)
+	}
+
+	if newPassword == "" {
+		return fmt.Errorf("%w: set it using --admin-password or LEAFWIKI_ADMIN_PASSWORD environment variable", ErrAdminPasswordRequired)
 	}
 
 	if len(newPassword) < MinPasswordLength {

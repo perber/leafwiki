@@ -13,6 +13,7 @@ var ErrSessionManagerNotWired = errors.New("session manager: resolveUser not con
 var ErrLoginThrottled = errors.New("login throttled after too many failed attempts")
 var ErrRemoteUserEmailConflict = errors.New("remote user auto-create: asserted email belongs to a different existing user")
 var ErrPasswordTooShort = errors.New("password is too short")
+var ErrAdminPasswordRequired = errors.New("admin password is required")
 var ErrEditorLimitReached = errors.New("editor limit reached for this plan")
 
 var ErrAPIKeyNotFound = errors.New("api key not found")
