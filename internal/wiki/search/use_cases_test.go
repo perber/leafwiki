@@ -42,44 +42,11 @@ func setupSearchUseCaseForTags(t *testing.T) (*SearchUseCase, *coretags.TagsServ
 	return NewSearchUseCase(index, tagsSvc, treeSvc, slog.Default()), tagsSvc, treeSvc
 }
 
-func pageKind() *tree.NodeKind {
-	k := tree.NodeKindPage
-	return &k
-}
-
-func createTaggedPage(t *testing.T, treeSvc *tree.TreeService, title, slug string, tags []string) string {
-	t.Helper()
-
-	idPtr, err := treeSvc.CreateNode("system", nil, title, slug, pageKind())
-	if err != nil {
-		t.Fatalf("CreateNode %q: %v", slug, err)
-	}
-
-	content := "---\ntags:\n"
-	for _, tag := range tags {
-		content += "  - " + tag + "\n"
-	}
-	content += "---\n\n# Page body"
-
-	if err := treeSvc.UpdateNode(tree.UpdateNodeInput{UserID: "system", ID: *idPtr, Title: title, Slug: slug, Content: &content, ExpectedVersion: tree.VersionUnchecked, PreserveFrontmatter: true}); err != nil {
-		t.Fatalf("UpdateNode %q: %v", slug, err)
-	}
-
-	return *idPtr
-}
-
 func TestSearchUseCase_Execute_TagOnlySearchEscapesTitle(t *testing.T) {
 	uc, tagsSvc, treeSvc := setupSearchUseCaseForTags(t)
-
-	pageID := createTaggedPage(t, treeSvc, `<img src=x onerror="alert(1)">`, "tagged-title", []string{"docs"})
-
-	page, err := treeSvc.GetPage(pageID)
-	if err != nil {
-		t.Fatalf("GetPage: %v", err)
-	}
-	if err := tagsSvc.IndexPageContent(page.ID, page.RawContent); err != nil {
-		t.Fatalf("IndexPageContent: %v", err)
-	}
+	addSearchPage(t, treeSvc, tagsSvc, uc.index, searchPage{
+		title: `<img src=x onerror="alert(1)">`, slug: "tagged-title", body: "# Page body", tags: []string{"docs"},
+	})
 
 	out, err := uc.Execute(context.Background(), SearchInput{
 		Tags:  []string{"docs"},
