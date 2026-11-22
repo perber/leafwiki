@@ -3,7 +3,7 @@ import { ApiLocalizedError } from '@/lib/api/errors'
 import { searchPages } from '@/lib/api/search'
 import { useHotKeysStore } from '@/stores/hotkeys'
 import { act, fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useNavigate } from 'react-router'
 import {
   afterEach,
   beforeEach,
@@ -378,6 +378,44 @@ describe('Search', () => {
       expect(screen.getByRole('status')).toHaveTextContent(tooLongHint)
       expect(screen.queryByText('No results found.')).toBeNull()
     })
+
+    it.each([
+      { name: 'a short query', url: '/?q=pi' },
+      { name: 'no query', url: '/' },
+    ])(
+      'clears the limit hint when the URL changes to $name',
+      async ({ url }) => {
+        // Stands in for a link or history step that changes q while the
+        // search panel stays mounted.
+        function NavigateButton() {
+          const navigate = useNavigate()
+          return <button data-testid="navigate" onClick={() => navigate(url)} />
+        }
+        searchPagesMock.mockRejectedValueOnce(tooLong)
+        render(
+          <MemoryRouter
+            initialEntries={[
+              `/?q=${encodeURIComponent('pi '.repeat(13).trim())}`,
+            ]}
+          >
+            <NavigateButton />
+            <Search active />
+          </MemoryRouter>,
+        )
+        await act(async () => {
+          vi.advanceTimersByTime(PAST_DEBOUNCE_MS)
+        })
+        expect(screen.getByRole('status')).toHaveTextContent(tooLongHint)
+
+        fireEvent.click(screen.getByTestId('navigate'))
+        await act(async () => {
+          vi.advanceTimersByTime(PAST_DEBOUNCE_MS)
+        })
+
+        expect(screen.queryByTestId('search-query-limit-hint')).toBeNull()
+        expect(screen.getByRole('status')).toBeEmptyDOMElement()
+      },
+    )
 
     it('ignores a limit rejection for a query that was replaced meanwhile', async () => {
       let rejectStale: (err: unknown) => void = () => {}
