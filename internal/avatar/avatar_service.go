@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"golang.org/x/image/draw"
@@ -37,6 +38,21 @@ const MaxUploadSize = 5 << 20 // 5 MiB
 // TargetSize is the width and height, in pixels, every stored avatar is
 // resized to after being center-cropped to a square.
 const TargetSize = 256
+
+// MaxImagePixels caps the decoded size of an uploaded image. MaxUploadSize
+// only bounds the compressed bytes: a few KB of PNG/GIF/WebP can declare a
+// canvas that image.Decode would allocate gigabytes for (GHSA-p295-c79q-qjg7),
+// so the declared dimensions are checked before any pixel is decoded.
+// 4096x4096 still covers the 12-megapixel photos phones produce. Memory per
+// pixel depends on the format: 8 B for a 16-bit RGBA PNG, but about 24 B for
+// a progressive CMYK JPEG (coefficient buffers plus the decoded image), so a
+// single decode can still reach ~390 MiB — which is why decodes are also
+// serialised (see AvatarService.decodeSlot).
+const MaxImagePixels = 4096 * 4096
+
+// MaxImageSide caps either dimension on its own, so a strip that stays under
+// MaxImagePixels cannot be arbitrarily long.
+const MaxImageSide = 16384
 
 // allowedExts are the accepted input file extensions (lower-case, with a
 // leading dot), independent of the always-PNG output format.
@@ -69,6 +85,10 @@ func allowedExtsAsString() string {
 // <storageDir>/avatars/<userID>.png.
 type AvatarService struct {
 	avatarsDir string
+	// decodeSlot lets one upload decode at a time, so parallel requests
+	// cannot multiply the per-decode memory bound (GHSA-p295-c79q-qjg7).
+	// Avatar uploads are rare, so the queueing is not noticeable.
+	decodeSlot chan struct{}
 }
 
 // NewAvatarService creates the avatars directory (if missing) under
@@ -78,7 +98,7 @@ func NewAvatarService(storageDir string) (*AvatarService, error) {
 	if err := os.MkdirAll(avatarsDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create avatars directory: %w", err)
 	}
-	return &AvatarService{avatarsDir: avatarsDir}, nil
+	return &AvatarService{avatarsDir: avatarsDir, decodeSlot: make(chan struct{}, 1)}, nil
 }
 
 // UploadAvatar validates, decodes, center-crops to a square, resizes to
@@ -121,7 +141,7 @@ func (s *AvatarService) UploadAvatar(userID string, file multipart.File, filenam
 		)
 	}
 
-	img, _, err := image.Decode(&buf)
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(buf.Bytes()))
 	if err != nil {
 		return sharederrors.NewLocalizedError(
 			"avatar_decode_failed",
@@ -130,9 +150,19 @@ func (s *AvatarService) UploadAvatar(userID string, file multipart.File, filenam
 			err,
 		)
 	}
+	if err := checkDimensions(cfg.Width, cfg.Height); err != nil {
+		return err
+	}
 
-	cropped := cropToSquare(img)
-	resized := resize(cropped, TargetSize, TargetSize)
+	resized, err := s.decodeAndResize(buf.Bytes())
+	if err != nil {
+		return sharederrors.NewLocalizedError(
+			"avatar_decode_failed",
+			"Failed to decode avatar image",
+			"failed to decode avatar image",
+			err,
+		)
+	}
 
 	var out bytes.Buffer
 	if err := png.Encode(&out, resized); err != nil {
@@ -195,6 +225,39 @@ func (s *AvatarService) AvatarPath(userID string) (string, bool) {
 
 func (s *AvatarService) avatarPath(userID string) string {
 	return filepath.Join(s.avatarsDir, userID+".png")
+}
+
+// decodeAndResize decodes data and scales it to TargetSize while holding
+// decodeSlot; the large source image is garbage once it returns, so only the
+// small result outlives the slot.
+func (s *AvatarService) decodeAndResize(data []byte) (image.Image, error) {
+	s.decodeSlot <- struct{}{}
+	defer func() { <-s.decodeSlot }()
+
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	return resize(cropToSquare(img), TargetSize, TargetSize), nil
+}
+
+// checkDimensions rejects images whose declared size is empty or exceeds
+// MaxImageSide or MaxImagePixels. The product is computed in int64 because
+// int is 32 bits on armv7 builds and 65535x65535 would overflow it.
+func checkDimensions(width, height int) error {
+	if width > 0 && height > 0 && width <= MaxImageSide && height <= MaxImageSide &&
+		int64(width)*int64(height) <= MaxImagePixels {
+		return nil
+	}
+	return sharederrors.NewLocalizedError(
+		"avatar_decode_failed",
+		"Avatar image dimensions too large",
+		"avatar image is %sx%s pixels (allowed: up to %s pixels in total)",
+		nil,
+		strconv.Itoa(width),
+		strconv.Itoa(height),
+		strconv.Itoa(MaxImagePixels),
+	)
 }
 
 // cropToSquare returns the largest centered square region of img, so the

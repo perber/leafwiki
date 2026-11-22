@@ -2,6 +2,8 @@ package avatar
 
 import (
 	"bytes"
+	"encoding/binary"
+	"hash/crc32"
 	"image"
 	"image/color"
 	"image/gif"
@@ -13,8 +15,11 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"golang.org/x/image/webp"
+
+	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 )
 
 // fakeMultipartFile adapts a bytes.Reader to multipart.File (io.Reader +
@@ -368,3 +373,123 @@ func TestAvatarService_UploadAvatar_UnsafeUserID_Rejected(t *testing.T) {
 }
 
 var _ io.ReaderAt = fakeMultipartFile{} // sanity: satisfies multipart.File
+
+// withDeclaredSize rewrites the width and height an encoded image declares in
+// its header while leaving the (small) pixel data untouched — the shape of a
+// decompression bomb: a few bytes on the wire that claim a huge canvas
+// (GHSA-p295-c79q-qjg7).
+func withDeclaredSize(t *testing.T, format string, data []byte, width, height int) []byte {
+	t.Helper()
+	out := bytes.Clone(data)
+	switch format {
+	case "png":
+		// IHDR is the first chunk: 8-byte signature, 4-byte length, "IHDR",
+		// then width and height (big-endian), and a CRC over type + data.
+		binary.BigEndian.PutUint32(out[16:20], uint32(width))
+		binary.BigEndian.PutUint32(out[20:24], uint32(height))
+		binary.BigEndian.PutUint32(out[29:33], crc32.ChecksumIEEE(out[12:29]))
+	case "gif":
+		// Logical screen width and height follow the 6-byte "GIF89a" header.
+		binary.LittleEndian.PutUint16(out[6:8], uint16(width))
+		binary.LittleEndian.PutUint16(out[8:10], uint16(height))
+	case "jpeg":
+		// SOF0 (FF C0): 2-byte length, 1-byte precision, height, width.
+		i := bytes.Index(out, []byte{0xFF, 0xC0})
+		if i < 0 {
+			t.Fatal("no SOF0 marker in JPEG fixture")
+		}
+		binary.BigEndian.PutUint16(out[i+5:i+7], uint16(height))
+		binary.BigEndian.PutUint16(out[i+7:i+9], uint16(width))
+	default:
+		t.Fatalf("unsupported fixture format %q", format)
+	}
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(out))
+	if err != nil || cfg.Width != width || cfg.Height != height {
+		t.Fatalf("patched %s fixture declares %dx%d (err %v), want %dx%d", format, cfg.Width, cfg.Height, err, width, height)
+	}
+	return out
+}
+
+func TestAvatarService_UploadAvatar_HugeDeclaredDimensions_RejectedBeforeDecode(t *testing.T) {
+	small := image.NewRGBA(image.Rect(0, 0, 16, 16))
+	cases := []struct {
+		format, filename string
+		data             []byte
+	}{
+		{"png", "avatar.png", encodePNG(t, small)},
+		{"gif", "avatar.gif", encodeGIF(t, small)},
+		{"jpeg", "avatar.jpg", encodeJPEG(t, small)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.format, func(t *testing.T) {
+			svc, dir := newTestAvatarService(t)
+			bomb := withDeclaredSize(t, tc.format, tc.data, 5000, 5000)
+
+			err := svc.UploadAvatar("user-1", newMultipartFile(bomb), tc.filename)
+
+			localized, ok := sharederrors.AsLocalizedError(err)
+			if !ok {
+				t.Fatalf("expected a LocalizedError, got %v", err)
+			}
+			if localized.Code != "avatar_decode_failed" || localized.Message != "Avatar image dimensions too large" {
+				t.Fatalf("got code %q message %q, want the dimension-limit rejection", localized.Code, localized.Message)
+			}
+			if _, statErr := os.Stat(filepath.Join(dir, "avatars", "user-1.png")); !os.IsNotExist(statErr) {
+				t.Fatalf("no avatar must be stored for a rejected upload, stat err: %v", statErr)
+			}
+		})
+	}
+}
+
+func TestCheckDimensions(t *testing.T) {
+	cases := []struct {
+		name          string
+		width, height int
+		wantOK        bool
+	}{
+		{"typical phone photo", 4032, 3024, true},
+		{"square at the pixel cap", 4096, 4096, true},
+		{"one row over the pixel cap", 4096, 4097, false},
+		{"long strip within the pixel cap", 16384, 1024, true},
+		{"side over the per-side cap", MaxImageSide + 1, 1, false},
+		// 65535² overflows a 32-bit int (armv7 Raspberry Pi builds).
+		{"largest GIF/JPEG canvas", 65535, 65535, false},
+		{"zero width", 0, 100, false},
+		{"negative height", 100, -1, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := checkDimensions(tc.width, tc.height) == nil; got != tc.wantOK {
+				t.Fatalf("checkDimensions(%d, %d) ok = %v, want %v", tc.width, tc.height, got, tc.wantOK)
+			}
+		})
+	}
+}
+
+// Even within MaxImagePixels one decode can take a few hundred MiB (a
+// progressive CMYK JPEG), so uploads decode one at a time instead of
+// multiplying that by the number of parallel requests.
+func TestAvatarService_UploadAvatar_DecodesOneAtATime(t *testing.T) {
+	svc, _ := newTestAvatarService(t)
+	data := solidSquarePNG(t, 32)
+
+	svc.decodeSlot <- struct{}{} // another upload is decoding
+	done := make(chan error, 1)
+	go func() { done <- svc.UploadAvatar("user-1", newMultipartFile(data), "avatar.png") }()
+
+	select {
+	case err := <-done:
+		t.Fatalf("upload finished (err %v) while another decode held the slot", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	<-svc.decodeSlot
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("UploadAvatar() error after the slot was freed: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("upload did not finish after the slot was freed")
+	}
+}
