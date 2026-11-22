@@ -65,6 +65,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const sidebarContainerRef = useRef<HTMLDivElement | null>(null)
   const sidebarPanelRef = useRef<HTMLDivElement | null>(null)
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const liveSidebarWidthRef = useRef(sidebarWidth)
 
   const handleSidebarResize = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -177,6 +178,41 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     liveSidebarWidthRef.current = sidebarWidth
   }, [sidebarWidth])
+
+  // The subheader is a sibling of #scroll-container, not a child, so a
+  // space-taking (classic) scrollbar narrows <main> but not the subheader:
+  // its inner row then centers half a scrollbar to the right of the article.
+  // Expose the scrollbar width as a custom property; the subheader reserves it
+  // as a transparent right border (see .page-viewer__subheader in index.css).
+  useLayoutEffect(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+
+    const syncScrollbarWidth = () => {
+      const scrollbarWidth = el.offsetWidth - el.clientWidth
+      document.documentElement.style.setProperty(
+        '--content-scrollbar-width',
+        `${scrollbarWidth}px`,
+      )
+    }
+
+    syncScrollbarWidth()
+
+    // A scrollbar that appears or disappears changes the container's content
+    // box, so observing the container catches navigation to a longer page, a
+    // sidebar resize and a window resize alike. jsdom has no ResizeObserver;
+    // the one-shot sync above still covers the mount case there.
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(syncScrollbarWidth)
+    observer?.observe(el)
+
+    return () => {
+      observer?.disconnect()
+      document.documentElement.style.removeProperty('--content-scrollbar-width')
+    }
+  }, [])
 
   const mainContainerStyle = !isEditor
     ? 'app-layout__main-content-area-viewer'
@@ -315,6 +351,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           />
           <div
             id="scroll-container"
+            ref={scrollContainerRef}
             className={`app-layout__content-row custom-scrollbar${isMobile && sidebarVisible ? 'overflow-hidden' : ''}`}
           >
             {/* Main content area */}
