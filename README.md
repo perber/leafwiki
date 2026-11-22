@@ -71,7 +71,7 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
 **Core functionality:**
 - Tree navigation — explicit hierarchy, not flat note feeds
 - Manual page ordering — sort order is explicit, not driven by filename (see [Sorting Pages](#sorting-pages))
-- Full-text search across titles and content, with tag-based filtering
+- Full-text search across titles and content, with tag-based filtering; finds matches from two characters, with built-in query syntax help (phrases, `title:`, `OR`, `NOT`, `word*`)
 - Tags on pages — searchable and filterable across the wiki
 - Backlinks and link status per page (incoming, outgoing, broken links), with a dedicated admin view for auditing broken links
 - Built-in Markdown editor with live preview, keyboard shortcuts, and autocomplete for internal page links
@@ -239,7 +239,7 @@ Requires Go and Node.js (versions: the `toolchain` line in `go.mod`, and `.nvmrc
 ```bash
 git clone https://github.com/perber/leafwiki.git
 cd leafwiki
-git switch --detach v0.13.0   # or any tag / main
+git switch --detach v0.15.0   # or any tag / main
 make build
 ./leafwiki --disable-auth --host=127.0.0.1 --data-dir ./data --allow-insecure=true
 ```
