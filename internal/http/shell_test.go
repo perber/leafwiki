@@ -371,6 +371,7 @@ func TestShellResponders_NonShellRequest_NotCalled(t *testing.T) {
 		path   string
 	}{
 		{name: "api", method: http.MethodGet, path: "/wiki/api/unknown"},
+		{name: "api without a trailing segment", method: http.MethodGet, path: "/wiki/api"},
 		{name: "static", method: http.MethodGet, path: "/wiki/static/missing.js"},
 		{name: "assets", method: http.MethodGet, path: "/wiki/assets/x.png"},
 		{name: "branding", method: http.MethodGet, path: "/wiki/branding/x.png"},
@@ -393,6 +394,29 @@ func TestShellResponders_NonShellRequest_NotCalled(t *testing.T) {
 			}
 			if rec.Code != http.StatusNotFound {
 				t.Fatalf("status = %d", rec.Code)
+			}
+		})
+	}
+}
+
+// A page slug may start with a reserved prefix (api-guide, static-ip); only
+// the prefix as a whole path segment is reserved, so a deep link or a reload
+// on such a page still gets the shell.
+func TestShellResponders_SlugStartingWithReservedPrefix_IsShellRoute(t *testing.T) {
+	for _, path := range []string{
+		"/wiki/api-guide",
+		"/wiki/apiary/child",
+		"/wiki/assets-list",
+		"/wiki/static-ip",
+		"/wiki/branding-guide",
+	} {
+		t.Run(path, func(t *testing.T) {
+			responder := &recordingResponder{handle: true, header: "X"}
+			router := shellRouter(t, true, wikihttp.FrontendConfig{ShellResponders: []wikihttp.ShellResponder{responder}}, "/wiki")
+			router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, path, nil))
+			want := strings.TrimPrefix(path, "/wiki")
+			if len(responder.calls) != 1 || responder.calls[0].RoutePath != want {
+				t.Fatalf("calls = %+v, want one call with RoutePath %q", responder.calls, want)
 			}
 		})
 	}

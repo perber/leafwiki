@@ -207,8 +207,8 @@ func TestSecurityHeaders_MethodsAndPathShapes_PolicyOnlyOnShellRoutes(t *testing
 		{http.MethodOptions, "/some/wiki/page", false},
 		{http.MethodOptions, "/api/config", false},
 		{http.MethodDelete, "/", false},
-		{http.MethodGet, "/apifoo", false},
-		{http.MethodGet, "/staticx", false},
+		{http.MethodGet, "/apifoo", true},
+		{http.MethodGet, "/staticx", true},
 		{http.MethodGet, "/%2e%2e/x", true},
 		{http.MethodGet, "/a/../login", true},
 	} {
@@ -250,7 +250,7 @@ func TestSecurityHeaders_BasePathBoundaries_PolicyAndNosniffFollowThePrefix(t *t
 		{"/wikistatic/x.js", false},
 		{"/static/x.js", false},
 		{"/other/page", false},
-		{"/wiki/staticx", false},
+		{"/wiki/staticx", true},
 	} {
 		rec := serveRouter(router, http.MethodGet, tc.path)
 		assertBaselineSecurityHeaders(t, "GET "+tc.path, rec.Header())
