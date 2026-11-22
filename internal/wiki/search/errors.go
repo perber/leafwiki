@@ -14,6 +14,7 @@ const (
 	ErrCodeSearchMissingQuery  = "search_missing_query"
 	ErrCodeSearchInvalidOffset = "search_invalid_offset"
 	ErrCodeSearchInvalidLimit  = "search_invalid_limit"
+	ErrCodeSearchQueryTooLong  = "search_query_too_long"
 )
 
 func respondWithSearchStatusError(c *gin.Context, status int, code, message, template string, args ...string) {
@@ -41,7 +42,7 @@ func searchErrorStatus(code string) int {
 	switch code {
 	case ErrCodeSearchUnavailable:
 		return http.StatusServiceUnavailable
-	case ErrCodeSearchMissingQuery, ErrCodeSearchInvalidOffset, ErrCodeSearchInvalidLimit:
+	case ErrCodeSearchMissingQuery, ErrCodeSearchInvalidOffset, ErrCodeSearchInvalidLimit, ErrCodeSearchQueryTooLong:
 		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError

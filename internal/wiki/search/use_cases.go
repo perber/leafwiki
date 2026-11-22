@@ -3,7 +3,9 @@ package search
 import (
 	"context"
 	"sort"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
 	"github.com/perber/wiki/internal/core/shared/htmlutil"
@@ -13,11 +15,32 @@ import (
 	coretags "github.com/perber/wiki/internal/tags"
 )
 
+// Caps on the text query of one search. Each search term is one more MATCH
+// over the whole index (plus the rank tiers), so a long query of short words
+// costs far more than a long word; the term cap is the one that matters, the
+// rune cap bounds the parsing work before it. The cost grows linearly with
+// the terms, so the cap bounds the worst case; it does not make it cheap.
+const (
+	maxQueryRunes = 256
+	maxQueryTerms = 12
+)
+
 var ErrSearchUnavailable = sharederrors.NewLocalizedError(
 	ErrCodeSearchUnavailable,
 	"Search is currently unavailable",
 	"search is currently unavailable",
 	nil,
+)
+
+// ErrSearchQueryTooLong rejects a query over maxQueryRunes runes or
+// maxQueryTerms terms. It is rejected rather than truncated, so the hits
+// always match what the user typed.
+var ErrSearchQueryTooLong = sharederrors.NewLocalizedError(
+	ErrCodeSearchQueryTooLong,
+	"Search query is too long: at most "+strconv.Itoa(maxQueryRunes)+" characters and "+strconv.Itoa(maxQueryTerms)+" terms",
+	"search query is too long: at most %s characters and %s terms",
+	nil,
+	strconv.Itoa(maxQueryRunes), strconv.Itoa(maxQueryTerms),
 )
 
 // ─── SearchUseCase ───────────────────────────────────────────────────────────
@@ -44,6 +67,11 @@ func NewSearchUseCase(idx *coresearch.SQLiteIndex, tags *coretags.TagsService, t
 }
 
 func (uc *SearchUseCase) Execute(_ context.Context, in SearchInput) (*SearchOutput, error) {
+	query := strings.TrimSpace(in.Query)
+	if utf8.RuneCountInString(query) > maxQueryRunes || coresearch.QueryTermCount(query) > maxQueryTerms {
+		return nil, ErrSearchQueryTooLong
+	}
+
 	if uc.index == nil {
 		return nil, ErrSearchUnavailable
 	}
@@ -60,7 +88,7 @@ func (uc *SearchUseCase) Execute(_ context.Context, in SearchInput) (*SearchOutp
 		}
 	}
 
-	if strings.TrimSpace(in.Query) == "" && len(pageIDs) > 0 {
+	if query == "" && len(pageIDs) > 0 {
 		return uc.searchByTags(pageIDs, in.Offset, in.Limit)
 	}
 

@@ -44,3 +44,26 @@ func TestRespondWithSearchError_InternalErrorIsSanitized(t *testing.T) {
 		t.Fatalf("body = %s, want %s", got, want)
 	}
 }
+
+func TestSearchErrorStatus_MapsCodesToStatus(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+		want int
+	}{
+		{name: "unavailable", code: ErrCodeSearchUnavailable, want: http.StatusServiceUnavailable},
+		{name: "missing query", code: ErrCodeSearchMissingQuery, want: http.StatusBadRequest},
+		{name: "invalid offset", code: ErrCodeSearchInvalidOffset, want: http.StatusBadRequest},
+		{name: "invalid limit", code: ErrCodeSearchInvalidLimit, want: http.StatusBadRequest},
+		{name: "query too long", code: ErrCodeSearchQueryTooLong, want: http.StatusBadRequest},
+		{name: "internal error", code: ErrCodeSearchInternal, want: http.StatusInternalServerError},
+		{name: "unknown code", code: "something_else", want: http.StatusInternalServerError},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := searchErrorStatus(tc.code); got != tc.want {
+				t.Errorf("searchErrorStatus(%q) = %d, want %d", tc.code, got, tc.want)
+			}
+		})
+	}
+}

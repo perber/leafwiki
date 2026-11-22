@@ -28,6 +28,19 @@ type searchQuery struct {
 	// literalWords are all literal words, in query order, whatever their
 	// length. searchTiers builds the rank tiers from them.
 	literalWords []string
+	// termCount is the number of words the query asks FTS5 to match, over
+	// every kind of field; boolean keywords and the NEAR keyword don't
+	// count. QueryTermCount exposes it so callers can cap the query's cost.
+	termCount int
+}
+
+// QueryTermCount returns the number of search terms q parses into: each
+// literal word, each word of a quoted phrase or column filter value and each
+// bareword of an operator field counts once, AND/OR/NOT and NEAR don't.
+// Every term is one more MATCH the index has to evaluate, so this is the
+// measure to cap a query by, not its length.
+func QueryTermCount(q string) int {
+	return parseSearchQuery(q).termCount
 }
 
 // buildFuzzyQuery turns raw user search input into an FTS5 MATCH argument.
@@ -62,15 +75,16 @@ func parseSearchQuery(q string) searchQuery {
 	// already-supported case exactly as it worked before this function
 	// existed.
 	if isNearFunctionCall(q) {
-		return searchQuery{fts: q}
+		return searchQuery{fts: q, termCount: nearCallTermCount(q)}
 	}
 
 	parsed := searchQuery{literalOnly: true}
 	fields := splitFTS5AwareFields(q)
 	sanitized := make([]string, len(fields))
 	for i := range fields {
-		if trusted, ok := trustedFTS5Field(fields, i); ok {
+		if trusted, terms, ok := trustedFTS5Field(fields, i); ok {
 			sanitized[i] = trusted
+			parsed.termCount += terms
 			parsed.literalOnly = false
 			continue
 		}
@@ -88,6 +102,7 @@ func parseSearchQuery(q string) searchQuery {
 		// AND-ing independent terms doesn't depend on that adjacency at all.
 		words := splitIntoIndexWords(fields[i])
 		parsed.literalWords = append(parsed.literalWords, words...)
+		parsed.termCount += countWordsTokens(words)
 		for _, w := range words {
 			if utf8.RuneCountInString(w) >= minSubstringTermRunes {
 				parsed.substringTerms = append(parsed.substringTerms, w)
@@ -146,18 +161,19 @@ func splitFTS5AwareFields(q string) []string {
 // trustedFTS5Field decides whether fields[i] is trustworthy, deliberate
 // FTS5 syntax (an operator, a boolean keyword used between two real
 // operands, a column filter naming a real column, an already-quoted
-// phrase) and returns it in the form to send to FTS5. ok is false for
-// literal search text that needs quoting so it can't be misread as syntax.
+// phrase) and returns it in the form to send to FTS5, with the number of
+// search terms it contributes (see QueryTermCount). ok is false for literal
+// search text that needs quoting so it can't be misread as syntax.
 //
 // A comma or apostrophe — never valid FTS5 syntax on their own — and an
 // unbalanced double quote always disqualify a field from the "trust it"
 // path, even if the same field also contains an operator character like *
 // or : (that combination is exactly what #1577's follow-up reports found:
 // "sometimes # and \"" alongside other punctuation).
-func trustedFTS5Field(fields []string, i int) (string, bool) {
+func trustedFTS5Field(fields []string, i int) (string, int, bool) {
 	f := fields[i]
 	if isBalancedQuotedField(f) {
-		return f, true
+		return f, countTokenizerTokens(f), true
 	}
 
 	// A column filter is always rewritten (never trusted verbatim) into a
@@ -166,8 +182,8 @@ func trustedFTS5Field(fields []string, i int) (string, bool) {
 	// (a pasted URL's second ":", an apostrophe, ...) without needing its
 	// own escaping rules, because it's built from the same safe
 	// splitIntoIndexWords primitive as the plain-literal-text path.
-	if rewritten, ok := rewriteColumnFilterField(f); ok {
-		return rewritten, true
+	if rewritten, terms, ok := rewriteColumnFilterField(f); ok {
+		return rewritten, terms, true
 	}
 
 	// An operator field ("foo*", "(foo", "bar)") is only trusted when it is
@@ -176,12 +192,83 @@ func trustedFTS5Field(fields []string, i int) (string, bool) {
 	// partner, a bare "*") is literal text.
 	if strings.ContainsAny(f, "*()") {
 		if isWellFormedOperatorField(f) && (!strings.ContainsAny(f, "()") || operatorParensBalanced(fields)) {
-			return f, true
+			// A well-formed operator field holds only barewords, "*" and
+			// parentheses, so its index words are exactly its barewords.
+			return f, countTokenizerTokens(f), true
 		}
 	} else if isFTS5Keyword(f) && hasRealOperandNeighbors(fields, i) {
-		return f, true
+		return f, 0, true
 	}
-	return "", false
+	return "", 0, false
+}
+
+// nearCallTermCount counts the terms of a NEAR(...) call q (see
+// isNearFunctionCall): the tokens between the parentheses, without the NEAR
+// keyword and without a trailing ", <distance>".
+func nearCallTermCount(q string) int {
+	inner := q[strings.Index(q, "(")+1 : strings.LastIndex(q, ")")]
+	if comma := strings.LastIndex(inner, ","); comma >= 0 {
+		distance := strings.TrimSpace(inner[comma+1:])
+		if distance != "" && strings.Trim(distance, "0123456789") == "" {
+			inner = inner[:comma]
+		}
+	}
+	return countTokenizerTokens(inner)
+}
+
+// countWordsTokens counts the tokens FTS5 makes of words from
+// splitIntoIndexWords. Usually one per word, but a word can hold a rune Go
+// calls a letter and unicode61 splits on (see unicode61Separators).
+func countWordsTokens(words []string) int {
+	n := 0
+	for _, w := range words {
+		n += countTokenizerTokens(w)
+	}
+	return n
+}
+
+// countTokenizerTokens counts the tokens the pages table's unicode61
+// tokenizer makes of text sent to FTS5 (a word, a quoted phrase, a NEAR
+// call). It uses the tokenizer's own classes (see isTokenizerTokenRune),
+// which are wider than splitIntoIndexWords': counting with those would miss
+// "①" or "Ⅻ" and let a phrase of them past the term cap.
+func countTokenizerTokens(text string) int {
+	n := 0
+	inToken := false
+	for _, r := range text {
+		isToken := isTokenizerTokenRune(r)
+		if isToken && !inToken {
+			n++
+		}
+		inToken = isToken
+	}
+	return n
+}
+
+// unicode61Separators are the runes Go's Unicode tables call letters or
+// numbers but the unicode61 tokenizer compiled into modernc.org/sqlite
+// splits on: its tables predate the Unicode version that reclassified them
+// (New Tai Lue vowel signs, Vedic signs). The term count must split there
+// too, or "aᦰbᦰa…" counts as one term while FTS5 matches every letter.
+// TestIsTokenizerTokenRune_AgreesWithUnicode61 checks this list against the
+// real tokenizer, so a Go or SQLite upgrade that shifts it fails the test.
+var unicode61Separators = &unicode.RangeTable{
+	R16: []unicode.Range16{
+		{Lo: 0x19B0, Hi: 0x19C0, Stride: 1},
+		{Lo: 0x19C8, Hi: 0x19C9, Stride: 1},
+		{Lo: 0x1CF2, Hi: 0x1CF3, Stride: 1},
+	},
+}
+
+// isTokenizerTokenRune reports whether the pages table's unicode61
+// tokenizer keeps r inside a token rather than splitting on it. It may call
+// a rune a separator that unicode61 keeps (unassigned code points, combining
+// marks): that only makes the term count too high, never too low.
+func isTokenizerTokenRune(r rune) bool {
+	if strings.ContainsRune(searchTokenChars, r) {
+		return true
+	}
+	return unicode.In(r, unicode.L, unicode.N, unicode.Co) && !unicode.Is(unicode61Separators, r)
 }
 
 // isBarewordRune reports whether r may appear in an unquoted FTS5 bareword.
@@ -353,21 +440,23 @@ var searchColumns = map[string]bool{
 // safely without a separate "is this value simple enough to trust"
 // predicate, and — unlike simply falling back to an unscoped literal
 // search — still honors the column scope the user asked for instead of
-// silently searching every column.
-func rewriteColumnFilterField(f string) (string, bool) {
+// silently searching every column. terms is the number of tokens FTS5
+// makes of the value words (see countWordsTokens).
+func rewriteColumnFilterField(f string) (rewritten string, terms int, ok bool) {
 	idx := strings.Index(f, ":")
 	if idx <= 0 {
-		return "", false
+		return "", 0, false
 	}
 	col := f[:idx]
 	if !searchColumns[strings.ToLower(col)] {
-		return "", false
+		return "", 0, false
 	}
 	words := splitIntoIndexWords(f[idx+1:])
 	if len(words) == 0 {
-		return "", false
+		return "", 0, false
 	}
-	return col + ":(" + quoteWordsAsPrefixTerms(words) + ")", true
+	terms = countWordsTokens(words)
+	return col + ":(" + quoteWordsAsPrefixTerms(words) + ")", terms, true
 }
 
 // isBalancedQuotedField reports whether f is a complete, balanced quoted

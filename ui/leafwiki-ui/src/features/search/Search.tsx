@@ -9,6 +9,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import { Input } from '@/components/ui/input'
+import { asApiLocalizedError, mapApiError } from '@/lib/api/errors'
 import { searchPages, SearchResultItem, SearchTagFacet } from '@/lib/api/search'
 import { deferStateUpdate } from '@/lib/deferState'
 import { normalizeWikiRoutePath } from '@/lib/wikiPath'
@@ -54,6 +55,10 @@ const SEARCH_INPUT_ALLOWED_HOTKEYS = [
 // IP, Go, C#).
 const MIN_QUERY_LENGTH = 2
 
+// The backend rejects longer queries (search_query_too_long); the term cap
+// it also enforces can only be checked there, after parsing.
+const MAX_QUERY_LENGTH = 256
+
 const isSearchableQuery = (query: string) =>
   query.trim().length >= MIN_QUERY_LENGTH
 
@@ -77,6 +82,13 @@ export default function Search({ active = false }: SearchProps) {
   const [availableTags, setAvailableTags] = useState<TagCount[]>([])
   const [availableTagsError, setAvailableTagsError] = useState(false)
   const [facetTags, setFacetTags] = useState<SearchTagFacet[]>([])
+  // The localized search_query_too_long message and the query it answered.
+  // It is shown only while the input still holds that query, so any change
+  // (typing, the clear button, a new q in the URL) hides it.
+  const [queryLimitError, setQueryLimitError] = useState<{
+    query: string
+    message: string
+  } | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   // Like the query and the tag accordion, the help panel keeps its state
   // while the sidebar shows another panel (Search stays mounted, hidden).
@@ -120,6 +132,11 @@ export default function Search({ active = false }: SearchProps) {
     !isIdleMode && (!isQueryTooShort || activeTags.length > 0)
   const hasDebouncedFilters = hasSearchQuery || debouncedActiveTags.length > 0
   const hasResults = results.length > 0
+  const queryLimitMessage =
+    queryLimitError?.query === inputQuery ? queryLimitError.message : null
+  // A rejected over-long query shows its limit in the status region instead.
+  const showNoResults =
+    !loading && hasImmediateFilters && !queryLimitMessage && !hasResults
   const clampedActiveIndex =
     results.length === 0 ? 0 : Math.min(activeIndex, results.length - 1)
   const visibleTags = isIdleMode ? availableTags : facetTags
@@ -258,21 +275,28 @@ export default function Search({ active = false }: SearchProps) {
     const requestId = latestRequestIdRef.current + 1
     latestRequestIdRef.current = requestId
 
-    searchPages(
-      hasSearchQuery ? debouncedQuery : '',
-      page * limit,
-      limit,
-      debouncedActiveTags,
-    )
+    const sentQuery = hasSearchQuery ? debouncedQuery : ''
+    searchPages(sentQuery, page * limit, limit, debouncedActiveTags)
       .then((data) => {
         if (latestRequestIdRef.current !== requestId) return
+        setQueryLimitError(null)
         setResults(data.items || [])
         setTotalCount(data.count)
         setFacetTags(data.tag_facets || [])
       })
       .catch((err) => {
         if (latestRequestIdRef.current !== requestId) return
-        console.error('Search failed', err)
+        const localized = asApiLocalizedError(err)
+        if (localized?.code === 'search_query_too_long') {
+          // An expected answer to user input, shown in the panel; not an
+          // error to log (ADR-0008).
+          setQueryLimitError({
+            query: sentQuery,
+            message: mapApiError(localized, localized.message).message,
+          })
+        } else {
+          console.error('Search failed', err)
+        }
         setResults([])
         setTotalCount(0)
         setFacetTags([])
@@ -336,6 +360,7 @@ export default function Search({ active = false }: SearchProps) {
             type="text"
             placeholder={t('input.placeholder')}
             value={inputQuery}
+            maxLength={MAX_QUERY_LENGTH}
             data-testid="search-input"
             data-allow-hotkeys={SEARCH_INPUT_ALLOWED_HOTKEYS}
             onChange={(e) => {
@@ -492,6 +517,11 @@ export default function Search({ active = false }: SearchProps) {
               {t('input.minLengthHint', { count: MIN_QUERY_LENGTH })}
             </span>
           )}
+          {queryLimitMessage && (
+            <span data-testid="search-query-limit-hint">
+              {queryLimitMessage}
+            </span>
+          )}
         </p>
 
         {hasImmediateFilters && (
@@ -538,7 +568,7 @@ export default function Search({ active = false }: SearchProps) {
           </ListView>
         )}
 
-        {!loading && hasImmediateFilters && results.length === 0 && (
+        {showNoResults && (
           <ListView
             as="div"
             className="search__results-view"

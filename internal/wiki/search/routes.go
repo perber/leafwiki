@@ -53,12 +53,12 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 //	@Tags			search
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Param			q		query		string				false	"Search text; required unless `tags` is given"
+//	@Param			q		query		string				false	"Search text; required unless `tags` is given. At most 256 characters (after trimming surrounding whitespace) and 12 search terms; AND, OR and NOT don't count as terms"
 //	@Param			tags	query		[]string			false	"Tags a page must all carry; repeat the parameter or separate tags with commas"	collectionFormat(multi)
 //	@Param			offset	query		integer				false	"Number of hits to skip"	default(0)
 //	@Param			limit	query		integer				false	"Maximum number of hits"	default(20)
 //	@Success		200		{object}	dto.SearchResult	"Hits and tag facets; empty lists when nothing matches"
-//	@Failure		400		{object}	dto.ErrorResponse	"Neither `q` nor a tag given (code search_missing_query), or `offset` or `limit` is not an integer (codes search_invalid_offset, search_invalid_limit)"
+//	@Failure		400		{object}	dto.ErrorResponse	"Neither `q` nor a tag given (code search_missing_query), `q` longer than 256 characters or 12 terms (code search_query_too_long), or `offset` or `limit` is not an integer (codes search_invalid_offset, search_invalid_limit)"
 //	@Failure		401		{object}	dto.LegacyError		"No valid session while public access is off, an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)"
 //	@Failure		429		{object}	dto.LegacyError		"API-key attempts throttled"
 //	@Failure		500		{object}	object				"Index lookup failed: the body is an ErrorResponse (code search_internal_error). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object."
