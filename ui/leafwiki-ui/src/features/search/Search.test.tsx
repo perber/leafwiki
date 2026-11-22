@@ -353,6 +353,75 @@ describe('Search', () => {
       expect(screen.getByRole('status')).toBeEmptyDOMElement()
       expect(screen.getByText('No results found.')).toBeInTheDocument()
     })
+
+    it('clears the limit hint with the clear button', async () => {
+      searchPagesMock.mockRejectedValueOnce(tooLong)
+      renderSearch()
+
+      await typeQuery('pi '.repeat(13).trim())
+      expect(screen.getByRole('status')).toHaveTextContent(tooLongHint)
+
+      fireEvent.click(screen.getByTestId('search-clear-button'))
+
+      expect(screen.queryByTestId('search-query-limit-hint')).toBeNull()
+      expect(screen.getByRole('status')).toBeEmptyDOMElement()
+    })
+
+    it('shows the limit hint for an over-long query from the URL', async () => {
+      searchPagesMock.mockRejectedValue(tooLong)
+      renderSearch(`/?q=${encodeURIComponent('pi '.repeat(13).trim())}`)
+
+      await act(async () => {
+        vi.advanceTimersByTime(PAST_DEBOUNCE_MS)
+      })
+
+      expect(screen.getByRole('status')).toHaveTextContent(tooLongHint)
+      expect(screen.queryByText('No results found.')).toBeNull()
+    })
+
+    it('ignores a limit rejection for a query that was replaced meanwhile', async () => {
+      let rejectStale: (err: unknown) => void = () => {}
+      searchPagesMock
+        .mockImplementationOnce(
+          () =>
+            new Promise((_, reject) => {
+              rejectStale = reject
+            }),
+        )
+        .mockResolvedValueOnce(twoResults)
+      renderSearch()
+
+      await typeQuery('pi '.repeat(13).trim())
+      await typeQuery('pi')
+      await act(async () => {
+        rejectStale(tooLong)
+      })
+
+      expect(screen.queryByTestId('search-query-limit-hint')).toBeNull()
+      expect(screen.getByText('Raspberry Pi')).toBeInTheDocument()
+    })
+
+    it('still logs and shows no results for other search errors', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {})
+      onTestFinished(() => consoleError.mockRestore())
+      searchPagesMock.mockRejectedValue(
+        new ApiLocalizedError({
+          code: 'search_unavailable',
+          message: 'Search is currently unavailable',
+          template: 'search is currently unavailable',
+          args: [],
+        }),
+      )
+      renderSearch()
+
+      await typeQuery('pi')
+
+      expect(screen.queryByTestId('search-query-limit-hint')).toBeNull()
+      expect(screen.getByText('No results found.')).toBeInTheDocument()
+      expect(consoleError).toHaveBeenCalled()
+    })
   })
 
   // jsdom computes no layout, so this only proves the class survives

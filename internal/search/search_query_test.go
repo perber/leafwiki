@@ -163,6 +163,21 @@ func TestQueryTermCount_CountsSearchTermsPerFieldKind(t *testing.T) {
 		{name: "NEAR call counts its words but not NEAR or the distance", input: "NEAR(a b, 5)", want: 2},
 		{name: "punctuation-only query", input: ",", want: 0},
 		{name: "one-letter words each count", input: "a b c d", want: 4},
+		{name: "every comma-separated word counts", input: "a,b,c,d,e,f,g,h,i,j,k,l,m", want: 13},
+		{name: "dotted and slashed word is one term", input: "foo-bar-baz.v2/x", want: 1},
+		{name: "each column filter counts its own words", input: "title:a title:b content:c,d", want: 4},
+		{name: "unknown column counts as literal words", input: "nope:a,b", want: 3},
+		{name: "nested groups count only barewords", input: "((a OR b) AND (c OR d*))", want: 4},
+		{name: "prefix operators count their words", input: "a* b* c*", want: 3},
+		{name: "long quoted phrase counts every word", input: `"a b c d e f g h i j k l m"`, want: 13},
+		{name: "quoted phrase prefix counts its words", input: `"a b"*`, want: 2},
+		{name: "unbalanced quote counts the literal words", input: `"a b c`, want: 3},
+		{name: "NOT between operands counts nothing", input: "a NOT b", want: 2},
+		{name: "doubled keyword counts as literal words", input: "a AND AND b", want: 4},
+		{name: "mixed operators, filters and phrases", input: `(a OR b) NOT title:c,d "e f" g*`, want: 7},
+		{name: "CJK runs count as one term each", input: "日本語 中文", want: 2},
+		{name: "emoji are separators", input: "🙂foo🙂bar🙂", want: 2},
+		{name: "NEAR with many words", input: "NEAR(a b c d e f g h i j k l m)", want: 13},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
