@@ -290,6 +290,20 @@ Use this for open documentation or project wikis where readers don't need accoun
 
 A public wiki also serves each page with its title, a description (the page's `description` property, otherwise the start of the page) and Open Graph tags for search engines and link previews. Set `--public-url` (including `--base-path`) to add canonical links; without it they are left out.
 
+#### Search engines
+
+| What | Behaviour |
+|------|-----------|
+| `/robots.txt` | `Allow: /` with public access, `Disallow: /` without; announces the sitemap when `--public-url` is set |
+| `/sitemap.xml` | Lists every page readable without login; only with `--public-url`, otherwise 404 |
+| `/` | 302 redirect to the first page |
+| Route without a page | Served with a `noindex` robots tag |
+| `Accept: text/markdown` | Returns the page's Markdown (without frontmatter) instead of the app |
+| Search-engine crawlers (Googlebot, Bingbot, …) | Get the rendered page content in the HTML; add `?ssr` to a page URL to see that content in a browser |
+
+- Under `--base-path`, crawlers ignore `robots.txt` (they only read it at the host root); submit `<public-url>/sitemap.xml` to the search engine yourself
+- Page responses carry `Vary: User-Agent, Accept` and `Cache-Control: no-cache`; a CDN in front of the wiki must respect them, or visitors may get the crawler or Markdown variant
+
 ### 3. No login — everyone can read and edit (`--disable-auth`)
 
 Authentication is completely disabled. Anyone who can reach the server can read and edit all pages.
