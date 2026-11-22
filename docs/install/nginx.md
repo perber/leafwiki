@@ -88,6 +88,16 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
+Tell LeafWiki that nginx is its proxy, so it reads the visitor's address from `X-Forwarded-For`. Without it every visitor shares nginx's address `127.0.0.1` in the access log, rate limits and login backoff. Add this line to `/etc/leafwiki/.env` and restart LeafWiki:
+
+```bash
+LEAFWIKI_TRUSTED_PROXY_IPS=127.0.0.1
+```
+
+```bash
+sudo systemctl restart leafwiki
+```
+
 Now LeafWiki should be accessible at  
 ➡️ `http://wiki.example.com`
 

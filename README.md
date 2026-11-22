@@ -390,7 +390,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--enable-http-remote-user-auto-create` | Auto-provision users the proxy asserts but LeafWiki doesn't know    | `false`    | v0.12.1 |
 | `--http-remote-user-email-header-name` | Header name carrying the email for auto-created users               | `""`        | v0.12.1 |
 | `--http-remote-user-default-role` | Role assigned to auto-created users; must not be `admin`               | `viewer`      | v0.12.1 |
-| `--trusted-proxy-ips`            | Trusted proxy IPs/CIDRs for remote-user header                          | `""`          | v0.10.0 |
+| `--trusted-proxy-ips`            | IPs/CIDRs of your reverse proxies; only they are believed for `X-Forwarded-For` (client address for the access log, rate limits and login backoff) and the remote-user header | `""` | v0.10.0 |
 | `--login-url`                    | Redirect to an external URL instead of the built-in login form          | `""`          | v0.12.0 |
 | `--logout-url`                   | Redirect to an external URL after logout                                | `""`          | v0.12.0 |
 | `--http-remote-user-logout-url`  | ⚠️ Deprecated, use `--logout-url` instead                               | `""`          | v0.10.0 |
@@ -464,7 +464,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_ENABLE_HTTP_REMOTE_USER_AUTO_CREATE` | Auto-provision users the proxy asserts but LeafWiki doesn't know | `false` | v0.12.1 |
 | `LEAFWIKI_HTTP_REMOTE_USER_EMAIL_HEADER_NAME` | Email header for auto-created users            | `""`          | v0.12.1 |
 | `LEAFWIKI_HTTP_REMOTE_USER_DEFAULT_ROLE` | Role assigned to auto-created users; must not be `admin` | `viewer`      | v0.12.1 |
-| `LEAFWIKI_TRUSTED_PROXY_IPS`            | Trusted proxy IPs/CIDRs                              | `""`          | v0.10.0 |
+| `LEAFWIKI_TRUSTED_PROXY_IPS`            | IPs/CIDRs of your reverse proxies, believed for `X-Forwarded-For` and the remote-user header | `""` | v0.10.0 |
 | `LEAFWIKI_LOGIN_URL`                    | Redirect to an external URL instead of the login form | `""`          | v0.12.0 |
 | `LEAFWIKI_LOGOUT_URL`                   | Redirect to an external URL after logout             | `""`          | v0.12.0 |
 | `LEAFWIKI_HTTP_REMOTE_USER_LOGOUT_URL`  | ⚠️ Deprecated, use `LEAFWIKI_LOGOUT_URL` instead     | `""`          | v0.10.0 |
@@ -695,6 +695,8 @@ Enabled by default since v0.7.0:
 - Secure, HttpOnly cookies for session handling
 - CSRF protection on all state-changing requests
 - Rate limiting on auth endpoints
+
+Behind a reverse proxy, list it in `--trusted-proxy-ips` (e.g. `127.0.0.1`): otherwise all visitors share the proxy's address in the access log, rate limits and login backoff.
 - Role-based access: admin, editor, viewer
 
 Since v0.15.0, responses carry `X-Frame-Options: SAMEORIGIN`,

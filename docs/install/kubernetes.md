@@ -131,6 +131,13 @@ spec:
                   number: 8080
 ```
 
+Set `LEAFWIKI_TRUSTED_PROXY_IPS` to the pod CIDR of your cluster (or the ingress controller's pod IPs) so LeafWiki reads the visitor's address from `X-Forwarded-For`; otherwise every visitor shares the controller's address in the access log, rate limits and login backoff:
+
+```yaml
+            - name: LEAFWIKI_TRUSTED_PROXY_IPS
+              value: "10.244.0.0/16" # your cluster's pod CIDR
+```
+
 Add TLS via your ingress controller / cert-manager as usual (e.g. a `cert-manager.io/cluster-issuer` annotation plus a `tls:` block). Once TLS terminates in front of LeafWiki and `X-Forwarded-Proto: https` is forwarded, drop `--allow-insecure=true` from the Deployment.
 
 ### Option B — Gateway API
