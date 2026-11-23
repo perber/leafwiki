@@ -248,6 +248,9 @@ func baseConfig(opts httpinternal.RouterOptions) gin.H {
 		"logoutUrl":                opts.LogoutURL,
 		"userManagementUrl":        opts.UserManagementURL,
 		"defaultLanguage":          opts.DefaultLanguage,
+		"oidcEnabled":              opts.OIDCEnabled,
+		"oidcButtonLabel":          opts.OIDCButtonLabel,
+		"oidcOnly":                 opts.OIDCOnly,
 	}
 }
 
@@ -271,6 +274,7 @@ func (r *Routes) handleMe(c *gin.Context) {
 		"email":       user.Email,
 		"role":        user.Role,
 		"totpEnabled": user.TOTPEnabled,
+		"authSource":  user.AuthSource(),
 	})
 }
 

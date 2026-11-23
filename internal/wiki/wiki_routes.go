@@ -3,6 +3,7 @@ package wiki
 import (
 	"path/filepath"
 
+	coreoidc "github.com/perber/wiki/internal/core/oidc"
 	httpinternal "github.com/perber/wiki/internal/http"
 	coreimporter "github.com/perber/wiki/internal/importer"
 	"github.com/perber/wiki/internal/scopedread"
@@ -16,6 +17,7 @@ import (
 	wikiimporter "github.com/perber/wiki/internal/wiki/importer"
 	wikiinstancesettings "github.com/perber/wiki/internal/wiki/instancesettings"
 	wikilinks "github.com/perber/wiki/internal/wiki/links"
+	wikioidc "github.com/perber/wiki/internal/wiki/oidc"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
 	"github.com/perber/wiki/internal/wiki/pagesave"
 	wikiproperties "github.com/perber/wiki/internal/wiki/properties"
@@ -51,6 +53,7 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 		})
 	}
 	w.importerRoutes = w.buildImporterRoutes(options)
+	w.oidcRoutes = w.buildOIDCRoutes()
 	w.healthRoutes = wikihealth.NewRoutes(wikihealth.RoutesConfig{
 		Index:      w.searchIndex,
 		Status:     w.status,
@@ -246,6 +249,20 @@ func (w *Wiki) buildImporterRoutes(options *WikiOptions) *wikiimporter.Routes {
 	})
 }
 
+// buildOIDCRoutes returns nil when OIDC isn't configured (w.oidc == nil),
+// matching the nil-skip idiom backupRoutes/snapshotRoutes/etc. already use —
+// see Registrars().
+func (w *Wiki) buildOIDCRoutes() *wikioidc.Routes {
+	if w.oidc == nil {
+		return nil
+	}
+	oidcService := func() *coreoidc.Service { return w.oidc }
+	return wikioidc.NewRoutes(wikioidc.RoutesConfig{
+		StartLogin:     wikioidc.NewStartOIDCLoginUseCase(oidcService),
+		HandleCallback: wikioidc.NewHandleOIDCCallbackUseCase(oidcService, w.auth, w.UserService, w.metrics),
+	})
+}
+
 // ─── Registrars / FrontendConfig ─────────────────────────────────────────────
 
 // Registrars returns all domain route registrars in registration order.
@@ -282,6 +299,9 @@ func (w *Wiki) Registrars() []httpinternal.RouteRegistrar {
 	}
 	if w.instanceSettingsRoutes != nil {
 		registrars = append(registrars, w.instanceSettingsRoutes)
+	}
+	if w.oidcRoutes != nil {
+		registrars = append(registrars, w.oidcRoutes)
 	}
 	return registrars
 }
