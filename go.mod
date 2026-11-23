@@ -5,6 +5,7 @@ go 1.26.0
 toolchain go1.27.4
 
 require (
+	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/dustin/go-humanize v1.1.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-git/go-git/v5 v5.19.3
@@ -20,6 +21,7 @@ require (
 	golang.org/x/crypto v0.59.0
 	golang.org/x/image v0.48.0
 	golang.org/x/net v0.62.0
+	golang.org/x/oauth2 v0.37.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.62.0
 )
@@ -43,6 +45,7 @@ require (
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.9.2 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.30.1 // indirect
