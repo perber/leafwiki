@@ -48,6 +48,8 @@ export type Config = {
   oidcEnabled: boolean
   oidcButtonLabel: string
   oidcOnly: boolean
+  oidcClientId: string
+  oidcEndSessionUrl: string
 }
 
 export async function getConfig(): Promise<Config> {

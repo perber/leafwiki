@@ -256,6 +256,137 @@ describe('UserMenu', () => {
     })
   })
 
+  describe('OIDC logout redirect', () => {
+    const renderWithLoginRoute = () =>
+      render(
+        <MemoryRouter initialEntries={['/']}>
+          <Routes>
+            <Route path="/" element={<UserMenu />} />
+            <Route
+              path="/login"
+              element={<div data-testid="login-form-sentinel">LOGIN</div>}
+            />
+          </Routes>
+        </MemoryRouter>,
+      )
+
+    let originalLocation: Location
+
+    beforeEach(() => {
+      originalLocation = window.location
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: { ...originalLocation, href: '' },
+      })
+      useSessionStore.setState({
+        user: {
+          id: 'user-1',
+          username: 'alice',
+          email: 'alice@example.com',
+          role: 'editor',
+          totpEnabled: false,
+          authSource: 'oidc',
+        },
+      })
+    })
+
+    afterEach(() => {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: originalLocation,
+      })
+    })
+
+    it('redirects to the IdP end-session URL, with client_id, post_logout_redirect_uri and id_token_hint, for an OIDC-linked user', async () => {
+      const user = userEvent.setup({ delay: null })
+      const logoutSpy = vi.spyOn(authAPI, 'logout').mockResolvedValue()
+      const hintSpy = vi
+        .spyOn(authAPI, 'getOidcLogoutHint')
+        .mockResolvedValue('raw.id.token')
+      useConfigStore.setState({
+        oidcEndSessionUrl: 'https://idp.example.com/end-session',
+        oidcClientId: 'leafwiki',
+      })
+
+      renderWithLoginRoute()
+
+      const avatar = screen.getByTestId('user-menu-avatar')
+      await user.click(avatar.closest('button') as HTMLButtonElement)
+      await user.click(screen.getByTestId('user-menu-logout'))
+
+      expect(hintSpy).toHaveBeenCalled()
+      expect(logoutSpy).toHaveBeenCalled()
+      expect(window.location.href).toBe(
+        'https://idp.example.com/end-session?client_id=leafwiki&post_logout_redirect_uri=' +
+          encodeURIComponent(`${originalLocation.origin}/login`) +
+          '&id_token_hint=raw.id.token',
+      )
+      expect(
+        screen.queryByTestId('login-form-sentinel'),
+      ).not.toBeInTheDocument()
+    })
+
+    // Regression test for a real production case: a session created before
+    // id_token_hint existed has no hint to look up. Authentik rejects
+    // post_logout_redirect_uri without id_token_hint outright once the
+    // redirect URI is registered on the client — so without a hint, the
+    // redirect URI must be omitted too, falling back to the IdP's own
+    // "logged out" page (same as before id_token_hint existed at all).
+    it('redirects without post_logout_redirect_uri or id_token_hint when the hint lookup comes back empty', async () => {
+      const user = userEvent.setup({ delay: null })
+      vi.spyOn(authAPI, 'logout').mockResolvedValue()
+      vi.spyOn(authAPI, 'getOidcLogoutHint').mockResolvedValue('')
+      useConfigStore.setState({
+        oidcEndSessionUrl: 'https://idp.example.com/end-session',
+        oidcClientId: 'leafwiki',
+      })
+
+      renderWithLoginRoute()
+
+      const avatar = screen.getByTestId('user-menu-avatar')
+      await user.click(avatar.closest('button') as HTMLButtonElement)
+      await user.click(screen.getByTestId('user-menu-logout'))
+
+      expect(window.location.href).toBe(
+        'https://idp.example.com/end-session?client_id=leafwiki',
+      )
+    })
+
+    it('falls back to the local /login route when no end-session URL is configured', async () => {
+      const user = userEvent.setup({ delay: null })
+      useConfigStore.setState({ oidcEndSessionUrl: '' })
+
+      renderWithLoginRoute()
+
+      const avatar = screen.getByTestId('user-menu-avatar')
+      await user.click(avatar.closest('button') as HTMLButtonElement)
+      await user.click(screen.getByTestId('user-menu-logout'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('login-form-sentinel')).toBeInTheDocument()
+      })
+    })
+
+    it('prefers logoutUrl over the OIDC end-session URL when both are set', async () => {
+      const user = userEvent.setup({ delay: null })
+      vi.spyOn(authAPI, 'logout').mockResolvedValue()
+      useConfigStore.setState({
+        logoutUrl: 'https://control-plane.example.com/logout',
+        oidcEndSessionUrl: 'https://idp.example.com/end-session',
+      })
+
+      renderWithLoginRoute()
+
+      const avatar = screen.getByTestId('user-menu-avatar')
+      await user.click(avatar.closest('button') as HTMLButtonElement)
+      await user.click(screen.getByTestId('user-menu-logout'))
+
+      expect(window.location.href).toBe(
+        'https://control-plane.example.com/logout',
+      )
+    })
+  })
+
   describe('login redirect', () => {
     let originalLocation: Location
 
