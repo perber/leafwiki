@@ -63,6 +63,12 @@ const devShellPlaceholders: Plugin = {
   transformIndexHtml: stripDevShellBody,
 }
 
+// Requests the dev server forwards to the Go backend. Vite matches a plain
+// proxy key with startsWith, which would also send page slugs like
+// "api-guide" or "assets-list" to the backend; a key starting with "^" is a
+// regex, so this one matches whole path segments only.
+export const backendProxyPattern = '^/(?:api|assets|branding)(?:[/?]|$)'
+
 // https://vite.dev/config/
 export default defineConfig(({ command }: ConfigEnv) => ({
   // Relative base so asset paths in the built HTML are ./static/... instead of /static/...
@@ -76,17 +82,7 @@ export default defineConfig(({ command }: ConfigEnv) => ({
   plugins: [react(), devShellPlaceholders],
   server: {
     proxy: {
-      '/assets': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/branding': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api': {
+      [backendProxyPattern]: {
         target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false,
