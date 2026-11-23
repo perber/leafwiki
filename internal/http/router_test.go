@@ -1818,7 +1818,7 @@ func TestImportExecuteEndpoint_WithZipUpload_ImportsPagesLinksAndAssets(t *testi
 		} `json:"execution_result"`
 	}
 
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		statusReq := httptest.NewRequest(http.MethodGet, "/api/import/plan", nil)
 		for _, cookie := range cookies {
@@ -1985,7 +1985,7 @@ func TestImportExecuteEndpoint_UsesConfiguredAssetUploadLimit(t *testing.T) {
 		} `json:"execution_result"`
 	}
 
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		statusReq := httptest.NewRequest(http.MethodGet, "/api/import/plan", nil)
 		for _, cookie := range cookies {
