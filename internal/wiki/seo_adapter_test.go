@@ -1110,12 +1110,18 @@ func TestWiki_Sitemap_WithoutPublicURL_NotFound(t *testing.T) {
 	}
 }
 
-func TestSEOPageRouteLister_TreeNotLoaded_ReturnsError(t *testing.T) {
+// A tree that hasn't finished its async startup load must degrade
+// gracefully here, the same way seoFirstPageReader.FirstPage and
+// seoPageReader.PageByRoutePath already do in this file: an empty sitemap
+// during this window, not a propagated error that would otherwise turn
+// GET /sitemap.xml into a 500 (see BuildSitemapUseCase.Execute, which
+// returns the error from ListPageRoutes verbatim).
+func TestSEOPageRouteLister_TreeNotLoaded_ReturnsEmptyWithoutError(t *testing.T) {
 	lister := seoPageRouteLister{uc: wikipages.NewListPageRoutesUseCase(tree.NewTreeService(t.TempDir()))}
 
 	routes, truncated, err := lister.ListPageRoutes(context.Background(), 0)
-	if !errors.Is(err, tree.ErrTreeNotLoaded) || routes != nil || truncated {
-		t.Fatalf("ListPageRoutes = %v, %v, %v; want nil, false, ErrTreeNotLoaded", routes, truncated, err)
+	if err != nil || routes != nil || truncated {
+		t.Fatalf("ListPageRoutes = %v, %v, %v; want nil, false, nil", routes, truncated, err)
 	}
 }
 

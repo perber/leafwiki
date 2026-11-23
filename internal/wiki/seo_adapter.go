@@ -148,6 +148,9 @@ type seoPageRouteLister struct {
 
 func (l seoPageRouteLister) ListPageRoutes(ctx context.Context, limit int) ([]seo.PageRoute, bool, error) {
 	out, err := l.uc.Execute(ctx, wikipages.ListPageRoutesInput{Limit: limit})
+	if errors.Is(err, tree.ErrTreeNotLoaded) {
+		return nil, false, nil
+	}
 	if err != nil {
 		return nil, false, err
 	}
