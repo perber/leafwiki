@@ -1,6 +1,7 @@
 package security
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -167,6 +168,132 @@ func TestKeyedLimiter_NotifyResultDoesNotResetOnFailure(t *testing.T) {
 
 	if kl.Allow("k1") {
 		t.Fatalf("expected the count to remain after a failed result")
+	}
+}
+
+// A key that goes quiet (all its events age out of the window) and is then
+// hit again must not keep accumulating a growing, mostly-expired history —
+// Allow filters it back down to just the new hit and, if that's its only
+// remaining event, the entry stays minimal rather than growing unbounded in
+// memory per key. Checked here by confirming a key that ages out and comes
+// back is treated exactly like a fresh key (allowed up to the full limit
+// again), not still "mostly at its limit" from stale events.
+func TestKeyedLimiter_StaleEventsDontAccumulate(t *testing.T) {
+	kl := NewKeyedLimiter(2, 50*time.Millisecond, false)
+
+	if !kl.Allow("k1") {
+		t.Fatalf("expected first hit to be allowed")
+	}
+	if !kl.Allow("k1") {
+		t.Fatalf("expected second hit to be allowed")
+	}
+	time.Sleep(60 * time.Millisecond)
+
+	// Both earlier events are now outside the window: this key should be
+	// treated as if fresh again, allowed up to the full limit once more.
+	if !kl.Allow("k1") {
+		t.Fatalf("expected a hit after the window aged out to be allowed")
+	}
+	if !kl.Allow("k1") {
+		t.Fatalf("expected a second hit after the window aged out to be allowed")
+	}
+	if kl.Allow("k1") {
+		t.Fatalf("expected a third hit within the new window to be denied")
+	}
+
+	kl.mu.Lock()
+	n := len(kl.hits["k1"])
+	kl.mu.Unlock()
+	if n != 2 {
+		t.Fatalf("expected exactly 2 live events for k1, got %d (stale events not dropped)", n)
+	}
+}
+
+// store's empty-events branch isn't reachable through Allow for any realistic
+// limit (>= 1): the deny path only reaches store with zero events when
+// limit <= 0, and the allow path always just appended "now". It still exists
+// as a defensive guard (e.g. against a future caller or a limit of 0), and
+// the table staying bounded in practice comes from makeRoom capping key
+// count, not from this branch — covered directly since the public API can't
+// reach it.
+func TestKeyedLimiter_StoreDropsAKeyWithNoEventsLeft(t *testing.T) {
+	kl := NewKeyedLimiter(2, time.Minute, false)
+	kl.hits["k1"] = []time.Time{time.Now()}
+
+	kl.mu.Lock()
+	kl.store("k1", nil, true)
+	_, stillThere := kl.hits["k1"]
+	kl.mu.Unlock()
+
+	if stillThere {
+		t.Fatalf("expected store to remove a key given an empty events list")
+	}
+}
+
+// The table must never grow past maxKeys, however many distinct keys are
+// seen — the whole point of the bound (see keyedLimiterMaxKeys).
+func TestKeyedLimiter_TableStaysBoundedUnderManyDistinctKeys(t *testing.T) {
+	kl := NewKeyedLimiter(5, time.Hour, false)
+	kl.maxKeys = 50
+
+	for i := range 500 {
+		kl.Allow(fmt.Sprintf("client-%d", i))
+	}
+
+	kl.mu.Lock()
+	n := len(kl.hits)
+	kl.mu.Unlock()
+	if n > kl.maxKeys {
+		t.Fatalf("table has %d entries, want at most maxKeys (%d)", n, kl.maxKeys)
+	}
+}
+
+// Eviction must never target the key currently being inserted — otherwise a
+// client could be rate-limited (wrongly denied or, worse, its own fresh hit
+// silently discarded) by the very act of making room for itself.
+func TestKeyedLimiter_MakeRoomNeverEvictsTheKeyBeingInserted(t *testing.T) {
+	kl := NewKeyedLimiter(5, time.Hour, false)
+	kl.maxKeys = 10
+
+	for i := range kl.maxKeys {
+		kl.Allow(fmt.Sprintf("client-%d", i))
+	}
+
+	// The table is now at capacity; inserting one more distinct key must
+	// still succeed and be recorded, not be the one evicted to make room.
+	if !kl.Allow("newcomer") {
+		t.Fatalf("expected a brand-new key to be allowed even at capacity")
+	}
+	kl.mu.Lock()
+	_, present := kl.hits["newcomer"]
+	kl.mu.Unlock()
+	if !present {
+		t.Fatalf("expected the newly inserted key to remain in the table, not be its own eviction victim")
+	}
+}
+
+// At capacity, the key whose most recent hit is oldest — the one closest to
+// aging out of its own window anyway — is the one evicted, same idea as
+// loginAttemptTracker.makeRoom.
+func TestKeyedLimiter_MakeRoomEvictsTheLeastRecentlyActiveKey(t *testing.T) {
+	kl := NewKeyedLimiter(5, time.Hour, false)
+	kl.maxKeys = 2
+
+	kl.Allow("oldest")
+	time.Sleep(5 * time.Millisecond)
+	kl.Allow("newer")
+
+	kl.Allow("triggers-eviction")
+
+	kl.mu.Lock()
+	_, oldestStillThere := kl.hits["oldest"]
+	_, newerStillThere := kl.hits["newer"]
+	kl.mu.Unlock()
+	if oldestStillThere {
+		t.Fatalf("expected the least recently active key to be evicted")
+	}
+	if !newerStillThere {
+		t.Fatalf("expected the more recently active key to survive")
 	}
 }
 
