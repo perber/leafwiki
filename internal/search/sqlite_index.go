@@ -617,14 +617,23 @@ func (s *SQLiteIndex) RemovePageByFilePath(filePath string) (int64, error) {
 // that is non-nil. Every statement runs under ctx: once ctx ends, the running
 // statement is interrupted and Search returns ctx's error and no result.
 func (s *SQLiteIndex) Search(ctx context.Context, query string, pageIDs []string, offset, limit int) (*SearchResult, error) {
-	query = strings.TrimSpace(query)
+	return s.searchParsed(ctx, parseSearchQuery(strings.TrimSpace(query)), pageIDs, offset, limit)
+}
+
+// SearchParsed is Search for a caller that already parsed query once (see
+// ParseQuery) and wants to reuse that parse instead of Search re-deriving the
+// FTS5 expression from the raw string again.
+func (s *SQLiteIndex) SearchParsed(ctx context.Context, query ParsedQuery, pageIDs []string, offset, limit int) (*SearchResult, error) {
+	return s.searchParsed(ctx, query.q, pageIDs, offset, limit)
+}
+
+func (s *SQLiteIndex) searchParsed(ctx context.Context, parsed searchQuery, pageIDs []string, offset, limit int) (*SearchResult, error) {
 	// ftsQuery, not the raw query, decides whether there's anything to MATCH
 	// on: a query built entirely from characters outside the tokenizer's
 	// word alphabet (e.g. "," or "'" alone) sanitizes to "" even though the
 	// raw query wasn't empty, and `pages MATCH ''` is itself an FTS5 syntax
 	// error — the same crash class #1577 reported, for the simplest
 	// possible input.
-	parsed := parseSearchQuery(query)
 	ftsQuery := parsed.fts
 
 	if len(pageIDs) == 0 && pageIDs != nil {
@@ -742,8 +751,17 @@ func (s *SQLiteIndex) Search(ctx context.Context, query string, pageIDs []string
 // SearchPageIDs returns the IDs of all pages matching query, best first,
 // restricted to pageIDs when that is non-nil. It honours ctx like Search.
 func (s *SQLiteIndex) SearchPageIDs(ctx context.Context, query string, pageIDs []string) ([]string, error) {
-	query = strings.TrimSpace(query)
-	ftsQuery := buildFuzzyQuery(query)
+	return s.searchPageIDsParsed(ctx, parseSearchQuery(strings.TrimSpace(query)), pageIDs)
+}
+
+// SearchPageIDsParsed is SearchPageIDs for a caller that already parsed query
+// once (see ParseQuery) — same relationship as SearchParsed/Search.
+func (s *SQLiteIndex) SearchPageIDsParsed(ctx context.Context, query ParsedQuery, pageIDs []string) ([]string, error) {
+	return s.searchPageIDsParsed(ctx, query.q, pageIDs)
+}
+
+func (s *SQLiteIndex) searchPageIDsParsed(ctx context.Context, parsed searchQuery, pageIDs []string) ([]string, error) {
+	ftsQuery := parsed.fts
 
 	if len(pageIDs) == 0 && pageIDs != nil {
 		return []string{}, nil
@@ -789,6 +807,60 @@ func (s *SQLiteIndex) SearchPageIDs(ctx context.Context, query string, pageIDs [
 		return nil, err
 	}
 	return result, nil
+}
+
+// searchConcurrencyProbe, when non-nil, is called at the start of each of
+// SearchWithFacetIDs's two goroutines with a label identifying which one —
+// a test seam (see TestSearchWithFacetIDs_RunsBothQueriesConcurrently)
+// proving both are actually in flight at once rather than one blocking on
+// the other. nil in production; always nil-checked, so the normal path pays
+// nothing for it.
+var searchConcurrencyProbe func(label string)
+
+// SearchWithFacetIDs runs Search and SearchPageIDs concurrently against the
+// same already-parsed query: they are independent reads (each opens its own
+// connection via withDBRead) that don't depend on each other's result, so
+// running them sequentially — as callers previously had to, since each took
+// a raw string and re-parsed it — only added latency. Parsing happens once
+// in the caller (see ParseQuery), not twice more here. Both goroutines share
+// ctx: if one fails or ctx ends, the other is already running under the same
+// deadline/cancellation and is not forcibly aborted early, but neither can
+// outlive ctx either. The first non-nil error either goroutine returns is
+// the one returned; if both fail, Search's error wins (arbitrary but
+// deterministic, matching the order the sequential version checked them in).
+func (s *SQLiteIndex) SearchWithFacetIDs(ctx context.Context, query ParsedQuery, pageIDs []string, offset, limit int) (*SearchResult, []string, error) {
+	var (
+		wg               sync.WaitGroup
+		result           *SearchResult
+		fullMatchPageIDs []string
+		searchErr        error
+		pageIDsErr       error
+	)
+
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		if searchConcurrencyProbe != nil {
+			searchConcurrencyProbe("search")
+		}
+		result, searchErr = s.searchParsed(ctx, query.q, pageIDs, offset, limit)
+	}()
+	go func() {
+		defer wg.Done()
+		if searchConcurrencyProbe != nil {
+			searchConcurrencyProbe("pageIDs")
+		}
+		fullMatchPageIDs, pageIDsErr = s.searchPageIDsParsed(ctx, query.q, pageIDs)
+	}()
+	wg.Wait()
+
+	if searchErr != nil {
+		return nil, nil, searchErr
+	}
+	if pageIDsErr != nil {
+		return nil, nil, pageIDsErr
+	}
+	return result, fullMatchPageIDs, nil
 }
 
 // hitStart and hitEnd are the single-byte markers highlight() puts around a

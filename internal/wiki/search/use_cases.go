@@ -110,7 +110,11 @@ func boundPaging(offset, limit int) (int, int) {
 
 func (uc *SearchUseCase) Execute(ctx context.Context, in SearchInput) (*SearchOutput, error) {
 	query := strings.TrimSpace(in.Query)
-	if utf8.RuneCountInString(query) > maxQueryRunes || coresearch.QueryTermCount(query) > maxQueryTerms {
+	// Parsed once here and reused below (SearchWithFacetIDs), instead of
+	// QueryTermCount, Search and SearchPageIDs each re-deriving the same
+	// FTS5 expression from the raw string independently.
+	parsed := coresearch.ParseQuery(query)
+	if utf8.RuneCountInString(query) > maxQueryRunes || parsed.TermCount() > maxQueryTerms {
 		return nil, ErrSearchQueryTooLong
 	}
 
@@ -138,14 +142,12 @@ func (uc *SearchUseCase) Execute(ctx context.Context, in SearchInput) (*SearchOu
 	ctx, cancel := context.WithTimeout(ctx, searchTimeout)
 	defer cancel()
 
-	result, err := uc.index.Search(ctx, in.Query, pageIDs, in.Offset, in.Limit)
+	// Search and SearchPageIDs are independent reads over the same parsed
+	// query; SearchWithFacetIDs runs them concurrently instead of one after
+	// the other.
+	result, fullMatchPageIDs, err := uc.index.SearchWithFacetIDs(ctx, parsed, pageIDs, in.Offset, in.Limit)
 	if err != nil {
-		return nil, uc.searchQueryError(ctx, err, query)
-	}
-
-	fullMatchPageIDs, err := uc.index.SearchPageIDs(ctx, in.Query, pageIDs)
-	if err != nil {
-		return nil, uc.searchQueryError(ctx, err, query)
+		return nil, uc.searchQueryError(ctx, err, query, parsed)
 	}
 
 	uc.attachTags(result.Items)
@@ -159,12 +161,14 @@ func (uc *SearchUseCase) Execute(ctx context.Context, in SearchInput) (*SearchOu
 // ctx (the client went away) comes back as context.Canceled and is not
 // logged; the handler answers it without a body. Checking ctx and not only
 // err also catches a driver error that doesn't wrap the context's error.
-func (uc *SearchUseCase) searchQueryError(ctx context.Context, err error, query string) error {
+// parsed is the same ParsedQuery Execute already built — its term count is
+// reused for the log line rather than re-parsing the query again here.
+func (uc *SearchUseCase) searchQueryError(ctx context.Context, err error, query string, parsed coresearch.ParsedQuery) error {
 	switch {
 	case errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded):
 		uc.log.Warn("search timed out",
 			"queryRunes", utf8.RuneCountInString(query),
-			"terms", coresearch.QueryTermCount(query))
+			"terms", parsed.TermCount())
 		return ErrSearchUnavailable
 	case ctx.Err() != nil:
 		return ctx.Err()

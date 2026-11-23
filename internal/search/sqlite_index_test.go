@@ -2,6 +2,7 @@ package search
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -1975,6 +1976,75 @@ func TestNewSQLiteIndex_RebuildsAnOlderVersionOnceAndThenKeepsIt(t *testing.T) {
 
 // newTestIndex opens a fresh index in a temporary directory and closes it
 // when the test ends.
+// A caller that parses once (ParseQuery) and reuses the result for both
+// SQLiteIndex queries must not pay for the FTS5 expression being re-derived
+// inside SearchWithFacetIDs — this pins that down against the real parse
+// counter (parseSearchQueryCalls), not just by reading the code.
+func TestSearchWithFacetIDs_ParsesQueryOnce(t *testing.T) {
+	index := newTestIndex(t)
+	if err := index.IndexPage("docs/a", "docs/a.md", "a", "Hello", tree.NodeKindPage, "hello world"); err != nil {
+		t.Fatalf("IndexPage: %v", err)
+	}
+
+	parseSearchQueryCalls.Store(0)
+	parsed := ParseQuery("hello world")
+	if got := parseSearchQueryCalls.Load(); got != 1 {
+		t.Fatalf("ParseQuery triggered %d parses, want exactly 1", got)
+	}
+
+	if _, _, err := index.SearchWithFacetIDs(context.Background(), parsed, nil, 0, 20); err != nil {
+		t.Fatalf("SearchWithFacetIDs: %v", err)
+	}
+	if got := parseSearchQueryCalls.Load(); got != 1 {
+		t.Fatalf("SearchWithFacetIDs triggered %d additional parse(s); the query must not be re-parsed, only the one ParseQuery call should count", got)
+	}
+}
+
+// Search and SearchPageIDs are independent reads; SearchWithFacetIDs must run
+// them concurrently, not one after the other, or it buys nothing over the
+// sequential Search()+SearchPageIDs() calls it replaces. Proven deterministically
+// via a test seam (searchConcurrencyProbe) rather than timing, which would be
+// flaky against real (fast, small) SQLite queries.
+func TestSearchWithFacetIDs_RunsBothQueriesConcurrently(t *testing.T) {
+	index := newTestIndex(t)
+	if err := index.IndexPage("docs/a", "docs/a.md", "a", "Hello", tree.NodeKindPage, "hello world"); err != nil {
+		t.Fatalf("IndexPage: %v", err)
+	}
+
+	var mu sync.Mutex
+	started := map[string]bool{}
+	bothStarted := make(chan struct{})
+	var once sync.Once
+	searchConcurrencyProbe = func(label string) {
+		mu.Lock()
+		started[label] = true
+		n := len(started)
+		mu.Unlock()
+		if n == 2 {
+			once.Do(func() { close(bothStarted) })
+		}
+	}
+	t.Cleanup(func() { searchConcurrencyProbe = nil })
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if _, _, err := index.SearchWithFacetIDs(context.Background(), ParseQuery("hello"), nil, 0, 20); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	select {
+	case <-bothStarted:
+		// Both goroutines were in flight at once — this is what we're proving.
+	case <-done:
+		t.Fatal("SearchWithFacetIDs returned before both queries had started — they ran sequentially, not concurrently")
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for both queries to start concurrently")
+	}
+	<-done
+}
+
 func newTestIndex(t *testing.T) *SQLiteIndex {
 	t.Helper()
 	index, err := NewSQLiteIndex(t.TempDir())
