@@ -8,6 +8,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// keyedLimiterMaxKeys bounds the table, mirroring loginAttemptTracker's
+// loginTrackerMaxEntries (internal/core/auth/login_attempt_tracker.go) for
+// the same reason: key (see ClientBucket) comes from the network, so the
+// table cannot be left to grow with it.
+const keyedLimiterMaxKeys = 10000
+
 // KeyedLimiter is a per-key sliding-window rate limiter. NewRateLimiter wraps
 // one as a ready-to-use Gin middleware for the common case (rate-limit every
 // request through a route, abort-and-continue). KeyedLimiter itself is used
@@ -21,6 +27,7 @@ type KeyedLimiter struct {
 	limit          int
 	window         time.Duration
 	resetOnSuccess bool
+	maxKeys        int
 }
 
 // NewKeyedLimiter creates a limiter allowing up to limit hits per window per
@@ -32,64 +39,79 @@ func NewKeyedLimiter(limit int, window time.Duration, resetOnSuccess bool) *Keye
 		limit:          limit,
 		window:         window,
 		resetOnSuccess: resetOnSuccess,
-	}
-}
-
-func (rl *KeyedLimiter) cleanup() {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-
-	cutoff := time.Now().Add(-rl.window)
-
-	for key, events := range rl.hits {
-		n := 0
-		for _, t := range events {
-			if t.After(cutoff) {
-				// keep this event within the active window
-				events[n] = t
-				n++
-			}
-		}
-
-		if n == 0 {
-			// no more events in the current window for this key; remove entry
-			delete(rl.hits, key)
-		} else {
-			// shrink slice to the kept events
-			rl.hits[key] = events[:n]
-		}
+		maxKeys:        keyedLimiterMaxKeys,
 	}
 }
 
 // Allow reports whether a hit for key is permitted right now, recording it if
 // so. Returns false (without recording) once key is at its limit within the
-// current window.
+// current window. Only touches key's own history — no per-call scan of every
+// other key — and drops the entry entirely once it has no events left in the
+// window, so a key that goes quiet doesn't keep a permanent map slot (see
+// makeRoom for how the table as a whole stays bounded).
 func (rl *KeyedLimiter) Allow(key string) bool {
-	rl.cleanup()
-
 	now := time.Now()
 	cutoff := now.Add(-rl.window)
 
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	var events []time.Time
-	if old, ok := rl.hits[key]; ok {
-		events = old[:0]
-		for _, t := range old {
-			if t.After(cutoff) {
-				events = append(events, t)
-			}
+	old, existed := rl.hits[key]
+	events := old[:0]
+	for _, t := range old {
+		if t.After(cutoff) {
+			events = append(events, t)
 		}
 	}
+
 	if len(events) >= rl.limit {
-		rl.hits[key] = events
+		rl.store(key, events, existed)
 		return false
 	}
 
 	events = append(events, now)
-	rl.hits[key] = events
+	rl.store(key, events, existed)
 	return true
+}
+
+// store saves key's filtered event list, or forgets key entirely once it has
+// none left. Must be called with rl.mu held.
+func (rl *KeyedLimiter) store(key string, events []time.Time, existed bool) {
+	if len(events) == 0 {
+		delete(rl.hits, key)
+		return
+	}
+	if !existed {
+		rl.makeRoom()
+	}
+	rl.hits[key] = events
+}
+
+// makeRoom evicts one entry when the table is at its cap, picking the key
+// whose most recent hit is oldest — the one closest to aging out of its own
+// window anyway, so the cheapest to lose. Same idea as
+// loginAttemptTracker.makeRoom, adapted to this type's data (a slice of hit
+// times rather than a single next-allowed deadline). Must be called with
+// rl.mu held, and only for a key not yet in the table — eviction never
+// targets the caller's own about-to-be-inserted key. Never refuses to track
+// and never empties the table, so a full table cannot switch the limiter off.
+func (rl *KeyedLimiter) makeRoom() {
+	if len(rl.hits) < rl.maxKeys {
+		return
+	}
+	var victim string
+	var victimLast time.Time
+	found := false
+	for k, events := range rl.hits {
+		last := events[len(events)-1]
+		if !found || last.Before(victimLast) {
+			victim, victimLast = k, last
+			found = true
+		}
+	}
+	if found {
+		delete(rl.hits, victim)
+	}
 }
 
 // NotifyResult tells the limiter whether the request keyed by key ultimately
