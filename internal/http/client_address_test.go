@@ -50,7 +50,7 @@ func newClientAddressRigOn(t *testing.T, trusted *auth_middleware.TrustedProxies
 	if err := httpinternal.ConfigureClientAddress(rig.engine, trusted, unixListener); err != nil {
 		t.Fatalf("ConfigureClientAddress: %v", err)
 	}
-	rig.engine.Use(httpinternal.WarnOnUntrustedForwarding(slog.New(slog.NewTextHandler(rig.logs, nil)), trusted))
+	rig.engine.Use(httpinternal.WarnOnUntrustedForwarding(slog.New(slog.NewTextHandler(rig.logs, nil)), rig.engine))
 	rig.engine.GET("/who", func(c *gin.Context) {
 		c.String(http.StatusOK, c.ClientIP()+"|"+security.ClientBucket(c))
 	})
@@ -241,5 +241,36 @@ func TestClientAddress_WarningIsOncePerRouter(t *testing.T) {
 		if got := strings.Count(rig.logs.String(), untrustedForwardingMessage); got != 1 {
 			t.Errorf("router %d: warning logged %d times, want 1", i, got)
 		}
+	}
+}
+
+// peerIsTrusted (unexported) now reads gin's own trust decision back via
+// (*gin.Context).ClientIP instead of re-deriving it from the trusted-proxy
+// CIDR list by hand, so this and the suite above double as regression
+// coverage for any future gin upgrade that changes CIDR/IP-matching
+// semantics: a drift there would show up here as a wrong ClientIP, not as a
+// silently-wrong warning decision.
+//
+// Known, accepted false positive of that approach: if a forwarding header's
+// value happens to equal the TCP peer's own address, ClientIP() returns the
+// same string whether gin trusted and applied the header or ignored it, so
+// peerIsTrusted can't tell the two apart here and treats it as untrusted —
+// the warning fires even though the proxy IS trusted and correctly listed.
+// Accepted because X-Forwarded-For exists specifically to carry an address
+// *different* from the relaying proxy's own — a real proxy forwarding its
+// own address essentially never happens outside a deliberately contrived
+// test like this one — and because the actual, security-relevant value
+// (ClientIP, hence security.ClientBucket) is still exactly correct either
+// way: only this diagnostic warning log can be spuriously noisy, nothing
+// that depends on trust being correctly resolved is affected.
+func TestClientAddress_CoincidentallyMatchingForwardedValueWarnsSpuriously(t *testing.T) {
+	rig := newClientAddressRig(t, "10.0.0.0/8")
+
+	got := rig.get(t, "10.0.0.1:5000", "X-Forwarded-For", "10.0.0.1")
+	if got.ip != "10.0.0.1" || got.bucket != "10.0.0.1" {
+		t.Errorf("client = %+v, want the (coincidentally identical) forwarded value 10.0.0.1 either way", got)
+	}
+	if !strings.Contains(rig.logs.String(), untrustedForwardingMessage) {
+		t.Errorf("expected the known spurious warning for this contrived coincidence, got none: %s", rig.logs.String())
 	}
 }

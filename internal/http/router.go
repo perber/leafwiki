@@ -232,7 +232,7 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 		engine.Use(opts.Metrics.Middleware())
 	}
 	engine.Use(gin.RecoveryWithWriter(gin.DefaultErrorWriter))
-	engine.Use(warnOnUntrustedForwarding(slog.Default(), opts.TrustedProxies))
+	engine.Use(warnOnUntrustedForwarding(slog.Default(), engine))
 	if !opts.DisableSecurityHeaders {
 		// On the engine, not on a group: some slices build their /api groups
 		// from ctx.Base directly, and NoRoute responses need the headers too.
