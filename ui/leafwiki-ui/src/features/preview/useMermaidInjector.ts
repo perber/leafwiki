@@ -120,14 +120,6 @@ export function useMermaidInjector({
 }: MermaidInjectorOps) {
   const lastHashRef = useRef<string | null>(null)
   const lastDataLineRef = useRef<string | undefined>(undefined)
-  const lastThemeRef = useRef<'default' | 'dark' | null>(null)
-
-  useEffect(() => {
-    if (lastThemeRef.current !== theme) {
-      lastHashRef.current = null
-      lastThemeRef.current = theme
-    }
-  }, [theme])
 
   useEffect(() => {
     if (!containerRef) return
@@ -140,7 +132,11 @@ export function useMermaidInjector({
       if (!el) return
       const normalizedCode = normalizeCode(code)
 
-      const codeHash = djb2(normalizedCode)
+      // theme is folded into the cache key (not just normalizedCode) so a
+      // theme-only change naturally misses the cache and falls through to a
+      // real re-render below — no separate "invalidate on theme change"
+      // effect needed to force that.
+      const codeHash = djb2(`${normalizedCode}|${theme}`)
       if (lastHashRef.current === codeHash) {
         if (lastDataLineRef.current !== dataLine) {
           // Replace data-line of existing SVG in the list of svgs

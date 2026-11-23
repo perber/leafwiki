@@ -240,6 +240,82 @@ describe('useMermaidInjector sandbox', () => {
   }, 15000)
 })
 
+describe('useMermaidInjector re-render cache key', () => {
+  it('forces a real re-render (a new mermaid.render call) when only the theme changes', async () => {
+    const mermaid = (await import('mermaid')).default
+    const renderSpy = vi.spyOn(mermaid, 'render')
+    const sandbox = document.createElement('div')
+    const container = document.createElement('div')
+    document.body.append(sandbox, container)
+
+    try {
+      const { rerender } = renderHook(
+        ({ theme }: { theme: 'default' | 'dark' }) =>
+          useMermaidInjector({
+            containerRef: { current: container },
+            sandboxRef: { current: sandbox },
+            code: 'flowchart TD\n  A[one]',
+            theme,
+            onError: vi.fn(),
+          }),
+        { initialProps: { theme: 'default' } },
+      )
+      await waitFor(
+        () => expect(container.querySelector('svg')).not.toBeNull(),
+        { timeout: 10000 },
+      )
+      expect(renderSpy).toHaveBeenCalledTimes(1)
+
+      rerender({ theme: 'dark' })
+      await waitFor(() => expect(renderSpy).toHaveBeenCalledTimes(2), {
+        timeout: 10000,
+      })
+    } finally {
+      renderSpy.mockRestore()
+    }
+  }, 15000)
+
+  it('does not re-render when only dataLine changes, but still updates the SVG attribute', async () => {
+    const mermaid = (await import('mermaid')).default
+    const renderSpy = vi.spyOn(mermaid, 'render')
+    const sandbox = document.createElement('div')
+    const container = document.createElement('div')
+    document.body.append(sandbox, container)
+
+    try {
+      const { rerender } = renderHook(
+        ({ dataLine }: { dataLine?: string }) =>
+          useMermaidInjector({
+            containerRef: { current: container },
+            sandboxRef: { current: sandbox },
+            code: 'flowchart TD\n  A[one]',
+            dataLine,
+            theme: 'default',
+            onError: vi.fn(),
+          }),
+        { initialProps: { dataLine: '1' } },
+      )
+      await waitFor(
+        () => expect(container.querySelector('svg')).not.toBeNull(),
+        { timeout: 10000 },
+      )
+      expect(renderSpy).toHaveBeenCalledTimes(1)
+
+      rerender({ dataLine: '2' })
+      await waitFor(
+        () =>
+          expect(
+            container.querySelector('svg')?.getAttribute('data-line'),
+          ).toBe('2'),
+        { timeout: 10000 },
+      )
+      expect(renderSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      renderSpy.mockRestore()
+    }
+  }, 15000)
+})
+
 describe('useMermaidInjector label names', () => {
   it('drops name attributes from HTML labels', async () => {
     const svg = await renderDiagram(`flowchart TD
