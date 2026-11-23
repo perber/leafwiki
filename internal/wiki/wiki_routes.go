@@ -49,7 +49,8 @@ func (w *Wiki) buildRoutes(options *WikiOptions) {
 			Log:     w.log,
 		})
 	}
-	w.importerRoutes = w.buildImporterRoutes(options)
+	w.importer = w.newImporterService(options)
+	w.importerRoutes = w.buildImporterRoutes(w.importer)
 	w.healthRoutes = wikihealth.NewRoutes(wikihealth.RoutesConfig{
 		Index:      w.searchIndex,
 		Status:     w.status,
@@ -226,14 +227,19 @@ func (w *Wiki) buildAPIKeysRoutes() *wikiapikeys.Routes {
 	})
 }
 
-func (w *Wiki) buildImporterRoutes(options *WikiOptions) *wikiimporter.Routes {
+// newImporterService builds the importer; Wiki.Close stops its running
+// import before the stores close.
+func (w *Wiki) newImporterService(options *WikiOptions) *coreimporter.ImporterService {
 	importerDir := filepath.Join(options.StorageDir, ".importer")
 	adapter := NewWikiImportAdapter(w)
 	planner := coreimporter.NewPlanner(adapter, w.slug, options.StorageDir)
 	planner.SetIgnoreCache(w.ignoreCache)
 
 	store := coreimporter.NewPlanStore(filepath.Join(importerDir, "current-plan.json"))
-	svc := coreimporter.NewImporterService(planner, store, filepath.Join(importerDir, "workspaces"), options.MaxAssetUploadSizeBytes)
+	return coreimporter.NewImporterService(planner, store, filepath.Join(importerDir, "workspaces"), options.MaxAssetUploadSizeBytes)
+}
+
+func (w *Wiki) buildImporterRoutes(svc *coreimporter.ImporterService) *wikiimporter.Routes {
 	return wikiimporter.NewRoutes(wikiimporter.RoutesConfig{
 		CreatePlan:  wikiimporter.NewCreateImportPlanUseCase(svc),
 		GetPlan:     wikiimporter.NewGetImportPlanUseCase(svc),

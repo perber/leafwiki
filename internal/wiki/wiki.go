@@ -18,6 +18,7 @@ import (
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/favorites"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
+	coreimporter "github.com/perber/wiki/internal/importer"
 	"github.com/perber/wiki/internal/links"
 	"github.com/perber/wiki/internal/properties"
 	"github.com/perber/wiki/internal/publicaccess"
@@ -82,6 +83,7 @@ type Wiki struct {
 	apiKeysRoutes          *wikiapikeys.Routes
 	sharesRoutes           *wikishares.Routes
 	importerRoutes         *wikiimporter.Routes
+	importer               *coreimporter.ImporterService
 	healthRoutes           *wikihealth.Routes
 	revision               *revision.Service
 	links                  *links.LinkService
@@ -308,6 +310,12 @@ func (w *Wiki) EmailTokenService() *auth.EmailTokenService {
 func (w *Wiki) Close() error {
 	w.shutdownCancel() // signal in-flight reloads to abort
 	w.reloadWG.Wait()  // drain goroutines before closing stores
+	if w.importer != nil {
+		// A background import writes through the tree, link, tag and
+		// property stores closed below; it stops between items and the
+		// next start picks it up again.
+		w.importer.Close()
+	}
 	if w.status != nil {
 		w.status.Finish()
 	}

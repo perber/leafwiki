@@ -123,7 +123,7 @@ func (uc *ExecuteImportUseCase) Execute(_ context.Context, in ExecuteImportInput
 		if errors.Is(err, coreimporter.ErrNoPlan) {
 			return nil, sharederrors.NewLocalizedError("importer_no_plan", "No import plan available", "no import plan available", err)
 		}
-		if errors.Is(err, coreimporter.ErrImportStateUnavailable) {
+		if errors.Is(err, coreimporter.ErrImportStateUnavailable) || errors.Is(err, coreimporter.ErrImporterClosed) {
 			return nil, sharederrors.NewLocalizedError("importer_state_unavailable", "Import state is unavailable", "import state is unavailable", err)
 		}
 		return nil, err

@@ -9,11 +9,17 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/perber/wiki/internal/core/assets"
 	"github.com/perber/wiki/internal/core/shared"
 )
+
+// ErrImporterClosed is returned when an import is started after the importer
+// was closed (the wiki is shutting down).
+var ErrImporterClosed = errors.New("importer is closed")
 
 type ImporterService struct {
 	planner                 *Planner
@@ -23,6 +29,13 @@ type ImporterService struct {
 	assetMaxUploadSizeBytes int64
 	workspaceBaseDir        string
 	zipExtractionLimits     shared.ExtractionLimits
+
+	// runMu guards closed and the Add on runs, so Close cannot miss an
+	// execution that starts while it is waiting.
+	runMu   sync.Mutex
+	closed  bool
+	closing atomic.Bool
+	runs    sync.WaitGroup
 }
 
 type CurrentPlanState struct {
@@ -165,6 +178,11 @@ func (is *ImporterService) CancelCurrentPlan() (*CurrentPlanState, bool, error) 
 
 // ExecuteCurrentPlan executes the currently stored import plan
 func (is *ImporterService) ExecuteCurrentPlan(userID string) (*ExecutionResult, error) {
+	if !is.beginRun() {
+		return nil, ErrImporterClosed
+	}
+	defer is.runs.Done()
+
 	sp, started, err := is.planStore.TryStartExecution(userID)
 	if err != nil {
 		return nil, err
@@ -187,6 +205,9 @@ func (is *ImporterService) ExecuteCurrentPlan(userID string) (*ExecutionResult, 
 	}
 
 	res, err := is.executeStoredPlan(sp)
+	if errors.Is(err, errImportInterrupted) {
+		return nil, ErrImporterClosed
+	}
 	if finishErr := is.planStore.FinishExecution(sp.Plan.ID, res, err); finishErr != nil {
 		return nil, finishErr
 	}
@@ -198,23 +219,65 @@ func (is *ImporterService) ExecuteCurrentPlan(userID string) (*ExecutionResult, 
 }
 
 func (is *ImporterService) StartCurrentPlanExecution(userID string) (*CurrentPlanState, bool, error) {
+	if !is.beginRun() {
+		return nil, false, ErrImporterClosed
+	}
+
 	sp, started, err := is.planStore.TryStartExecution(userID)
 	if err != nil {
+		is.runs.Done()
 		return nil, false, err
 	}
 
 	if started {
-		go func(snapshot *StoredPlan) {
-			res, execErr := is.executeStoredPlan(snapshot)
-			if finishErr := is.planStore.FinishExecution(snapshot.Plan.ID, res, execErr); finishErr != nil {
-				is.logger.Error("failed to persist finished import state", "error", finishErr)
-				return
-			}
-			is.cleanupWorkspace(snapshot.WorkspaceRoot)
-		}(sp)
+		go is.runInBackground(sp)
+	} else {
+		is.runs.Done()
 	}
 
 	return currentPlanStateFromStored(sp), started, nil
+}
+
+// Close stops a running import before its next item and waits for the item
+// in progress, so nothing writes into the wiki's stores after they are
+// closed. The interrupted import stays running in the persisted state, so
+// the next start picks it up again (resumeInterruptedExecution). Further
+// executions are refused.
+func (is *ImporterService) Close() {
+	is.runMu.Lock()
+	is.closed = true
+	is.closing.Store(true)
+	is.runMu.Unlock()
+	is.runs.Wait()
+}
+
+// beginRun registers an execution with Close's wait group; false means the
+// importer is closed. The caller must call runs.Done when the run ends.
+func (is *ImporterService) beginRun() bool {
+	is.runMu.Lock()
+	defer is.runMu.Unlock()
+	if is.closed {
+		return false
+	}
+	is.runs.Add(1)
+	return true
+}
+
+// runInBackground executes a started plan; the caller has already called
+// beginRun for it.
+func (is *ImporterService) runInBackground(snapshot *StoredPlan) {
+	defer is.runs.Done()
+
+	res, execErr := is.executeStoredPlan(snapshot)
+	if errors.Is(execErr, errImportInterrupted) {
+		is.logger.Info("import interrupted by shutdown, the next start picks it up again", "plan_id", snapshot.Plan.ID)
+		return
+	}
+	if finishErr := is.planStore.FinishExecution(snapshot.Plan.ID, res, execErr); finishErr != nil {
+		is.logger.Error("failed to persist finished import state", "error", finishErr)
+		return
+	}
+	is.cleanupWorkspace(snapshot.WorkspaceRoot)
 }
 
 // FindMarkdownEntries finds markdown files in the given source base path
@@ -338,6 +401,7 @@ func (is *ImporterService) executeStoredPlan(sp *StoredPlan) (*ExecutionResult, 
 		WithCancelCheck(func() bool {
 			return is.planStore.IsCancelRequested(sp.Plan.ID)
 		}).
+		WithInterruptCheck(is.closing.Load).
 		WithResumeState(sp.ProcessedItems, sp.ExecutionResult)
 	return exec.Execute(sp.ExecutionUserID)
 }
@@ -390,12 +454,8 @@ func (is *ImporterService) resumeInterruptedExecution() {
 		sp.ExecutionUserID = "system"
 	}
 
-	go func(snapshot *StoredPlan) {
-		res, execErr := is.executeStoredPlan(snapshot)
-		if finishErr := is.planStore.FinishExecution(snapshot.Plan.ID, res, execErr); finishErr != nil {
-			is.logger.Error("failed to persist resumed import completion", "error", finishErr)
-			return
-		}
-		is.cleanupWorkspace(snapshot.WorkspaceRoot)
-	}(sp)
+	if !is.beginRun() {
+		return
+	}
+	go is.runInBackground(sp)
 }
