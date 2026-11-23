@@ -753,3 +753,97 @@ func TestUserStore_Suspend_ClosesDBAndBlocksReconnect(t *testing.T) {
 		t.Fatalf("expected a second suspend call to be a safe no-op, got: %v", err)
 	}
 }
+
+func TestUserStore_GetUserBySub(t *testing.T) {
+	store := setupTestUserStore(t)
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
+
+	user := &User{ID: "1", Username: "alice", Password: "x", Email: "alice@example.com", Role: RoleViewer}
+	if err := store.CreateUser(user); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	if _, err := store.GetUserBySub("sub-123"); err != ErrUserNotFound {
+		t.Fatalf("expected ErrUserNotFound before linking, got %v", err)
+	}
+
+	if err := store.SetOIDCSub(user.ID, "sub-123"); err != nil {
+		t.Fatalf("SetOIDCSub: %v", err)
+	}
+
+	got, err := store.GetUserBySub("sub-123")
+	if err != nil {
+		t.Fatalf("GetUserBySub after linking: %v", err)
+	}
+	if got.ID != user.ID {
+		t.Fatalf("expected user %s, got %s", user.ID, got.ID)
+	}
+	if got.OIDCSub != "sub-123" {
+		t.Fatalf("expected OIDCSub %q, got %q", "sub-123", got.OIDCSub)
+	}
+}
+
+// TestUserStore_GetUserBySub_EmptyStringNeverMatches guards the exact bug
+// the "oidc_sub != ”" clause exists to prevent: every pre-migration (or
+// never-linked) row defaults to oidc_sub = ”, which must never be treated
+// as a valid, matchable sub value.
+func TestUserStore_GetUserBySub_EmptyStringNeverMatches(t *testing.T) {
+	store := setupTestUserStore(t)
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
+
+	user := &User{ID: "1", Username: "alice", Password: "x", Email: "alice@example.com", Role: RoleViewer}
+	if err := store.CreateUser(user); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	if _, err := store.GetUserBySub(""); err != ErrUserNotFound {
+		t.Fatalf("expected ErrUserNotFound for an empty sub, got %v", err)
+	}
+}
+
+func TestUserStore_UpdateUserRole(t *testing.T) {
+	store := setupTestUserStore(t)
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
+
+	admin := &User{ID: "1", Username: "admin", Password: "x", Email: "admin@example.com", Role: RoleAdmin}
+	if err := store.CreateUser(admin); err != nil {
+		t.Fatalf("CreateUser(admin): %v", err)
+	}
+	other := &User{ID: "2", Username: "bob", Password: "x", Email: "bob@example.com", Role: RoleViewer}
+	if err := store.CreateUser(other); err != nil {
+		t.Fatalf("CreateUser(bob): %v", err)
+	}
+
+	if err := store.UpdateUserRole(other.ID, RoleEditor); err != nil {
+		t.Fatalf("UpdateUserRole: %v", err)
+	}
+	got, err := store.GetUserByID(other.ID)
+	if err != nil {
+		t.Fatalf("GetUserByID: %v", err)
+	}
+	if got.Role != RoleEditor {
+		t.Fatalf("expected role %q, got %q", RoleEditor, got.Role)
+	}
+}
+
+func TestUserStore_UpdateUserRole_LastAdminCannotBeDemoted(t *testing.T) {
+	store := setupTestUserStore(t)
+	defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
+
+	admin := &User{ID: "1", Username: "admin", Password: "x", Email: "admin@example.com", Role: RoleAdmin}
+	if err := store.CreateUser(admin); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	if err := store.UpdateUserRole(admin.ID, RoleViewer); err != ErrLastAdminCannotBeDemoted {
+		t.Fatalf("expected ErrLastAdminCannotBeDemoted, got %v", err)
+	}
+	// And the role must actually be unchanged, not partially applied.
+	got, err := store.GetUserByID(admin.ID)
+	if err != nil {
+		t.Fatalf("GetUserByID: %v", err)
+	}
+	if got.Role != RoleAdmin {
+		t.Fatalf("expected role to remain %q, got %q", RoleAdmin, got.Role)
+	}
+}
