@@ -4,7 +4,7 @@ import { useSessionStore } from '@/stores/session'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import LoginForm from './LoginForm'
 
 const loginMock = vi.fn()
@@ -242,5 +242,104 @@ describe('LoginForm forgot-password link', () => {
     })
     renderLoginForm()
     expect(screen.getByTestId('login-forgot-password-link')).toBeInTheDocument()
+  })
+})
+
+describe('LoginForm OIDC', () => {
+  let originalLocation: Location
+
+  beforeEach(() => {
+    loginMock.mockReset()
+    vi.mocked(toast.error).mockReset()
+    useSessionStore.setState({
+      user: null,
+      isRefreshing: false,
+      accessTokenExpiresAt: null,
+    })
+    originalLocation = window.location
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...originalLocation, href: '' },
+    })
+  })
+
+  afterEach(() => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: originalLocation,
+    })
+  })
+
+  it('hides the OIDC button when it is not enabled', () => {
+    useConfigStore.setState({
+      authDisabled: false,
+      httpRemoteUserEnabled: false,
+      oidcEnabled: false,
+    })
+    renderLoginForm()
+    expect(screen.queryByTestId('login-oidc-button')).not.toBeInTheDocument()
+  })
+
+  it('shows the OIDC button with the configured label and redirects on click', async () => {
+    useConfigStore.setState({
+      authDisabled: false,
+      httpRemoteUserEnabled: false,
+      oidcEnabled: true,
+      oidcButtonLabel: 'authentik',
+    })
+    const user = userEvent.setup()
+    renderLoginForm()
+
+    const button = screen.getByTestId('login-oidc-button')
+    expect(button).toHaveTextContent('authentik')
+
+    await user.click(button)
+    expect(window.location.href).toContain('/api/auth/oidc/login')
+  })
+
+  it('hides the local form when OIDC-only, and shows it again with ?local=1', () => {
+    useConfigStore.setState({
+      authDisabled: false,
+      httpRemoteUserEnabled: false,
+      oidcEnabled: true,
+      oidcOnly: true,
+    })
+    renderLoginForm()
+    expect(screen.queryByTestId('login-identifier')).not.toBeInTheDocument()
+
+    render(
+      <MemoryRouter initialEntries={['/login?local=1']}>
+        <Routes>
+          <Route path="/login" element={<LoginForm />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(screen.getByTestId('login-identifier')).toBeInTheDocument()
+  })
+
+  it('shows an error toast once when redirected back with oidc_error', () => {
+    useConfigStore.setState({
+      authDisabled: false,
+      httpRemoteUserEnabled: false,
+      oidcEnabled: true,
+    })
+    render(
+      <MemoryRouter initialEntries={['/login?oidc_error=state_mismatch']}>
+        <Routes>
+          <Route path="/login" element={<LoginForm />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(toast.error).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not show an error toast without oidc_error', () => {
+    useConfigStore.setState({
+      authDisabled: false,
+      httpRemoteUserEnabled: false,
+      oidcEnabled: true,
+    })
+    renderLoginForm()
+    expect(toast.error).not.toHaveBeenCalled()
   })
 })
