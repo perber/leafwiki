@@ -81,33 +81,36 @@ func (s *Service) AuthCodeURL(state, nonce, codeVerifier string) string {
 }
 
 // Exchange trades an authorization code for tokens, verifies the returned ID
-// token's signature/issuer/audience/expiry and nonce, and returns its claims.
-// codeVerifier must be the exact PKCE verifier that produced the challenge
-// passed to AuthCodeURL for this same flow.
-func (s *Service) Exchange(ctx context.Context, code, codeVerifier, expectedNonce string) (*Claims, error) {
+// token's signature/issuer/audience/expiry and nonce, and returns its claims
+// plus the raw (still-encoded) ID token string itself — the latter is opaque
+// to this app beyond verification, kept only so a caller can store it and
+// later send it back to the provider as the end_session_endpoint's
+// id_token_hint on logout. codeVerifier must be the exact PKCE verifier that
+// produced the challenge passed to AuthCodeURL for this same flow.
+func (s *Service) Exchange(ctx context.Context, code, codeVerifier, expectedNonce string) (*Claims, string, error) {
 	token, err := s.oauth2.Exchange(ctx, code, oauth2.VerifierOption(codeVerifier))
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrProviderExchangeFailed, err)
+		return nil, "", fmt.Errorf("%w: %w", ErrProviderExchangeFailed, err)
 	}
 
 	rawIDToken, ok := token.Extra("id_token").(string)
 	if !ok || rawIDToken == "" {
-		return nil, ErrMissingIDToken
+		return nil, "", ErrMissingIDToken
 	}
 
 	idToken, err := s.verifier.Verify(ctx, rawIDToken)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrIDTokenInvalid, err)
+		return nil, "", fmt.Errorf("%w: %w", ErrIDTokenInvalid, err)
 	}
 	if idToken.Nonce != expectedNonce {
-		return nil, fmt.Errorf("%w: nonce mismatch", ErrIDTokenInvalid)
+		return nil, "", fmt.Errorf("%w: nonce mismatch", ErrIDTokenInvalid)
 	}
 
 	var claims Claims
 	if err := idToken.Claims(&claims); err != nil {
-		return nil, fmt.Errorf("%w: parsing claims: %w", ErrIDTokenInvalid, err)
+		return nil, "", fmt.Errorf("%w: parsing claims: %w", ErrIDTokenInvalid, err)
 	}
-	return &claims, nil
+	return &claims, rawIDToken, nil
 }
 
 // MapRole maps claims.Groups to a LeafWiki role using this service's

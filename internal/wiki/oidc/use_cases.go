@@ -119,7 +119,7 @@ func (uc *HandleOIDCCallbackUseCase) Execute(ctx context.Context, in HandleOIDCC
 		return nil, coreoidc.ErrStateMismatch
 	}
 
-	claims, err := svc.Exchange(ctx, in.Code, in.Verifier, in.ExpectedNonce)
+	claims, rawIDToken, err := svc.Exchange(ctx, in.Code, in.Verifier, in.ExpectedNonce)
 	if err != nil {
 		uc.metrics.IncAuthLoginAttempt("oidc_error")
 		return nil, err
@@ -138,7 +138,7 @@ func (uc *HandleOIDCCallbackUseCase) Execute(ctx context.Context, in HandleOIDCC
 	}
 	uc.user().SyncOIDCRole(user.ID, svc.ResolveSyncedRole(claims, user.Role))
 
-	token, err := uc.auth.IssueSessionForUser(user.ID)
+	token, err := uc.auth.IssueOIDCSessionForUser(user.ID, rawIDToken)
 	if err != nil {
 		uc.metrics.IncAuthLoginAttempt("oidc_error")
 		return nil, err

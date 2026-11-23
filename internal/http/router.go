@@ -176,6 +176,8 @@ type RouterOptions struct {
 	OIDCEnabled             bool                     // Whether native OIDC login is configured
 	OIDCButtonLabel         string                   // Label for the "Log in with ..." button
 	OIDCOnly                bool                     // When true, the frontend hides the local login form except via the ?local=1 escape hatch
+	OIDCClientID            string                   // This app's registered OIDC client_id; public by OAuth2 convention, sent to the provider's end_session_endpoint so it ignores any post_logout_redirect_uri registered to a different client
+	OIDCEndSessionURL       string                   // Provider's end_session_endpoint (from discovery), empty if unavailable
 	WriteGate               *restore.WriteGate       // Optional; when set, gates mutating requests while a restore is in progress. nil disables the middleware entirely (no snapshot/restore enabled)
 
 	// TrustedProxies are the proxies whose X-Forwarded-For is believed when

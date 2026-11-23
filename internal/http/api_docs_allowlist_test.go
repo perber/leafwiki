@@ -15,6 +15,7 @@ var undocumentedAPIRouteLiteral = map[string]string{
 	"POST /api/auth/login":                  "auth: pending package documentation",
 	"POST /api/auth/login/totp":             "auth: pending package documentation",
 	"POST /api/auth/logout":                 "auth: pending package documentation",
+	"GET /api/auth/oidc/logout-hint":        "auth: pending package documentation",
 	"GET /api/auth/me":                      "auth: pending package documentation",
 	"POST /api/auth/password/forgot":        "auth: pending package documentation",
 	"POST /api/auth/password/reset":         "auth: pending package documentation",

@@ -111,6 +111,7 @@ func (w *Wiki) buildAuthRoutes() *wikiauth.Routes {
 		Login:             wikiauth.NewLoginUseCase(w.auth, w.metrics),
 		CompleteTOTPLogin: wikiauth.NewCompleteTOTPLoginUseCase(w.auth, w.metrics),
 		Logout:            wikiauth.NewLogoutUseCase(w.auth, w.metrics),
+		GetOIDCLogoutHint: wikiauth.NewGetOIDCLogoutHintUseCase(w.auth),
 		RefreshToken:      wikiauth.NewRefreshTokenUseCase(w.auth, w.metrics),
 		CreateUser:        wikiauth.NewCreateUserUseCase(w.UserService, w.userResolver, w.log),
 		UpdateUser:        wikiauth.NewUpdateUserUseCase(w.UserService, w.userResolver, w.auth, w.log),

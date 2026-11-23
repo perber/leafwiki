@@ -431,6 +431,8 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		OIDCEnabled:            w.OIDCService() != nil,
 		OIDCButtonLabel:        cfg.oidc.buttonLabel,
 		OIDCOnly:               cfg.oidc.only,
+		OIDCClientID:           cfg.oidc.clientID,
+		OIDCEndSessionURL:      oidcEndSessionURL(w.OIDCService()),
 		WriteGate:              writeGate,
 	})
 
@@ -752,6 +754,15 @@ func validateOIDCConfig(o oidcOptions, loginURL string) error {
 		return fmt.Errorf("--oidc-role-sync must be one of all, admin, got %q", o.roleSync)
 	}
 	return nil
+}
+
+// oidcEndSessionURL returns svc's discovered end_session_endpoint, or "" if
+// OIDC isn't configured or the provider doesn't advertise one.
+func oidcEndSessionURL(svc *coreoidc.Service) string {
+	if svc == nil {
+		return ""
+	}
+	return svc.EndSessionURL
 }
 
 // validatePublicURL checks --public-url, which outgoing email links and

@@ -171,9 +171,10 @@ func extractQueryParam(t *testing.T, rawURL, key string) string {
 
 func createRouterTestInstanceWithOIDC(w *wiki.Wiki, t *testing.T) *gin.Engine {
 	svc := w.OIDCService()
-	var buttonLabel string
+	var buttonLabel, endSession string
 	if svc != nil {
 		buttonLabel = svc.ButtonLabel()
+		endSession = svc.EndSessionURL
 	}
 	return httpinternal.NewRouter(w.Registrars(), w.FrontendConfig(), httpinternal.RouterOptions{
 		PublicAccess:            publicaccess.NewEnvManaged(false),
@@ -184,6 +185,7 @@ func createRouterTestInstanceWithOIDC(w *wiki.Wiki, t *testing.T) *gin.Engine {
 		OIDCEnabled:             svc != nil,
 		OIDCButtonLabel:         buttonLabel,
 		OIDCOnly:                svc != nil && svc.OIDCOnly(),
+		OIDCEndSessionURL:       endSession,
 	})
 }
 
@@ -305,6 +307,70 @@ func TestOIDC_NewUser_CreatedWithMappedRoleAndLogsIn(t *testing.T) {
 	}
 	if me.Username != "carol" || me.Role != "admin" || me.AuthSource != "oidc" {
 		t.Fatalf("unexpected /api/auth/me response: %+v", me)
+	}
+}
+
+func TestOIDC_LogoutHint_ReturnsTheStoredIDTokenAfterLogin(t *testing.T) {
+	provider := newFakeOIDCProvider(t, "leafwiki")
+	w := createOIDCWikiTestInstance(t, provider, coreoidc.Config{})
+	router := createRouterTestInstanceWithOIDC(w, t)
+
+	rec := doOIDCLogin(t, router, provider, fakeIDTokenClaims{
+		Sub:               "sub-carol",
+		PreferredUsername: "carol",
+		Email:             "carol@example.com",
+		Groups:            []string{"wiki-admins"},
+	})
+
+	var refreshCookie *http.Cookie
+	for _, c := range rec.Result().Cookies() {
+		if strings.Contains(c.Name, "_rt") {
+			refreshCookie = c
+		}
+	}
+	if refreshCookie == nil {
+		t.Fatal("expected a refresh-token cookie to be set after a successful callback")
+	}
+
+	hintReq := httptest.NewRequest(http.MethodGet, "/api/auth/oidc/logout-hint", nil)
+	hintReq.AddCookie(refreshCookie)
+	hintRec := httptest.NewRecorder()
+	router.ServeHTTP(hintRec, hintReq)
+
+	if hintRec.Code != http.StatusOK {
+		t.Fatalf("GET /api/auth/oidc/logout-hint: expected 200, got %d - %s", hintRec.Code, hintRec.Body.String())
+	}
+	var out struct {
+		IDTokenHint string `json:"idTokenHint"`
+	}
+	if err := json.Unmarshal(hintRec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("unmarshal logout-hint response: %v", err)
+	}
+	if out.IDTokenHint == "" {
+		t.Fatal("expected a non-empty idTokenHint for a session issued via OIDC login")
+	}
+}
+
+func TestOIDC_LogoutHint_EmptyWithoutASession(t *testing.T) {
+	provider := newFakeOIDCProvider(t, "leafwiki")
+	w := createOIDCWikiTestInstance(t, provider, coreoidc.Config{})
+	router := createRouterTestInstanceWithOIDC(w, t)
+
+	hintReq := httptest.NewRequest(http.MethodGet, "/api/auth/oidc/logout-hint", nil)
+	hintRec := httptest.NewRecorder()
+	router.ServeHTTP(hintRec, hintReq)
+
+	if hintRec.Code != http.StatusOK {
+		t.Fatalf("GET /api/auth/oidc/logout-hint: expected 200, got %d - %s", hintRec.Code, hintRec.Body.String())
+	}
+	var out struct {
+		IDTokenHint string `json:"idTokenHint"`
+	}
+	if err := json.Unmarshal(hintRec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("unmarshal logout-hint response: %v", err)
+	}
+	if out.IDTokenHint != "" {
+		t.Fatalf("expected an empty idTokenHint without a session, got %q", out.IDTokenHint)
 	}
 }
 
