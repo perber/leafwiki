@@ -594,14 +594,14 @@ func TestAuthService_ConfirmTOTPSetup_RevokesOtherSessionsButKeepsCurrent(t *tes
 	f := setupTOTPSetupFixture(t)
 
 	// Simulate an existing "other device" session, plus the session performing this request.
-	if err := f.sessionStr.CreateSession("other-device", f.userID, "refresh", time.Now().Add(time.Hour)); err != nil {
+	if err := f.sessionStr.CreateSession("other-device", f.userID, "refresh", time.Now().Add(time.Hour), ""); err != nil {
 		t.Fatalf("failed to seed other-device session: %v", err)
 	}
 	currentRefreshToken, currentJTI, _, err := f.authService.sessions.generateToken(&User{ID: f.userID}, time.Hour, "refresh")
 	if err != nil {
 		t.Fatalf("failed to generate current refresh token: %v", err)
 	}
-	if err := f.sessionStr.CreateSession(currentJTI, f.userID, "refresh", time.Now().Add(time.Hour)); err != nil {
+	if err := f.sessionStr.CreateSession(currentJTI, f.userID, "refresh", time.Now().Add(time.Hour), ""); err != nil {
 		t.Fatalf("failed to seed current session: %v", err)
 	}
 
@@ -698,7 +698,7 @@ func TestAuthService_DisableTOTP_NotEnabledRejected(t *testing.T) {
 func TestAuthService_DisableTOTP_ValidCodeDisablesAndRevokesOtherSessions(t *testing.T) {
 	f := setupTOTPTestFixture(t)
 
-	if err := f.authService.sessions.sessionStore.CreateSession("other-device", f.userID, "refresh", time.Now().Add(time.Hour)); err != nil {
+	if err := f.authService.sessions.sessionStore.CreateSession("other-device", f.userID, "refresh", time.Now().Add(time.Hour), ""); err != nil {
 		t.Fatalf("failed to seed other-device session: %v", err)
 	}
 
@@ -1120,5 +1120,46 @@ func TestAuthService_Login_RejectedBranchesLogTheClient(t *testing.T) {
 				t.Fatalf("expected a log line containing %q, got:\n%s", tt.wantLine, logs.String())
 			}
 		})
+	}
+}
+
+func TestAuthService_IssueOIDCSessionForUser_StoresIDTokenAndGetOIDCLogoutHintReturnsIt(t *testing.T) {
+	authService := setupTestAuthService(t)
+	user, err := authService.users().GetUserByUsername("testuser")
+	if err != nil {
+		t.Fatalf("GetUserByUsername failed: %v", err)
+	}
+
+	token, err := authService.IssueOIDCSessionForUser(user.ID, "raw.id.token")
+	if err != nil {
+		t.Fatalf("IssueOIDCSessionForUser failed: %v", err)
+	}
+
+	got := authService.GetOIDCLogoutHint(token.RefreshToken)
+	if got != "raw.id.token" {
+		t.Fatalf("GetOIDCLogoutHint = %q, want %q", got, "raw.id.token")
+	}
+}
+
+func TestAuthService_GetOIDCLogoutHint_EmptyForLocalLogin(t *testing.T) {
+	authService := setupTestAuthService(t)
+
+	token, err := authService.Login("testuser", "securepass", "")
+	if err != nil {
+		t.Fatalf("Login failed: %v", err)
+	}
+
+	got := authService.GetOIDCLogoutHint(token.RefreshToken)
+	if got != "" {
+		t.Fatalf("GetOIDCLogoutHint = %q, want empty for a local login", got)
+	}
+}
+
+func TestAuthService_GetOIDCLogoutHint_EmptyForInvalidToken(t *testing.T) {
+	authService := setupTestAuthService(t)
+
+	got := authService.GetOIDCLogoutHint("not-a-valid-token")
+	if got != "" {
+		t.Fatalf("GetOIDCLogoutHint = %q, want empty for an invalid token", got)
 	}
 }

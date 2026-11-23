@@ -204,10 +204,10 @@ func TestAuthService_InvalidateAllSessions_RevokesActiveSessions(t *testing.T) {
 	f := setupTestAuthService(t)
 	t.Cleanup(func() { _ = f.Close() })
 
-	if err := f.sessions.sessionStore.CreateSession("jti-a", "user-a", "refresh", time.Now().Add(time.Hour)); err != nil {
+	if err := f.sessions.sessionStore.CreateSession("jti-a", "user-a", "refresh", time.Now().Add(time.Hour), ""); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.sessions.sessionStore.CreateSession("jti-b", "user-b", "refresh", time.Now().Add(time.Hour)); err != nil {
+	if err := f.sessions.sessionStore.CreateSession("jti-b", "user-b", "refresh", time.Now().Add(time.Hour), ""); err != nil {
 		t.Fatal(err)
 	}
 

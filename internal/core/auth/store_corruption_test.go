@@ -54,7 +54,7 @@ func TestShortLivedAuthStores_CorruptFile_QuarantinesAndContinues(t *testing.T) 
 					t.Fatalf("NewSessionStore: %v", err)
 				}
 				defer test_utils.WrapCloseWithErrorCheck(store.Close, t)
-				if err := store.CreateSession("s1", "u1", "refresh", time.Now().Add(time.Hour)); err != nil {
+				if err := store.CreateSession("s1", "u1", "refresh", time.Now().Add(time.Hour), ""); err != nil {
 					t.Fatalf("CreateSession after quarantine: %v", err)
 				}
 			},
