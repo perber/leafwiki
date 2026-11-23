@@ -77,6 +77,7 @@
   "owning user not found": "未找到所属用户",
   "page %s not found": "未找到页面 %s",
   "page already exists": "页面已存在",
+  "slug is reserved at the top level": "此名称在顶层页面中被保留",
   "page cannot be moved to itself": "页面不能移动到自身",
   "page has children": "页面包含子项，请使用递归删除",
   "page id is required": "需要页面 ID",

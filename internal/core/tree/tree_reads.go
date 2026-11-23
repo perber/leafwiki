@@ -539,7 +539,7 @@ func (t *TreeService) lookupPagePathLocked(p string) (*PathLookup, error) {
 
 		// If the segment does not exist, set the pathExists flag to false
 		if !lookup.Segments[i].Exists {
-			if lookup.CanCreate && slugService.IsValidSlug(part) != nil {
+			if lookup.CanCreate && slugService.ValidateChildSlug(parent, part) != nil {
 				lookup.CanCreate = false
 			}
 

@@ -77,6 +77,7 @@
   "owning user not found": "Owning user not found",
   "page %s not found": "Page %s not found",
   "page already exists": "Page already exists",
+  "slug is reserved at the top level": "This name is reserved for top-level pages",
   "page cannot be moved to itself": "Page cannot be moved to itself",
   "page has children": "Page has children, use recursive delete",
   "page id is required": "Page ID is required",

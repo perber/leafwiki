@@ -19,6 +19,7 @@ var ErrInvalidOperation = errors.New("invalid operation")
 var ErrConvertNotAllowed = errors.New("convert not allowed")
 var ErrVersionConflict = errors.New("version conflict")
 var ErrVersionRequired = errors.New("version required")
+var ErrSlugReserved = errors.New("slug is reserved")
 
 // VersionUnchecked bypasses optimistic locking for internal system operations
 // that have no client-supplied version (e.g. revision restore, copy cleanup).

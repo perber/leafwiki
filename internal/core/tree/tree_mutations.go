@@ -95,6 +95,10 @@ func (t *TreeService) createNodeLocked(userID string, parentID *string, title st
 		return nil, ErrPageAlreadyExists
 	}
 
+	if err := checkRootReservedSlug(parent, slug); err != nil {
+		return nil, err
+	}
+
 	parentWasConverted := false
 
 	// Check if the current parent is a section
@@ -329,6 +333,12 @@ func (t *TreeService) UpdateNode(in UpdateNodeInput) error {
 			existing := t.findChildBySlugInParentLocked(node.Parent, in.Slug)
 			if existing != nil && existing.ID != node.ID {
 				return ErrPageAlreadyExists
+			}
+			// A case-only rename keeps an existing top-level page usable.
+			if !strings.EqualFold(in.Slug, node.Slug) {
+				if err := checkRootReservedSlug(node.Parent, in.Slug); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -628,6 +638,12 @@ func (t *TreeService) MoveNodeToPosition(userID string, id string, parentID stri
 	// Same slug collision under new parent
 	if existing := t.findChildBySlugInParentLocked(newParent, node.Slug); existing != nil && existing.ID != node.ID {
 		return fmt.Errorf("child with the same slug already exists: %w", ErrPageAlreadyExists)
+	}
+
+	if newParent.ID != oldParent.ID {
+		if err := checkRootReservedSlug(newParent, node.Slug); err != nil {
+			return err
+		}
 	}
 
 	// Can't move into itself

@@ -24,6 +24,27 @@ var reservedSlugs = map[string]bool{
 	"settings": true,
 }
 
+// rootReservedSlugs are only reserved directly under the root, where they
+// collide with a server route (/static/* serves the frontend bundle). Below the
+// root they are ordinary slugs. Unlike reservedSlugs they are enforced only when
+// a page gets the slug at the root (create, rename, move), so an existing
+// top-level page with such a slug keeps loading and stays editable.
+var rootReservedSlugs = map[string]bool{
+	"static": true,
+}
+
+// checkRootReservedSlug returns ErrSlugReserved when slug may not be used
+// directly under parent.
+func checkRootReservedSlug(parent *PageNode, slug string) error {
+	if parent == nil || parent.ID != "root" {
+		return nil
+	}
+	if rootReservedSlugs[strings.ToLower(slug)] {
+		return fmt.Errorf("slug '%s' is reserved at the top level: %w", slug, ErrSlugReserved)
+	}
+	return nil
+}
+
 // defaultSlug is used when a title yields no usable characters.
 const defaultSlug = "page"
 
@@ -49,7 +70,7 @@ func (s *SlugService) GenerateUniqueChildSlug(parent *PageNode, currentID, desir
 	original := slug
 	i := 1
 
-	for hasSlugConflict(parent, currentID, slug) || s.IsValidSlug(slug) != nil {
+	for hasSlugConflict(parent, currentID, slug) || s.ValidateChildSlug(parent, slug) != nil {
 		slug = fmt.Sprintf("%s-%d", original, i)
 		i++
 	}
@@ -83,6 +104,15 @@ func (s *SlugService) IsValidSlug(slug string) error {
 	}
 
 	return nil
+}
+
+// ValidateChildSlug checks slug for a new page directly under parent: the
+// rules of IsValidSlug plus the names reserved only at the root.
+func (s *SlugService) ValidateChildSlug(parent *PageNode, slug string) error {
+	if err := s.IsValidSlug(slug); err != nil {
+		return err
+	}
+	return checkRootReservedSlug(parent, slug)
 }
 
 // GenerateValidSlug returns the first valid slug for the desired value.

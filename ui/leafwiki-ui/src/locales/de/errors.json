@@ -77,6 +77,7 @@
   "owning user not found": "Besitzender Benutzer nicht gefunden",
   "page %s not found": "Seite %s nicht gefunden",
   "page already exists": "Seite existiert bereits",
+  "slug is reserved at the top level": "Dieser Name ist für Seiten auf oberster Ebene reserviert",
   "page cannot be moved to itself": "Die Seite kann nicht auf sich selbst verschoben werden",
   "page has children": "Die Seite hat Unterseiten, verwenden Sie das rekursive Löschen",
   "page id is required": "Seiten-ID ist erforderlich",
