@@ -128,3 +128,8 @@ fingerprint sync at boot, trigram table): what changed and which searchSchemaVer
   headings and content with a space before writing them. `highlight()` marks hits with these two
   characters and `sanitizeSearchTitle` turns them into `<b>`/`</b>`, so the same characters in a
   page title faked a highlight in the results (and showed up raw in excerpts).
+- **2026-11-24, `searchSchemaVersion` 3:** a second, contentless FTS5 table `pages_trigram`
+  (title, headings, content; trigram tokenizer) shares each `pages` row's rowid and is written
+  and deleted in the same transaction, for substring matching
+  ([ADR-0025](./0025-substring-search-through-a-trigram-table.md)). An existing search.db is
+  rebuilt empty once and refilled by the boot reindex.

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"log/slog"
 	"path/filepath"
 	"strings"
@@ -158,11 +159,16 @@ func (s *SQLiteIndex) withDBRead(fn func(db *sql.DB) error) error {
 // whenever the columns of a search table change, or the text written into
 // them does, so an existing search.db is rebuilt instead of read in a shape
 // or normalisation this binary doesn't expect (ADR-0022).
-const searchSchemaVersion = 2
+const searchSchemaVersion = 3
 
 // searchSchema creates every table of search.db. ensureSchema compares the
 // schema SQLite stores for it against the one in the file, so it is the
 // single description of what a current search.db looks like.
+//
+// pages_trigram indexes the title, headings and content of every pages row
+// under the same rowid for substring matching (ADR-0025). It is contentless,
+// so it costs only its index; rows are deleted by rowid (contentless_delete)
+// and its text is never read back.
 var searchSchema = `
 	CREATE VIRTUAL TABLE pages USING fts5(
 		path UNINDEXED,
@@ -173,6 +179,14 @@ var searchSchema = `
 		headings,
 		content,
 		tokenize = "unicode61 tokenchars '` + searchTokenChars + `'"
+	);
+	CREATE VIRTUAL TABLE pages_trigram USING fts5(
+		title,
+		headings,
+		content,
+		content = '',
+		contentless_delete = 1,
+		tokenize = "trigram remove_diacritics 1"
 	);
 `
 
@@ -510,13 +524,11 @@ func (s *SQLiteIndex) IndexPages(inputs []IndexPageInput) ([]IndexFailure, error
 			_ = tx.Rollback()
 		}()
 
-		deleteStmt, err := tx.Prepare(`DELETE FROM pages WHERE pageID = ?`)
+		deleter, err := preparePageRowDeleter(tx, "pageID = ?")
 		if err != nil {
 			return err
 		}
-		defer func() {
-			_ = deleteStmt.Close()
-		}()
+		defer deleter.close()
 
 		insertStmt, err := tx.Prepare(`
 			INSERT INTO pages (path, filepath, pageID, kind, title, headings, content)
@@ -529,11 +541,33 @@ func (s *SQLiteIndex) IndexPages(inputs []IndexPageInput) ([]IndexFailure, error
 			_ = insertStmt.Close()
 		}()
 
+		trigramStmt, err := tx.Prepare(`
+			INSERT INTO pages_trigram (rowid, title, headings, content)
+			VALUES (?, ?, ?, ?);
+		`)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = trigramStmt.Close()
+		}()
+
 		for _, p := range prepped {
-			if _, err := deleteStmt.Exec(p.pageID); err != nil {
+			if _, err := deleter.delete(p.pageID); err != nil {
 				return err
 			}
-			if _, err := insertStmt.Exec(p.path, p.filePath, p.pageID, string(p.kind), p.title, p.headings, p.sanitizedBody); err != nil {
+			res, err := insertStmt.Exec(p.path, p.filePath, p.pageID, string(p.kind), p.title, p.headings, p.sanitizedBody)
+			if err != nil {
+				return err
+			}
+			rowid, err := res.LastInsertId()
+			if err != nil {
+				return err
+			}
+			// pages holds headings and content HTML-escaped for snippet();
+			// the substring index gets the text itself, so a query never
+			// matches inside an entity ("amp" in "&amp;").
+			if _, err := trigramStmt.Exec(rowid, p.title, html.UnescapeString(p.headings), html.UnescapeString(p.sanitizedBody)); err != nil {
 				return err
 			}
 		}
@@ -572,16 +606,14 @@ func (s *SQLiteIndex) RemovePages(pageIDs []string) error {
 			_ = tx.Rollback()
 		}()
 
-		stmt, err := tx.Prepare(`DELETE FROM pages WHERE pageID = ?`)
+		deleter, err := preparePageRowDeleter(tx, "pageID = ?")
 		if err != nil {
 			return err
 		}
-		defer func() {
-			_ = stmt.Close()
-		}()
+		defer deleter.close()
 
 		for _, pageID := range pageIDs {
-			if _, err := stmt.Exec(pageID); err != nil {
+			if _, err := deleter.delete(pageID); err != nil {
 				return err
 			}
 		}
@@ -591,27 +623,107 @@ func (s *SQLiteIndex) RemovePages(pageIDs []string) error {
 }
 
 func (s *SQLiteIndex) RemovePage(pageID string) error {
-	return s.withDB(func(db *sql.DB) error {
-		_, err := db.Exec(`DELETE FROM pages WHERE pageID = ?`, pageID)
-		return err
-	})
+	return s.RemovePages([]string{pageID})
 }
 
 func (s *SQLiteIndex) RemovePageByFilePath(filePath string) (int64, error) {
 	var rows int64
 	err := s.withDB(func(db *sql.DB) error {
-		res, err := db.Exec(`DELETE FROM pages WHERE filepath = ?`, filePath)
+		tx, err := db.Begin()
 		if err != nil {
 			return err
 		}
-		r, err := res.RowsAffected()
+		defer func() {
+			_ = tx.Rollback()
+		}()
+
+		deleter, err := preparePageRowDeleter(tx, "filepath = ?")
 		if err != nil {
 			return err
 		}
-		rows = r
+		defer deleter.close()
+
+		n, err := deleter.delete(filePath)
+		if err != nil {
+			return err
+		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+		rows = n
 		return nil
 	})
 	return rows, err
+}
+
+// pageRowDeleter deletes pages rows together with their pages_trigram rows
+// in one transaction, the only way rows leave the index besides Clear.
+// pages_trigram is contentless and can only be deleted from by rowid, so the
+// rowids of the pages rows are read first.
+type pageRowDeleter struct {
+	selectRowids, deletePage, deleteTrigram *sql.Stmt
+}
+
+// preparePageRowDeleter prepares a deleter for the pages rows that match
+// where, a fixed condition with one placeholder (never user input).
+func preparePageRowDeleter(tx *sql.Tx, where string) (*pageRowDeleter, error) {
+	d := &pageRowDeleter{}
+	var err error
+	if d.selectRowids, err = tx.Prepare(`SELECT rowid FROM pages WHERE ` + where); err != nil {
+		d.close()
+		return nil, err
+	}
+	if d.deletePage, err = tx.Prepare(`DELETE FROM pages WHERE rowid = ?`); err != nil {
+		d.close()
+		return nil, err
+	}
+	if d.deleteTrigram, err = tx.Prepare(`DELETE FROM pages_trigram WHERE rowid = ?`); err != nil {
+		d.close()
+		return nil, err
+	}
+	return d, nil
+}
+
+// delete deletes the rows whose condition matches arg and returns how many
+// pages rows it deleted.
+func (d *pageRowDeleter) delete(arg any) (int64, error) {
+	rows, err := d.selectRowids.Query(arg)
+	if err != nil {
+		return 0, err
+	}
+	var rowids []int64
+	for rows.Next() {
+		var rowid int64
+		if err := rows.Scan(&rowid); err != nil {
+			_ = rows.Close()
+			return 0, err
+		}
+		rowids = append(rowids, rowid)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return 0, err
+	}
+	if err := rows.Close(); err != nil {
+		return 0, err
+	}
+	for _, rowid := range rowids {
+		if _, err := d.deletePage.Exec(rowid); err != nil {
+			return 0, err
+		}
+		if _, err := d.deleteTrigram.Exec(rowid); err != nil {
+			return 0, err
+		}
+	}
+	return int64(len(rowids)), nil
+}
+
+func (d *pageRowDeleter) close() {
+	for _, stmt := range []*sql.Stmt{d.selectRowids, d.deletePage, d.deleteTrigram} {
+		if stmt != nil {
+			_ = stmt.Close()
+		}
+	}
 }
 
 // Search returns one page of the hits for query, restricted to pageIDs when

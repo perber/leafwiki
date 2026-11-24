@@ -69,3 +69,4 @@ Status values: `Proposed`, `Accepted`, `Rejected`, `Deprecated`, `Superseded by 
 | [0022](./0022-versioned-derived-search-index.md) | The search index persists across restarts and is rebuilt on a schema version or DDL mismatch or on corruption | Proposed |
 | [0023](./0023-throttle-failed-logins-per-user-and-client.md) | Failed logins are throttled per account and client; the client address is resolved through `--trusted-proxy-ips` | Proposed |
 | [0024](./0024-security-response-headers.md) | Security response headers come from one engine middleware, the page policy from the shell | Proposed |
+| [0025](./0025-substring-search-through-a-trigram-table.md) | Literal search words also match inside longer words, through a trigram table, ranked after token matches | Proposed |
