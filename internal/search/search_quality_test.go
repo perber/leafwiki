@@ -100,22 +100,16 @@ type qualityCase struct {
 }
 
 var qualityCases = []qualityCase{
-	{category: "Teilwort", query: "syntax", want: []string{"Markdown-Syntax"},
-		knownMiss: "part of a hyphenated title token (markdown-syntax), #1826"},
-	{category: "Teilwort", query: "suche", want: []string{"Wikisuche verwenden"},
-		knownMiss: "no substring match inside a compound (Wikisuche)"},
-	{category: "Teilwort", query: "08-26", want: []string{"Logbuch August"},
-		knownMiss: "suffix of a date token (2026-08-26), #1472"},
-	{category: "Teilwort", query: "beleuchtung", want: []string{"Störungsmeldung Straßenbeleuchtung"},
-		knownMiss: "no substring match inside a compound (Straßenbeleuchtung)"},
-	{category: "Teilwort", query: "ausweis", want: []string{"Onboarding neuer Mitarbeiter"},
-		knownMiss: "no substring match inside a compound (Mitarbeiterausweis)"},
-	{category: "Teilwort", query: "nginx", want: []string{"Kubernetes Deployment"},
-		knownMiss: "part of a hyphenated token (ingress-nginx), #1826"},
-	{category: "Teilwort", query: "daily", want: []string{"Backup und Wiederherstellung"},
-		knownMiss: "part of an underscore token (backup_daily.sh), #1826"},
-	{category: "Teilwort", query: "fuzzy", want: []string{"API-Referenz"},
-		knownMiss: "no substring match inside a camelCase identifier (buildFuzzyQuery), #1826"},
+	// A substring-only match ranks after every token match, here the
+	// cheatsheet that has "Syntax" as a word of its own.
+	{category: "Teilwort", query: "syntax", want: []string{"Markdown-Syntax"}, maxRank: 2},
+	{category: "Teilwort", query: "suche", want: []string{"Wikisuche verwenden"}},
+	{category: "Teilwort", query: "08-26", want: []string{"Logbuch August"}},
+	{category: "Teilwort", query: "beleuchtung", want: []string{"Störungsmeldung Straßenbeleuchtung"}},
+	{category: "Teilwort", query: "ausweis", want: []string{"Onboarding neuer Mitarbeiter"}},
+	{category: "Teilwort", query: "nginx", want: []string{"Kubernetes Deployment"}},
+	{category: "Teilwort", query: "daily", want: []string{"Backup und Wiederherstellung"}},
+	{category: "Teilwort", query: "fuzzy", want: []string{"API-Referenz"}},
 	{category: "Teilwort", query: "postgresql", want: []string{"Datenbankserver"}},
 	{category: "Teilwort", query: "pi", want: []string{"Raspberry Pi einrichten"}},
 

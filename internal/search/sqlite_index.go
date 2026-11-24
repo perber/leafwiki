@@ -729,6 +729,11 @@ func (d *pageRowDeleter) close() {
 // Search returns one page of the hits for query, restricted to pageIDs when
 // that is non-nil. Every statement runs under ctx: once ctx ends, the running
 // statement is interrupted and Search returns ctx's error and no result.
+//
+// The hits are the token matches of the pages table, in their tiers, followed
+// by the substring-only matches of pages_trigram (substringOnlyWhere). The
+// counts, the ranking and the rendering run under one read lock, which index
+// writes wait for, so they see the same index.
 func (s *SQLiteIndex) Search(ctx context.Context, query string, pageIDs []string, offset, limit int) (*SearchResult, error) {
 	query = strings.TrimSpace(query)
 	// ftsQuery, not the raw query, decides whether there's anything to MATCH
@@ -763,24 +768,36 @@ func (s *SQLiteIndex) Search(ctx context.Context, query string, pageIDs []string
 	sr := &SearchResult{TagFacets: []SearchTagFacet{}}
 
 	err := s.withDBRead(func(db *sql.DB) error {
-		var total int
+		var tokenCount int
 		whereClause, whereArgs := buildSearchWhereClause(ftsQuery, pageIDs)
 
 		countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM pages WHERE %s;`, whereClause)
-		if err := db.QueryRowContext(ctx, countQuery, whereArgs...).Scan(&total); err != nil {
+		if err := db.QueryRowContext(ctx, countQuery, whereArgs...).Scan(&tokenCount); err != nil {
 			return err
 		}
-		sr.Count = total
+		substringWhere, substringArgs, hasSubstring := substringOnlyWhere(parsed, pageIDs)
+		var substringCount int
+		if hasSubstring {
+			countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM pages_trigram WHERE %s;`, substringWhere)
+			if err := db.QueryRowContext(ctx, countQuery, substringArgs...).Scan(&substringCount); err != nil {
+				return err
+			}
+		}
+		sr.Count = tokenCount + substringCount
 
 		var results []SearchResultItem
 		var err error
 		if ftsQuery == "" {
 			results, err = listFilteredPages(ctx, db, whereClause, whereArgs, offset, limit)
 		} else {
-			var rowids []int64
-			rowids, err = rankMatches(ctx, db, parsed, whereClause, whereArgs, offset, limit)
+			var substring *substringPart
+			if hasSubstring {
+				substring = &substringPart{where: substringWhere, args: substringArgs}
+			}
+			var ranked []rankedMatch
+			ranked, err = rankMatches(ctx, db, parsed, whereClause, whereArgs, substring, offset, limit)
 			if err == nil {
-				results, err = renderMatches(ctx, db, ftsQuery, rowids)
+				results, err = renderRanked(ctx, db, parsed, ranked)
 			}
 		}
 		if err != nil {
@@ -797,11 +814,27 @@ func (s *SQLiteIndex) Search(ctx context.Context, query string, pageIDs []string
 	return sr, nil
 }
 
-// rankMatches returns the rowids of one page of the pages rows that match
-// whereClause, best first: by tier (searchOrderBy), bm25 and rowid, so ties
-// keep their order from page to page. It reads no page text, so the sort
-// holds three numbers per match instead of each match's text, highlight and
-// snippet.
+// rankedMatch is one ranked hit: its rowid in pages (and pages_trigram),
+// whether only pages_trigram matched it, and its bm25 score in that table.
+type rankedMatch struct {
+	rowid     int64
+	substring bool
+	score     float64
+}
+
+// substringPart is the substring-only condition of a query over
+// pages_trigram (substringOnlyWhere) and its arguments.
+type substringPart struct {
+	where string
+	args  []interface{}
+}
+
+// rankMatches returns one page of the matches, best first: the pages rows
+// that match whereClause by tier (searchTiers), bm25 and rowid, then, when
+// substring is not nil, the substring-only matches in one more tier, by bm25
+// over pages_trigram. rowid breaks ties so pages keep their order from page
+// to page. It reads no page text, so the sort holds a few numbers per match
+// instead of each match's text, highlight and snippet.
 //
 // ctx bounds this statement only because its heavy work (MATCH, bm25 and the
 // sort) runs in the first sqlite3_step, which the driver interrupts when ctx
@@ -809,46 +842,140 @@ func (s *SQLiteIndex) Search(ctx context.Context, query string, pageIDs []string
 // interrupted. An ORDER BY that an index satisfies under the LIMIT, or
 // SQLITE_ENABLE_SORTER_REFERENCES, would move that work into those
 // uninterruptible steps.
-func rankMatches(ctx context.Context, db *sql.DB, parsed searchQuery, whereClause string, whereArgs []interface{}, offset, limit int) ([]int64, error) {
+func rankMatches(ctx context.Context, db *sql.DB, parsed searchQuery, whereClause string, whereArgs []interface{}, substring *substringPart, offset, limit int) ([]rankedMatch, error) {
 	orderBy, orderArgs := searchOrderBy(parsed)
 	rankQuery := fmt.Sprintf(`
-		SELECT rowid, %s AS bm25_score
+		SELECT rowid, 0 AS substring_only, %s AS bm25_score
 		FROM pages
 		WHERE %s
 		ORDER BY %s, rowid
 		LIMIT ? OFFSET ?;
 	`, searchRankExpr(true), whereClause, orderBy)
 	queryArgs := append(append(append([]interface{}{}, whereArgs...), orderArgs...), limit, offset)
+	if substring != nil {
+		tierExpr, tierArgs, tierCount := searchTierExpr(parsed)
+		rankQuery = fmt.Sprintf(`
+		SELECT rowid, substring_only, score FROM (
+			SELECT rowid, %s AS tier, 0 AS substring_only, %s AS score
+			FROM pages
+			WHERE %s
+			UNION ALL
+			SELECT rowid, %d, 1, %s
+			FROM pages_trigram
+			WHERE %s
+		)
+		ORDER BY tier, substring_only, score ASC, rowid
+		LIMIT ? OFFSET ?;
+	`, tierExpr, searchRankExpr(true), whereClause, tierCount+1, substringRankExpr, substring.where)
+		queryArgs = append(append(append(append([]interface{}{}, tierArgs...), whereArgs...), substring.args...), limit, offset)
+	}
 	rows, err := db.QueryContext(ctx, rankQuery, queryArgs...)
 	if err != nil {
 		return nil, err
 	}
 	defer closeRows(rows)
 
-	var rowids []int64
+	var ranked []rankedMatch
 	for rows.Next() {
-		var rowid int64
-		var score float64
-		if err := rows.Scan(&rowid, &score); err != nil {
+		var m rankedMatch
+		if err := rows.Scan(&m.rowid, &m.substring, &m.score); err != nil {
 			return nil, err
 		}
-		rowids = append(rowids, rowid)
+		ranked = append(ranked, m)
 	}
-	return rowids, rows.Err()
+	return ranked, rows.Err()
 }
 
-// renderMatches returns the result items of the ranked rowids, in that order,
+// renderRanked returns the result items of ranked, in that order: the token
+// matches with SQLite's highlight and snippet (renderMatches), the
+// substring-only matches with marks set in Go (renderSubstringMatches).
+func renderRanked(ctx context.Context, db *sql.DB, parsed searchQuery, ranked []rankedMatch) ([]SearchResultItem, error) {
+	var tokenRowids, substringRowids []int64
+	for _, m := range ranked {
+		if m.substring {
+			substringRowids = append(substringRowids, m.rowid)
+		} else {
+			tokenRowids = append(tokenRowids, m.rowid)
+		}
+	}
+	tokenItems, err := renderMatches(ctx, db, parsed.fts, tokenRowids)
+	if err != nil {
+		return nil, err
+	}
+	substringItems, err := renderSubstringMatches(ctx, db, substringRowids)
+	if err != nil {
+		return nil, err
+	}
+
+	// Non-nil so a query without a match serializes as [] and not null.
+	results := make([]SearchResultItem, 0, len(ranked))
+	// Every statement runs under the same read lock, which index writes
+	// wait for, so every ranked rowid is there.
+	for _, m := range ranked {
+		items := tokenItems
+		if m.substring {
+			items = substringItems
+		}
+		r, ok := items[m.rowid]
+		if !ok {
+			continue
+		}
+		if m.substring {
+			r.Rank = rankFromBM25(m.score)
+		}
+		results = append(results, r)
+	}
+	return results, nil
+}
+
+// renderSubstringMatches returns the result items of substring-only matches
+// by rowid. pages_trigram is contentless and has no highlight() or snippet(),
+// so the title and excerpt come unmarked.
+func renderSubstringMatches(ctx context.Context, db *sql.DB, rowids []int64) (map[int64]SearchResultItem, error) {
+	items := make(map[int64]SearchResultItem, len(rowids))
+	if len(rowids) == 0 {
+		return items, nil
+	}
+	const renderQuery = `
+		SELECT rowid, pageID, path, kind, title, content
+		FROM pages
+		WHERE rowid IN (SELECT value FROM json_each(?));
+	`
+	rowidList, err := json.Marshal(rowids)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := db.QueryContext(ctx, renderQuery, string(rowidList))
+	if err != nil {
+		return nil, err
+	}
+	defer closeRows(rows)
+
+	for rows.Next() {
+		var rowid int64
+		var r SearchResultItem
+		var title, content string
+		if err := rows.Scan(&rowid, &r.PageID, &r.Path, &r.Kind, &title, &content); err != nil {
+			return nil, err
+		}
+		r.Title = sanitizeSearchTitle(title)
+		r.Excerpt = excerpt.FromBody(content)
+		items[rowid] = r
+	}
+	return items, rows.Err()
+}
+
+// renderMatches returns the result items of token-matched rowids by rowid,
 // with the title highlight and snippet of ftsQuery. Its MATCH drives the
 // query and +rowid keeps the rowid list a filter: as a rowid lookup, FTS5
 // would evaluate the MATCH once per row. highlight() and snippet() then run
 // for these rows only. The rowids travel as one JSON array, since a page of
 // a search with a negative limit ("all") can hold more rowids than SQLite
 // allows bound variables.
-func renderMatches(ctx context.Context, db *sql.DB, ftsQuery string, rowids []int64) ([]SearchResultItem, error) {
-	// Non-nil so a query without a match serializes as [] and not null.
-	results := []SearchResultItem{}
+func renderMatches(ctx context.Context, db *sql.DB, ftsQuery string, rowids []int64) (map[int64]SearchResultItem, error) {
+	items := make(map[int64]SearchResultItem, len(rowids))
 	if len(rowids) == 0 {
-		return results, nil
+		return items, nil
 	}
 	renderQuery := fmt.Sprintf(`
 		SELECT
@@ -873,7 +1000,6 @@ func renderMatches(ctx context.Context, db *sql.DB, ftsQuery string, rowids []in
 	}
 	defer closeRows(rows)
 
-	byRowid := make(map[int64]SearchResultItem, len(rowids))
 	for rows.Next() {
 		var rowid int64
 		var r SearchResultItem
@@ -887,19 +1013,9 @@ func renderMatches(ctx context.Context, db *sql.DB, ftsQuery string, rowids []in
 			r.Excerpt = excerpt.FromBody(content)
 		}
 		r.Rank = rankFromBM25(bm25Score)
-		byRowid[rowid] = r
+		items[rowid] = r
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	// Both statements run under the same read lock, which index writes wait
-	// for, so every ranked rowid is here.
-	for _, rowid := range rowids {
-		if r, ok := byRowid[rowid]; ok {
-			results = append(results, r)
-		}
-	}
-	return results, nil
+	return items, rows.Err()
 }
 
 // listFilteredPages returns one page of the pages that whereClause (a page
@@ -949,11 +1065,14 @@ func closeRows(rows *sql.Rows) {
 	}
 }
 
-// SearchPageIDs returns the IDs of all pages matching query, best first,
-// restricted to pageIDs when that is non-nil. It honours ctx like Search.
+// SearchPageIDs returns the IDs of all pages matching query, restricted to
+// pageIDs when that is non-nil: the token matches by bm25 (without Search's
+// tiers), then the substring-only matches by bm25 over pages_trigram. It
+// honours ctx like Search. Its caller (the tag facets) uses the IDs as a set.
 func (s *SQLiteIndex) SearchPageIDs(ctx context.Context, query string, pageIDs []string) ([]string, error) {
 	query = strings.TrimSpace(query)
-	ftsQuery := buildFuzzyQuery(query)
+	parsed := parseSearchQuery(query)
+	ftsQuery := parsed.fts
 
 	if len(pageIDs) == 0 && pageIDs != nil {
 		return []string{}, nil
@@ -973,28 +1092,56 @@ func (s *SQLiteIndex) SearchPageIDs(ctx context.Context, query string, pageIDs [
 		WHERE %s
 		ORDER BY %s;
 	`, searchRankExpr(ftsQuery != ""), whereClause, searchOrderByExpr(ftsQuery != ""))
-
-		rows, err := db.QueryContext(ctx, searchQuery, whereArgs...)
+		ids, err := queryPageIDs(ctx, db, searchQuery, whereArgs)
 		if err != nil {
 			return err
 		}
-		defer closeRows(rows)
+		result = ids
 
-		for rows.Next() {
-			var pageID string
-			var bm25Score float64
-			if err := rows.Scan(&pageID, &bm25Score); err != nil {
+		if substringWhere, substringArgs, ok := substringOnlyWhere(parsed, pageIDs); ok {
+			substringQuery := fmt.Sprintf(`
+			SELECT p.pageID, s.score
+			FROM (
+				SELECT rowid, %s AS score
+				FROM pages_trigram
+				WHERE %s
+			) AS s
+			CROSS JOIN pages AS p ON p.rowid = s.rowid
+			ORDER BY s.score, s.rowid;
+		`, substringRankExpr, substringWhere)
+			ids, err := queryPageIDs(ctx, db, substringQuery, substringArgs)
+			if err != nil {
 				return err
 			}
-			result = append(result, pageID)
+			result = append(result, ids...)
 		}
-
-		return rows.Err()
+		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 	return result, nil
+}
+
+// queryPageIDs runs query, whose rows are a pageID and its sort score, and
+// returns the pageIDs in order.
+func queryPageIDs(ctx context.Context, db *sql.DB, query string, args []interface{}) ([]string, error) {
+	rows, err := db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer closeRows(rows)
+
+	var ids []string
+	for rows.Next() {
+		var pageID string
+		var score float64
+		if err := rows.Scan(&pageID, &score); err != nil {
+			return nil, err
+		}
+		ids = append(ids, pageID)
+	}
+	return ids, rows.Err()
 }
 
 // hitStart and hitEnd are the single-byte markers highlight() puts around a

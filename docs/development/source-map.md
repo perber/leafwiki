@@ -139,9 +139,10 @@ resync-derived state.
 - **`internal/properties`** — arbitrary-frontmatter-property index (custom, non-reserved
   frontmatter keys): `properties_store.go` (`properties.db`), `properties_service.go`.
 - **`internal/search`** — full-text search index: `sqlite_index.go` (`search.db`, FTS via
-  `modernc.org/sqlite`, goldmark-based content extraction + `htmlutil` sanitization),
-  `search_query.go` (user input → FTS5 MATCH argument and literal terms, WHERE/rank/snippet
-  expressions), `indexing_status.go`, `search_result.go`.
+  `modernc.org/sqlite`: the token table `pages` and the substring table `pages_trigram`,
+  goldmark-based content extraction + `htmlutil` sanitization), `search_query.go` (user input →
+  FTS5 MATCH argument and literal terms, WHERE/rank/snippet expressions, the substring-only
+  condition), `indexing_status.go`, `search_result.go`.
 - **`internal/usersettings`** — per-user preferences (language, auto-save, date/time format):
   `usersettings_store.go` (`usersettings.db`), `usersettings_service.go`, `language.go`
   (allowed languages), `dateformat.go`. Real state, part of full backup/restore.
