@@ -537,6 +537,43 @@ func TestSQLiteIndex_Search_ExcerptIsEscapedOnceAndMarksOnlyTheHit(t *testing.T)
 	}
 }
 
+// Search ranks the matches first and renders only the returned page, so
+// every page of a paged result, not just the first, must carry the title
+// highlight and the snippet of its own rows.
+func TestSQLiteIndex_Search_EveryPageOfAPagedResultIsHighlighted(t *testing.T) {
+	index := newTestIndex(t)
+	for i := 0; i < 5; i++ {
+		id := fmt.Sprintf("page%d", i)
+		body := fmt.Sprintf("Intro %d. The keyword sits here.", i)
+		if err := index.IndexPage("docs/"+id, "docs/"+id+".md", id, "Keyword "+id, tree.NodeKindPage, body); err != nil {
+			t.Fatalf("IndexPage(%s): %v", id, err)
+		}
+	}
+
+	seen := map[string]bool{}
+	for offset := 0; offset < 5; offset += 2 {
+		result, err := index.Search(t.Context(), "keyword", nil, offset, 2)
+		if err != nil {
+			t.Fatalf("Search(offset %d): %v", offset, err)
+		}
+		if result.Count != 5 {
+			t.Fatalf("Search(offset %d): count %d, want 5", offset, result.Count)
+		}
+		for _, item := range result.Items {
+			seen[item.PageID] = true
+			if want := "<b>Keyword</b> " + item.PageID; item.Title != want {
+				t.Errorf("offset %d: title %q, want %q", offset, item.Title, want)
+			}
+			if !strings.Contains(item.Excerpt, "<b>keyword</b>") || !strings.Contains(item.Excerpt, "Intro "+strings.TrimPrefix(item.PageID, "page")) {
+				t.Errorf("offset %d: excerpt %q is not the snippet of %s", offset, item.Excerpt, item.PageID)
+			}
+		}
+	}
+	if len(seen) != 5 {
+		t.Errorf("pages listed %d distinct results, want 5", len(seen))
+	}
+}
+
 // char(2)/char(3) mark the hit in title and excerpt, so the same characters
 // in a page must not reach the index, or they would turn into fake <b>s.
 func TestSQLiteIndex_Search_HighlightMarkersInPageTextDoNotFakeAHighlight(t *testing.T) {
