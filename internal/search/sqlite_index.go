@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -659,73 +660,18 @@ func (s *SQLiteIndex) Search(ctx context.Context, query string, pageIDs []string
 		}
 		sr.Count = total
 
-		orderBy, orderArgs := searchOrderBy(parsed)
-		searchQuery := fmt.Sprintf(`
-		SELECT 
-			pageID,
-			path,
-			kind,
-			%s AS highlighted_title,
-			%s AS excerpt,
-			content,
-			%s AS bm25_score
-		FROM pages
-		WHERE %s
-		ORDER BY %s
-		LIMIT ? OFFSET ?;
-	`,
-			searchTitleExpr(ftsQuery != ""),
-			searchExcerptExpr(ftsQuery != ""),
-			searchRankExpr(ftsQuery != ""),
-			whereClause,
-			orderBy,
-		)
-
-		// ctx bounds this statement only because its heavy work (MATCH, bm25,
-		// highlight, snippet and the sort) runs in the first sqlite3_step,
-		// which the driver interrupts when ctx ends; later rows.Next steps
-		// only read the sorted rows and are not interrupted. An ORDER BY that
-		// an index satisfies under the LIMIT, or SQLITE_ENABLE_SORTER_REFERENCES,
-		// would move that work into those uninterruptible steps.
-		queryArgs := append(append(append([]interface{}{}, whereArgs...), orderArgs...), limit, offset)
-		rows, err := db.QueryContext(ctx, searchQuery, queryArgs...)
+		var results []SearchResultItem
+		var err error
+		if ftsQuery == "" {
+			results, err = listFilteredPages(ctx, db, whereClause, whereArgs, offset, limit)
+		} else {
+			var rowids []int64
+			rowids, err = rankMatches(ctx, db, parsed, whereClause, whereArgs, offset, limit)
+			if err == nil {
+				results, err = renderMatches(ctx, db, ftsQuery, rowids)
+			}
+		}
 		if err != nil {
-			return err
-		}
-		defer func() {
-			if err := rows.Close(); err != nil {
-				slog.Default().Error("could not close rows", "error", err)
-			}
-		}()
-
-		// Non-nil so a query without a match serializes as [] and not null.
-		results := []SearchResultItem{}
-		for rows.Next() {
-			var r SearchResultItem
-			var bm25Score float64
-			var content string
-
-			if err := rows.Scan(&r.PageID, &r.Path, &r.Kind, &r.Title, &r.Excerpt, &content, &bm25Score); err != nil {
-				return err
-			}
-			r.Title = sanitizeSearchTitle(r.Title)
-			if strings.TrimSpace(r.Excerpt) == "" {
-				r.Excerpt = excerpt.FromBody(content)
-			}
-
-			if ftsQuery == "" {
-				r.Rank = 1
-			} else {
-				// Convert bm25 score to a rank (lower score = higher rank)
-				if bm25Score < 0 {
-					bm25Score = 0
-				}
-				r.Rank = 1.0 / (1.0 + bm25Score)
-			}
-
-			results = append(results, r)
-		}
-		if err := rows.Err(); err != nil {
 			return err
 		}
 		sr.Items = results
@@ -737,6 +683,158 @@ func (s *SQLiteIndex) Search(ctx context.Context, query string, pageIDs []string
 		return nil, err
 	}
 	return sr, nil
+}
+
+// rankMatches returns the rowids of one page of the pages rows that match
+// whereClause, best first: by tier (searchOrderBy), bm25 and rowid, so ties
+// keep their order from page to page. It reads no page text, so the sort
+// holds three numbers per match instead of each match's text, highlight and
+// snippet.
+//
+// ctx bounds this statement only because its heavy work (MATCH, bm25 and the
+// sort) runs in the first sqlite3_step, which the driver interrupts when ctx
+// ends; later rows.Next steps only read the sorted rows and are not
+// interrupted. An ORDER BY that an index satisfies under the LIMIT, or
+// SQLITE_ENABLE_SORTER_REFERENCES, would move that work into those
+// uninterruptible steps.
+func rankMatches(ctx context.Context, db *sql.DB, parsed searchQuery, whereClause string, whereArgs []interface{}, offset, limit int) ([]int64, error) {
+	orderBy, orderArgs := searchOrderBy(parsed)
+	rankQuery := fmt.Sprintf(`
+		SELECT rowid, %s AS bm25_score
+		FROM pages
+		WHERE %s
+		ORDER BY %s, rowid
+		LIMIT ? OFFSET ?;
+	`, searchRankExpr(true), whereClause, orderBy)
+	queryArgs := append(append(append([]interface{}{}, whereArgs...), orderArgs...), limit, offset)
+	rows, err := db.QueryContext(ctx, rankQuery, queryArgs...)
+	if err != nil {
+		return nil, err
+	}
+	defer closeRows(rows)
+
+	var rowids []int64
+	for rows.Next() {
+		var rowid int64
+		var score float64
+		if err := rows.Scan(&rowid, &score); err != nil {
+			return nil, err
+		}
+		rowids = append(rowids, rowid)
+	}
+	return rowids, rows.Err()
+}
+
+// renderMatches returns the result items of the ranked rowids, in that order,
+// with the title highlight and snippet of ftsQuery. Its MATCH drives the
+// query and +rowid keeps the rowid list a filter: as a rowid lookup, FTS5
+// would evaluate the MATCH once per row. highlight() and snippet() then run
+// for these rows only. The rowids travel as one JSON array, since a page of
+// a search with a negative limit ("all") can hold more rowids than SQLite
+// allows bound variables.
+func renderMatches(ctx context.Context, db *sql.DB, ftsQuery string, rowids []int64) ([]SearchResultItem, error) {
+	// Non-nil so a query without a match serializes as [] and not null.
+	results := []SearchResultItem{}
+	if len(rowids) == 0 {
+		return results, nil
+	}
+	renderQuery := fmt.Sprintf(`
+		SELECT
+			rowid,
+			pageID,
+			path,
+			kind,
+			%s AS highlighted_title,
+			%s AS excerpt,
+			content,
+			%s AS bm25_score
+		FROM pages
+		WHERE pages MATCH ? AND +rowid IN (SELECT value FROM json_each(?));
+	`, searchTitleExpr(true), searchExcerptExpr(true), searchRankExpr(true))
+	rowidList, err := json.Marshal(rowids)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := db.QueryContext(ctx, renderQuery, ftsQuery, string(rowidList))
+	if err != nil {
+		return nil, err
+	}
+	defer closeRows(rows)
+
+	byRowid := make(map[int64]SearchResultItem, len(rowids))
+	for rows.Next() {
+		var rowid int64
+		var r SearchResultItem
+		var bm25Score float64
+		var content string
+		if err := rows.Scan(&rowid, &r.PageID, &r.Path, &r.Kind, &r.Title, &r.Excerpt, &content, &bm25Score); err != nil {
+			return nil, err
+		}
+		r.Title = sanitizeSearchTitle(r.Title)
+		if strings.TrimSpace(r.Excerpt) == "" {
+			r.Excerpt = excerpt.FromBody(content)
+		}
+		r.Rank = rankFromBM25(bm25Score)
+		byRowid[rowid] = r
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// Both statements run under the same read lock, which index writes wait
+	// for, so every ranked rowid is here.
+	for _, rowid := range rowids {
+		if r, ok := byRowid[rowid]; ok {
+			results = append(results, r)
+		}
+	}
+	return results, nil
+}
+
+// listFilteredPages returns one page of the pages that whereClause (a page
+// filter without a query) selects, by title and path.
+func listFilteredPages(ctx context.Context, db *sql.DB, whereClause string, whereArgs []interface{}, offset, limit int) ([]SearchResultItem, error) {
+	listQuery := fmt.Sprintf(`
+		SELECT pageID, path, kind, title, content
+		FROM pages
+		WHERE %s
+		ORDER BY %s
+		LIMIT ? OFFSET ?;
+	`, whereClause, searchOrderByExpr(false))
+	queryArgs := append(append([]interface{}{}, whereArgs...), limit, offset)
+	rows, err := db.QueryContext(ctx, listQuery, queryArgs...)
+	if err != nil {
+		return nil, err
+	}
+	defer closeRows(rows)
+
+	// Non-nil so a query without a match serializes as [] and not null.
+	results := []SearchResultItem{}
+	for rows.Next() {
+		var r SearchResultItem
+		var content string
+		if err := rows.Scan(&r.PageID, &r.Path, &r.Kind, &r.Title, &content); err != nil {
+			return nil, err
+		}
+		r.Title = sanitizeSearchTitle(r.Title)
+		r.Excerpt = excerpt.FromBody(content)
+		r.Rank = 1
+		results = append(results, r)
+	}
+	return results, rows.Err()
+}
+
+// rankFromBM25 converts a bm25 score to a rank (lower score = higher rank).
+func rankFromBM25(score float64) float64 {
+	if score < 0 {
+		score = 0
+	}
+	return 1.0 / (1.0 + score)
+}
+
+func closeRows(rows *sql.Rows) {
+	if err := rows.Close(); err != nil {
+		slog.Default().Error("could not close rows", "error", err)
+	}
 }
 
 // SearchPageIDs returns the IDs of all pages matching query, best first,
@@ -768,11 +866,7 @@ func (s *SQLiteIndex) SearchPageIDs(ctx context.Context, query string, pageIDs [
 		if err != nil {
 			return err
 		}
-		defer func() {
-			if err := rows.Close(); err != nil {
-				slog.Default().Error("could not close rows", "error", err)
-			}
-		}()
+		defer closeRows(rows)
 
 		for rows.Next() {
 			var pageID string
