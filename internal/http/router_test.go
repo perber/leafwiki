@@ -704,6 +704,9 @@ func TestRequestLogger_RedactsTokenQuery(t *testing.T) {
 		{name: "semicolon separator", target: "/accept-invite?lang=de;token=" + secret, wantLogged: "/accept-invite?"},
 		{name: "very long query", target: "/accept-invite?pad=" + strings.Repeat("a", 16*1024) + "&token=" + secret, wantLogged: "/accept-invite?pad=" + strings.Repeat("a", 16*1024) + "&token=REDACTED"},
 		{name: "token-like key is not redacted", target: "/api/search?tokens=abc&Token=def", wantLogged: "/api/search?tokens=abc&Token=def"},
+		{name: "oidc callback", target: "/login/oidc/callback?state=" + secret + "&code=" + secret, wantLogged: "/login/oidc/callback?code=REDACTED&state=REDACTED"},
+		{name: "oidc callback error, no code/state", target: "/login/oidc/callback?error=access_denied", wantLogged: "/login/oidc/callback?error=access_denied"},
+		{name: "code/state-like key is not redacted", target: "/api/search?codes=abc&States=def", wantLogged: "/api/search?codes=abc&States=def"},
 	}
 
 	w := createWikiTestInstance(t)

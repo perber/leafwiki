@@ -261,6 +261,37 @@ func (uc *LogoutUseCase) Execute(_ context.Context, in LogoutInput) error {
 	return nil
 }
 
+// ─── GetOIDCLogoutHintUseCase ────────────────────────────────────────────────
+
+type GetOIDCLogoutHintInput struct{ RefreshToken string }
+
+type GetOIDCLogoutHintOutput struct{ IDTokenHint string }
+
+// GetOIDCLogoutHintUseCase looks up the OIDC ID token stored for the caller's
+// current session, so the frontend can send it as the IdP's
+// end_session_endpoint's id_token_hint. Read-only: does not revoke or change
+// anything, unlike LogoutUseCase — meant to be called (and awaited) just
+// before it, while the session is still active.
+type GetOIDCLogoutHintUseCase struct {
+	auth *coreauth.AuthService
+}
+
+func NewGetOIDCLogoutHintUseCase(a *coreauth.AuthService) *GetOIDCLogoutHintUseCase {
+	return &GetOIDCLogoutHintUseCase{auth: a}
+}
+
+// Execute never fails in a way the caller should surface: a missing or
+// unreadable hint just means the frontend omits id_token_hint, degrading
+// logout to the IdP's own confirmation page rather than breaking it. It
+// still reports ErrAuthDisabled so the HTTP layer can tell "no auth at all"
+// apart from "no hint for this session" if it ever needs to.
+func (uc *GetOIDCLogoutHintUseCase) Execute(_ context.Context, in GetOIDCLogoutHintInput) (*GetOIDCLogoutHintOutput, error) {
+	if uc.auth == nil {
+		return nil, ErrAuthDisabled
+	}
+	return &GetOIDCLogoutHintOutput{IDTokenHint: uc.auth.GetOIDCLogoutHint(in.RefreshToken)}, nil
+}
+
 // ─── RefreshTokenUseCase ─────────────────────────────────────────────────────
 
 type RefreshTokenInput struct{ RefreshToken string }

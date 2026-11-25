@@ -27,6 +27,7 @@ import (
 	"github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/core/email"
 	"github.com/perber/wiki/internal/core/ignore"
+	coreoidc "github.com/perber/wiki/internal/core/oidc"
 	"github.com/perber/wiki/internal/core/settings"
 	sharedcrypto "github.com/perber/wiki/internal/core/shared/crypto"
 	"github.com/perber/wiki/internal/core/tools"
@@ -172,6 +173,11 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 	if err := validateSMTPConfig(cfg.email.smtpHost, cfg.email.smtpFrom, cfg.server.publicURL, cfg.email.smtpSecurity); err != nil {
 		fail("Invalid SMTP configuration", "error", err)
 	}
+
+	if err := validateOIDCConfig(cfg.oidc, cfg.proxy.loginURL); err != nil {
+		fail("Invalid OIDC configuration", "error", err)
+	}
+
 	publicURL, publicURLWarning, err := validatePublicURL(cfg.server.publicURL, basePath, smtpEnabled)
 	if err != nil {
 		fail("Invalid SMTP configuration", "error", err)
@@ -285,6 +291,17 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 			InsecureSkipVerify: cfg.email.smtpInsecureSkipVerify,
 			Timeout:            cfg.email.smtpTimeout,
 			PublicURL:          publicURL,
+		},
+		OIDC: coreoidc.Config{
+			Issuer:       cfg.oidc.issuer,
+			ClientID:     cfg.oidc.clientID,
+			ClientSecret: cfg.oidc.clientSecret,
+			RedirectURL:  cfg.oidc.redirectURL,
+			ButtonLabel:  cfg.oidc.buttonLabel,
+			OIDCOnly:     cfg.oidc.only,
+			AdminGroup:   cfg.oidc.adminGroup,
+			EditorGroup:  cfg.oidc.editorGroup,
+			RoleSync:     coreoidc.RoleSync(cfg.oidc.roleSync),
 		},
 		Metrics:      metrics,
 		PublicAccess: publicAccessService,
@@ -411,6 +428,11 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 		DefaultLanguage:        cfg.frontend.defaultLanguage,
 		LoginURL:               cfg.proxy.loginURL,
 		LogoutURL:              logoutURL,
+		OIDCEnabled:            w.OIDCService() != nil,
+		OIDCButtonLabel:        cfg.oidc.buttonLabel,
+		OIDCOnly:               cfg.oidc.only,
+		OIDCClientID:           cfg.oidc.clientID,
+		OIDCEndSessionURL:      oidcEndSessionURL(w.OIDCService()),
 		WriteGate:              writeGate,
 	})
 
@@ -692,6 +714,55 @@ func validateSMTPConfig(host, from, publicURL, security string) error {
 		return fmt.Errorf("--smtp-security must be one of none, starttls, tls, got %q", security)
 	}
 	return nil
+}
+
+// validateOIDCConfig validates native OIDC login configuration. issuer being
+// empty means OIDC is simply disabled and every other field is ignored.
+// loginURL is --login-url/LEAFWIKI_LOGIN_URL: it and OIDC are two different
+// ways to externalize the login page, and supporting both at once is
+// undefined UX, so they're mutually exclusive — reject rather than leave it
+// ambiguous which one wins.
+func validateOIDCConfig(o oidcOptions, loginURL string) error {
+	if o.issuer == "" {
+		if o.only {
+			return fmt.Errorf("--oidc-only requires --oidc-issuer to be set")
+		}
+		return nil
+	}
+	if loginURL != "" {
+		return fmt.Errorf("--oidc-issuer and --login-url cannot both be set")
+	}
+	if o.clientID == "" {
+		return fmt.Errorf("--oidc-client-id is required when --oidc-issuer is set")
+	}
+	if o.clientSecret == "" {
+		return fmt.Errorf("--oidc-client-secret is required when --oidc-issuer is set")
+	}
+	if o.redirectURL == "" {
+		return fmt.Errorf("--oidc-redirect-url is required when --oidc-issuer is set")
+	}
+	u, err := url.Parse(o.redirectURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return fmt.Errorf("--oidc-redirect-url must be an absolute http(s):// URL, got %q", o.redirectURL)
+	}
+	if !strings.HasSuffix(u.Path, "/login/oidc/callback") {
+		return fmt.Errorf("--oidc-redirect-url must end in /login/oidc/callback (this exact path is what LeafWiki intercepts server-side), got %q", o.redirectURL)
+	}
+	switch coreoidc.RoleSync(o.roleSync) {
+	case "", coreoidc.RoleSyncAll, coreoidc.RoleSyncAdmin:
+	default:
+		return fmt.Errorf("--oidc-role-sync must be one of all, admin, got %q", o.roleSync)
+	}
+	return nil
+}
+
+// oidcEndSessionURL returns svc's discovered end_session_endpoint, or "" if
+// OIDC isn't configured or the provider doesn't advertise one.
+func oidcEndSessionURL(svc *coreoidc.Service) string {
+	if svc == nil {
+		return ""
+	}
+	return svc.EndSessionURL
 }
 
 // validatePublicURL checks --public-url, which outgoing email links and

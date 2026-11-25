@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"path/filepath"
 	"strings"
@@ -90,7 +91,7 @@ func (s *SessionStore) withDB(fn func(db *sql.DB) error) error {
 }
 
 func (s *SessionStore) ensureSchema() error {
-	return s.withDB(func(db *sql.DB) error {
+	if err := s.withDB(func(db *sql.DB) error {
 		_, err := db.Exec(`
 			CREATE TABLE IF NOT EXISTS sessions (
 				id TEXT PRIMARY KEY,          -- jti
@@ -98,7 +99,11 @@ func (s *SessionStore) ensureSchema() error {
 				token_type TEXT NOT NULL,     -- "refresh"
 				created_at INTEGER NOT NULL,  -- unix sec
 				expires_at INTEGER NOT NULL,  -- unix sec
-				revoked_at INTEGER            -- unix sec, NULL = active
+				revoked_at INTEGER,           -- unix sec, NULL = active
+				oidc_id_token TEXT NOT NULL DEFAULT '' -- raw OIDC ID token for this
+					-- session, used as the end_session_endpoint's id_token_hint on
+					-- logout; empty for a local/invite-issued session. Carried
+					-- forward to each new row on refresh (see SessionManager.RefreshToken).
 			);
 
 			CREATE INDEX IF NOT EXISTS sessions_user_id_idx
@@ -107,6 +112,42 @@ func (s *SessionStore) ensureSchema() error {
 				ON sessions(user_id, token_type);
 		`)
 		return err
+	}); err != nil {
+		return err
+	}
+	return s.ensureOIDCIDTokenColumn()
+}
+
+// ensureOIDCIDTokenColumn additively migrates a pre-existing sessions.db by
+// adding oidc_id_token if missing. Idempotent, safe to run on every startup —
+// mirrors the pattern in UserStore.ensureOIDCColumns.
+func (s *SessionStore) ensureOIDCIDTokenColumn() error {
+	return s.withDB(func(db *sql.DB) error {
+		existing := map[string]bool{}
+		rows, err := db.Query(`PRAGMA table_info(sessions)`)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var cid, notNull, pk int
+			var name, ctype string
+			var dflt sql.NullString
+			if err := rows.Scan(&cid, &name, &ctype, &notNull, &dflt, &pk); err != nil {
+				_ = rows.Close()
+				return err
+			}
+			existing[name] = true
+		}
+		if err := rows.Close(); err != nil {
+			return err
+		}
+		if existing["oidc_id_token"] {
+			return nil
+		}
+		if _, err := db.Exec(`ALTER TABLE sessions ADD COLUMN oidc_id_token TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("failed to add column oidc_id_token to sessions table: %w", err)
+		}
+		return nil
 	})
 }
 
@@ -128,14 +169,39 @@ func (s *SessionStore) Close() error {
 	return nil
 }
 
-func (s *SessionStore) CreateSession(id, userID, tokenType string, expiresAt time.Time) error {
+// CreateSession inserts a new session row. oidcIDToken is the raw OIDC ID
+// token to associate with it (empty for a local/invite-issued session) — see
+// the oidc_id_token column comment in ensureSchema.
+func (s *SessionStore) CreateSession(id, userID, tokenType string, expiresAt time.Time, oidcIDToken string) error {
 	return s.withDB(func(db *sql.DB) error {
 		_, err := db.Exec(`
-			INSERT INTO sessions (id, user_id, token_type, created_at, expires_at, revoked_at)
-			VALUES (?, ?, ?, ?, ?, NULL);
-		`, id, userID, tokenType, time.Now().Unix(), expiresAt.Unix())
+			INSERT INTO sessions (id, user_id, token_type, created_at, expires_at, revoked_at, oidc_id_token)
+			VALUES (?, ?, ?, ?, ?, NULL, ?);
+		`, id, userID, tokenType, time.Now().Unix(), expiresAt.Unix(), oidcIDToken)
 		return err
 	})
+}
+
+// GetOIDCIDToken returns the raw OIDC ID token stored for the given session,
+// or "" if the session doesn't exist or has no ID token (a local/invite
+// session, or lookup failure) — this is always a best-effort read for an
+// optional id_token_hint on logout, never a reason to fail the caller.
+func (s *SessionStore) GetOIDCIDToken(id, userID, tokenType string) (string, error) {
+	var idToken string
+	err := s.withDB(func(db *sql.DB) error {
+		return db.QueryRow(`
+			SELECT oidc_id_token
+			FROM sessions
+			WHERE id = ? AND user_id = ? AND token_type = ?;
+		`, id, userID, tokenType).Scan(&idToken)
+	})
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return idToken, nil
 }
 
 func (s *SessionStore) IsActive(id, userID, tokenType string, now time.Time) (bool, error) {

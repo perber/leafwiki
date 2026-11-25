@@ -31,6 +31,7 @@ type Routes struct {
 	login             *LoginUseCase
 	completeTOTPLogin *CompleteTOTPLoginUseCase
 	logout            *LogoutUseCase
+	getOIDCLogoutHint *GetOIDCLogoutHintUseCase
 	refreshToken      *RefreshTokenUseCase
 	createUser        *CreateUserUseCase
 	updateUser        *UpdateUserUseCase
@@ -56,6 +57,7 @@ type RoutesConfig struct {
 	Login             *LoginUseCase
 	CompleteTOTPLogin *CompleteTOTPLoginUseCase
 	Logout            *LogoutUseCase
+	GetOIDCLogoutHint *GetOIDCLogoutHintUseCase
 	RefreshToken      *RefreshTokenUseCase
 	CreateUser        *CreateUserUseCase
 	UpdateUser        *UpdateUserUseCase
@@ -82,6 +84,7 @@ func NewRoutes(cfg RoutesConfig) *Routes {
 		login:             cfg.Login,
 		completeTOTPLogin: cfg.CompleteTOTPLogin,
 		logout:            cfg.Logout,
+		getOIDCLogoutHint: cfg.GetOIDCLogoutHint,
 		refreshToken:      cfg.RefreshToken,
 		createUser:        cfg.CreateUser,
 		updateUser:        cfg.UpdateUser,
@@ -121,6 +124,13 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 		refreshRateLimiter := security.NewRateLimiter(30, time.Minute, false)
 		nonAuth.POST("/auth/refresh-token", refreshRateLimiter, r.handleRefreshToken(ctx))
 	}
+
+	// Read-only, same trust model as /auth/refresh-token above (the refresh
+	// cookie itself is the credential, validated inside the handler — no
+	// RequireCookieSession/CSRF, same as that route and /auth/me). Meant to be
+	// called by the frontend just before POST /auth/logout, while the session
+	// is still active, so a GET here never risks seeing it already revoked.
+	nonAuth.GET("/auth/oidc/logout-hint", r.handleGetOIDCLogoutHint(ctx))
 
 	// Config endpoint also lives here as it issues the CSRF cookie.
 	nonAuth.GET("/config", r.handleConfig(ctx))
@@ -248,6 +258,11 @@ func baseConfig(opts httpinternal.RouterOptions) gin.H {
 		"logoutUrl":                opts.LogoutURL,
 		"userManagementUrl":        opts.UserManagementURL,
 		"defaultLanguage":          opts.DefaultLanguage,
+		"oidcEnabled":              opts.OIDCEnabled,
+		"oidcButtonLabel":          opts.OIDCButtonLabel,
+		"oidcOnly":                 opts.OIDCOnly,
+		"oidcClientId":             opts.OIDCClientID,
+		"oidcEndSessionUrl":        opts.OIDCEndSessionURL,
 	}
 }
 
@@ -271,6 +286,7 @@ func (r *Routes) handleMe(c *gin.Context) {
 		"email":       user.Email,
 		"role":        user.Role,
 		"totpEnabled": user.TOTPEnabled,
+		"authSource":  user.AuthSource(),
 	})
 }
 
@@ -394,6 +410,26 @@ func (r *Routes) handleLogout(rctx httpinternal.RouterContext) gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "Logout successful"})
+	}
+}
+
+// handleGetOIDCLogoutHint returns {"idTokenHint": "..."} (empty string if
+// there's none) for the caller's current session — see GetOIDCLogoutHintUseCase.
+// Always 200: a missing/invalid refresh cookie or a use-case error both just
+// mean no hint, never a reason to fail the frontend's logout flow over it.
+func (r *Routes) handleGetOIDCLogoutHint(rctx httpinternal.RouterContext) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		refreshToken, err := rctx.AuthCookies.ReadRefresh(c)
+		if err != nil || refreshToken == "" {
+			c.JSON(http.StatusOK, gin.H{"idTokenHint": ""})
+			return
+		}
+		out, err := r.getOIDCLogoutHint.Execute(c.Request.Context(), GetOIDCLogoutHintInput{RefreshToken: refreshToken})
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{"idTokenHint": ""})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"idTokenHint": out.IDTokenHint})
 	}
 }
 

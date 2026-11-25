@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { avatarUrl } from '@/lib/api/avatar'
 import * as authAPI from '@/lib/api/auth'
+import { buildOidcLogoutUrl } from '@/lib/buildOidcLogoutUrl'
 import i18next from '@/lib/i18n'
 import { DIALOG_SHORTCUTS_HELP } from '@/lib/registries'
 import { useTranslation } from 'react-i18next'
@@ -53,6 +54,8 @@ export default function UserMenu() {
   const unregisterHotkey = useHotKeysStore((state) => state.unregisterHotkey)
   const logoutUrl = useConfigStore((s) => s.logoutUrl)
   const loginUrl = useConfigStore((s) => s.loginUrl)
+  const oidcEndSessionUrl = useConfigStore((s) => s.oidcEndSessionUrl)
+  const oidcClientId = useConfigStore((s) => s.oidcClientId)
 
   useEffect(() => {
     if (!authDisabled && (!user || readOnly)) {
@@ -106,6 +109,25 @@ export default function UserMenu() {
       // browser navigates away (see plans/logout-flash-and-external-user-management.md).
       authAPI.logout().catch(() => {})
       redirectToExternal(logoutUrl)
+      return
+    }
+    if (user?.authSource === 'oidc' && oidcEndSessionUrl) {
+      // Unlike logout() below, this one IS awaited: it has to read the
+      // session's stored ID token before logout() revokes that same session
+      // (the lookup would just come back empty afterwards). Never throws —
+      // worst case idTokenHint is '', same as before this existed.
+      const idTokenHint = await authAPI.getOidcLogoutHint()
+      // Same reasoning as the logoutUrl branch above: end the local
+      // session, but navigate away before clearing it so the login screen
+      // never flashes behind the IdP's own logout page.
+      authAPI.logout().catch(() => {})
+      redirectToExternal(
+        buildOidcLogoutUrl(oidcEndSessionUrl, {
+          clientId: oidcClientId,
+          postLogoutRedirectUri: `${window.location.origin}/login`,
+          idTokenHint,
+        }),
+      )
       return
     }
     await logout()

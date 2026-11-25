@@ -24,6 +24,9 @@ type RouterContext struct {
 	AuthCookies *authmiddleware.AuthCookies
 	// CSRFCookie manages issuing and validating CSRF tokens.
 	CSRFCookie *security.CSRFCookie
+	// OIDCStateCookie transports an OIDC login attempt's state/nonce/PKCE
+	// verifier between the login-initiating redirect and the callback.
+	OIDCStateCookie *authmiddleware.OIDCStateCookie
 	// Opts contains the global router configuration.
 	Opts RouterOptions
 

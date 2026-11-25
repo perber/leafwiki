@@ -217,11 +217,42 @@ export async function logout() {
   const csrfToken = getCsrfTokenFromCookie()
   if (csrfToken) headers.set('X-CSRF-Token', csrfToken)
 
+  // keepalive: UserMenu's logoutUrl/OIDC branches fire this and navigate away
+  // (via redirectToExternal) in the same tick, without awaiting it — on
+  // purpose, so the external IdP/operator page isn't delayed and the local
+  // login screen never flashes first. Without keepalive, the browser aborts
+  // an in-flight fetch as soon as the navigation starts, so the request
+  // never reached the server at all (confirmed: zero /api/auth/logout hits
+  // in the access log for either path). keepalive tells the browser to
+  // complete it in the background regardless of the page unloading, the same
+  // mechanism navigator.sendBeacon relies on — no body here, well under its
+  // size limit.
   await fetch(`${API_BASE_URL}/api/auth/logout`, {
     method: 'POST',
     credentials: 'include',
+    keepalive: true,
     headers,
   }).catch(() => {})
+}
+
+// getOidcLogoutHint fetches the current session's stored OIDC ID token, to
+// pass as id_token_hint to the IdP's end_session_endpoint (see
+// buildOidcLogoutUrl). Must be called and awaited BEFORE logout() above —
+// once the session is revoked there's nothing left to look up. Never throws:
+// any failure (not an OIDC session, no session at all, network error) just
+// means no hint, which only degrades the IdP's logout page, never breaks it.
+export async function getOidcLogoutHint(): Promise<string> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth/oidc/logout-hint`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!res.ok) return ''
+    const data = (await res.json()) as { idTokenHint?: string }
+    return data.idTokenHint || ''
+  } catch {
+    return ''
+  }
 }
 
 // fetchWithAuth sends an authenticated request and resolves the parsed JSON

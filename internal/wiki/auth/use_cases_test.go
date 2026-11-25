@@ -360,6 +360,68 @@ func TestLogoutUseCase_EmitsSessionRevokedMetric(t *testing.T) {
 	}
 }
 
+func TestGetOIDCLogoutHintUseCase_ReturnsTheStoredIDToken(t *testing.T) {
+	authSvc, userSvc, _ := setupAuthUseCases(t, false)
+	user, err := userSvc.CreateUser("alice", "alice@example.com", "securepass", coreauth.RoleViewer)
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	token, err := authSvc.IssueOIDCSessionForUser(user.ID, "raw.id.token")
+	if err != nil {
+		t.Fatalf("IssueOIDCSessionForUser: %v", err)
+	}
+
+	uc := NewGetOIDCLogoutHintUseCase(authSvc)
+	out, err := uc.Execute(context.Background(), GetOIDCLogoutHintInput{RefreshToken: token.RefreshToken})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if out.IDTokenHint != "raw.id.token" {
+		t.Fatalf("IDTokenHint = %q, want %q", out.IDTokenHint, "raw.id.token")
+	}
+}
+
+func TestGetOIDCLogoutHintUseCase_EmptyForLocalLogin(t *testing.T) {
+	authSvc, userSvc, metrics := setupAuthUseCases(t, false)
+	if _, err := userSvc.CreateUser("alice", "alice@example.com", "securepass", coreauth.RoleViewer); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	loginUC := NewLoginUseCase(authSvc, metrics)
+	out, err := loginUC.Execute(context.Background(), LoginInput{Identifier: "alice", Password: "securepass"})
+	if err != nil {
+		t.Fatalf("Login Execute: %v", err)
+	}
+
+	uc := NewGetOIDCLogoutHintUseCase(authSvc)
+	hintOut, err := uc.Execute(context.Background(), GetOIDCLogoutHintInput{RefreshToken: out.Token.RefreshToken})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if hintOut.IDTokenHint != "" {
+		t.Fatalf("IDTokenHint = %q, want empty for a local login", hintOut.IDTokenHint)
+	}
+}
+
+func TestGetOIDCLogoutHintUseCase_EmptyForInvalidRefreshToken(t *testing.T) {
+	authSvc, _, _ := setupAuthUseCases(t, false)
+
+	uc := NewGetOIDCLogoutHintUseCase(authSvc)
+	out, err := uc.Execute(context.Background(), GetOIDCLogoutHintInput{RefreshToken: "not-a-valid-token"})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if out.IDTokenHint != "" {
+		t.Fatalf("IDTokenHint = %q, want empty for an invalid token", out.IDTokenHint)
+	}
+}
+
+func TestGetOIDCLogoutHintUseCase_AuthDisabled(t *testing.T) {
+	uc := NewGetOIDCLogoutHintUseCase(nil)
+	if _, err := uc.Execute(context.Background(), GetOIDCLogoutHintInput{RefreshToken: "anything"}); !errors.Is(err, ErrAuthDisabled) {
+		t.Fatalf("Execute err = %v, want ErrAuthDisabled", err)
+	}
+}
+
 // TestCompleteTOTPLoginUseCase_EmitsVerificationMetric verifies a successful
 // TOTP login handshake records both the verification outcome and the
 // resulting session-issued event.

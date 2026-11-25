@@ -43,6 +43,11 @@ type ConfigStore = {
   logoutUrl: string
   userManagementUrl: string
   defaultLanguage: string
+  oidcEnabled: boolean
+  oidcButtonLabel: string
+  oidcOnly: boolean
+  oidcClientId: string
+  oidcEndSessionUrl: string
   error: string | null
   loading: boolean
   hasLoaded: boolean
@@ -99,6 +104,11 @@ export const useConfigStore = create<ConfigStore>((set) => ({
   logoutUrl: '',
   userManagementUrl: '',
   defaultLanguage: '',
+  oidcEnabled: false,
+  oidcButtonLabel: '',
+  oidcOnly: false,
+  oidcClientId: '',
+  oidcEndSessionUrl: '',
   error: null,
   loading: false,
   hasLoaded: false,
@@ -150,6 +160,11 @@ export const useConfigStore = create<ConfigStore>((set) => ({
           logoutUrl: config.logoutUrl ?? '',
           userManagementUrl: config.userManagementUrl ?? '',
           defaultLanguage: config.defaultLanguage ?? '',
+          oidcEnabled: config.oidcEnabled ?? false,
+          oidcButtonLabel: config.oidcButtonLabel ?? '',
+          oidcOnly: config.oidcOnly ?? false,
+          oidcClientId: config.oidcClientId ?? '',
+          oidcEndSessionUrl: config.oidcEndSessionUrl ?? '',
           error: null,
           hasLoaded: true,
           configLoadSucceeded: true,

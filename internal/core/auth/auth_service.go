@@ -215,7 +215,7 @@ func (a *AuthService) Login(identifier, password string, client Client) (*AuthTo
 	}
 
 	a.log.Info("login succeeded", "userID", user.ID)
-	return a.sessions.IssueSession(user)
+	return a.sessions.IssueSession(user, "")
 }
 
 // IssueSessionForUser issues a fresh access/refresh token pair for userID
@@ -232,7 +232,35 @@ func (a *AuthService) IssueSessionForUser(userID string) (*AuthToken, error) {
 		return nil, err
 	}
 	user.Password = ""
-	return a.sessions.IssueSession(user)
+	return a.sessions.IssueSession(user, "")
+}
+
+// IssueOIDCSessionForUser is IssueSessionForUser's OIDC counterpart: same
+// no-password-check session issuance, but also stores rawIDToken alongside
+// the new session (see SessionStore's oidc_id_token column) so a later
+// logout can send it as the end_session_endpoint's id_token_hint. Called by
+// the OIDC callback handler once GetOrCreateOIDCUser/SyncOIDCRole have
+// resolved the user.
+func (a *AuthService) IssueOIDCSessionForUser(userID, rawIDToken string) (*AuthToken, error) {
+	user, err := a.users().GetUserByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	user.Password = ""
+	return a.sessions.IssueSession(user, rawIDToken)
+}
+
+// GetOIDCLogoutHint returns the OIDC ID token stored for the session
+// refreshToken identifies, for use as the end_session_endpoint's
+// id_token_hint — "" if there isn't one (a local session, or any lookup
+// failure). Always best-effort: a missing hint degrades logout to the
+// IdP's own confirmation page, it never breaks it.
+func (a *AuthService) GetOIDCLogoutHint(refreshToken string) string {
+	hint, err := a.sessions.GetOIDCIDTokenForRefreshToken(refreshToken)
+	if err != nil {
+		return ""
+	}
+	return hint
 }
 
 // CompleteTOTPLogin finishes a login handshake started by Login when a user
@@ -302,7 +330,7 @@ func (a *AuthService) CompleteTOTPLogin(challengeToken, code string) (*AuthToken
 	}
 
 	user.Password = ""
-	return a.sessions.IssueSession(user)
+	return a.sessions.IssueSession(user, "")
 }
 
 // StartTOTPSetup verifies the user's current password, generates a fresh TOTP
@@ -645,7 +673,7 @@ func (a *AuthService) beginTOTPChallenge(user *User) (*AuthToken, error) {
 		return nil, err
 	}
 
-	if err := a.sessions.sessionStore.CreateSession(jti, user.ID, loginChallengeTokenType, expiresAt); err != nil {
+	if err := a.sessions.sessionStore.CreateSession(jti, user.ID, loginChallengeTokenType, expiresAt, ""); err != nil {
 		return nil, err
 	}
 

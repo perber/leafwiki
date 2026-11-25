@@ -173,6 +173,43 @@ func TestValidateHTTPRemoteUserAutoCreateConfig(t *testing.T) {
 	}
 }
 
+func TestValidateOIDCConfig(t *testing.T) {
+	valid := oidcOptions{
+		issuer:       "https://auth.example.com/application/o/leafwiki/",
+		clientID:     "leafwiki",
+		clientSecret: "secret",
+		redirectURL:  "https://wiki.example.com/login/oidc/callback",
+	}
+
+	tests := []struct {
+		name     string
+		o        oidcOptions
+		loginURL string
+		wantErr  bool
+	}{
+		{"disabled, everything else empty", oidcOptions{}, "", false},
+		{"disabled but --oidc-only set", oidcOptions{only: true}, "", true},
+		{"enabled, fully valid", valid, "", false},
+		{"enabled, missing client id", oidcOptions{issuer: valid.issuer, clientSecret: valid.clientSecret, redirectURL: valid.redirectURL}, "", true},
+		{"enabled, missing client secret", oidcOptions{issuer: valid.issuer, clientID: valid.clientID, redirectURL: valid.redirectURL}, "", true},
+		{"enabled, missing redirect url", oidcOptions{issuer: valid.issuer, clientID: valid.clientID, clientSecret: valid.clientSecret}, "", true},
+		{"enabled, redirect url not absolute", oidcOptions{issuer: valid.issuer, clientID: valid.clientID, clientSecret: valid.clientSecret, redirectURL: "/login/oidc/callback"}, "", true},
+		{"enabled, redirect url wrong path", oidcOptions{issuer: valid.issuer, clientID: valid.clientID, clientSecret: valid.clientSecret, redirectURL: "https://wiki.example.com/callback"}, "", true},
+		{"enabled and --login-url both set", valid, "https://sso.example.com/login", true},
+		{"enabled, role-sync left at its zero value is valid (treated as \"all\")", valid, "", false},
+		{"enabled, role-sync explicitly \"admin\"", oidcOptions{issuer: valid.issuer, clientID: valid.clientID, clientSecret: valid.clientSecret, redirectURL: valid.redirectURL, roleSync: "admin"}, "", false},
+		{"enabled, invalid role-sync value", oidcOptions{issuer: valid.issuer, clientID: valid.clientID, clientSecret: valid.clientSecret, redirectURL: valid.redirectURL, roleSync: "everyone"}, "", true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateOIDCConfig(tc.o, tc.loginURL)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("validateOIDCConfig(%+v, %q) error = %v, wantErr %v", tc.o, tc.loginURL, err, tc.wantErr)
+			}
+		})
+	}
+}
+
 // The messages are pinned: operators grep logs for them.
 func TestValidateSMTPConfig_FlagCombinations_ReturnPinnedErrors(t *testing.T) {
 	tests := []struct {

@@ -7,7 +7,9 @@ import {
   confirmPasswordReset,
   ensureRefresh,
   fetchWithAuth,
+  getOidcLogoutHint,
   login,
+  logout,
 } from './auth'
 import { ApiLocalizedError } from './errors'
 
@@ -62,6 +64,86 @@ const testUser = {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+describe('logout', () => {
+  // UserMenu's logoutUrl/OIDC branches fire this and navigate away in the
+  // same tick, without awaiting it, so the login screen never flashes first.
+  // Without keepalive, the browser aborts the fetch the instant navigation
+  // starts and /api/auth/logout never reaches the server — the local
+  // session/refresh token then silently survives. Regression test for that.
+  it('sends the request with keepalive so it survives an immediate navigation away', async () => {
+    useConfigStore.setState({ authDisabled: false })
+    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await logout()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [, init] = fetchMock.mock.calls[0] as unknown as [
+      RequestInfo | URL,
+      RequestInit,
+    ]
+    expect(init).toMatchObject({ method: 'POST', keepalive: true })
+  })
+
+  it('does nothing when auth is disabled', async () => {
+    useConfigStore.setState({ authDisabled: true })
+    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await logout()
+
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('getOidcLogoutHint', () => {
+  it('returns idTokenHint from a successful response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ idTokenHint: 'raw.id.token' }), {
+            status: 200,
+          }),
+      ),
+    )
+
+    expect(await getOidcLogoutHint()).toBe('raw.id.token')
+  })
+
+  it('returns an empty string when the response has no hint', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ idTokenHint: '' }), { status: 200 }),
+      ),
+    )
+
+    expect(await getOidcLogoutHint()).toBe('')
+  })
+
+  it('returns an empty string instead of throwing on a non-2xx response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 401 })),
+    )
+
+    expect(await getOidcLogoutHint()).toBe('')
+  })
+
+  it('returns an empty string instead of throwing on a network error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('network down')
+      }),
+    )
+
+    expect(await getOidcLogoutHint()).toBe('')
+  })
 })
 
 describe('ensureRefresh', () => {

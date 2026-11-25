@@ -391,7 +391,7 @@ func TestManager_Restore_InvalidatesSessions(t *testing.T) {
 	t.Cleanup(func() { _ = probe.Close() })
 
 	expiresAt := time.Now().Add(time.Hour)
-	if err := probe.CreateSession("jti-1", "user-1", "refresh", expiresAt); err != nil {
+	if err := probe.CreateSession("jti-1", "user-1", "refresh", expiresAt, ""); err != nil {
 		t.Fatalf("CreateSession failed: %v", err)
 	}
 	active, err := probe.IsActive("jti-1", "user-1", "refresh", time.Now())

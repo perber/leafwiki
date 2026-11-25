@@ -50,7 +50,7 @@ func TestSessionManager_IssueSession_ReturnsAccessAndRefreshTokens(t *testing.T)
 	user := &User{ID: "u1", Username: "alice", Email: "alice@example.com", Role: RoleAdmin}
 	sm := setupTestSessionManager(t, map[string]*User{user.ID: user})
 
-	tokens, err := sm.IssueSession(user)
+	tokens, err := sm.IssueSession(user, "")
 	if err != nil {
 		t.Fatalf("IssueSession failed: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestSessionManager_ValidateToken_ReturnsCurrentUser(t *testing.T) {
 	user := &User{ID: "u1", Username: "alice", Role: RoleEditor}
 	sm := setupTestSessionManager(t, map[string]*User{user.ID: user})
 
-	tokens, err := sm.IssueSession(user)
+	tokens, err := sm.IssueSession(user, "")
 	if err != nil {
 		t.Fatalf("IssueSession failed: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestSessionManager_ValidateToken_RejectsRefreshToken(t *testing.T) {
 	user := &User{ID: "u1", Username: "alice", Role: RoleAdmin}
 	sm := setupTestSessionManager(t, map[string]*User{user.ID: user})
 
-	tokens, err := sm.IssueSession(user)
+	tokens, err := sm.IssueSession(user, "")
 	if err != nil {
 		t.Fatalf("IssueSession failed: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestSessionManager_ValidateToken_ResolveUserNotWired_ReturnsErrorInsteadOfP
 
 	user := &User{ID: "u1", Username: "alice", Role: RoleAdmin}
 	sm.resolveUser = func(id string) (*User, error) { return user, nil }
-	tokens, err := sm.IssueSession(user)
+	tokens, err := sm.IssueSession(user, "")
 	if err != nil {
 		t.Fatalf("IssueSession failed: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestSessionManager_RefreshToken_ResolveUserNotWired_ReturnsErrorInsteadOfPa
 
 	user := &User{ID: "u1", Username: "alice", Role: RoleAdmin}
 	sm.resolveUser = func(id string) (*User, error) { return user, nil }
-	tokens, err := sm.IssueSession(user)
+	tokens, err := sm.IssueSession(user, "")
 	if err != nil {
 		t.Fatalf("IssueSession failed: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestSessionManager_ValidateToken_ReflectsCurrentResolvedUser(t *testing.T) 
 	users := map[string]*User{user.ID: user}
 	sm := setupTestSessionManager(t, users)
 
-	tokens, err := sm.IssueSession(user)
+	tokens, err := sm.IssueSession(user, "")
 	if err != nil {
 		t.Fatalf("IssueSession failed: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestSessionManager_RefreshToken_IssuesNewTokensAndRevokesOld(t *testing.T) 
 	user := &User{ID: "u1", Username: "alice", Role: RoleAdmin}
 	sm := setupTestSessionManager(t, map[string]*User{user.ID: user})
 
-	tokens, err := sm.IssueSession(user)
+	tokens, err := sm.IssueSession(user, "")
 	if err != nil {
 		t.Fatalf("IssueSession failed: %v", err)
 	}
@@ -202,7 +202,7 @@ func TestSessionManager_RefreshToken_RevokedTokenRejected(t *testing.T) {
 	user := &User{ID: "u1", Username: "alice", Role: RoleAdmin}
 	sm := setupTestSessionManager(t, map[string]*User{user.ID: user})
 
-	tokens, err := sm.IssueSession(user)
+	tokens, err := sm.IssueSession(user, "")
 	if err != nil {
 		t.Fatalf("IssueSession failed: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestSessionManager_RefreshToken_AccessTokenRejected(t *testing.T) {
 	user := &User{ID: "u1", Username: "alice", Role: RoleAdmin}
 	sm := setupTestSessionManager(t, map[string]*User{user.ID: user})
 
-	tokens, err := sm.IssueSession(user)
+	tokens, err := sm.IssueSession(user, "")
 	if err != nil {
 		t.Fatalf("IssueSession failed: %v", err)
 	}
@@ -244,7 +244,7 @@ func TestSessionManager_RevokeRefreshToken_InvalidToken(t *testing.T) {
 func TestSessionManager_RevokeRefreshToken_AccessTokenRejected(t *testing.T) {
 	user := &User{ID: "u1", Username: "alice", Role: RoleAdmin}
 	sm := setupTestSessionManager(t, map[string]*User{user.ID: user})
-	tokens, err := sm.IssueSession(user)
+	tokens, err := sm.IssueSession(user, "")
 	if err != nil {
 		t.Fatalf("IssueSession failed: %v", err)
 	}
@@ -257,11 +257,11 @@ func TestSessionManager_RevokeAllUserSessions(t *testing.T) {
 	user := &User{ID: "u1", Username: "alice", Role: RoleAdmin}
 	sm := setupTestSessionManager(t, map[string]*User{user.ID: user})
 
-	tokens1, err := sm.IssueSession(user)
+	tokens1, err := sm.IssueSession(user, "")
 	if err != nil {
 		t.Fatalf("IssueSession failed: %v", err)
 	}
-	tokens2, err := sm.IssueSession(user)
+	tokens2, err := sm.IssueSession(user, "")
 	if err != nil {
 		t.Fatalf("IssueSession failed: %v", err)
 	}
@@ -282,11 +282,11 @@ func TestSessionManager_RevokeAllUserSessionsExceptCurrent_PreservesCallersSessi
 	user := &User{ID: "u1", Username: "alice", Role: RoleAdmin}
 	sm := setupTestSessionManager(t, map[string]*User{user.ID: user})
 
-	current, err := sm.IssueSession(user)
+	current, err := sm.IssueSession(user, "")
 	if err != nil {
 		t.Fatalf("IssueSession failed: %v", err)
 	}
-	other, err := sm.IssueSession(user)
+	other, err := sm.IssueSession(user, "")
 	if err != nil {
 		t.Fatalf("IssueSession failed: %v", err)
 	}
@@ -307,7 +307,7 @@ func TestSessionManager_RevokeAllUserSessionsExceptCurrent_UnparsableCurrentRevo
 	user := &User{ID: "u1", Username: "alice", Role: RoleAdmin}
 	sm := setupTestSessionManager(t, map[string]*User{user.ID: user})
 
-	tokens, err := sm.IssueSession(user)
+	tokens, err := sm.IssueSession(user, "")
 	if err != nil {
 		t.Fatalf("IssueSession failed: %v", err)
 	}
@@ -351,7 +351,7 @@ func TestSessionManager_IssueSession_SessionExpiryMatchesRefreshTokenExp(t *test
 	sm.resolveUser = func(id string) (*User, error) { return user, nil }
 	sm.now = fakeAdvancingClock(3 * time.Second)
 
-	tokens, err := sm.IssueSession(user)
+	tokens, err := sm.IssueSession(user, "")
 	if err != nil {
 		t.Fatalf("IssueSession failed: %v", err)
 	}
@@ -387,7 +387,7 @@ func TestSessionManager_RefreshToken_SessionExpiryMatchesNewRefreshTokenExp(t *t
 	sm.resolveUser = func(id string) (*User, error) { return user, nil }
 	sm.now = fakeAdvancingClock(3 * time.Second)
 
-	initial, err := sm.IssueSession(user)
+	initial, err := sm.IssueSession(user, "")
 	if err != nil {
 		t.Fatalf("IssueSession failed: %v", err)
 	}
@@ -429,5 +429,82 @@ func TestSessionManager_Close_ClosesSessionStore(t *testing.T) {
 	}
 	if store.db != nil {
 		t.Fatal("expected session store db to be closed")
+	}
+}
+
+func TestSessionManager_IssueSession_StoresOIDCIDToken(t *testing.T) {
+	user := &User{ID: "u1", Username: "alice", Role: RoleEditor}
+	sm := setupTestSessionManager(t, map[string]*User{user.ID: user})
+
+	tokens, err := sm.IssueSession(user, "raw.id.token")
+	if err != nil {
+		t.Fatalf("IssueSession failed: %v", err)
+	}
+
+	got, err := sm.GetOIDCIDTokenForRefreshToken(tokens.RefreshToken)
+	if err != nil {
+		t.Fatalf("GetOIDCIDTokenForRefreshToken failed: %v", err)
+	}
+	if got != "raw.id.token" {
+		t.Fatalf("GetOIDCIDTokenForRefreshToken = %q, want %q", got, "raw.id.token")
+	}
+}
+
+func TestSessionManager_GetOIDCIDTokenForRefreshToken_EmptyForLocalSession(t *testing.T) {
+	user := &User{ID: "u1", Username: "alice", Role: RoleEditor}
+	sm := setupTestSessionManager(t, map[string]*User{user.ID: user})
+
+	tokens, err := sm.IssueSession(user, "")
+	if err != nil {
+		t.Fatalf("IssueSession failed: %v", err)
+	}
+
+	got, err := sm.GetOIDCIDTokenForRefreshToken(tokens.RefreshToken)
+	if err != nil {
+		t.Fatalf("GetOIDCIDTokenForRefreshToken failed: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("GetOIDCIDTokenForRefreshToken = %q, want empty", got)
+	}
+}
+
+func TestSessionManager_GetOIDCIDTokenForRefreshToken_RejectsAccessToken(t *testing.T) {
+	user := &User{ID: "u1", Username: "alice", Role: RoleEditor}
+	sm := setupTestSessionManager(t, map[string]*User{user.ID: user})
+
+	tokens, err := sm.IssueSession(user, "raw.id.token")
+	if err != nil {
+		t.Fatalf("IssueSession failed: %v", err)
+	}
+
+	if _, err := sm.GetOIDCIDTokenForRefreshToken(tokens.Token); err == nil {
+		t.Fatal("expected an access token to be rejected")
+	}
+}
+
+// The whole reason a refresh must carry the OIDC ID token forward: without
+// it, logout's id_token_hint would silently stop working the moment a
+// session outlives its first access-token lifetime, even though the user
+// never logged out and back in.
+func TestSessionManager_RefreshToken_CarriesOIDCIDTokenForward(t *testing.T) {
+	user := &User{ID: "u1", Username: "alice", Role: RoleEditor}
+	sm := setupTestSessionManager(t, map[string]*User{user.ID: user})
+
+	tokens, err := sm.IssueSession(user, "raw.id.token")
+	if err != nil {
+		t.Fatalf("IssueSession failed: %v", err)
+	}
+
+	newTokens, err := sm.RefreshToken(tokens.RefreshToken)
+	if err != nil {
+		t.Fatalf("RefreshToken failed: %v", err)
+	}
+
+	got, err := sm.GetOIDCIDTokenForRefreshToken(newTokens.RefreshToken)
+	if err != nil {
+		t.Fatalf("GetOIDCIDTokenForRefreshToken failed: %v", err)
+	}
+	if got != "raw.id.token" {
+		t.Fatalf("GetOIDCIDTokenForRefreshToken = %q, want %q carried forward from before the refresh", got, "raw.id.token")
 	}
 }

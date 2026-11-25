@@ -405,6 +405,94 @@ func (s *UserService) GetOrCreateRemoteUser(identifier, email, defaultRole strin
 	return created, nil
 }
 
+// GetUserBySub resolves an OIDC-linked account by its provider "sub" claim.
+func (s *UserService) GetUserBySub(sub string) (*User, error) {
+	user, err := s.store.GetUserBySub(sub)
+	if err != nil {
+		return nil, mapUserLookupErr(err)
+	}
+	return user, nil
+}
+
+// GetOrCreateOIDCUser resolves an OIDC login to a local account: first by the
+// provider's stable "sub" claim, then — for a user never seen via OIDC
+// before — by preferredUsername, to link a pre-existing local account rather
+// than create a duplicate. If neither matches, a brand-new account is
+// created. Unlike GetOrCreateRemoteUser, no email-collision disambiguation
+// is needed on the linking path: a signed, verified "sub" is a strong enough
+// signal on its own that a username match is intentional, so email is never
+// compared here (also per the provider's email_verified being unreliable).
+func (s *UserService) GetOrCreateOIDCUser(sub, preferredUsername, email, role string) (*User, error) {
+	user, err := s.store.GetUserBySub(sub)
+	if err == nil {
+		return user, nil
+	}
+	if !errors.Is(err, ErrUserNotFound) {
+		return nil, err
+	}
+
+	if existing, lookupErr := s.store.GetUserByUsername(preferredUsername); lookupErr == nil {
+		if err := s.store.SetOIDCSub(existing.ID, sub); err != nil {
+			return nil, err
+		}
+		existing.OIDCSub = sub
+		s.log.Info("local account linked to OIDC identity", "userID", existing.ID, "username", preferredUsername)
+		return existing, nil
+	} else if !errors.Is(lookupErr, ErrUserNotFound) {
+		return nil, lookupErr
+	}
+
+	if email == "" {
+		email = preferredUsername + "@oidc-user.invalid"
+	}
+	password, err := shared.GenerateRandomPassword(32)
+	if err != nil {
+		return nil, err
+	}
+
+	created, err := s.CreateUser(preferredUsername, email, password, role)
+	if err != nil {
+		if errors.Is(err, ErrUserAlreadyExists) {
+			// Lost a create race against a concurrent OIDC login for the same new
+			// identity — re-resolve by sub first (the other request may have
+			// already finished linking/creating), then by username.
+			if existing, lookupErr := s.store.GetUserBySub(sub); lookupErr == nil {
+				return existing, nil
+			}
+			if existing, lookupErr := s.store.GetUserByUsername(preferredUsername); lookupErr == nil {
+				if err := s.store.SetOIDCSub(existing.ID, sub); err != nil {
+					return nil, err
+				}
+				existing.OIDCSub = sub
+				return existing, nil
+			}
+		}
+		return nil, err
+	}
+
+	if err := s.store.SetOIDCSub(created.ID, sub); err != nil {
+		return nil, err
+	}
+	created.OIDCSub = sub
+	s.log.Info("OIDC user auto-provisioned", "userID", created.ID, "username", preferredUsername, "role", role)
+	return created, nil
+}
+
+// SyncOIDCRole updates userID's role to match the role currently mapped from
+// their OIDC groups claim, re-evaluated on every login per the fork's spec.
+// A tripped last-admin guard (ErrLastAdminCannotBeDemoted) is logged and
+// swallowed rather than failing the login — the account keeps its current
+// role until there's a second admin to take over.
+func (s *UserService) SyncOIDCRole(userID, role string) {
+	if err := s.store.UpdateUserRole(userID, role); err != nil {
+		if errors.Is(err, ErrLastAdminCannotBeDemoted) {
+			s.log.Warn("OIDC role sync skipped: cannot demote the last admin", "userID", userID, "mappedRole", role)
+			return
+		}
+		s.log.Error("OIDC role sync failed", "userID", userID, "mappedRole", role, "error", err)
+	}
+}
+
 func (s *UserService) GetUserByEmailOrUsernameAndPassword(identifier, password string) (*User, error) {
 	user, err := s.store.GetUserByUsername(identifier)
 	if err != nil {

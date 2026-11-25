@@ -14,6 +14,7 @@ import (
 var legacyBoolFlagNames = []string{
 	"git-backup",
 	"hide-link-metadata-section",
+	"oidc-only",
 	"public-access",
 	"smtp-insecure-skip-verify",
 	"snapshot",

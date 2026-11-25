@@ -63,8 +63,11 @@ func (s *SessionManager) Close() error {
 }
 
 // IssueSession generates and stores access/refresh tokens for an
-// already-authenticated user.
-func (s *SessionManager) IssueSession(user *User) (*AuthToken, error) {
+// already-authenticated user. oidcIDToken is the raw OIDC ID token to
+// associate with the new session (empty for a local/invite-issued one) — see
+// IssueOIDCSessionForUser and the oidc_id_token column comment in
+// SessionStore.ensureSchema.
+func (s *SessionManager) IssueSession(user *User, oidcIDToken string) (*AuthToken, error) {
 	accessToken, _, accessTokenExpiresAt, err := s.generateToken(user, s.accessTokenLifetime, "access")
 	if err != nil {
 		return nil, err
@@ -85,6 +88,7 @@ func (s *SessionManager) IssueSession(user *User) (*AuthToken, error) {
 		user.ID,
 		"refresh",
 		time.Unix(refreshExpiresAt, 0),
+		oidcIDToken,
 	); err != nil {
 		return nil, err
 	}
@@ -131,6 +135,13 @@ func (s *SessionManager) RefreshToken(refreshToken string) (*AuthToken, error) {
 		return nil, ErrInvalidToken
 	}
 
+	// Best-effort carry-forward: a refresh mustn't silently drop the OIDC ID
+	// token an id_token_hint logout depends on, or logout would start failing
+	// (if post_logout_redirect_uri is registered with the IdP) the moment a
+	// session outlives its first access-token lifetime. A lookup failure here
+	// just means no hint on this new session either — same as a local login.
+	oidcIDToken, _ := s.sessionStore.GetOIDCIDToken(jti, userID, "refresh")
+
 	if s.resolveUser == nil {
 		return nil, ErrSessionManagerNotWired
 	}
@@ -157,6 +168,7 @@ func (s *SessionManager) RefreshToken(refreshToken string) (*AuthToken, error) {
 		user.ID,
 		"refresh",
 		time.Unix(newRefreshExpiresAt, 0),
+		oidcIDToken,
 	); err != nil {
 		return nil, err
 	}
@@ -197,6 +209,30 @@ func (s *SessionManager) RevokeRefreshToken(tokenString string) error {
 		s.log.Info("session revoked", "userID", userID)
 	}
 	return err
+}
+
+// GetOIDCIDTokenForRefreshToken returns the OIDC ID token stored alongside
+// the session refreshToken identifies, or "" if it can't be parsed, isn't a
+// refresh token, or carries none (a local/invite session). Used to build the
+// end_session_endpoint's id_token_hint on logout — always best-effort, never
+// a reason to fail the logout itself.
+func (s *SessionManager) GetOIDCIDTokenForRefreshToken(refreshToken string) (string, error) {
+	claims, err := s.parseClaims(refreshToken)
+	if err != nil {
+		return "", ErrInvalidToken
+	}
+	if typ, ok := claims["typ"].(string); !ok || typ != "refresh" {
+		return "", ErrInvalidToken
+	}
+	jti, ok := claims["jti"].(string)
+	if !ok || jti == "" {
+		return "", ErrInvalidToken
+	}
+	userID, ok := claims["sub"].(string)
+	if !ok {
+		return "", ErrInvalidToken
+	}
+	return s.sessionStore.GetOIDCIDToken(jti, userID, "refresh")
 }
 
 func (s *SessionManager) RevokeAllUserSessions(userID string) error {
