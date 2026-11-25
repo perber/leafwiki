@@ -24,6 +24,15 @@ RUN CGO_ENABLED=0 go build -trimpath -tags nomsgpack \
 # Step 3: Final image (small)
 FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS final
 WORKDIR /app
+
+# Needed for any outbound HTTPS call (OIDC discovery/JWKS/token exchange,
+# SMTP over implicit TLS) to verify the public CA chain. An operator talking
+# to a provider behind an internal CA additionally sets SSL_CERT_FILE to a
+# full bundle (system CAs + their own root) — Go's crypto/x509 uses *only*
+# that file when it's set, so this package is what keeps everything else
+# (anyone who doesn't need a custom CA) working without it.
+RUN apk add --no-cache ca-certificates
+
 COPY --from=backend-build /out/leafwiki /app/leafwiki
 
 COPY ./docker-entrypoint.sh /docker-entrypoint.sh

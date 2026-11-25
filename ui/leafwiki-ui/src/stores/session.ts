@@ -8,6 +8,7 @@ type UserInfo = {
   email: string
   role: 'admin' | 'editor' | 'viewer'
   totpEnabled: boolean
+  authSource?: 'local' | 'oidc'
 }
 
 // Unix timestamp in seconds, matching the backend's use of time.Now().Unix().

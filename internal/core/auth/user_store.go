@@ -129,7 +129,8 @@ func (f *UserStore) ensureSchema() error {
 			totp_recovery_codes_json TEXT NOT NULL DEFAULT '[]',
 			totp_enabled_at TIMESTAMP NULL,
 			totp_last_reset_at TIMESTAMP NULL,
-			must_set_password INTEGER NOT NULL DEFAULT 0
+			must_set_password INTEGER NOT NULL DEFAULT 0,
+			oidc_sub TEXT NOT NULL DEFAULT ''
 		);
 	`)
 	if err != nil {
@@ -138,7 +139,26 @@ func (f *UserStore) ensureSchema() error {
 	if err := f.ensureTOTPColumns(); err != nil {
 		return err
 	}
-	return f.ensureMustSetPasswordColumn()
+	if err := f.ensureMustSetPasswordColumn(); err != nil {
+		return err
+	}
+	return f.ensureOIDCColumns()
+}
+
+// ensureOIDCColumns additively migrates a pre-OIDC users.db by adding
+// oidc_sub if missing. Same idempotent pattern as ensureTOTPColumns.
+func (f *UserStore) ensureOIDCColumns() error {
+	existing, err := f.existingColumns()
+	if err != nil {
+		return err
+	}
+	if existing["oidc_sub"] {
+		return nil
+	}
+	if _, err := f.db.Exec(`ALTER TABLE users ADD COLUMN oidc_sub TEXT NOT NULL DEFAULT ''`); err != nil {
+		return fmt.Errorf("failed to add column oidc_sub to users table: %w", err)
+	}
+	return nil
 }
 
 // ensureMustSetPasswordColumn additively migrates a pre-invite users.db by
@@ -247,7 +267,7 @@ func (f *UserStore) CreateUser(user *User) error {
 
 const userColumns = `id, username, password, email, role,
 		totp_secret_encrypted, totp_enabled, totp_recovery_codes_json, totp_enabled_at, totp_last_reset_at,
-		must_set_password`
+		must_set_password, oidc_sub`
 
 // scanner is satisfied by both *sql.Row and *sql.Rows.
 type scanner interface {
@@ -264,7 +284,7 @@ func scanUser(row scanner) (*User, error) {
 	err := row.Scan(
 		&user.ID, &user.Username, &user.Password, &user.Email, &user.Role,
 		&user.TOTPSecretEncrypted, &totpEnabledInt, &recoveryCodesJSON, &enabledAt, &lastResetAt,
-		&mustSetPasswordInt,
+		&mustSetPasswordInt, &user.OIDCSub,
 	)
 	if err != nil {
 		return nil, err
@@ -355,6 +375,87 @@ func (f *UserStore) GetUserByEmail(email string) (*User, error) {
 		return nil, err
 	}
 	return user, nil
+}
+
+// GetUserBySub looks up a user by their linked OIDC "sub" claim. The empty
+// string is never a valid sub (it's the pre-migration/unlinked default), so
+// it's explicitly excluded rather than matching every unlinked row.
+func (f *UserStore) GetUserBySub(sub string) (*User, error) {
+	err := f.Connect()
+	if err != nil {
+		return nil, err
+	}
+	row := f.db.QueryRow(`SELECT `+userColumns+`
+		FROM users
+		WHERE oidc_sub = ? AND oidc_sub != '';
+	`, sub)
+
+	user, err := scanUser(row)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+	return user, nil
+}
+
+// SetOIDCSub links userID to an external OIDC identity. Used both to record
+// a brand-new OIDC-created account's sub and to link a pre-existing local
+// account the first time it's matched by username (see
+// UserService.GetOrCreateOIDCUser).
+func (f *UserStore) SetOIDCSub(userID, sub string) error {
+	err := f.Connect()
+	if err != nil {
+		return err
+	}
+	if _, err := f.GetUserByID(userID); err != nil {
+		return err
+	}
+	_, err = f.db.Exec(`
+		UPDATE users
+		SET oidc_sub = ?
+		WHERE id = ?;
+	`, sub, userID)
+	return err
+}
+
+// UpdateUserRole sets userID's role to role, honoring the same last-admin
+// protection as UpdateUser, but touching only the role column — used by the
+// OIDC login flow to re-sync a role from the provider's groups claim on
+// every login without needing (or overwriting) username/email/password.
+func (f *UserStore) UpdateUserRole(userID, role string) error {
+	err := f.Connect()
+	if err != nil {
+		return err
+	}
+
+	existingUser, err := f.GetUserByID(userID)
+	if err != nil {
+		return err
+	}
+
+	result, err := f.db.Exec(`
+		UPDATE users
+		SET role = ?
+		WHERE id = ?
+		  AND NOT (
+			role = ?
+			AND ? != ?
+			AND (SELECT COUNT(*) FROM users WHERE role = ?) <= 1
+		  );
+	`, role, userID, RoleAdmin, role, RoleAdmin, RoleAdmin)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 && existingUser.Role == RoleAdmin && role != RoleAdmin {
+		return ErrLastAdminCannotBeDemoted
+	}
+	return nil
 }
 
 func (f *UserStore) UpdateUser(user *User) error {

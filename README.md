@@ -43,6 +43,7 @@ docker run -p 8080:8080 -v ~/leafwiki-data:/app/data \
   - [Environment Variables](#environment-variables)
   - [Custom Stylesheet](#custom-stylesheet)
   - [Reverse-Proxy Authentication](#reverse-proxy-authentication)
+  - [OpenID Connect (OIDC)](#openid-connect-oidc)
   - [Unix Socket (v0.11.3)](#unix-socket-v0113)
   - [Git Backup](#git-backup-v0113-experimental)
   - [Email (SMTP)](#email-smtp)
@@ -428,6 +429,15 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `--smtp-security`                | Transport security: `none`, `starttls`, or `tls`                        | `starttls`    | v0.13.0 |
 | `--smtp-insecure-skip-verify`    | Skip TLS certificate verification for SMTP (testing only)               | `false`       | v0.13.0 |
 | `--smtp-timeout`                 | Timeout for a single SMTP send (e.g. `10s`)                             | `10s`         | v0.13.0 |
+| `--oidc-issuer`                  | OIDC provider discovery URL; unset disables OIDC login entirely         | `""`          | –       |
+| `--oidc-client-id`               | OIDC client ID (required when `--oidc-issuer` is set)                   | `""`          | –       |
+| `--oidc-client-secret`           | OIDC confidential client secret (prefer env var)                        | `""`          | –       |
+| `--oidc-redirect-url`            | Callback URL registered with the provider, must end in `/login/oidc/callback` | `""`    | –       |
+| `--oidc-button-label`            | Label for the login button ("Sign in with `<label>`")                   | `authentik`   | –       |
+| `--oidc-only`                    | Hide the local login form (reachable at `/login?local=1` regardless)    | `false`       | –       |
+| `--oidc-admin-group`             | `groups` claim value mapped to the admin role, re-evaluated on every login | `wiki-admins` | –     |
+| `--oidc-editor-group`            | `groups` claim value mapped to the editor role, re-evaluated on every login | `wiki-editors` | –  |
+| `--oidc-role-sync`               | How much of a role OIDC may override on login: `all` or `admin`          | `all`         | –       |
 
 > Docker image default: `LEAFWIKI_HOST` is set to `0.0.0.0` automatically by the container entrypoint if neither `--host` nor `LEAFWIKI_HOST` is provided.
 
@@ -504,6 +514,16 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_SMTP_SECURITY`               | Transport security: `none`, `starttls`, or `tls`    | `starttls`    | v0.13.0 |
 | `LEAFWIKI_SMTP_INSECURE_SKIP_VERIFY`   | Skip TLS certificate verification for SMTP           | `false`       | v0.13.0 |
 | `LEAFWIKI_SMTP_TIMEOUT`                | Timeout for a single SMTP send                       | `10s`         | v0.13.0 |
+| `LEAFWIKI_OIDC_ISSUER`                 | OIDC provider discovery URL; unset disables OIDC login entirely | `""` | –       |
+| `LEAFWIKI_OIDC_CLIENT_ID`              | OIDC client ID (required with `LEAFWIKI_OIDC_ISSUER`) | `""`          | –       |
+| `LEAFWIKI_OIDC_CLIENT_SECRET`          | OIDC confidential client secret (required with `LEAFWIKI_OIDC_ISSUER`) | `""` | –   |
+| `LEAFWIKI_OIDC_REDIRECT_URL`           | Callback URL registered with the provider, must end in `/login/oidc/callback` | `""` | – |
+| `LEAFWIKI_OIDC_BUTTON_LABEL`           | Label for the login button ("Sign in with `<label>`") | `authentik`   | –       |
+| `LEAFWIKI_OIDC_ONLY`                   | Hide the local login form (reachable at `/login?local=1` regardless) | `false` | –  |
+| `LEAFWIKI_OIDC_ADMIN_GROUP`            | `groups` claim value mapped to the admin role, re-evaluated on every login | `wiki-admins` | – |
+| `LEAFWIKI_OIDC_EDITOR_GROUP`           | `groups` claim value mapped to the editor role, re-evaluated on every login | `wiki-editors` | – |
+| `LEAFWIKI_OIDC_ROLE_SYNC`              | How much of a role OIDC may override on login: `all` or `admin`      | `all`         | –       |
+| `SSL_CERT_FILE`                        | Not LeafWiki-specific: CA bundle for outbound HTTPS (OIDC, SMTP) behind a private CA; replaces the system trust store | *(system default)* | – |
 
 ### Custom Stylesheet
 
@@ -565,6 +585,30 @@ By default, a proxy-asserted identity with no matching LeafWiki account is rejec
 - If `--http-remote-user-email-header-name` isn't set or the header is empty, a non-deliverable placeholder email (`<username>@remote-user.invalid`) is used instead
 - Auto-created accounts get a random password nobody is told — they can only ever authenticate via the trusted proxy, not the built-in login form
 - `--http-remote-user-default-role` **must not be `admin`** — the server refuses to start otherwise. A forged or misrouted header must not be able to mint an admin account by itself; promote an auto-created user to admin manually if needed
+
+### OpenID Connect (OIDC)
+
+Native login via an external OIDC provider (authorization code + PKCE), as an additional method alongside the built-in password+TOTP login — not a replacement for it.
+
+```bash
+./leafwiki \
+  --jwt-secret=yoursecret \
+  --admin-password=yourpassword \
+  --oidc-issuer=https://auth.example.com/application/o/leafwiki/ \
+  --oidc-client-id=leafwiki \
+  --oidc-client-secret=yourclientsecret \
+  --oidc-redirect-url=https://wiki.example.com/login/oidc/callback
+```
+
+- Setting `--oidc-issuer` enables the whole subsystem; `--oidc-client-id`, `--oidc-client-secret` and `--oidc-redirect-url` are then required, and `--oidc-redirect-url` must end in `/login/oidc/callback` exactly as registered with the provider
+- Mutually exclusive with `--login-url`/`--logout-url` (reverse-proxy auth) — the server refuses to start if both are set
+- Discovery (the provider's `.well-known/openid-configuration`) runs once at startup; a failure there is fatal, not degraded — a broken OIDC config must be noticed immediately, not discovered on the first login attempt
+- A user's role is derived from the `groups` claim on *every* login, not just at account creation: `--oidc-admin-group` wins over `--oidc-editor-group`, and neither matching falls back to `viewer`. If re-evaluating would demote the last remaining admin, the account silently keeps its current role instead (logged as a warning) — same protection as removing the last local admin
+- `--oidc-role-sync` controls how much of that re-evaluation actually happens: `all` (default) is the behavior above — the groups claim always wins. `admin` only ever promotes a user into admin or demotes them out of it (to `editor`) based on the groups claim; editor/viewer are managed entirely inside LeafWiki once assigned (including a brand-new account's initial role) and OIDC never touches them again
+- An OIDC login is linked to an existing local account by matching username, with no email-verification check (the provider's signed subject is trusted on its own) — if none matches, a new account is created
+- Two-factor authentication (TOTP) is never requested for an OIDC login, even on an account that has it enabled for local login — the identity provider is the one authenticating the user
+- `--oidc-only=true` hides the local login form; it's still reachable at `/login?local=1` as a deliberately undocumented-in-the-UI escape hatch for an admin who gets locked out
+- If your provider sits behind an internal/private CA, set `SSL_CERT_FILE` to a full bundle (system CAs *and* your internal root) — Go's HTTPS client uses only that file once it's set, so a partial bundle breaks every other outbound HTTPS call (SMTP included)
 
 ### Unix Socket (v0.11.3)
 

@@ -11,6 +11,7 @@ import (
 	"github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/core/email"
 	"github.com/perber/wiki/internal/core/ignore"
+	coreoidc "github.com/perber/wiki/internal/core/oidc"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/favorites"
 	"github.com/perber/wiki/internal/links"
@@ -80,6 +81,27 @@ func (w *Wiki) initAuth(options *WikiOptions) error {
 			w.apiKeys = auth.NewAPIKeyService(apiKeyStore, w.auth)
 		}
 	}
+	return nil
+}
+
+// initOIDC builds the OIDC service when an issuer has been configured and
+// auth is enabled, mirroring initEmail's shape. Discovery is a blocking
+// network call performed once here, at boot: a configured-but-unreachable
+// issuer fails startup loudly rather than leaving a login button that would
+// only fail once a visitor actually tries to use it. Must run after
+// initAuth, which sets w.user (needed to resolve/create OIDC-authenticated
+// users) and w.auth (needed to issue sessions for them).
+func (w *Wiki) initOIDC(options *WikiOptions) error {
+	if !options.OIDC.Enabled() || options.AuthDisabled {
+		return nil
+	}
+
+	svc, err := coreoidc.NewService(context.Background(), options.OIDC)
+	if err != nil {
+		return fmt.Errorf("oidc: %w", err)
+	}
+	w.oidc = svc
+	w.log.Info("OIDC login enabled", "issuer", options.OIDC.Issuer, "buttonLabel", options.OIDC.ButtonLabel)
 	return nil
 }
 

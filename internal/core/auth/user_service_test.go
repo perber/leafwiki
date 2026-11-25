@@ -726,3 +726,139 @@ func TestUserService_UpdateUser_EditorToAdmin_NotBlockedByLimit(t *testing.T) {
 		t.Errorf("Expected editor->admin role change to stay neutral under the editor limit, got: %v", err)
 	}
 }
+
+func TestUserService_GetOrCreateOIDCUser_CreatesNewUser(t *testing.T) {
+	service := setupTestUserService(t)
+	defer test_utils.WrapCloseWithErrorCheck(service.Close, t)
+
+	user, err := service.GetOrCreateOIDCUser("sub-1", "carol", "carol@example.com", RoleViewer)
+	if err != nil {
+		t.Fatalf("GetOrCreateOIDCUser failed: %v", err)
+	}
+	if user.Username != "carol" || user.Email != "carol@example.com" || user.Role != RoleViewer {
+		t.Errorf("user not created with expected data: %+v", user)
+	}
+	if user.OIDCSub != "sub-1" {
+		t.Errorf("expected OIDCSub %q, got %q", "sub-1", user.OIDCSub)
+	}
+}
+
+func TestUserService_GetOrCreateOIDCUser_ReturnsExistingUserBySubOnSecondCall(t *testing.T) {
+	service := setupTestUserService(t)
+	defer test_utils.WrapCloseWithErrorCheck(service.Close, t)
+
+	first, err := service.GetOrCreateOIDCUser("sub-1", "carol", "carol@example.com", RoleViewer)
+	if err != nil {
+		t.Fatalf("first GetOrCreateOIDCUser failed: %v", err)
+	}
+	second, err := service.GetOrCreateOIDCUser("sub-1", "carol", "carol@example.com", RoleViewer)
+	if err != nil {
+		t.Fatalf("second GetOrCreateOIDCUser failed: %v", err)
+	}
+	if second.ID != first.ID {
+		t.Errorf("expected same user on second call, got different IDs: %s vs %s", first.ID, second.ID)
+	}
+}
+
+// TestUserService_GetOrCreateOIDCUser_LinksExistingLocalAccountByUsername is
+// the account-linking path: a pre-existing local account with no OIDC
+// identity yet is matched purely by username, with no email comparison at
+// all — unlike GetOrCreateRemoteUser, since a verified "sub" is itself a
+// strong enough signal, and the spec requires ignoring email_verified.
+func TestUserService_GetOrCreateOIDCUser_LinksExistingLocalAccountByUsername(t *testing.T) {
+	service := setupTestUserService(t)
+	defer test_utils.WrapCloseWithErrorCheck(service.Close, t)
+
+	preexisting, err := service.CreateUser("dave", "dave@local.example.com", "secure123", RoleEditor)
+	if err != nil {
+		t.Fatalf("CreateUser failed: %v", err)
+	}
+
+	// Email deliberately differs from the local account's and would fail an
+	// email-based conflict check if one existed — it must not matter here.
+	linked, err := service.GetOrCreateOIDCUser("sub-dave", "dave", "dave@idp.example.com", RoleEditor)
+	if err != nil {
+		t.Fatalf("GetOrCreateOIDCUser failed: %v", err)
+	}
+	if linked.ID != preexisting.ID {
+		t.Errorf("expected to link the pre-existing account %s, got a different user %s", preexisting.ID, linked.ID)
+	}
+	if linked.OIDCSub != "sub-dave" {
+		t.Errorf("expected OIDCSub %q, got %q", "sub-dave", linked.OIDCSub)
+	}
+
+	users, err := service.GetUsers()
+	if err != nil {
+		t.Fatalf("GetUsers failed: %v", err)
+	}
+	count := 0
+	for _, u := range users {
+		if u.Username == "dave" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("expected exactly one 'dave' user (linked, not duplicated), got %d", count)
+	}
+}
+
+func TestUserService_GetOrCreateOIDCUser_SynthesizesPlaceholderEmailWhenNoneGiven(t *testing.T) {
+	service := setupTestUserService(t)
+	defer test_utils.WrapCloseWithErrorCheck(service.Close, t)
+
+	user, err := service.GetOrCreateOIDCUser("sub-erin", "erin", "", RoleViewer)
+	if err != nil {
+		t.Fatalf("GetOrCreateOIDCUser failed: %v", err)
+	}
+	want := "erin@oidc-user.invalid"
+	if user.Email != want {
+		t.Errorf("expected synthesized email %q, got %q", want, user.Email)
+	}
+}
+
+func TestUserService_SyncOIDCRole_UpdatesRoleOnEveryLogin(t *testing.T) {
+	service := setupTestUserService(t)
+	defer test_utils.WrapCloseWithErrorCheck(service.Close, t)
+
+	user, err := service.GetOrCreateOIDCUser("sub-1", "carol", "carol@example.com", RoleViewer)
+	if err != nil {
+		t.Fatalf("GetOrCreateOIDCUser failed: %v", err)
+	}
+
+	// Simulate a later login where carol has since been added to the admin
+	// group in the IdP.
+	service.SyncOIDCRole(user.ID, RoleAdmin)
+
+	got, err := service.GetUserByID(user.ID)
+	if err != nil {
+		t.Fatalf("GetUserByID: %v", err)
+	}
+	if got.Role != RoleAdmin {
+		t.Fatalf("expected role synced to %q, got %q", RoleAdmin, got.Role)
+	}
+}
+
+// TestUserService_SyncOIDCRole_LastAdminGuard_DoesNotPanicOrCorrupt covers
+// decision #2 from the OIDC plan: a role-sync that would demote the sole
+// remaining admin must be swallowed (logged), not propagated as an error the
+// login flow would have to handle — the account simply keeps its current
+// role.
+func TestUserService_SyncOIDCRole_LastAdminGuard_DoesNotPanicOrCorrupt(t *testing.T) {
+	service := setupTestUserService(t)
+	defer test_utils.WrapCloseWithErrorCheck(service.Close, t)
+
+	admin, err := service.GetOrCreateOIDCUser("sub-admin", "admin", "admin@example.com", RoleAdmin)
+	if err != nil {
+		t.Fatalf("GetOrCreateOIDCUser failed: %v", err)
+	}
+
+	service.SyncOIDCRole(admin.ID, RoleViewer)
+
+	got, err := service.GetUserByID(admin.ID)
+	if err != nil {
+		t.Fatalf("GetUserByID: %v", err)
+	}
+	if got.Role != RoleAdmin {
+		t.Fatalf("expected the last admin's role to remain %q, got %q", RoleAdmin, got.Role)
+	}
+}

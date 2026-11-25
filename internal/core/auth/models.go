@@ -10,6 +10,11 @@ type PublicUser struct {
 	Role            string `json:"role"`
 	TOTPEnabled     bool   `json:"totpEnabled"`
 	MustSetPassword bool   `json:"mustSetPassword"`
+	// AuthSource is "oidc" for an account linked to an external OIDC
+	// identity (see User.OIDCSub), empty for a plain local account. A
+	// string rather than a bool so a future identity source (e.g.
+	// http-remote-user) can be represented without a breaking change.
+	AuthSource string `json:"authSource,omitempty"`
 }
 
 // User represents a user object with sensitive information.
@@ -34,6 +39,11 @@ type User struct {
 	TOTPRecoveryCodeHashes []string
 	TOTPEnabledAt          *time.Time
 	TOTPLastResetAt        *time.Time
+
+	// OIDCSub is the "sub" claim of the external OIDC identity this account
+	// is linked to, empty for a plain local account. Never exposed directly
+	// (see PublicUser.AuthSource for the derived, frontend-safe signal).
+	OIDCSub string
 }
 
 func (u *User) HasRole(role string) bool {
@@ -48,7 +58,16 @@ func (u *User) ToPublicUser() *PublicUser {
 		Role:            u.Role,
 		TOTPEnabled:     u.TOTPEnabled,
 		MustSetPassword: u.MustSetPassword,
+		AuthSource:      u.AuthSource(),
 	}
+}
+
+// AuthSource reports "oidc" for an OIDC-linked account, "" otherwise.
+func (u *User) AuthSource() string {
+	if u.OIDCSub != "" {
+		return "oidc"
+	}
+	return ""
 }
 
 // Client is an opaque, already grouped identity of the caller of an operation

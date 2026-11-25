@@ -14,6 +14,7 @@ import (
 	"github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/core/email"
 	"github.com/perber/wiki/internal/core/ignore"
+	coreoidc "github.com/perber/wiki/internal/core/oidc"
 	"github.com/perber/wiki/internal/core/revision"
 	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/favorites"
@@ -36,6 +37,7 @@ import (
 	wikiimporter "github.com/perber/wiki/internal/wiki/importer"
 	wikiinstancesettings "github.com/perber/wiki/internal/wiki/instancesettings"
 	wikilinks "github.com/perber/wiki/internal/wiki/links"
+	wikioidc "github.com/perber/wiki/internal/wiki/oidc"
 	wikipages "github.com/perber/wiki/internal/wiki/pages"
 	wikiproperties "github.com/perber/wiki/internal/wiki/properties"
 	wikirestore "github.com/perber/wiki/internal/wiki/restore"
@@ -65,6 +67,7 @@ type Wiki struct {
 	searchIndex       *search.SQLiteIndex
 	status            *search.IndexingStatus
 	storageDir        string
+	oidc              *coreoidc.Service
 	publicAccess      publicaccess.ReadGate
 	publicURL         string
 
@@ -94,6 +97,7 @@ type Wiki struct {
 	snapshotRoutes         *wikisnapshot.Routes
 	restoreRoutes          *wikirestore.Routes
 	instanceSettingsRoutes *wikiinstancesettings.Routes
+	oidcRoutes             *wikioidc.Routes
 	resyncRoutes           *wikiresync.Routes
 	resyncJob              *wikiresync.ResyncJob
 	ignoreCache            *ignore.Cache
@@ -126,6 +130,7 @@ type WikiOptions struct {
 	TOTPEncryptionKey       string        // Key used to encrypt per-user TOTP secrets at rest; empty disables TOTP self-service
 	SMTP                    email.Config  // SMTP config for password-reset/invite email; SMTP.Enabled()==false disables the feature entirely
 	Metrics                 *httpmetrics.HTTPMetrics
+	OIDC                    coreoidc.Config // OIDC login config; OIDC.Enabled()==false disables the feature entirely
 	// PublicAccess is the runtime public-access setting, read per request by
 	// features that serve anonymous visitors (search engine rendering). nil
 	// means public access is off.
@@ -160,6 +165,9 @@ func NewWiki(options *WikiOptions) (*Wiki, error) {
 
 func (w *Wiki) boot(options *WikiOptions) error {
 	if err := w.initAuth(options); err != nil {
+		return err
+	}
+	if err := w.initOIDC(options); err != nil {
 		return err
 	}
 	if err := w.initEmail(options); err != nil {
@@ -303,6 +311,12 @@ func (w *Wiki) StateStores() []restore.LiveStore {
 // nil-checks it and returns ErrEmailDisabled.
 func (w *Wiki) EmailTokenService() *auth.EmailTokenService {
 	return w.emailTokenService
+}
+
+// OIDCService returns the OIDC service, or nil if no issuer was configured
+// (or auth is disabled) — see initOIDC.
+func (w *Wiki) OIDCService() *coreoidc.Service {
+	return w.oidc
 }
 
 func (w *Wiki) Close() error {

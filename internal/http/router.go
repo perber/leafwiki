@@ -84,20 +84,32 @@ func loggedPath(c *gin.Context, capabilities *capabilityPrefixes) string {
 	return path
 }
 
-// redactLoggedQuery replaces the value of the token query parameter, which
-// carries the secret of invite and password-reset links (see
-// auth.EmailTokenService.buildLink), so the request log never holds a usable
-// link. A query without a token is logged exactly as sent. One with a token
-// is re-encoded with sorted keys. A query that doesn't parse is re-encoded
-// too, because a token may hide in the part that failed to parse.
+// redactedQueryParams are query keys whose value is a usable credential and
+// must never reach the request log: "token" carries the secret of invite and
+// password-reset links (see auth.EmailTokenService.buildLink); "code" and
+// "state" are the authorization code and CSRF/PKCE state on
+// GET /login/oidc/callback (see oidc.Routes.handleCallback) — the code is
+// single-use and bound to a PKCE verifier only this server holds, so the risk
+// is low, but it's still a real, if short-lived, credential and has no
+// business sitting in a log file.
+var redactedQueryParams = []string{"token", "code", "state"}
+
+// redactLoggedQuery replaces the value of each key in redactedQueryParams, so
+// the request log never holds a usable credential. A query with none of them
+// is logged exactly as sent. One with any of them is re-encoded with sorted
+// keys. A query that doesn't parse is re-encoded too, because a redacted key
+// may hide in the part that failed to parse.
 func redactLoggedQuery(raw string) string {
 	values, err := url.ParseQuery(raw)
-	_, hasToken := values["token"]
-	if !hasToken && err == nil {
-		return raw
+	hasRedacted := false
+	for _, key := range redactedQueryParams {
+		if _, ok := values[key]; ok {
+			hasRedacted = true
+			values.Set(key, "REDACTED")
+		}
 	}
-	if hasToken {
-		values.Set("token", "REDACTED")
+	if !hasRedacted && err == nil {
+		return raw
 	}
 	return values.Encode()
 }
@@ -161,6 +173,9 @@ type RouterOptions struct {
 	DefaultLanguage         string                   // Optional default UI language code (e.g. "de"); frontend applies it only if it matches a language it ships
 	LoginURL                string                   // Optional URL the frontend redirects to instead of showing the built-in login form
 	LogoutURL               string                   // Optional URL the frontend redirects to after logout
+	OIDCEnabled             bool                     // Whether native OIDC login is configured
+	OIDCButtonLabel         string                   // Label for the "Log in with ..." button
+	OIDCOnly                bool                     // When true, the frontend hides the local login form except via the ?local=1 escape hatch
 	WriteGate               *restore.WriteGate       // Optional; when set, gates mutating requests while a restore is in progress. nil disables the middleware entirely (no snapshot/restore enabled)
 
 	// TrustedProxies are the proxies whose X-Forwarded-For is believed when
@@ -219,6 +234,7 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 
 	authCookies := auth_middleware.NewAuthCookies(opts.AllowInsecure, opts.AccessTokenTimeout, opts.RefreshTokenTimeout)
 	csrfCookie := security.NewCSRFCookie(opts.AllowInsecure, 3*24*time.Hour)
+	oidcStateCookie := auth_middleware.NewOIDCStateCookie(opts.AllowInsecure, 10*time.Minute)
 
 	capabilities := &capabilityPrefixes{}
 	engine := gin.New()
@@ -276,12 +292,13 @@ func NewRouter(registrars []RouteRegistrar, frontendCfg FrontendConfig, opts Rou
 	}
 
 	ctx := RouterContext{
-		Engine:       engine,
-		Base:         base,
-		AuthCookies:  authCookies,
-		CSRFCookie:   csrfCookie,
-		Opts:         opts,
-		capabilities: capabilities,
+		Engine:          engine,
+		Base:            base,
+		AuthCookies:     authCookies,
+		CSRFCookie:      csrfCookie,
+		OIDCStateCookie: oidcStateCookie,
+		Opts:            opts,
+		capabilities:    capabilities,
 	}
 
 	for _, r := range registrars {

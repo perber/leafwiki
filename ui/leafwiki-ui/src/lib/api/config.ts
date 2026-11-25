@@ -45,6 +45,9 @@ export type Config = {
   logoutUrl: string
   userManagementUrl: string
   defaultLanguage: string
+  oidcEnabled: boolean
+  oidcButtonLabel: string
+  oidcOnly: boolean
 }
 
 export async function getConfig(): Promise<Config> {
