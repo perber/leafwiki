@@ -3,6 +3,7 @@ import { EditorSelection, EditorState, Transaction } from '@codemirror/state'
 import { EditorView, keymap, runScopeHandlers } from '@codemirror/view'
 import { describe, expect, it } from 'vitest'
 import {
+  formatDocument,
   replaceFilenameInText,
   tabIndentKeyBinding,
   tabIndentUnit,
@@ -311,5 +312,32 @@ describe('replaceFilenameInText', () => {
     expect(result).toBe(
       '![foo.png](/assets/foo.png) and ![new-name.png](/assets/new-name.png)',
     )
+  })
+})
+
+describe('formatDocument', () => {
+  function viewWith(doc: string, cursor: number) {
+    return new EditorView({
+      state: EditorState.create({
+        doc,
+        selection: EditorSelection.cursor(cursor),
+      }),
+    })
+  }
+
+  it('formats the doc and keeps a cursor that sits before the change', () => {
+    const view = viewWith('# Title\ntext \n\n\nmore', 3)
+    formatDocument(view)
+    expect(view.state.doc.toString()).toBe('# Title\n\ntext\n\nmore\n')
+    expect(view.state.selection.main.head).toBe(3)
+    view.destroy()
+  })
+
+  it('dispatches nothing when the doc is already formatted', () => {
+    const view = viewWith('text\n', 0)
+    const before = view.state
+    formatDocument(view)
+    expect(view.state).toBe(before)
+    view.destroy()
   })
 })
