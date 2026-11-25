@@ -39,10 +39,10 @@ func configureClientAddress(engine *gin.Engine, trusted *auth_middleware.Trusted
 // ignored in that case, and the common cause is a reverse proxy missing from
 // --trusted-proxy-ips: every visitor then shares the proxy's address. A direct
 // client can send the header as well, so the wording does not assume a proxy.
-func warnOnUntrustedForwarding(logger *slog.Logger, trusted *auth_middleware.TrustedProxies) gin.HandlerFunc {
+func warnOnUntrustedForwarding(logger *slog.Logger, engine *gin.Engine) gin.HandlerFunc {
 	var once sync.Once
 	return func(c *gin.Context) {
-		if hasForwardingHeader(c.Request) && !peerIsTrusted(c.Request, trusted) {
+		if hasForwardingHeader(c.Request) && !peerIsTrusted(c, engine) {
 			once.Do(func() {
 				logger.Warn("forwarding header from an untrusted peer ignored; "+
 					"if this is your reverse proxy, list it in --trusted-proxy-ips",
@@ -57,15 +57,27 @@ func hasForwardingHeader(r *http.Request) bool {
 	return r.Header.Get("X-Forwarded-For") != "" || r.Header.Get("X-Real-IP") != ""
 }
 
-// peerIsTrusted mirrors what configureClientAddress makes gin do, to decide
-// whether a forwarding header is believed: a unix-socket peer is believed when
-// at least one proxy is listed, any other peer when it is in the list. It is a
-// mirror because gin does not expose its decision. InjectRemoteUser asks a
-// different question (is the immediate TCP peer a proxy) and keeps using
-// IsTrusted.
-func peerIsTrusted(r *http.Request, trusted *auth_middleware.TrustedProxies) bool {
-	if addr, ok := r.Context().Value(http.LocalAddrContextKey).(net.Addr); ok && strings.HasPrefix(addr.Network(), "unix") {
-		return len(trusted.Entries()) > 0
+// peerIsTrusted reports whether gin itself believed the forwarding header on
+// this request, reading that decision back instead of reimplementing gin's
+// CIDR matching (the previous version of this function did, and could
+// silently drift from gin's actual behavior on a library upgrade).
+//
+// For a non-unix peer, gin's own (*Context).ClientIP applies the header only
+// when it trusted the peer and the header parsed: it returns the header's
+// value in that case, and RemoteIP() unchanged otherwise. Comparing the two
+// — both already computed by gin, not by us — reads that decision back
+// exactly, for whatever CIDR/IP-matching rules gin currently implements.
+//
+// A unix-socket peer is a special case gin's ClientIP doesn't expose this
+// way: gin always treats it as locally trusted, so ClientIP alone can't tell
+// "trusted, no header to apply" apart from "trusted, header applied but
+// coincidentally identical." configureClientAddress is the one place that
+// already decides whether the header is honored at all on a unix listener
+// (ForwardedByClientIP, gated on whether any proxy was configured) — read
+// that resolved field back directly rather than recomputing it.
+func peerIsTrusted(c *gin.Context, engine *gin.Engine) bool {
+	if addr, ok := c.Request.Context().Value(http.LocalAddrContextKey).(net.Addr); ok && strings.HasPrefix(addr.Network(), "unix") {
+		return engine.ForwardedByClientIP
 	}
-	return trusted != nil && trusted.IsTrusted(r.RemoteAddr)
+	return c.ClientIP() != c.RemoteIP()
 }
