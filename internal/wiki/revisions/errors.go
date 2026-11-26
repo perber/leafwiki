@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
+	"github.com/perber/wiki/internal/http/dto"
 )
 
 const (
@@ -31,22 +32,9 @@ const (
 	ErrCodeRevisionInternalError               = "revision_internal_error"
 )
 
-// RevisionErrorResponse is the structured JSON error body returned by revision endpoints.
-type RevisionErrorResponse struct {
-	Error RevisionErrorDetail `json:"error"`
-}
-
-// RevisionErrorDetail carries the localization-ready error data.
-type RevisionErrorDetail struct {
-	Code     string   `json:"code"`
-	Message  string   `json:"message"`
-	Template string   `json:"template"`
-	Args     []string `json:"args,omitempty"`
-}
-
 func respondWithRevisionStatusError(c *gin.Context, status int, code, message, template string, args ...string) {
-	c.JSON(status, RevisionErrorResponse{
-		Error: RevisionErrorDetail{
+	c.JSON(status, dto.ErrorResponse{
+		Error: dto.ErrorDetail{
 			Code:     code,
 			Message:  message,
 			Template: template,
