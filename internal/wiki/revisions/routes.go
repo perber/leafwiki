@@ -110,14 +110,7 @@ func (r *Routes) handleListRevisions(c *gin.Context) {
 		return
 	}
 
-	result := make([]*RevisionResponse, 0, len(out.Revisions))
-	for _, rev := range out.Revisions {
-		result = append(result, toRevisionResponse(rev, r.userResolver))
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"revisions":  result,
-		"nextCursor": out.NextCursor,
-	})
+	c.JSON(http.StatusOK, toRevisionListResponse(out, r.userResolver))
 }
 
 func (r *Routes) handleGetRevision(c *gin.Context) {
