@@ -263,6 +263,9 @@ type opSpec struct {
 	// okFile requires the 200 schema to be a file (a download) instead of a
 	// model or an array.
 	okFile bool
+	// produces, when set, is the exact list of content types the operation
+	// declares; nil leaves it unchecked.
+	produces []string
 	// refs maps a status to the model suffix its schema references.
 	refs map[string]string
 	// broad maps a status with several real shapes to the model names its
@@ -357,6 +360,18 @@ func assertOperation(t *testing.T, doc map[string]any, spec opSpec) {
 	}
 	assertParams(t, "query", gotQuery, spec.query)
 	assertParams(t, "path", gotPath, spec.pathParams)
+
+	if spec.produces != nil {
+		raw, _ := op["produces"].([]any)
+		got := make([]string, 0, len(raw))
+		for _, p := range raw {
+			s, _ := p.(string)
+			got = append(got, s)
+		}
+		if !slices.Equal(got, spec.produces) {
+			t.Errorf("produces = %v, want %v", op["produces"], spec.produces)
+		}
+	}
 
 	responses := docObject(t, op, "responses")
 	ok := docObject(t, responses, "200", "schema")
@@ -580,18 +595,12 @@ func TestAPIDocs_Revisions_DescribeReadOperations(t *testing.T) {
 	asset := read("/pages/{id}/revisions/{revisionId}/assets/{name}")
 	asset.pathParams = map[string]queryParam{"id": {"string", true}, "revisionId": {"string", true}, "name": {"string", true}}
 	asset.okFile = true
+	asset.produces = []string{"application/octet-stream"}
 
 	doc := readAPIDocument(t, "swagger.json")
 	for _, spec := range []opSpec{list, latest, compare, get, asset} {
 		t.Run(spec.path, func(t *testing.T) { assertOperation(t, doc, spec) })
 	}
-
-	t.Run("asset is a download", func(t *testing.T) {
-		op := docObject(t, doc, "paths", asset.path, "get")
-		if produces, _ := op["produces"].([]any); len(produces) != 1 || produces[0] != "application/octet-stream" {
-			t.Errorf("produces = %v, want [application/octet-stream]", op["produces"])
-		}
-	})
 
 	t.Run("nested models", func(t *testing.T) {
 		refs := map[string]string{
