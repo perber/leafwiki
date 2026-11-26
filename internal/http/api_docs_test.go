@@ -30,6 +30,7 @@ import (
 	"github.com/perber/wiki/internal/wiki/health"
 	wikiinstancesettings "github.com/perber/wiki/internal/wiki/instancesettings"
 	wikirestore "github.com/perber/wiki/internal/wiki/restore"
+	"github.com/perber/wiki/internal/wiki/revisions"
 	wikisnapshot "github.com/perber/wiki/internal/wiki/snapshot"
 	"gopkg.in/yaml.v3"
 )
@@ -259,6 +260,9 @@ type opSpec struct {
 	arrayOfProps map[string]string
 	okRef        string
 	okProps      map[string]string
+	// okFile requires the 200 schema to be a file (a download) instead of a
+	// model or an array.
+	okFile bool
 	// refs maps a status to the model suffix its schema references.
 	refs map[string]string
 	// broad maps a status with several real shapes to the model names its
@@ -285,6 +289,16 @@ func apiReadGroupGET(path, tag string) opSpec {
 		broad:               map[string][]string{"500": {"ErrorResponse", "LegacyError"}},
 		absent:              []string{"403"},
 	}
+}
+
+// apiAuthGroupGET is the spec of a GET behind RouterContext.APIAuthGroup
+// without a role guard: the statuses of apiReadGroupGET, but RequireAuth
+// instead of RequireAuthOrPublicRead, so any signed-in role reads and public
+// access does not open it; the description must say so.
+func apiAuthGroupGET(path, tag string) opSpec {
+	spec := apiReadGroupGET(path, tag)
+	spec.descriptionMentions = append(spec.descriptionMentions, "public access does not open it")
+	return spec
 }
 
 // assertParams compares the documented parameters of one kind with the wanted
@@ -346,13 +360,18 @@ func assertOperation(t *testing.T, doc map[string]any, spec opSpec) {
 
 	responses := docObject(t, op, "responses")
 	ok := docObject(t, responses, "200", "schema")
-	if spec.okRef != "" {
+	switch {
+	case spec.okFile:
+		if docString(ok, "type") != "file" || ok["$ref"] != nil {
+			t.Errorf("200 schema = %v, want a file", ok)
+		}
+	case spec.okRef != "":
 		name, model := resolveDefinition(t, doc, ok)
 		if !strings.HasSuffix(name, spec.okRef) {
 			t.Errorf("200 references %q, want %s", name, spec.okRef)
 		}
 		assertProperties(t, model, spec.okProps)
-	} else {
+	default:
 		if docString(ok, "type") != "array" {
 			t.Fatalf("200 schema = %v, want an array", ok)
 		}
@@ -512,33 +531,134 @@ func TestAPIDocs_Links_DescribeOperations(t *testing.T) {
 	})
 }
 
+func TestAPIDocs_Revisions_DescribeReadOperations(t *testing.T) {
+	revisionProps := map[string]string{
+		"id": "string", "pageId": "string", "parentId": "string", "type": "string", "authorId": "string", "author": "",
+		"createdAt": "string", "title": "string", "slug": "string", "kind": "string", "path": "string",
+		"contentHash": "string", "assetManifestHash": "string", "pageCreatedAt": "string", "pageUpdatedAt": "string",
+		"creatorId": "string", "lastAuthorId": "string", "summary": "string",
+	}
+	pageID := map[string]queryParam{"id": {"string", true}}
+	revisionPath := map[string]queryParam{"id": {"string", true}, "revisionId": {"string", true}}
+	read := func(path string) opSpec {
+		spec := apiAuthGroupGET(path, "revisions")
+		spec.descriptionMentions = append(spec.descriptionMentions, "--enable-revision")
+		spec.refs["404"] = "ErrorResponse"
+		return spec
+	}
+
+	// An unknown page has no revisions: 200 with an empty list, so no 404 is
+	// documented. The 404 without --enable-revision is the router's, not an
+	// operation response, and the Access text describes it.
+	list := read("/pages/{id}/revisions")
+	list.pathParams = pageID
+	list.query = map[string]queryParam{"limit": {"integer", false}, "cursor": {"string", false}}
+	list.okRef = "revisions.RevisionListResponse"
+	list.okProps = map[string]string{"nextCursor": "string", "revisions": "array"}
+	delete(list.refs, "404")
+	list.absent = append(list.absent, "404")
+
+	latest := read("/pages/{id}/revisions/latest")
+	latest.pathParams = pageID
+	latest.okRef = "revisions.RevisionResponse"
+	latest.okProps = revisionProps
+
+	compare := read("/pages/{id}/revisions/compare")
+	compare.pathParams = pageID
+	compare.query = map[string]queryParam{"base": {"string", true}, "target": {"string", true}}
+	compare.okRef = "revisions.RevisionComparisonResponse"
+	compare.okProps = map[string]string{"base": "", "target": "", "contentChanged": "boolean", "assetChanges": "array"}
+
+	get := read("/pages/{id}/revisions/{revisionId}")
+	get.pathParams = revisionPath
+	get.okRef = "revisions.RevisionSnapshotResponse"
+	get.okProps = map[string]string{"revision": "", "content": "string", "assets": "array"}
+	// An empty revision ID is redirected by the router before the handler runs
+	// (TestRevisionRoutes_EmptyPathSegments); the description has to say so.
+	get.descriptionMentions = append(get.descriptionMentions, "301")
+
+	asset := read("/pages/{id}/revisions/{revisionId}/assets/{name}")
+	asset.pathParams = map[string]queryParam{"id": {"string", true}, "revisionId": {"string", true}, "name": {"string", true}}
+	asset.okFile = true
+
+	doc := readAPIDocument(t, "swagger.json")
+	for _, spec := range []opSpec{list, latest, compare, get, asset} {
+		t.Run(spec.path, func(t *testing.T) { assertOperation(t, doc, spec) })
+	}
+
+	t.Run("asset is a download", func(t *testing.T) {
+		op := docObject(t, doc, "paths", asset.path, "get")
+		if produces, _ := op["produces"].([]any); len(produces) != 1 || produces[0] != "application/octet-stream" {
+			t.Errorf("produces = %v, want [application/octet-stream]", op["produces"])
+		}
+	})
+
+	t.Run("nested models", func(t *testing.T) {
+		refs := map[string]string{
+			"revisions.RevisionResponse/author":           "#/definitions/dto.UserLabel",
+			"revisions.RevisionSnapshotResponse/revision": "#/definitions/revisions.RevisionResponse",
+			"revisions.RevisionComparisonResponse/base":   "#/definitions/revisions.RevisionSnapshotResponse",
+			"revisions.RevisionComparisonResponse/target": "#/definitions/revisions.RevisionSnapshotResponse",
+		}
+		for at, want := range refs {
+			model, prop, _ := strings.Cut(at, "/")
+			if got := docString(docObject(t, doc, "definitions", model, "properties", prop), "$ref"); got != want {
+				t.Errorf("%s references %q, want %q", at, got, want)
+			}
+		}
+		items := map[string]string{
+			"revisions.RevisionListResponse/revisions":          "#/definitions/revisions.RevisionResponse",
+			"revisions.RevisionSnapshotResponse/assets":         "#/definitions/revisions.RevisionAssetResponse",
+			"revisions.RevisionComparisonResponse/assetChanges": "#/definitions/revisions.RevisionAssetDeltaResponse",
+		}
+		for at, want := range items {
+			model, prop, _ := strings.Cut(at, "/")
+			if got := docString(docObject(t, doc, "definitions", model, "properties", prop, "items"), "$ref"); got != want {
+				t.Errorf("%s items reference %q, want %q", at, got, want)
+			}
+		}
+		assertProperties(t, docObject(t, doc, "definitions", "revisions.RevisionAssetResponse"), map[string]string{
+			"name": "string", "sha256": "string", "sizeBytes": "integer", "mimeType": "string",
+		})
+		assertProperties(t, docObject(t, doc, "definitions", "revisions.RevisionAssetDeltaResponse"), map[string]string{
+			"name": "string", "status": "string",
+		})
+	})
+}
+
 // documentedModels maps every definition in the spec to the Go type swag
 // generated it from. A new documented model must be added here, so its
 // required list is checked against the code.
 var documentedModels = map[string]reflect.Type{
-	"dto.Backlink":            reflect.TypeFor[dto.Backlink](),
-	"dto.BrokenLink":          reflect.TypeFor[dto.BrokenLink](),
-	"dto.BrokenLinks":         reflect.TypeFor[dto.BrokenLinks](),
-	"dto.ErrorDetail":         reflect.TypeFor[dto.ErrorDetail](),
-	"dto.ErrorResponse":       reflect.TypeFor[dto.ErrorResponse](),
-	"dto.IndexingStatus":      reflect.TypeFor[dto.IndexingStatus](),
-	"dto.LegacyError":         reflect.TypeFor[dto.LegacyError](),
-	"dto.LinkStatus":          reflect.TypeFor[dto.LinkStatus](),
-	"dto.LinkStatusCounts":    reflect.TypeFor[dto.LinkStatusCounts](),
-	"dto.OutgoingLink":        reflect.TypeFor[dto.OutgoingLink](),
-	"dto.PropertyEntry":       reflect.TypeFor[dto.PropertyEntry](),
-	"dto.PropertyKeyCount":    reflect.TypeFor[dto.PropertyKeyCount](),
-	"dto.PropertyPage":        reflect.TypeFor[dto.PropertyPage](),
-	"dto.SearchResult":        reflect.TypeFor[dto.SearchResult](),
-	"dto.SearchResultItem":    reflect.TypeFor[dto.SearchResultItem](),
-	"dto.SearchTagFacet":      reflect.TypeFor[dto.SearchTagFacet](),
-	"dto.TagCount":            reflect.TypeFor[dto.TagCount](),
-	"dto.TaggedPage":          reflect.TypeFor[dto.TaggedPage](),
-	"dto.UserLabel":           reflect.TypeFor[dto.UserLabel](),
-	"health.HealthResponse":   reflect.TypeFor[health.HealthResponse](),
-	"scopedread.LinkView":     reflect.TypeFor[scopedread.LinkView](),
-	"scopedread.PageView":     reflect.TypeFor[scopedread.PageView](),
-	"scopedread.TreeNodeView": reflect.TypeFor[scopedread.TreeNodeView](),
+	"dto.Backlink":                         reflect.TypeFor[dto.Backlink](),
+	"dto.BrokenLink":                       reflect.TypeFor[dto.BrokenLink](),
+	"dto.BrokenLinks":                      reflect.TypeFor[dto.BrokenLinks](),
+	"dto.ErrorDetail":                      reflect.TypeFor[dto.ErrorDetail](),
+	"dto.ErrorResponse":                    reflect.TypeFor[dto.ErrorResponse](),
+	"dto.IndexingStatus":                   reflect.TypeFor[dto.IndexingStatus](),
+	"dto.LegacyError":                      reflect.TypeFor[dto.LegacyError](),
+	"dto.LinkStatus":                       reflect.TypeFor[dto.LinkStatus](),
+	"dto.LinkStatusCounts":                 reflect.TypeFor[dto.LinkStatusCounts](),
+	"dto.OutgoingLink":                     reflect.TypeFor[dto.OutgoingLink](),
+	"dto.PropertyEntry":                    reflect.TypeFor[dto.PropertyEntry](),
+	"dto.PropertyKeyCount":                 reflect.TypeFor[dto.PropertyKeyCount](),
+	"dto.PropertyPage":                     reflect.TypeFor[dto.PropertyPage](),
+	"dto.SearchResult":                     reflect.TypeFor[dto.SearchResult](),
+	"dto.SearchResultItem":                 reflect.TypeFor[dto.SearchResultItem](),
+	"dto.SearchTagFacet":                   reflect.TypeFor[dto.SearchTagFacet](),
+	"dto.TagCount":                         reflect.TypeFor[dto.TagCount](),
+	"dto.TaggedPage":                       reflect.TypeFor[dto.TaggedPage](),
+	"dto.UserLabel":                        reflect.TypeFor[dto.UserLabel](),
+	"health.HealthResponse":                reflect.TypeFor[health.HealthResponse](),
+	"revisions.RevisionAssetDeltaResponse": reflect.TypeFor[revisions.RevisionAssetDeltaResponse](),
+	"revisions.RevisionAssetResponse":      reflect.TypeFor[revisions.RevisionAssetResponse](),
+	"revisions.RevisionComparisonResponse": reflect.TypeFor[revisions.RevisionComparisonResponse](),
+	"revisions.RevisionListResponse":       reflect.TypeFor[revisions.RevisionListResponse](),
+	"revisions.RevisionResponse":           reflect.TypeFor[revisions.RevisionResponse](),
+	"revisions.RevisionSnapshotResponse":   reflect.TypeFor[revisions.RevisionSnapshotResponse](),
+	"scopedread.LinkView":                  reflect.TypeFor[scopedread.LinkView](),
+	"scopedread.PageView":                  reflect.TypeFor[scopedread.PageView](),
+	"scopedread.TreeNodeView":              reflect.TypeFor[scopedread.TreeNodeView](),
 }
 
 // alwaysPresentJSONFields lists the JSON keys of a struct's fields without
