@@ -23,6 +23,7 @@ import (
 	"github.com/perber/wiki/internal/core/tree"
 	httpinternal "github.com/perber/wiki/internal/http"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
+	"github.com/perber/wiki/internal/importer"
 	"github.com/perber/wiki/internal/pagedisplay"
 	"github.com/perber/wiki/internal/publicaccess"
 	"github.com/perber/wiki/internal/test_utils"
@@ -1703,6 +1704,52 @@ func TestCancelImportPlanEndpoint(t *testing.T) {
 	}
 }
 
+// importCompletionTimeout is generous because the Windows CI runner can take well over 5 s to
+// finish a small import (#1875); green runs return as soon as the import is completed.
+const importCompletionTimeout = 30 * time.Second
+
+// waitForImportCompleted polls GET /api/import/plan until the import reaches a terminal status.
+// On completed it decodes the final response into out; on failed or canceled it fails at once.
+func waitForImportCompleted(t *testing.T, router http.Handler, cookies []*http.Cookie, out any) {
+	t.Helper()
+
+	var status struct {
+		ExecutionStatus importer.ExecutionStatus `json:"execution_status"`
+	}
+	var lastBody string
+	deadline := time.Now().Add(importCompletionTimeout)
+	for time.Now().Before(deadline) {
+		statusReq := httptest.NewRequest(http.MethodGet, "/api/import/plan", nil)
+		for _, cookie := range cookies {
+			statusReq.AddCookie(cookie)
+		}
+
+		statusRec := httptest.NewRecorder()
+		router.ServeHTTP(statusRec, statusReq)
+
+		if statusRec.Code != http.StatusOK {
+			t.Fatalf("Expected status 200 when fetching import plan, got %d: %s", statusRec.Code, statusRec.Body.String())
+		}
+		lastBody = statusRec.Body.String()
+		if err := json.Unmarshal(statusRec.Body.Bytes(), &status); err != nil {
+			t.Fatalf("Invalid import status response JSON: %v", err)
+		}
+		switch status.ExecutionStatus {
+		case importer.ExecutionStatusCompleted:
+			if err := json.Unmarshal(statusRec.Body.Bytes(), out); err != nil {
+				t.Fatalf("Invalid import status response JSON: %v", err)
+			}
+			return
+		case importer.ExecutionStatusFailed, importer.ExecutionStatusCanceled:
+			t.Fatalf("import ended with status %q instead of completed: %s", status.ExecutionStatus, lastBody)
+		}
+
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	t.Fatalf("import not completed within %s, last status %q: %s", importCompletionTimeout, status.ExecutionStatus, lastBody)
+}
+
 func TestImportExecuteEndpoint_WithZipUpload_ImportsPagesLinksAndAssets(t *testing.T) {
 	w := createWikiTestInstance(t)
 	defer test_utils.WrapCloseWithErrorCheck(w.Close, t)
@@ -1818,28 +1865,7 @@ func TestImportExecuteEndpoint_WithZipUpload_ImportsPagesLinksAndAssets(t *testi
 		} `json:"execution_result"`
 	}
 
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		statusReq := httptest.NewRequest(http.MethodGet, "/api/import/plan", nil)
-		for _, cookie := range cookies {
-			statusReq.AddCookie(cookie)
-		}
-
-		statusRec := httptest.NewRecorder()
-		router.ServeHTTP(statusRec, statusReq)
-
-		if statusRec.Code != http.StatusOK {
-			t.Fatalf("Expected status 200 when fetching import plan, got %d: %s", statusRec.Code, statusRec.Body.String())
-		}
-		if err := json.Unmarshal(statusRec.Body.Bytes(), &completedResp); err != nil {
-			t.Fatalf("Invalid import status response JSON: %v", err)
-		}
-		if completedResp.ExecutionStatus == "completed" {
-			break
-		}
-
-		time.Sleep(50 * time.Millisecond)
-	}
+	waitForImportCompleted(t, router, cookies, &completedResp)
 
 	if completedResp.ExecutionStatus != "completed" || completedResp.ExecutionResult == nil {
 		t.Fatalf("expected completed execution result, got %#v", completedResp)
@@ -1985,28 +2011,7 @@ func TestImportExecuteEndpoint_UsesConfiguredAssetUploadLimit(t *testing.T) {
 		} `json:"execution_result"`
 	}
 
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		statusReq := httptest.NewRequest(http.MethodGet, "/api/import/plan", nil)
-		for _, cookie := range cookies {
-			statusReq.AddCookie(cookie)
-		}
-
-		statusRec := httptest.NewRecorder()
-		router.ServeHTTP(statusRec, statusReq)
-
-		if statusRec.Code != http.StatusOK {
-			t.Fatalf("Expected status 200 when fetching import plan, got %d: %s", statusRec.Code, statusRec.Body.String())
-		}
-		if err := json.Unmarshal(statusRec.Body.Bytes(), &completedResp); err != nil {
-			t.Fatalf("Invalid import status response JSON: %v", err)
-		}
-		if completedResp.ExecutionStatus == "completed" {
-			break
-		}
-
-		time.Sleep(50 * time.Millisecond)
-	}
+	waitForImportCompleted(t, router, cookies, &completedResp)
 
 	if completedResp.ExecutionStatus != "completed" || completedResp.ExecutionResult == nil {
 		t.Fatalf("expected completed execution result, got %#v", completedResp)
