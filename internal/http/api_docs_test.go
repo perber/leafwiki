@@ -601,37 +601,47 @@ func TestAPIDocs_Revisions_DescribeReadOperations(t *testing.T) {
 	for _, spec := range []opSpec{list, latest, compare, get, asset} {
 		t.Run(spec.path, func(t *testing.T) { assertOperation(t, doc, spec) })
 	}
+}
 
-	t.Run("nested models", func(t *testing.T) {
-		refs := map[string]string{
-			"revisions.RevisionResponse/author":           "#/definitions/dto.UserLabel",
-			"revisions.RevisionSnapshotResponse/revision": "#/definitions/revisions.RevisionResponse",
-			"revisions.RevisionComparisonResponse/base":   "#/definitions/revisions.RevisionSnapshotResponse",
-			"revisions.RevisionComparisonResponse/target": "#/definitions/revisions.RevisionSnapshotResponse",
-		}
-		for at, want := range refs {
-			model, prop, _ := strings.Cut(at, "/")
-			if got := docString(docObject(t, doc, "definitions", model, "properties", prop), "$ref"); got != want {
-				t.Errorf("%s references %q, want %q", at, got, want)
+// TestAPIDocs_Revisions_DescribeNestedModels checks that the revision
+// responses reference their nested models instead of inlining them, and the
+// properties of the two leaf models no operation answers with directly.
+func TestAPIDocs_Revisions_DescribeNestedModels(t *testing.T) {
+	doc := readAPIDocument(t, "swagger.json")
+
+	refs := []struct {
+		model, prop string
+		// items: the property is an array and its items carry the $ref.
+		items bool
+		want  string
+	}{
+		{model: "revisions.RevisionResponse", prop: "author", want: "dto.UserLabel"},
+		{model: "revisions.RevisionSnapshotResponse", prop: "revision", want: "revisions.RevisionResponse"},
+		{model: "revisions.RevisionComparisonResponse", prop: "base", want: "revisions.RevisionSnapshotResponse"},
+		{model: "revisions.RevisionComparisonResponse", prop: "target", want: "revisions.RevisionSnapshotResponse"},
+		{model: "revisions.RevisionListResponse", prop: "revisions", items: true, want: "revisions.RevisionResponse"},
+		{model: "revisions.RevisionSnapshotResponse", prop: "assets", items: true, want: "revisions.RevisionAssetResponse"},
+		{model: "revisions.RevisionComparisonResponse", prop: "assetChanges", items: true, want: "revisions.RevisionAssetDeltaResponse"},
+	}
+	for _, r := range refs {
+		t.Run(r.model+"/"+r.prop, func(t *testing.T) {
+			schema := docObject(t, doc, "definitions", r.model, "properties", r.prop)
+			what := "property"
+			if r.items {
+				schema = docObject(t, schema, "items")
+				what = "array items"
 			}
-		}
-		items := map[string]string{
-			"revisions.RevisionListResponse/revisions":          "#/definitions/revisions.RevisionResponse",
-			"revisions.RevisionSnapshotResponse/assets":         "#/definitions/revisions.RevisionAssetResponse",
-			"revisions.RevisionComparisonResponse/assetChanges": "#/definitions/revisions.RevisionAssetDeltaResponse",
-		}
-		for at, want := range items {
-			model, prop, _ := strings.Cut(at, "/")
-			if got := docString(docObject(t, doc, "definitions", model, "properties", prop, "items"), "$ref"); got != want {
-				t.Errorf("%s items reference %q, want %q", at, got, want)
+			if got, want := docString(schema, "$ref"), "#/definitions/"+r.want; got != want {
+				t.Errorf("%s reference %q, want %q", what, got, want)
 			}
-		}
-		assertProperties(t, docObject(t, doc, "definitions", "revisions.RevisionAssetResponse"), map[string]string{
-			"name": "string", "sha256": "string", "sizeBytes": "integer", "mimeType": "string",
 		})
-		assertProperties(t, docObject(t, doc, "definitions", "revisions.RevisionAssetDeltaResponse"), map[string]string{
-			"name": "string", "status": "string",
-		})
+	}
+
+	assertProperties(t, docObject(t, doc, "definitions", "revisions.RevisionAssetResponse"), map[string]string{
+		"name": "string", "sha256": "string", "sizeBytes": "integer", "mimeType": "string",
+	})
+	assertProperties(t, docObject(t, doc, "definitions", "revisions.RevisionAssetDeltaResponse"), map[string]string{
+		"name": "string", "status": "string",
 	})
 }
 
