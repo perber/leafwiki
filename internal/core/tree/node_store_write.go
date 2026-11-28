@@ -518,8 +518,9 @@ func (f *NodeStore) RenameNode(entry *PageNode, newSlug string) error {
 		return &InvalidOpError{Op: "RenameNode", Reason: "target path matches .leafwikiignore"}
 	}
 
-	// destination collision checks
-	if fileExists(newBase+".md") || fileExists(newBase) {
+	// destination collision checks; a destination that is the source itself
+	// (a case-only rename on a case-insensitive file system) is no collision
+	if takenByAnother(newBase+".md", oldBase+".md") || takenByAnother(newBase, oldBase) {
 		return &PageAlreadyExistsError{Path: newBase}
 	}
 	// perform rename based on kind

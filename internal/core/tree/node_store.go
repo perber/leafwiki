@@ -17,6 +17,19 @@ func fileExists(p string) bool {
 	return err == nil
 }
 
+// takenByAnother reports whether dst exists and is not src itself. On a
+// case-insensitive file system (Windows, macOS) the destination of a
+// case-only rename ("static" -> "Static") exists because it is the source,
+// and renaming onto it is fine.
+func takenByAnother(dst, src string) bool {
+	dstInfo, err := os.Stat(dst)
+	if err != nil {
+		return false
+	}
+	srcInfo, err := os.Stat(src)
+	return err != nil || !os.SameFile(dstInfo, srcInfo)
+}
+
 type ResolvedNode struct {
 	Kind       NodeKind
 	DirPath    string
