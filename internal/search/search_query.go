@@ -3,9 +3,18 @@ package search
 import (
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"unicode"
 	"unicode/utf8"
 )
+
+// parseSearchQueryCalls counts parseSearchQuery invocations — a test seam
+// (see TestSearchWithFacetIDs_ParsesQueryOnce) proving a caller that builds a
+// ParsedQuery once and reuses it via SQLiteIndex's *Parsed methods only pays
+// for one parse per request, instead of the up-to-three a naive
+// QueryTermCount + Search + SearchPageIDs call would have cost. Always-on
+// (not test-gated): one atomic add is negligible next to the parse itself.
+var parseSearchQueryCalls atomic.Int64
 
 // minSubstringTermRunes is the shortest literal word that also counts as a
 // substring term: a trigram index cannot match anything shorter.
@@ -48,6 +57,25 @@ func buildFuzzyQuery(q string) string {
 	return parseSearchQuery(q).fts
 }
 
+// ParsedQuery is a raw search query, classified once. A caller with its own
+// per-request cap check (e.g. the term-count cap in wiki/search.SearchUseCase)
+// can build one with ParseQuery and reuse it for TermCount and for
+// SQLiteIndex's *Parsed query methods, instead of having each re-derive the
+// same FTS5 expression from the raw string.
+type ParsedQuery struct {
+	q searchQuery
+}
+
+// ParseQuery parses raw user search input once. See ParsedQuery.
+func ParseQuery(q string) ParsedQuery {
+	return ParsedQuery{q: parseSearchQuery(q)}
+}
+
+// TermCount is QueryTermCount's result for the query p was parsed from.
+func (p ParsedQuery) TermCount() int {
+	return p.q.termCount
+}
+
 // parseSearchQuery turns raw user search input into a searchQuery.
 //
 // It classifies each whitespace-separated field independently rather than
@@ -60,6 +88,7 @@ func buildFuzzyQuery(q string) string {
 // error. Classifying field-by-field means one field's operator syntax can
 // no longer vouch for a different field's stray punctuation.
 func parseSearchQuery(q string) searchQuery {
+	parseSearchQueryCalls.Add(1)
 	q = strings.TrimSpace(q)
 	if q == "" {
 		return searchQuery{}
