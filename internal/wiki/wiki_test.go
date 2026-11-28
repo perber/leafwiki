@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/perber/wiki/internal/core/auth"
 	"github.com/perber/wiki/internal/core/shared/sqliteutil"
 	"github.com/perber/wiki/internal/core/tree"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
@@ -933,5 +934,52 @@ func TestNewWiki_ShareLinksFlag_ControlsDatabaseFile(t *testing.T) {
 		if err := w.Close(); err != nil {
 			t.Errorf("Close(enabled=%v): %v", enabled, err)
 		}
+	}
+}
+
+func TestNewWiki_RestartWithoutAdminPassword_SucceedsWhenAdminExists(t *testing.T) {
+	dir := t.TempDir()
+
+	initial, err := NewWiki(&WikiOptions{
+		StorageDir:          dir,
+		AdminPassword:       "adminpassword",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("initial NewWiki failed: %v", err)
+	}
+	if err := initial.Close(); err != nil {
+		t.Fatalf("initial Close failed: %v", err)
+	}
+
+	restarted, err := NewWiki(&WikiOptions{
+		StorageDir:          dir,
+		AdminPassword:       "",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("restart NewWiki without AdminPassword failed: %v", err)
+	}
+	defer test_utils.WrapCloseWithErrorCheck(restarted.Close, t)
+
+	if _, err := restarted.AuthService().Login("admin", "adminpassword", ""); err != nil {
+		t.Fatalf("expected existing admin credentials to remain valid after restart: %v", err)
+	}
+}
+
+func TestNewWiki_EmptyAdminPassword_FailsWithoutExistingAdmin(t *testing.T) {
+	_, err := NewWiki(&WikiOptions{
+		StorageDir:          t.TempDir(),
+		AdminPassword:       "",
+		JWTSecret:           "secretkey",
+		AccessTokenTimeout:  15 * time.Minute,
+		RefreshTokenTimeout: 7 * 24 * time.Hour,
+	})
+	if !errors.Is(err, auth.ErrAdminPasswordRequired) {
+		t.Fatalf("NewWiki error = %v, want auth.ErrAdminPasswordRequired", err)
 	}
 }

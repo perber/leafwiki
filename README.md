@@ -252,6 +252,11 @@ For API-only local development with Vite, use `make build-api` (or `make run`) i
 ./leafwiki reset-admin-password
 ```
 
+`--admin-password` / `LEAFWIKI_ADMIN_PASSWORD` is only needed until the first admin exists, so
+you can remove it from your configuration afterwards. If the wiki later has no admin at all,
+the server refuses to start with "admin password is required": set the password again to
+create a new admin, or run `reset-admin-password`.
+
 ### Restore a snapshot (offline)
 
 For disaster recovery or migrating to a fresh instance, restore a snapshot ZIP into the data directory while the server is stopped:
@@ -347,7 +352,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md#development-setup) for running the two sep
 | Flag | Description |
 |------|-------------|
 | `--jwt-secret` | Secret for signing JWTs. Keep it secure. |
-| `--admin-password` | Initial admin password (only applied if no admin exists yet). |
+| `--admin-password` | Initial admin password. Required on the first start; once an admin exists it is ignored and can be removed ([Reset admin password](#reset-admin-password)). |
 
 ### Optional admin identity
 
@@ -439,7 +444,7 @@ For plain HTTP: add `--allow-insecure=true` so login and CSRF cookies work.
 | `LEAFWIKI_PORT`                         | Port                                                 | `8080`        | –       |
 | `LEAFWIKI_UNIX_SOCKET`                  | Unix domain socket path; overrides host/port         | `""`          | v0.11.3 |
 | `LEAFWIKI_DATA_DIR`                     | Data directory path                                  | `./data`      | –       |
-| `LEAFWIKI_ADMIN_PASSWORD`               | Initial admin password *(required)*                  | –             | –       |
+| `LEAFWIKI_ADMIN_PASSWORD`               | Initial admin password (only applied if no admin exists yet; required on first start) | –             | –       |
 | `LEAFWIKI_ADMIN_USERNAME`               | Initial admin username (only applied if no admin exists yet) | `admin`       | v0.12.0 |
 | `LEAFWIKI_ADMIN_EMAIL`                  | Initial admin email (only applied if no admin exists yet) | `admin@localhost` | v0.12.0 |
 | `LEAFWIKI_EDITOR_LIMIT`                 | Maximum number of admin and editor users; `0` = unlimited | `0`  | v0.13.0 |

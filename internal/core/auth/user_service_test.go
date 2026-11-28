@@ -220,6 +220,32 @@ func TestUserService_InitDefaultAdmin_SkipsWhenAdminAlreadyExists(t *testing.T) 
 	}
 }
 
+func TestUserService_InitDefaultAdmin_EmptyPassword(t *testing.T) {
+	store, err := NewUserStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewUserStore failed: %v", err)
+	}
+	t.Cleanup(func() { test_utils.WrapCloseWithErrorCheck(store.Close, t) })
+	service := NewUserService(store)
+
+	err = service.InitDefaultAdmin("", "", "")
+	if !errors.Is(err, ErrAdminPasswordRequired) {
+		t.Fatalf("InitDefaultAdmin() error = %v, want ErrAdminPasswordRequired", err)
+	}
+
+	users, err := service.GetUsers()
+	if err != nil || len(users) != 0 {
+		t.Fatalf("Expected no admin user to be created, got: %+v (err=%v)", users, err)
+	}
+
+	if _, err := service.CreateUser("admin", "admin@localhost", "existingpass", RoleAdmin); err != nil {
+		t.Fatalf("CreateUser failed: %v", err)
+	}
+	if err := service.InitDefaultAdmin("", "", ""); err != nil {
+		t.Fatalf("InitDefaultAdmin with existing admin returned unexpected error: %v", err)
+	}
+}
+
 func TestUserService_ResetAdminUserPassword(t *testing.T) {
 	service := setupTestUserService(t)
 	defer test_utils.WrapCloseWithErrorCheck(service.Close, t)

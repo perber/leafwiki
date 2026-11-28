@@ -138,6 +138,17 @@ func runResetAdminPasswordCommand(cfg *serverConfig) error {
 	return nil
 }
 
+// adminPasswordRequiredMessage turns InitDefaultAdmin's ErrAdminPasswordRequired
+// (no admin exists yet and no bootstrap password was given) into the startup
+// message operators know. Once an admin exists, the password may be omitted
+// (#1799), so the check lives in InitDefaultAdmin, not in flag validation.
+func adminPasswordRequiredMessage(err error) (string, bool) {
+	if !errors.Is(err, auth.ErrAdminPasswordRequired) {
+		return "", false
+	}
+	return "admin password is required. Set it using --admin-password or LEAFWIKI_ADMIN_PASSWORD environment variable.", true
+}
+
 // runServerCommand is the root action: with no subcommand given, leafwiki runs
 // the wiki server.
 func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) error {
@@ -240,9 +251,6 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 			fail("JWT secret is required. Set it using --jwt-secret or LEAFWIKI_JWT_SECRET environment variable.")
 		}
 
-		if cfg.auth.adminPassword == "" {
-			fail("admin password is required. Set it using --admin-password or LEAFWIKI_ADMIN_PASSWORD environment variable.")
-		}
 	}
 
 	var metrics *httpmetrics.HTTPMetrics
@@ -293,6 +301,9 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 	if err != nil {
 		if msg, ok := corruptDatabaseMessage(err); ok {
 			fail(msg, "error", err)
+		}
+		if msg, ok := adminPasswordRequiredMessage(err); ok {
+			fail(msg)
 		}
 		fail("Failed to initialize Wiki", "error", err)
 	}

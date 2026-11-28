@@ -31,7 +31,7 @@ const (
 	catEmail     = "Email (SMTP)"
 )
 
-const rootUsageText = `leafwiki --jwt-secret <SECRET> --admin-password <PASSWORD> [--host <HOST>] [--port <PORT>] [--unix-socket <PATH>] [--data-dir <DIR>]
+const rootUsageText = `leafwiki --jwt-secret <SECRET> [--admin-password <PASSWORD>] [--host <HOST>] [--port <PORT>] [--unix-socket <PATH>] [--data-dir <DIR>]
 leafwiki --disable-auth [--host <HOST>] [--port <PORT>] [--unix-socket <PATH>] [--data-dir <DIR>]
 leafwiki reset-admin-password
 leafwiki [--data-dir <DIR>] restore-snapshot <path-to-zip>

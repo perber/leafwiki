@@ -17,6 +17,10 @@ stringData:
   jwt_secret: "generate-a-long-random-secret"
 ```
 
+`admin_password` is only used to create the first admin. Once the wiki has started with it,
+you can drop it from the Secret and the Deployment; if the wiki later has no admin, it refuses
+to start until you set it again or run `leafwiki reset-admin-password`.
+
 ## 2. Persistent storage
 
 ```yaml

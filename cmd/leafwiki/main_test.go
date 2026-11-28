@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -23,6 +24,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/perber/wiki/internal/core/auth"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
 )
 
@@ -1584,4 +1586,35 @@ func TestViteConfig_ResolvesVersionViaSharedScript(t *testing.T) {
 	if !strings.Contains(string(content), "scripts/resolve-version.sh") {
 		t.Fatalf("expected vite.config.ts to resolve its version via scripts/resolve-version.sh, got:\n%s", content)
 	}
+}
+
+func TestRootCommandUsage_AdminPasswordIsOptional(t *testing.T) {
+	var buf bytes.Buffer
+
+	cmd := newRootCommand()
+	cmd.Writer = &buf
+	cmd.ErrWriter = &buf
+	if err := cmd.Run(context.Background(), []string{"leafwiki", "--help"}); err != nil {
+		t.Fatalf("cmd.Run(--help) error = %v", err)
+	}
+
+	if !strings.Contains(buf.String(), "[--admin-password <PASSWORD>]") {
+		t.Fatalf("expected usage to mark --admin-password as optional, got:\n%s", buf.String())
+	}
+}
+
+func TestAdminPasswordRequiredMessage(t *testing.T) {
+	t.Run("maps a wrapped ErrAdminPasswordRequired to the startup message", func(t *testing.T) {
+		err := fmt.Errorf("init auth: %w", auth.ErrAdminPasswordRequired)
+		msg, ok := adminPasswordRequiredMessage(err)
+		if !ok || !strings.Contains(msg, "LEAFWIKI_ADMIN_PASSWORD") {
+			t.Fatalf("adminPasswordRequiredMessage() = %q, %v, want the admin password message", msg, ok)
+		}
+	})
+
+	t.Run("ignores other errors", func(t *testing.T) {
+		if msg, ok := adminPasswordRequiredMessage(auth.ErrPasswordTooShort); ok {
+			t.Fatalf("adminPasswordRequiredMessage(ErrPasswordTooShort) = %q, true, want false", msg)
+		}
+	})
 }
