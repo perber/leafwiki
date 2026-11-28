@@ -77,6 +77,7 @@
   "owning user not found": "No se encontró el usuario propietario",
   "page %s not found": "No se encontró la página %s",
   "page already exists": "La página ya existe",
+  "slug is reserved at the top level": "Este nombre está reservado para páginas de nivel superior",
   "page cannot be moved to itself": "La página no se puede mover a sí misma",
   "page has children": "La página tiene páginas secundarias; usa la eliminación recursiva",
   "page id is required": "Se requiere el ID de la página",

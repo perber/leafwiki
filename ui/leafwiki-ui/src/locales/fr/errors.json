@@ -77,6 +77,7 @@
   "owning user not found": "Utilisateur propriétaire introuvable",
   "page %s not found": "Page %s introuvable",
   "page already exists": "La page existe déjà",
+  "slug is reserved at the top level": "Ce nom est réservé pour les pages de premier niveau",
   "page cannot be moved to itself": "La page ne peut pas être déplacée vers elle-même",
   "page has children": "La page a des sous-pages, utilisez la suppression récursive",
   "page id is required": "L'identifiant de la page est requis",

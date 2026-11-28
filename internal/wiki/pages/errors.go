@@ -16,6 +16,7 @@ const (
 	ErrCodePageNotFound          = "page_not_found"
 	ErrCodePageParentNotFound    = "page_parent_not_found"
 	ErrCodePageSlugConflict      = "page_slug_conflict"
+	ErrCodePageSlugReserved      = "page_slug_reserved"
 	ErrCodePageHasChildren       = "page_has_children"
 	ErrCodePageCircularMove      = "page_circular_move"
 	ErrCodePageCannotMoveToSelf  = "page_cannot_move_to_self"
@@ -102,6 +103,8 @@ func respondWithPageError(c *gin.Context, err error) {
 		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageHasChildren, "Page has children, use recursive delete", "page has children")
 	case errors.Is(err, tree.ErrPageAlreadyExists):
 		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageSlugConflict, "Page already exists", "page already exists")
+	case errors.Is(err, tree.ErrSlugReserved):
+		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageSlugReserved, "This slug is reserved at the top level", "slug is reserved at the top level")
 	case errors.Is(err, tree.ErrMovePageCircularReference):
 		respondWithPageStatusError(c, http.StatusBadRequest, ErrCodePageCircularMove, "Move would create a circular reference", "circular reference detected")
 	case errors.Is(err, tree.ErrPageCannotBeMovedToItself):
@@ -125,7 +128,7 @@ func pageErrorStatus(code string) int {
 	switch code {
 	case ErrCodePageNotFound, ErrCodePageParentNotFound:
 		return http.StatusNotFound
-	case ErrCodePageHasChildren, ErrCodePageCircularMove, ErrCodePageCannotMoveToSelf, ErrCodePageSlugConflict,
+	case ErrCodePageHasChildren, ErrCodePageCircularMove, ErrCodePageCannotMoveToSelf, ErrCodePageSlugConflict, ErrCodePageSlugReserved,
 		ErrCodePageConvertNotAllowed, ErrCodePageRootOperation, ErrCodePageVersionRequired,
 		ErrCodePageMissingPath, ErrCodePageMissingID, ErrCodePageMissingTitle, ErrCodePageInvalidRequest,
 		ErrCodePageInvalidPayload, ErrCodePageInvalidTargetKind:

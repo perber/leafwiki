@@ -210,3 +210,16 @@ func TestGenerateUniqueChildSlug_SymbolOnlyTitleWithConflict(t *testing.T) {
 		t.Errorf("Expected 'page-2', got '%s'", got)
 	}
 }
+
+func TestGenerateUniqueChildSlug_SuffixesRootReservedSlugOnlyAtRoot(t *testing.T) {
+	s := NewSlugService()
+	root := &PageNode{ID: "root"}
+	section := &PageNode{ID: "docs", Parent: root}
+
+	if got := s.GenerateUniqueChildSlug(root, "", "Static"); got != "static-1" {
+		t.Fatalf("at root: got %q, want static-1", got)
+	}
+	if got := s.GenerateUniqueChildSlug(section, "", "Static"); got != "static" {
+		t.Fatalf("below root: got %q, want static", got)
+	}
+}

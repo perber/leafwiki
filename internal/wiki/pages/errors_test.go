@@ -1,12 +1,15 @@
 package pages
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	sharederrors "github.com/perber/wiki/internal/core/shared/errors"
+	"github.com/perber/wiki/internal/core/tree"
 	"github.com/perber/wiki/internal/favorites"
 )
 
@@ -34,5 +37,24 @@ func TestRespondWithPageError_FavoritesStoreUnavailable_Returns503(t *testing.T)
 
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+	}
+}
+
+// A slug reserved at the top level is a client error with its own code, not
+// the generic 500 the fallback would give.
+func TestRespondWithPageError_SlugReserved_Returns400(t *testing.T) {
+	t.Parallel()
+
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+
+	respondWithPageError(c, fmt.Errorf("slug 'static' is reserved at the top level: %w", tree.ErrSlugReserved))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(rec.Body.String(), ErrCodePageSlugReserved) {
+		t.Fatalf("body = %s, want code %s", rec.Body.String(), ErrCodePageSlugReserved)
 	}
 }
