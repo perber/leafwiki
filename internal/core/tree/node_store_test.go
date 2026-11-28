@@ -953,6 +953,40 @@ func TestNodeStore_RenameNode_RejectsDestinationCollision(t *testing.T) {
 	}
 }
 
+// A case-insensitive file system (Windows, macOS) reports the destination of
+// a case-only rename ("static" -> "Static") as existing, because it is the
+// source itself. A hard link stands in for that alias here: two names, one
+// file.
+func TestTakenByAnother_DestinationThatIsTheSourceIsFree(t *testing.T) {
+	tmp := t.TempDir()
+	src := filepath.Join(tmp, "static.md")
+	mustWriteFile(t, src, "# x", 0o644)
+	other := filepath.Join(tmp, "other.md")
+	mustWriteFile(t, other, "# y", 0o644)
+	alias := filepath.Join(tmp, "alias.md")
+	if err := os.Link(src, alias); err != nil {
+		t.Skipf("hard links not supported here: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		dst  string
+		want bool
+	}{
+		{name: "missing destination", dst: filepath.Join(tmp, "missing.md"), want: false},
+		{name: "another file", dst: other, want: true},
+		{name: "the source under another name", dst: alias, want: false},
+		{name: "the source itself", dst: src, want: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := takenByAnother(tc.dst, src); got != tc.want {
+				t.Errorf("takenByAnother(%s, %s) = %v, want %v", filepath.Base(tc.dst), filepath.Base(src), got, tc.want)
+			}
+		})
+	}
+}
+
 func TestNodeStore_RenameNode_Page_DriftWhenSourceIsFolder(t *testing.T) {
 	tmp := t.TempDir()
 	store := NewNodeStore(tmp)
