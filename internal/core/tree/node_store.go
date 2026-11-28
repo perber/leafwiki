@@ -20,13 +20,15 @@ func fileExists(p string) bool {
 // takenByAnother reports whether dst exists and is not src itself. On a
 // case-insensitive file system (Windows, macOS) the destination of a
 // case-only rename ("static" -> "Static") exists because it is the source,
-// and renaming onto it is fine.
+// and renaming onto it is fine. A destination next to a missing source
+// counts as taken. Lstat keeps a symlink to the source from passing as the
+// source.
 func takenByAnother(dst, src string) bool {
-	dstInfo, err := os.Stat(dst)
+	dstInfo, err := os.Lstat(dst)
 	if err != nil {
 		return false
 	}
-	srcInfo, err := os.Stat(src)
+	srcInfo, err := os.Lstat(src)
 	return err != nil || !os.SameFile(dstInfo, srcInfo)
 }
 
