@@ -5,11 +5,15 @@ export type BrandingConfig = {
   siteName: string
   logoFile: string
   faviconFile: string
+  notFoundTitle: string
+  notFoundMessage: string
   brandingConstraints: {
     logoExts: string[]
     maxLogoSize: number
     faviconExts: string[]
     maxFaviconSize: number
+    maxNotFoundTitleLength: number
+    maxNotFoundMessageLength: number
   }
 }
 

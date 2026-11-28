@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { mapApiError } from '@/lib/api/errors'
 import { withBasePath } from '@/lib/routePath'
 import { useBrandingStore } from '@/stores/branding'
@@ -21,6 +22,8 @@ export default function BrandingSettings() {
     siteName,
     logoFile,
     faviconFile,
+    notFoundTitle,
+    notFoundMessage,
     logoVersion,
     faviconVersion,
     isLoading,
@@ -28,6 +31,8 @@ export default function BrandingSettings() {
     maxLogoSize,
     faviconExts,
     maxFaviconSize,
+    maxNotFoundTitleLength,
+    maxNotFoundMessageLength,
     loadBranding,
     updateBranding,
     uploadLogo,
@@ -41,6 +46,9 @@ export default function BrandingSettings() {
   useSetTitle({ title: t('pageTitle') })
 
   const [localSiteName, setLocalSiteName] = useState(siteName)
+  const [localNotFoundTitle, setLocalNotFoundTitle] = useState(notFoundTitle)
+  const [localNotFoundMessage, setLocalNotFoundMessage] =
+    useState(notFoundMessage)
   const [saving, setSaving] = useState(false)
 
   const logoInputRef = useRef<HTMLInputElement>(null)
@@ -53,6 +61,14 @@ export default function BrandingSettings() {
   useEffect(() => {
     setLocalSiteName(siteName)
   }, [siteName])
+
+  useEffect(() => {
+    setLocalNotFoundTitle(notFoundTitle)
+  }, [notFoundTitle])
+
+  useEffect(() => {
+    setLocalNotFoundMessage(notFoundMessage)
+  }, [notFoundMessage])
 
   const handleLogoDelete = async () => {
     try {
@@ -77,6 +93,8 @@ export default function BrandingSettings() {
     try {
       await updateBranding({
         siteName: localSiteName,
+        notFoundTitle: localNotFoundTitle,
+        notFoundMessage: localNotFoundMessage,
       })
       toast.success(t('toast.brandingSaved'))
     } catch (err) {
@@ -128,6 +146,38 @@ export default function BrandingSettings() {
               value={localSiteName}
               onChange={(e) => setLocalSiteName(e.target.value)}
               placeholder={t('siteName.placeholder')}
+            />
+          </div>
+        </div>
+
+        <div className="settings__section">
+          <h2 className="settings__section-title">{t('notFoundPage.title')}</h2>
+          <p className="settings__section-description">
+            {t('notFoundPage.description')}
+          </p>
+          <div className="settings__field">
+            <Label htmlFor="notFoundTitle">
+              {t('notFoundPage.titleLabel')}
+            </Label>
+            <Input
+              id="notFoundTitle"
+              value={localNotFoundTitle}
+              onChange={(e) => setLocalNotFoundTitle(e.target.value)}
+              placeholder={t('notFoundPage.titlePlaceholder')}
+              maxLength={maxNotFoundTitleLength || undefined}
+            />
+          </div>
+          <div className="settings__field">
+            <Label htmlFor="notFoundMessage">
+              {t('notFoundPage.messageLabel')}
+            </Label>
+            <Textarea
+              id="notFoundMessage"
+              value={localNotFoundMessage}
+              onChange={(e) => setLocalNotFoundMessage(e.target.value)}
+              placeholder={t('notFoundPage.messagePlaceholder')}
+              maxLength={maxNotFoundMessageLength || undefined}
+              rows={3}
             />
           </div>
         </div>

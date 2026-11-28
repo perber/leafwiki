@@ -77,7 +77,7 @@ func TestBrandingService_DeleteLogo_RemovesFileAndClearsConfig(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(assetsDir, "logo.png"), []byte("logo"), 0644); err != nil {
 		t.Fatalf("seed logo file: %v", err)
 	}
-	if err := svc.UpdateBranding("X"); err != nil { // just to ensure Save works; not required
+	if err := svc.UpdateBranding(UpdateBrandingInput{SiteName: "X"}); err != nil { // just to ensure Save works; not required
 		t.Fatalf("UpdateBranding() error: %v", err)
 	}
 	// Set config to reference the seeded file
@@ -445,7 +445,7 @@ func TestBrandingService_GetBranding_ReturnsResponseWithConstraints(t *testing.T
 func TestBrandingService_UpdateBranding_PersistsToDisk(t *testing.T) {
 	svc, dir := newTestBrandingService(t)
 
-	if err := svc.UpdateBranding("My Wiki"); err != nil {
+	if err := svc.UpdateBranding(UpdateBrandingInput{SiteName: "My Wiki"}); err != nil {
 		t.Fatalf("UpdateBranding() error: %v", err)
 	}
 
@@ -463,7 +463,7 @@ func TestBrandingService_UpdateBranding_PersistsToDisk(t *testing.T) {
 func TestBrandingService_UpdateBranding_TrimsSiteName(t *testing.T) {
 	svc, dir := newTestBrandingService(t)
 
-	if err := svc.UpdateBranding("  Trimmed Wiki  "); err != nil {
+	if err := svc.UpdateBranding(UpdateBrandingInput{SiteName: "  Trimmed Wiki  "}); err != nil {
 		t.Fatalf("UpdateBranding() error: %v", err)
 	}
 
@@ -480,7 +480,7 @@ func TestBrandingService_UpdateBranding_TrimsSiteName(t *testing.T) {
 func TestBrandingService_UpdateBranding_EmptySiteName_ReturnsValidationError(t *testing.T) {
 	svc, _ := newTestBrandingService(t)
 
-	err := svc.UpdateBranding("")
+	err := svc.UpdateBranding(UpdateBrandingInput{SiteName: ""})
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -497,7 +497,7 @@ func TestBrandingService_UpdateBranding_EmptySiteName_ReturnsValidationError(t *
 func TestBrandingService_UpdateBranding_WhitespaceOnlySiteName_ReturnsValidationError(t *testing.T) {
 	svc, _ := newTestBrandingService(t)
 
-	err := svc.UpdateBranding("   ")
+	err := svc.UpdateBranding(UpdateBrandingInput{SiteName: "   "})
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -517,7 +517,7 @@ func TestBrandingService_UpdateBranding_TooLongSiteName_ReturnsValidationError(t
 	// Create a site name that exceeds the max length (default is 100)
 	longName := strings.Repeat("a", 101)
 
-	err := svc.UpdateBranding(longName)
+	err := svc.UpdateBranding(UpdateBrandingInput{SiteName: longName})
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -540,7 +540,7 @@ func TestBrandingService_UpdateBranding_MaxLengthSiteName_Success(t *testing.T) 
 	// Create a site name exactly at max length (default is 100)
 	exactName := strings.Repeat("a", 100)
 
-	if err := svc.UpdateBranding(exactName); err != nil {
+	if err := svc.UpdateBranding(UpdateBrandingInput{SiteName: exactName}); err != nil {
 		t.Fatalf("UpdateBranding() error: %v", err)
 	}
 
@@ -560,7 +560,7 @@ func TestBrandingService_UpdateBranding_ControlCharacters_ReturnsValidationError
 	// Test with null character (control character)
 	nameWithControl := "My\x00Wiki"
 
-	err := svc.UpdateBranding(nameWithControl)
+	err := svc.UpdateBranding(UpdateBrandingInput{SiteName: nameWithControl})
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -583,7 +583,7 @@ func TestBrandingService_UpdateBranding_ValidSpecialCharacters_Success(t *testin
 	// Test with common special characters that should be allowed
 	validName := "My Wiki - The Best! (2024) & More"
 
-	if err := svc.UpdateBranding(validName); err != nil {
+	if err := svc.UpdateBranding(UpdateBrandingInput{SiteName: validName}); err != nil {
 		t.Fatalf("UpdateBranding() error: %v", err)
 	}
 
@@ -594,6 +594,130 @@ func TestBrandingService_UpdateBranding_ValidSpecialCharacters_Success(t *testin
 	cfg := store.Load()
 	if cfg.SiteName != validName {
 		t.Fatalf("expected SiteName %q, got %q", validName, cfg.SiteName)
+	}
+}
+
+func TestBrandingService_UpdateBranding_NotFoundFields_EmptyIsValid(t *testing.T) {
+	svc, dir := newTestBrandingService(t)
+
+	if err := svc.UpdateBranding(UpdateBrandingInput{SiteName: "My Wiki"}); err != nil {
+		t.Fatalf("UpdateBranding() error: %v", err)
+	}
+
+	store, err := NewBrandingStore(dir)
+	if err != nil {
+		t.Fatalf("NewBrandingStore() error: %v", err)
+	}
+	cfg := store.Load()
+	if cfg.NotFoundTitle != "" || cfg.NotFoundMessage != "" {
+		t.Fatalf("expected empty NotFoundTitle/NotFoundMessage to stay empty, got %q / %q", cfg.NotFoundTitle, cfg.NotFoundMessage)
+	}
+}
+
+func TestBrandingService_UpdateBranding_NotFoundFields_RoundTrip(t *testing.T) {
+	svc, dir := newTestBrandingService(t)
+
+	if err := svc.UpdateBranding(UpdateBrandingInput{
+		SiteName:        "My Wiki",
+		NotFoundTitle:   "  Nothing here  ",
+		NotFoundMessage: "  Ask an admin if you think this is a mistake.  ",
+	}); err != nil {
+		t.Fatalf("UpdateBranding() error: %v", err)
+	}
+
+	store, err := NewBrandingStore(dir)
+	if err != nil {
+		t.Fatalf("NewBrandingStore() error: %v", err)
+	}
+	cfg := store.Load()
+	if cfg.NotFoundTitle != "Nothing here" {
+		t.Fatalf("expected trimmed NotFoundTitle, got %q", cfg.NotFoundTitle)
+	}
+	if cfg.NotFoundMessage != "Ask an admin if you think this is a mistake." {
+		t.Fatalf("expected trimmed NotFoundMessage, got %q", cfg.NotFoundMessage)
+	}
+}
+
+func TestBrandingService_UpdateBranding_TooLongNotFoundTitle_ReturnsValidationError(t *testing.T) {
+	svc, _ := newTestBrandingService(t)
+
+	err := svc.UpdateBranding(UpdateBrandingInput{
+		SiteName:      "My Wiki",
+		NotFoundTitle: strings.Repeat("a", 151), // default max is 150
+	})
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	ve, ok := err.(*errors.ValidationErrors)
+	if !ok {
+		t.Fatalf("expected ValidationErrors, got %T", err)
+	}
+	if len(ve.Errors) != 1 || ve.Errors[0].Field != "notFoundTitle" {
+		t.Fatalf("expected validation error for notFoundTitle, got %v", ve.Errors)
+	}
+}
+
+func TestBrandingService_UpdateBranding_TooLongNotFoundMessage_ReturnsValidationError(t *testing.T) {
+	svc, _ := newTestBrandingService(t)
+
+	err := svc.UpdateBranding(UpdateBrandingInput{
+		SiteName:        "My Wiki",
+		NotFoundMessage: strings.Repeat("a", 1001), // default max is 1000
+	})
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	ve, ok := err.(*errors.ValidationErrors)
+	if !ok {
+		t.Fatalf("expected ValidationErrors, got %T", err)
+	}
+	if len(ve.Errors) != 1 || ve.Errors[0].Field != "notFoundMessage" {
+		t.Fatalf("expected validation error for notFoundMessage, got %v", ve.Errors)
+	}
+}
+
+func TestBrandingService_UpdateBranding_NotFoundMessage_ControlCharacters_ReturnsValidationError(t *testing.T) {
+	svc, _ := newTestBrandingService(t)
+
+	err := svc.UpdateBranding(UpdateBrandingInput{
+		SiteName:        "My Wiki",
+		NotFoundMessage: "Contact us\x00now",
+	})
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	ve, ok := err.(*errors.ValidationErrors)
+	if !ok {
+		t.Fatalf("expected ValidationErrors, got %T", err)
+	}
+	if len(ve.Errors) != 1 || ve.Errors[0].Field != "notFoundMessage" {
+		t.Fatalf("expected validation error for notFoundMessage, got %v", ve.Errors)
+	}
+}
+
+// A multi-line message (\n) is a legitimate use case (a short paragraph),
+// not a control-character violation — containsControlCharacters exempts it.
+func TestBrandingService_UpdateBranding_NotFoundMessage_Multiline_Success(t *testing.T) {
+	svc, dir := newTestBrandingService(t)
+
+	multiline := "Line one.\nLine two."
+	if err := svc.UpdateBranding(UpdateBrandingInput{
+		SiteName:        "My Wiki",
+		NotFoundMessage: multiline,
+	}); err != nil {
+		t.Fatalf("UpdateBranding() error: %v", err)
+	}
+
+	store, err := NewBrandingStore(dir)
+	if err != nil {
+		t.Fatalf("NewBrandingStore() error: %v", err)
+	}
+	cfg := store.Load()
+	if cfg.NotFoundMessage != multiline {
+		t.Fatalf("expected multiline NotFoundMessage preserved, got %q", cfg.NotFoundMessage)
 	}
 }
 

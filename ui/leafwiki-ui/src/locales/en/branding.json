@@ -14,6 +14,14 @@
     "label": "Site Name",
     "placeholder": "LeafWiki"
   },
+  "notFoundPage": {
+    "title": "Page Not Found Screen",
+    "description": "Shown for a URL that doesn't exist — and, deliberately, for a page someone doesn't have access to read, so a denial never reveals that a page exists. Leave blank to use the default text.",
+    "titleLabel": "Heading",
+    "titlePlaceholder": "Page Not Found",
+    "messageLabel": "Message",
+    "messagePlaceholder": "The page you are looking for does not exist."
+  },
   "logo": {
     "title": "Logo",
     "description": "The logo displayed in the header next to the site name.",

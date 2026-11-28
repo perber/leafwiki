@@ -681,7 +681,7 @@
   }
 
   .page404__text {
-    @apply text-page-text text-sm;
+    @apply text-page-text text-sm whitespace-pre-line;
   }
 
   /** pagination **/

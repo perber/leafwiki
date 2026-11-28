@@ -92,13 +92,19 @@ func (r *Routes) handleGetBranding(c *gin.Context) {
 
 func (r *Routes) handleUpdateBranding(c *gin.Context) {
 	var req struct {
-		SiteName string `json:"siteName"`
+		SiteName        string `json:"siteName"`
+		NotFoundTitle   string `json:"notFoundTitle"`
+		NotFoundMessage string `json:"notFoundMessage"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		respondWithBrandingStatusError(c, http.StatusBadRequest, ErrCodeBrandingInvalidPayload, "Invalid payload", "invalid payload")
 		return
 	}
-	out, err := r.updateBranding.Execute(c.Request.Context(), UpdateBrandingInput{SiteName: req.SiteName})
+	out, err := r.updateBranding.Execute(c.Request.Context(), UpdateBrandingInput{
+		SiteName:        req.SiteName,
+		NotFoundTitle:   req.NotFoundTitle,
+		NotFoundMessage: req.NotFoundMessage,
+	})
 	if err != nil {
 		respondWithBrandingError(c, err)
 		return

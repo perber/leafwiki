@@ -59,16 +59,27 @@ func (s *BrandingService) GetBranding() (*BrandingConfigResponse, error) {
 	return s.store.Load().ToResponse(), nil
 }
 
+// UpdateBrandingInput is the writable subset of BrandingConfig.
+// NotFoundTitle/NotFoundMessage are both optional — an empty string means
+// "fall back to the built-in translated default" (see
+// BrandingConfig.NotFoundTitle).
+type UpdateBrandingInput struct {
+	SiteName        string
+	NotFoundTitle   string
+	NotFoundMessage string
+}
+
 // UpdateBranding updates the branding configuration
-func (s *BrandingService) UpdateBranding(siteName string) error {
+func (s *BrandingService) UpdateBranding(in UpdateBrandingInput) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	cfg := s.store.Load()
 
-	// Validate site name
 	ve := sharederrors.NewValidationErrors()
-	trimmedSiteName := strings.TrimSpace(siteName)
+	trimmedSiteName := strings.TrimSpace(in.SiteName)
+	trimmedNotFoundTitle := strings.TrimSpace(in.NotFoundTitle)
+	trimmedNotFoundMessage := strings.TrimSpace(in.NotFoundMessage)
 
 	switch {
 	case trimmedSiteName == "":
@@ -79,11 +90,32 @@ func (s *BrandingService) UpdateBranding(siteName string) error {
 		ve.Add("siteName", "Site name contains invalid control characters")
 	}
 
+	// Unlike site name, both fields below are optional — empty just clears
+	// the override — so they're only validated when non-empty.
+	if trimmedNotFoundTitle != "" {
+		switch {
+		case len(trimmedNotFoundTitle) > cfg.BrandingConstraints.MaxNotFoundTitleLength:
+			ve.Add("notFoundTitle", fmt.Sprintf("Not-found title must not exceed %d characters", cfg.BrandingConstraints.MaxNotFoundTitleLength))
+		case containsControlCharacters(trimmedNotFoundTitle):
+			ve.Add("notFoundTitle", "Not-found title contains invalid control characters")
+		}
+	}
+	if trimmedNotFoundMessage != "" {
+		switch {
+		case len(trimmedNotFoundMessage) > cfg.BrandingConstraints.MaxNotFoundMessageLength:
+			ve.Add("notFoundMessage", fmt.Sprintf("Not-found message must not exceed %d characters", cfg.BrandingConstraints.MaxNotFoundMessageLength))
+		case containsControlCharacters(trimmedNotFoundMessage):
+			ve.Add("notFoundMessage", "Not-found message contains invalid control characters")
+		}
+	}
+
 	if ve.HasErrors() {
 		return ve
 	}
 
 	cfg.SiteName = trimmedSiteName
+	cfg.NotFoundTitle = trimmedNotFoundTitle
+	cfg.NotFoundMessage = trimmedNotFoundMessage
 
 	if err := s.store.Save(cfg); err != nil {
 		return sharederrors.NewLocalizedError(

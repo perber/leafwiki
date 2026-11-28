@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button'
 import { lookupPath } from '@/lib/api/pages'
 import { DIALOG_CREATE_PAGE_BY_PATH } from '@/lib/registries'
 import { useIsReadOnly } from '@/lib/useIsReadOnly'
+import { useBrandingStore } from '@/stores/branding'
 import { useDialogsStore } from '@/stores/dialogs'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -18,6 +19,8 @@ export default function Page404({
   const { t } = useTranslation('common')
   const readOnlyMode = useIsReadOnly()
   const openDialog = useDialogsStore((s) => s.openDialog)
+  const notFoundTitle = useBrandingStore((s) => s.notFoundTitle)
+  const notFoundMessage = useBrandingStore((s) => s.notFoundMessage)
   const [lookupState, setLookupState] = useState<{
     path: string | null
     canCreate: boolean
@@ -67,8 +70,10 @@ export default function Page404({
   return (
     <div className="page404-shell">
       <div className="page404" data-testid="page404">
-        <h1 className="page404__title">{t('page404.heading')}</h1>
-        <p className="page404__text">{t('page404.body')}</p>
+        <h1 className="page404__title">
+          {notFoundTitle || t('page404.heading')}
+        </h1>
+        <p className="page404__text">{notFoundMessage || t('page404.body')}</p>
         {showCreate && (
           <>
             <p className="page404__text">{t('page404.createPrompt')}</p>

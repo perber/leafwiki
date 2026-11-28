@@ -14,6 +14,14 @@
     "label": "Nom du site",
     "placeholder": "LeafWiki"
   },
+  "notFoundPage": {
+    "title": "Écran « Page introuvable »",
+    "description": "Affiché pour une URL qui n'existe pas — et, volontairement, pour une page à laquelle quelqu'un n'a pas accès en lecture, afin qu'un refus ne révèle jamais qu'une page existe. Laissez vide pour utiliser le texte par défaut.",
+    "titleLabel": "Titre",
+    "titlePlaceholder": "Page introuvable",
+    "messageLabel": "Message",
+    "messagePlaceholder": "La page que vous recherchez n'existe pas."
+  },
   "logo": {
     "title": "Logo",
     "description": "Le logo affiché dans l'en-tête à côté du nom du site.",

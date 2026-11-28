@@ -19,6 +19,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/perber/wiki/internal/branding"
 	"github.com/perber/wiki/internal/core/tree"
 	httpinternal "github.com/perber/wiki/internal/http"
 	"github.com/perber/wiki/internal/publicaccess"
@@ -299,7 +300,7 @@ func TestWiki_PageMeta_PublicWiki_AddsMetaTags(t *testing.T) {
 			w, public := newSEOTestWiki(t, tc.publicURL)
 			setPublicAccess(t, public, true)
 			if tc.siteName != "" {
-				if err := w.branding.UpdateBranding(tc.siteName); err != nil {
+				if err := w.branding.UpdateBranding(branding.UpdateBrandingInput{SiteName: tc.siteName}); err != nil {
 					t.Fatalf("UpdateBranding: %v", err)
 				}
 			}

@@ -14,6 +14,14 @@
     "label": "Seitenname",
     "placeholder": "LeafWiki"
   },
+  "notFoundPage": {
+    "title": "Bildschirm „Seite nicht gefunden“",
+    "description": "Wird für eine URL angezeigt, die nicht existiert — und bewusst auch für eine Seite, auf die jemand keinen Lesezugriff hat, damit eine Zugriffsverweigerung nie verrät, dass eine Seite existiert. Leer lassen, um den Standardtext zu verwenden.",
+    "titleLabel": "Überschrift",
+    "titlePlaceholder": "Seite nicht gefunden",
+    "messageLabel": "Nachricht",
+    "messagePlaceholder": "Die gesuchte Seite existiert nicht."
+  },
   "logo": {
     "title": "Logo",
     "description": "Das Logo, das in der Kopfzeile neben dem Seitennamen angezeigt wird.",
