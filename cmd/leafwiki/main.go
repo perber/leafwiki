@@ -138,43 +138,15 @@ func runResetAdminPasswordCommand(cfg *serverConfig) error {
 	return nil
 }
 
-// ensureAdminPasswordAvailable allows omitting --admin-password /
-// LEAFWIKI_ADMIN_PASSWORD when users.db already contains an admin user.
-func ensureAdminPasswordAvailable(dataDir, adminPassword string) error {
-	if adminPassword != "" {
-		return nil
+// adminPasswordRequiredMessage turns InitDefaultAdmin's ErrAdminPasswordRequired
+// (no admin exists yet and no bootstrap password was given) into the startup
+// message operators know. Once an admin exists, the password may be omitted
+// (#1799), so the check lives in InitDefaultAdmin, not in flag validation.
+func adminPasswordRequiredMessage(err error) (string, bool) {
+	if !errors.Is(err, auth.ErrAdminPasswordRequired) {
+		return "", false
 	}
-
-	dbPath := filepath.Join(dataDir, "users.db")
-	info, err := os.Stat(dbPath)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("%w: set it using --admin-password or LEAFWIKI_ADMIN_PASSWORD environment variable", auth.ErrAdminPasswordRequired)
-		}
-		return fmt.Errorf("failed to inspect user database %q: %w", dbPath, err)
-	}
-	if info.IsDir() {
-		return fmt.Errorf("user database path %q is a directory", dbPath)
-	}
-
-	store, err := auth.NewUserStore(dataDir)
-	if err != nil {
-		return fmt.Errorf("failed to init user store: %w", err)
-	}
-	defer func() {
-		if closeErr := store.Close(); closeErr != nil {
-			slog.Default().Warn("Failed to close user store after admin check", "error", closeErr)
-		}
-	}()
-
-	if _, err := store.GetAdminUser(); err != nil {
-		if errors.Is(err, auth.ErrUserNotFound) {
-			return fmt.Errorf("%w: set it using --admin-password or LEAFWIKI_ADMIN_PASSWORD environment variable", auth.ErrAdminPasswordRequired)
-		}
-		return fmt.Errorf("failed to check existing admin user: %w", err)
-	}
-
-	return nil
+	return "admin password is required. Set it using --admin-password or LEAFWIKI_ADMIN_PASSWORD environment variable.", true
 }
 
 // runServerCommand is the root action: with no subcommand given, leafwiki runs
@@ -279,15 +251,6 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 			fail("JWT secret is required. Set it using --jwt-secret or LEAFWIKI_JWT_SECRET environment variable.")
 		}
 
-		if err := ensureAdminPasswordAvailable(cfg.server.dataDir, cfg.auth.adminPassword); err != nil {
-			if msg, ok := corruptDatabaseMessage(err); ok {
-				fail(msg, "error", err)
-			}
-			if errors.Is(err, auth.ErrAdminPasswordRequired) {
-				fail("admin password is required. Set it using --admin-password or LEAFWIKI_ADMIN_PASSWORD environment variable.")
-			}
-			fail("Failed to validate admin bootstrap configuration", "error", err)
-		}
 	}
 
 	var metrics *httpmetrics.HTTPMetrics
@@ -338,6 +301,9 @@ func runServerCommand(_ context.Context, cmd *cli.Command, cfg *serverConfig) er
 	if err != nil {
 		if msg, ok := corruptDatabaseMessage(err); ok {
 			fail(msg, "error", err)
+		}
+		if msg, ok := adminPasswordRequiredMessage(err); ok {
+			fail(msg)
 		}
 		fail("Failed to initialize Wiki", "error", err)
 	}

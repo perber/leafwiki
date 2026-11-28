@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -25,7 +26,6 @@ import (
 
 	"github.com/perber/wiki/internal/core/auth"
 	httpmetrics "github.com/perber/wiki/internal/http/metrics"
-	"github.com/perber/wiki/internal/test_utils"
 )
 
 // runRootCommand parses args through the real command tree and hands the
@@ -1603,68 +1603,18 @@ func TestRootCommandUsage_AdminPasswordIsOptional(t *testing.T) {
 	}
 }
 
-func TestEnsureAdminPasswordAvailable(t *testing.T) {
-	t.Run("fresh data dir requires admin password without creating users.db", func(t *testing.T) {
-		dataDir := t.TempDir()
-
-		err := ensureAdminPasswordAvailable(dataDir, "")
-		if !errors.Is(err, auth.ErrAdminPasswordRequired) {
-			t.Fatalf("ensureAdminPasswordAvailable() error = %v, want auth.ErrAdminPasswordRequired", err)
-		}
-		if _, statErr := os.Stat(filepath.Join(dataDir, "users.db")); !os.IsNotExist(statErr) {
-			t.Fatalf("expected users.db not to be created on missing password check, stat err = %v", statErr)
+func TestAdminPasswordRequiredMessage(t *testing.T) {
+	t.Run("maps a wrapped ErrAdminPasswordRequired to the startup message", func(t *testing.T) {
+		err := fmt.Errorf("init auth: %w", auth.ErrAdminPasswordRequired)
+		msg, ok := adminPasswordRequiredMessage(err)
+		if !ok || !strings.Contains(msg, "LEAFWIKI_ADMIN_PASSWORD") {
+			t.Fatalf("adminPasswordRequiredMessage() = %q, %v, want the admin password message", msg, ok)
 		}
 	})
 
-	t.Run("fresh data dir succeeds when admin password is provided", func(t *testing.T) {
-		if err := ensureAdminPasswordAvailable(t.TempDir(), "secretpassword"); err != nil {
-			t.Fatalf("ensureAdminPasswordAvailable() error = %v, want nil", err)
+	t.Run("ignores other errors", func(t *testing.T) {
+		if msg, ok := adminPasswordRequiredMessage(auth.ErrPasswordTooShort); ok {
+			t.Fatalf("adminPasswordRequiredMessage(ErrPasswordTooShort) = %q, true, want false", msg)
 		}
-	})
-
-	t.Run("existing users.db without admin still requires admin password", func(t *testing.T) {
-		dataDir := t.TempDir()
-		store, err := auth.NewUserStore(dataDir)
-		if err != nil {
-			t.Fatalf("NewUserStore failed: %v", err)
-		}
-		if err := store.Close(); err != nil {
-			t.Fatalf("store.Close failed: %v", err)
-		}
-
-		err = ensureAdminPasswordAvailable(dataDir, "")
-		if !errors.Is(err, auth.ErrAdminPasswordRequired) {
-			t.Fatalf("ensureAdminPasswordAvailable() error = %v, want auth.ErrAdminPasswordRequired", err)
-		}
-	})
-
-	t.Run("existing users.db with admin allows empty admin password", func(t *testing.T) {
-		dataDir := t.TempDir()
-		store, err := auth.NewUserStore(dataDir)
-		if err != nil {
-			t.Fatalf("NewUserStore failed: %v", err)
-		}
-		svc := auth.NewUserService(store)
-		if _, err := svc.CreateUser("admin", "admin@localhost", "adminpassword", auth.RoleAdmin); err != nil {
-			t.Fatalf("CreateUser failed: %v", err)
-		}
-		if err := store.Close(); err != nil {
-			t.Fatalf("store.Close failed: %v", err)
-		}
-
-		if err := ensureAdminPasswordAvailable(dataDir, ""); err != nil {
-			t.Fatalf("ensureAdminPasswordAvailable() error = %v, want nil", err)
-		}
-	})
-
-	t.Run("corrupt users.db returns corruption error without touching files", func(t *testing.T) {
-		dataDir := t.TempDir()
-		files := test_utils.WriteCorruptSQLiteDB(t, filepath.Join(dataDir, "users.db"))
-
-		err := ensureAdminPasswordAvailable(dataDir, "")
-		if msg, ok := corruptDatabaseMessage(err); !ok || !strings.Contains(msg, "restore-snapshot") {
-			t.Fatalf("ensureAdminPasswordAvailable() error = %v (msg=%q, ok=%v), want corrupt-database guidance", err, msg, ok)
-		}
-		test_utils.AssertFilesUnchanged(t, files)
 	})
 }
