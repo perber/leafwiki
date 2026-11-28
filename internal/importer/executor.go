@@ -51,6 +51,7 @@ type Executor struct {
 	logger        *slog.Logger
 	progressFn    func(ExecutionProgress, *ExecutionResult)
 	cancelFn      func() bool
+	interruptFn   func() bool
 	startIndex    int
 	initialResult *ExecutionResult
 }
@@ -75,6 +76,13 @@ func (e *Executor) WithProgressCallback(progressFn func(ExecutionProgress, *Exec
 
 func (e *Executor) WithCancelCheck(cancelFn func() bool) *Executor {
 	e.cancelFn = cancelFn
+	return e
+}
+
+// WithInterruptCheck stops the import before the next item, like a cancel,
+// but returns errImportInterrupted so the caller can leave it resumable.
+func (e *Executor) WithInterruptCheck(interruptFn func() bool) *Executor {
+	e.interruptFn = interruptFn
 	return e
 }
 
@@ -125,6 +133,9 @@ func (e *Executor) Execute(userID string) (*ExecutionResult, error) {
 	for index := e.startIndex; index < len(e.plan.Items); index++ {
 		if e.cancelFn != nil && e.cancelFn() {
 			return result, ErrImportCanceled
+		}
+		if e.interruptFn != nil && e.interruptFn() {
+			return result, errImportInterrupted
 		}
 
 		item := e.plan.Items[index]

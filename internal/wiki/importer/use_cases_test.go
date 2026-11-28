@@ -141,3 +141,19 @@ func assertMessageDoesNotLeakInternalDetail(t *testing.T, localized *sharederror
 		}
 	}
 }
+
+// An import started while the wiki shuts down gets a localized error, not a
+// raw one that would surface as a generic 500.
+func TestExecuteImportUseCase_Execute_MapsImporterClosedError(t *testing.T) {
+	importerDir := filepath.Join(t.TempDir(), ".importer")
+	planner := coreimporter.NewPlanner(nil, tree.NewSlugService(), "")
+	store := coreimporter.NewPlanStore(filepath.Join(importerDir, "current-plan.json"))
+	svc := coreimporter.NewImporterService(planner, store, filepath.Join(importerDir, "workspaces"), 0)
+	svc.Close()
+
+	_, err := NewExecuteImportUseCase(svc).Execute(context.Background(), ExecuteImportInput{UserID: "u1"})
+	localized, ok := sharederrors.AsLocalizedError(err)
+	if !ok || localized.Code != "importer_state_unavailable" {
+		t.Fatalf("expected LocalizedError importer_state_unavailable, got %v", err)
+	}
+}

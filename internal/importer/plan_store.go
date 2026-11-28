@@ -14,6 +14,11 @@ const errWrapFmt = "%w: %v"
 
 var ErrNoPlan = errors.New("no plan available")
 var ErrImportExecutionRunning = errors.New("import execution already running")
+
+// errImportInterrupted stops a running import between two items because the
+// importer is closing. Unlike ErrImportCanceled it is never persisted: the
+// plan stays running and the next start picks it up from its saved progress.
+var errImportInterrupted = errors.New("import execution interrupted")
 var ErrImportCanceled = errors.New("import execution canceled")
 var ErrImportStateUnavailable = errors.New("import state unavailable")
 
