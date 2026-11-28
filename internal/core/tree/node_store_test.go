@@ -957,7 +957,7 @@ func TestNodeStore_RenameNode_RejectsDestinationCollision(t *testing.T) {
 // a case-only rename ("static" -> "Static") as existing, because it is the
 // source itself. A hard link stands in for that alias here: two names, one
 // file.
-func TestTakenByAnother_DestinationThatIsTheSourceIsFree(t *testing.T) {
+func TestTakenByAnother_Destinations_ReportCollisionUnlessSource(t *testing.T) {
 	tmp := t.TempDir()
 	src := filepath.Join(tmp, "static.md")
 	mustWriteFile(t, src, "# x", 0o644)
@@ -968,20 +968,24 @@ func TestTakenByAnother_DestinationThatIsTheSourceIsFree(t *testing.T) {
 		t.Skipf("hard links not supported here: %v", err)
 	}
 
+	missing := filepath.Join(tmp, "missing.md")
 	tests := []struct {
-		name string
-		dst  string
-		want bool
+		name     string
+		dst, src string
+		want     bool
 	}{
-		{name: "missing destination", dst: filepath.Join(tmp, "missing.md"), want: false},
-		{name: "another file", dst: other, want: true},
-		{name: "the source under another name", dst: alias, want: false},
-		{name: "the source itself", dst: src, want: false},
+		{name: "missing destination", dst: missing, src: src, want: false},
+		{name: "another file", dst: other, src: src, want: true},
+		{name: "the source under another name", dst: alias, src: src, want: false},
+		{name: "the source itself", dst: src, src: src, want: false},
+		// Drift: the tree's source is gone, so an existing destination is
+		// someone else's.
+		{name: "source missing, destination exists", dst: other, src: missing, want: true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := takenByAnother(tc.dst, src); got != tc.want {
-				t.Errorf("takenByAnother(%s, %s) = %v, want %v", filepath.Base(tc.dst), filepath.Base(src), got, tc.want)
+			if got := takenByAnother(tc.dst, tc.src); got != tc.want {
+				t.Errorf("takenByAnother(%s, %s) = %v, want %v", filepath.Base(tc.dst), filepath.Base(tc.src), got, tc.want)
 			}
 		})
 	}
