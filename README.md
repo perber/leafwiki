@@ -252,6 +252,11 @@ For API-only local development with Vite, use `make build-api` (or `make run`) i
 ./leafwiki reset-admin-password
 ```
 
+`--admin-password` / `LEAFWIKI_ADMIN_PASSWORD` is only needed until the first admin exists, so
+you can remove it from your configuration afterwards. If the wiki later has no admin at all,
+the server refuses to start with "admin password is required": set the password again to
+create a new admin, or run `reset-admin-password`.
+
 ### Restore a snapshot (offline)
 
 For disaster recovery or migrating to a fresh instance, restore a snapshot ZIP into the data directory while the server is stopped:
@@ -331,7 +336,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md#development-setup) for running the two sep
 | Flag | Description |
 |------|-------------|
 | `--jwt-secret` | Secret for signing JWTs. Keep it secure. |
-| `--admin-password` | Initial admin password (only applied if no admin exists yet). |
+| `--admin-password` | Initial admin password. Required on the first start; once an admin exists it is ignored and can be removed ([Reset admin password](#reset-admin-password)). |
 
 ### Optional admin identity
 
