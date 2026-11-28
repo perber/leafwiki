@@ -340,10 +340,7 @@ func operatorParensBalanced(fields []string) bool {
 // each word came from splitIntoIndexWords, none of them can contain a
 // quote, comma, or apostrophe, so no escaping is needed here.
 func quoteWordsAsPrefixTerms(words []string) string {
-	for i, w := range words {
-		words[i] = `"` + w + `"*`
-	}
-	return strings.Join(words, " ")
+	return quoteWords(words, "*")
 }
 
 // hasRealOperandNeighbors reports whether fields[i] sits strictly between
@@ -481,14 +478,33 @@ func buildSearchWhereClause(ftsQuery string, pageIDs []string) (string, []interf
 	}
 
 	if len(pageIDs) > 0 {
-		placeholders := strings.TrimSuffix(strings.Repeat("?,", len(pageIDs)), ",")
-		clauses = append(clauses, fmt.Sprintf("pageID IN (%s)", placeholders))
-		for _, pageID := range pageIDs {
-			args = append(args, pageID)
-		}
+		list, idArgs := pageIDList(pageIDs)
+		clauses = append(clauses, "pageID IN ("+list+")")
+		args = append(args, idArgs...)
 	}
 
 	return strings.Join(clauses, " AND "), args
+}
+
+// pageIDList returns the placeholders of an SQL IN list of pageIDs and its
+// arguments.
+func pageIDList(pageIDs []string) (string, []interface{}) {
+	args := make([]interface{}, len(pageIDs))
+	for i, pageID := range pageIDs {
+		args[i] = pageID
+	}
+	return strings.TrimSuffix(strings.Repeat("?,", len(pageIDs)), ","), args
+}
+
+// quoteWords quotes each word as an FTS5 string and appends suffix ("" or
+// "*"), space-separated, which FTS5 reads as AND. The words come from
+// splitIntoIndexWords and can't contain a quote, so they need no escaping.
+func quoteWords(words []string, suffix string) string {
+	quoted := make([]string, len(words))
+	for i, w := range words {
+		quoted[i] = `"` + w + `"` + suffix
+	}
+	return strings.Join(quoted, " ")
 }
 
 func searchTitleExpr(hasQuery bool) string {
@@ -505,17 +521,18 @@ func searchExcerptExpr(hasQuery bool) string {
 	return "''"
 }
 
+// The bm25 column weights of title, headings and content, the same for the
+// token table (searchRankExpr) and the substring table (substringRankExpr).
+const (
+	titleWeight    = 20.0
+	headingsWeight = 5.0
+	contentWeight  = 1.0
+)
+
 func searchRankExpr(hasQuery bool) string {
 	if hasQuery {
-		return `bm25(pages,
-				0.0,  -- path
-				0.0,  -- filepath
-				0.0,  -- pageID
-				0.0,  -- kind
-				20.0, -- title
-				5.0,   -- headings
-				1.0    -- content
-			)`
+		// path, filepath, pageID and kind don't count.
+		return fmt.Sprintf("bm25(pages, 0.0, 0.0, 0.0, 0.0, %.1f, %.1f, %.1f)", titleWeight, headingsWeight, contentWeight)
 	}
 	return "0.0"
 }
@@ -547,8 +564,9 @@ func matchTier(expr string) searchTier {
 // The tiers of a literal-only query: every word as a whole word, then every
 // word but the last as a whole word and the last as a prefix (search as you
 // type: the last word is the one still being typed), then, implicitly, all
-// other matches ("pi" only in "Pipeline"). One word gets only the first tier,
-// since its second would equal the plain prefix query. Like
+// other matches ("pi" only in "Pipeline"); pages that match only as
+// substrings follow after all of them (substringOnlyWhere). One word gets
+// only the first tier, since its second would equal the plain prefix query. Like
 // quoteWordsAsPrefixTerms the terms need no escaping, because the words come
 // from splitIntoIndexWords and can't contain a quote.
 //
@@ -575,15 +593,27 @@ func searchTiers(q searchQuery) []searchTier {
 	return tiers
 }
 
-// searchOrderBy is the ORDER BY clause of Search and its bound arguments,
-// which go after the WHERE arguments: the tier from searchTiers, then the
-// bm25 order. Without tiers a short query lists prefix hits with short
-// titles above pages that contain the word itself.
+// searchOrderBy is the ORDER BY clause of a token search and its bound
+// arguments, which go after the WHERE arguments: the tier from searchTiers,
+// then the bm25 order. Without tiers a short query lists prefix hits with
+// short titles above pages that contain the word itself.
 func searchOrderBy(q searchQuery) (string, []interface{}) {
 	orderBy := searchOrderByExpr(q.fts != "")
+	tier, args, n := searchTierExpr(q)
+	if n == 0 {
+		return orderBy, nil
+	}
+	return tier + ", " + orderBy, args
+}
+
+// searchTierExpr is the SQL expression that numbers the tier of a pages row
+// that matches q (see searchTiers), its bound arguments, and the number of
+// tiers it names; a row in none of them gets that number. Without tiers the
+// expression is "0".
+func searchTierExpr(q searchQuery) (string, []interface{}, int) {
 	tiers := searchTiers(q)
 	if len(tiers) == 0 {
-		return orderBy, nil
+		return "0", nil, 0
 	}
 	var tier strings.Builder
 	tier.WriteString("CASE")
@@ -593,7 +623,52 @@ func searchOrderBy(q searchQuery) (string, []interface{}) {
 		args = append(args, t.args...)
 	}
 	fmt.Fprintf(&tier, " ELSE %d END", len(tiers))
-	return tier.String() + ", " + orderBy, args
+	return tier.String(), args, len(tiers)
+}
+
+// substringRankExpr ranks substring-only matches like searchRankExpr ranks
+// token matches, with the same column weights.
+var substringRankExpr = fmt.Sprintf("bm25(pages_trigram, %.1f, %.1f, %.1f)", titleWeight, headingsWeight, contentWeight)
+
+// substringOnlyWhere returns the WHERE condition over pages_trigram, and its
+// arguments, for the pages that a literal-only query q matches only as
+// substrings, and false when q has no substring part (ADR-0025).
+//
+// Each word of at least minSubstringTermRunes runes must occur anywhere in
+// the page's text (pages_trigram MATCH); a shorter word still has to match
+// as a token prefix, since a trigram index can't match it. Pages that q
+// matches as tokens are left out: they already rank above, from the pages
+// table, with bm25, highlight and snippet. For the long words a substring
+// match covers a token-prefix match (both tables fold case and diacritics),
+// so the two parts together are the pages that match each word one way or
+// the other.
+//
+// The rowid conditions are written +rowid so SQLite can't hand them to FTS5
+// as a rowid lookup: driving the query from a rowid list would evaluate the
+// trigram MATCH once per row instead of once.
+//
+// Operator queries (column filters, AND/OR/NOT, NEAR, quoted phrases, term*)
+// never get a substring part: there the user chose the matching. Like
+// searchTiers the terms need no escaping, because the words come from
+// splitIntoIndexWords and can't contain a quote.
+func substringOnlyWhere(q searchQuery, pageIDs []string) (string, []interface{}, bool) {
+	if q.fts == "" || !q.literalOnly || len(q.substringTerms) == 0 {
+		return "", nil, false
+	}
+	clauses := []string{"pages_trigram MATCH ?"}
+	args := []interface{}{quoteWords(q.substringTerms, "")}
+	if len(q.shortTerms) > 0 {
+		clauses = append(clauses, "+rowid IN (SELECT rowid FROM pages WHERE pages MATCH ?)")
+		args = append(args, quoteWords(q.shortTerms, "*"))
+	}
+	clauses = append(clauses, "+rowid NOT IN (SELECT rowid FROM pages WHERE pages MATCH ?)")
+	args = append(args, q.fts)
+	if len(pageIDs) > 0 {
+		list, idArgs := pageIDList(pageIDs)
+		clauses = append(clauses, "+rowid IN (SELECT rowid FROM pages WHERE pageID IN ("+list+"))")
+		args = append(args, idArgs...)
+	}
+	return strings.Join(clauses, " AND "), args, true
 }
 
 func searchOrderByExpr(hasQuery bool) string {

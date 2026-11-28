@@ -2,8 +2,8 @@
 
 ## Status
 
-Proposed (2026-11-24). The table and its write paths ship first; the query side
-(`substringOnlyWhere`, ranking, highlight) follows in the next pull request.
+Proposed (2026-11-24). The marks for substring-only matches (`substring_highlight.go`)
+follow in the next pull request.
 
 ## Context
 
