@@ -1704,6 +1704,13 @@
 
   .page-viewer__subheader {
     @apply bg-background/92 border-surface-border border-b backdrop-blur-sm md:min-h-12;
+    /* The scroll container is a sibling of this bar, so a space-taking
+       (classic) scrollbar narrows <main> but not the bar — the inner row would
+       center half a scrollbar to the right of the article. Reserve that width
+       as a transparent right border (the background still paints under it, so
+       the bar keeps its full-width border) and keep --content-scrollbar-width
+       in sync from AppLayout, where #scroll-container lives. */
+    border-right: var(--content-scrollbar-width, 0px) solid transparent;
   }
 
   /* The subheader bar/border itself stays full-width (this is a sibling of
