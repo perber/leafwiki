@@ -574,6 +574,10 @@ a sign to split it.
   expected error logs explicitly, don't silence them globally.
 - Stores and module-level state are reset between tests.
 - Tests run on fresh temporary data only, never on a real instance.
+- HTTP tests that send the `leafwiki_at` cookie through `NewRouter` set
+  `RouterOptions{AllowInsecure: true}`. Otherwise `utils.RequireSecure` ignores the cookie on a
+  plain-HTTP `httptest` request, every signed-in request gets 401, and a "no session → 401"
+  assertion passes for the wrong reason.
 
 ### Leave tests better than you found them
 

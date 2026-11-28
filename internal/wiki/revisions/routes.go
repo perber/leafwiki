@@ -83,6 +83,24 @@ func (r *Routes) RegisterRoutes(ctx httpinternal.RouterContext) {
 
 // ─── Handlers ───────────────────────────────────────────────────────────────
 
+// handleListRevisions handles GET /api/pages/{id}/revisions
+//
+//	@Summary		List the revisions of a page
+//	@Description	Returns one page of the page's revisions. Pass nextCursor of a response as cursor to get the next page; it is empty on the last page. A page without revisions, an unknown page ID and an unknown cursor all answer 200 with an empty list.
+//	@Description	Access: a signed-in user of any role (session cookie, API key or reverse-proxy identity). Public access does not open it: anonymous callers get 401 also when public access is on. With authentication disabled (--disable-auth) anyone can read it. Requires --enable-revision; without it the route does not exist (404).
+//	@Tags			revisions
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id		path		string							true	"Page ID"
+//	@Param			limit	query		integer							false	"Maximum number of revisions, 1 to 200; blank means 50, any other value answers 400"	default(50)	minimum(1)	maximum(200)
+//	@Param			cursor	query		string							false	"nextCursor of the previous response; omit for the first page"
+//	@Success		200		{object}	revisions.RevisionListResponse	"One page of revisions; an empty list when there are none"
+//	@Failure		400		{object}	dto.ErrorResponse				"Blank page ID (code revision_invalid_page_id), or limit not an integer from 1 to 200 (code revision_invalid_limit)"
+//	@Failure		401		{object}	dto.LegacyError					"No valid session (also when public access is on), an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)"
+//	@Failure		429		{object}	dto.LegacyError					"API-key attempts throttled"
+//	@Failure		500		{object}	object							"Reading the revisions failed, also for a malformed page ID: the body is an ErrorResponse (code revision_internal_error). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object."
+//	@Failure		503		{object}	dto.LegacyError					"API-key store unavailable during a live restore (when API-key management is enabled)"
+//	@Router			/pages/{id}/revisions [get]
 func (r *Routes) handleListRevisions(c *gin.Context) {
 	pageID := strings.TrimSpace(c.Param("id"))
 	if pageID == "" {
@@ -110,16 +128,27 @@ func (r *Routes) handleListRevisions(c *gin.Context) {
 		return
 	}
 
-	result := make([]*RevisionResponse, 0, len(out.Revisions))
-	for _, rev := range out.Revisions {
-		result = append(result, toRevisionResponse(rev, r.userResolver))
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"revisions":  result,
-		"nextCursor": out.NextCursor,
-	})
+	c.JSON(http.StatusOK, toRevisionListResponse(out, r.userResolver))
 }
 
+// handleGetRevision handles GET /api/pages/{id}/revisions/{revisionId}
+//
+//	@Summary		Get a revision of a page
+//	@Description	Returns the revision as a snapshot: its metadata, the Markdown content of the page at that revision and the list of its assets. An empty revision ID (a path ending in /revisions//) never reaches this operation: the router answers 301 Moved Permanently to /revisions/, the list route. A blank one (only spaces) answers 400.
+//	@Description	Access: a signed-in user of any role (session cookie, API key or reverse-proxy identity). Public access does not open it: anonymous callers get 401 also when public access is on. With authentication disabled (--disable-auth) anyone can read it. Requires --enable-revision; without it the route does not exist (404).
+//	@Tags			revisions
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id			path		string								true	"Page ID"
+//	@Param			revisionId	path		string								true	"Revision ID"
+//	@Success		200			{object}	revisions.RevisionSnapshotResponse	"The revision snapshot"
+//	@Failure		400			{object}	dto.ErrorResponse					"Blank page ID (code revision_invalid_page_id) or blank revision ID (code revision_invalid_revision_id)"
+//	@Failure		401			{object}	dto.LegacyError						"No valid session (also when public access is on), an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)"
+//	@Failure		404			{object}	dto.ErrorResponse					"No such revision for this page (code revision_not_found)"
+//	@Failure		429			{object}	dto.LegacyError						"API-key attempts throttled"
+//	@Failure		500			{object}	object								"Reading the revision failed, also for a malformed page ID: the body is an ErrorResponse (code revision_internal_error, revision_preview_content_unavailable or revision_preview_assets_unavailable). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object."
+//	@Failure		503			{object}	dto.LegacyError						"API-key store unavailable during a live restore (when API-key management is enabled)"
+//	@Router			/pages/{id}/revisions/{revisionId} [get]
 func (r *Routes) handleGetRevision(c *gin.Context) {
 	pageID := strings.TrimSpace(c.Param("id"))
 	revisionID := strings.TrimSpace(c.Param("revisionId"))
@@ -144,6 +173,23 @@ func (r *Routes) handleGetRevision(c *gin.Context) {
 	c.JSON(http.StatusOK, toSnapshotResponse(out.Snapshot, r.userResolver))
 }
 
+// handleGetLatestRevision handles GET /api/pages/{id}/revisions/latest
+//
+//	@Summary		Get the latest revision of a page
+//	@Description	Returns the metadata of the page's newest revision, without its content or assets.
+//	@Description	Access: a signed-in user of any role (session cookie, API key or reverse-proxy identity). Public access does not open it: anonymous callers get 401 also when public access is on. With authentication disabled (--disable-auth) anyone can read it. Requires --enable-revision; without it the route does not exist (404).
+//	@Tags			revisions
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		string						true	"Page ID"
+//	@Success		200	{object}	revisions.RevisionResponse	"The latest revision"
+//	@Failure		400	{object}	dto.ErrorResponse			"Blank page ID (code revision_invalid_page_id)"
+//	@Failure		401	{object}	dto.LegacyError				"No valid session (also when public access is on), an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)"
+//	@Failure		404	{object}	dto.ErrorResponse			"No revision for this page ID (code revision_not_found)"
+//	@Failure		429	{object}	dto.LegacyError				"API-key attempts throttled"
+//	@Failure		500	{object}	object						"Reading the revision failed, also for a malformed page ID: the body is an ErrorResponse (code revision_internal_error). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object."
+//	@Failure		503	{object}	dto.LegacyError				"API-key store unavailable during a live restore (when API-key management is enabled)"
+//	@Router			/pages/{id}/revisions/latest [get]
 func (r *Routes) handleGetLatestRevision(c *gin.Context) {
 	pageID := strings.TrimSpace(c.Param("id"))
 	if pageID == "" {
@@ -163,6 +209,25 @@ func (r *Routes) handleGetLatestRevision(c *gin.Context) {
 	c.JSON(http.StatusOK, toRevisionResponse(out.Revision, r.userResolver))
 }
 
+// handleCompareRevisions handles GET /api/pages/{id}/revisions/compare
+//
+//	@Summary		Compare two revisions of a page
+//	@Description	Returns both revisions as snapshots (metadata, Markdown content and asset list), whether the content differs, and the asset changes from base to target, each with status added, removed or modified.
+//	@Description	Access: a signed-in user of any role (session cookie, API key or reverse-proxy identity). Public access does not open it: anonymous callers get 401 also when public access is on. With authentication disabled (--disable-auth) anyone can read it. Requires --enable-revision; without it the route does not exist (404).
+//	@Tags			revisions
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id		path		string									true	"Page ID"
+//	@Param			base	query		string									true	"ID of the base revision"
+//	@Param			target	query		string									true	"ID of the target revision"
+//	@Success		200		{object}	revisions.RevisionComparisonResponse	"The comparison"
+//	@Failure		400		{object}	dto.ErrorResponse						"Blank page ID (code revision_invalid_page_id), or base or target missing (code revision_compare_invalid_request)"
+//	@Failure		401		{object}	dto.LegacyError							"No valid session (also when public access is on), an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)"
+//	@Failure		404		{object}	dto.ErrorResponse						"base or target is not a revision of this page (code revision_not_found)"
+//	@Failure		429		{object}	dto.LegacyError							"API-key attempts throttled"
+//	@Failure		500		{object}	object									"Reading a revision failed, also for a malformed page ID: the body is an ErrorResponse (code revision_internal_error, revision_preview_content_unavailable or revision_preview_assets_unavailable). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object."
+//	@Failure		503		{object}	dto.LegacyError							"API-key store unavailable during a live restore (when API-key management is enabled)"
+//	@Router			/pages/{id}/revisions/compare [get]
 func (r *Routes) handleCompareRevisions(c *gin.Context) {
 	pageID := strings.TrimSpace(c.Param("id"))
 	baseRevisionID := strings.TrimSpace(c.Query("base"))
@@ -190,6 +255,25 @@ func (r *Routes) handleCompareRevisions(c *gin.Context) {
 	c.JSON(http.StatusOK, toComparisonResponse(out.Comparison, r.userResolver))
 }
 
+// handleGetRevisionAsset handles GET /api/pages/{id}/revisions/{revisionId}/assets/{name}
+//
+//	@Summary		Read an asset of a revision
+//	@Description	Returns an asset as it was stored with the revision. The name is the rest of the path and may contain "/", which Swagger 2.0 cannot express for a path parameter; revisions store only top-level files, so such a name answers 404. Responses carry X-Content-Type-Options: nosniff, Content-Security-Policy: sandbox except for PDFs, and Content-Disposition inline for raster images, audio, video and PDFs, attachment otherwise; script types are served as application/octet-stream. Range requests are supported.
+//	@Description	Access: a signed-in user of any role (session cookie, API key or reverse-proxy identity). Public access does not open it: anonymous callers get 401 also when public access is on. With authentication disabled (--disable-auth) anyone can read it. Requires --enable-revision; without it the route does not exist (404).
+//	@Tags			revisions
+//	@Produce		octet-stream
+//	@Security		BearerAuth
+//	@Param			id			path		string				true	"Page ID"
+//	@Param			revisionId	path		string				true	"Revision ID"
+//	@Param			name		path		string				true	"Asset name; may contain /"
+//	@Success		200			{file}		binary				"The asset"
+//	@Failure		400			{object}	dto.ErrorResponse	"Blank page ID (code revision_invalid_page_id), empty or blank revision ID (code revision_invalid_revision_id), or empty asset name (code revision_preview_asset_invalid_name)"
+//	@Failure		401			{object}	dto.LegacyError		"No valid session (also when public access is on), an invalid, revoked or expired API key (when API-key management is enabled), or a rejected trusted-proxy identity (when reverse-proxy authentication is enabled)"
+//	@Failure		404			{object}	dto.ErrorResponse	"No such revision for this page (code revision_not_found), or the revision has no asset with this name (code revision_preview_asset_not_found)"
+//	@Failure		429			{object}	dto.LegacyError		"API-key attempts throttled"
+//	@Failure		500			{object}	object				"Reading the asset failed, also for a malformed page ID: the body is an ErrorResponse (code revision_internal_error, revision_preview_assets_unavailable or revision_preview_asset_blob_unavailable). Authentication middleware failures return a LegacyError instead. Swagger 2.0 cannot express this alternative, so the schema is a broad object."
+//	@Failure		503			{object}	dto.LegacyError		"API-key store unavailable during a live restore (when API-key management is enabled)"
+//	@Router			/pages/{id}/revisions/{revisionId}/assets/{name} [get]
 func (r *Routes) handleGetRevisionAsset(c *gin.Context) {
 	pageID := strings.TrimSpace(c.Param("id"))
 	revisionID := strings.TrimSpace(c.Param("revisionId"))

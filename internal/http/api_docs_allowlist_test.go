@@ -62,12 +62,7 @@ var undocumentedAPIRouteLiteral = map[string]string{
 	"DELETE /api/pages/{id}/assets/{name}": "assets: pending package documentation",
 
 	// revisions (internal/wiki/revisions)
-	"GET /api/pages/{id}/revisions":                            "revisions: pending package documentation",
-	"GET /api/pages/{id}/revisions/compare":                    "revisions: pending package documentation",
-	"GET /api/pages/{id}/revisions/latest":                     "revisions: pending package documentation",
-	"GET /api/pages/{id}/revisions/{revisionId}":               "revisions: pending package documentation",
-	"GET /api/pages/{id}/revisions/{revisionId}/assets/{name}": "revisions: pending package documentation",
-	"POST /api/pages/{id}/revisions/{revisionId}/restore":      "revisions: pending package documentation",
+	"POST /api/pages/{id}/revisions/{revisionId}/restore": "revisions: returns dto.Page, documented with pages (PR 10 of #1661)",
 
 	// branding (internal/wiki/branding)
 	"GET /api/branding":            "branding: pending package documentation",

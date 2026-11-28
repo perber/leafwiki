@@ -55,7 +55,7 @@ errors), which the documentation must show instead of hiding.
   `internal/core`.
 - **Deferred.** Serving the specification or a viewer from the running server, swag v2/OpenAPI
   3, an API stability promise (`info.version` is `0.x`), and documenting the packages beyond
-  health, tags, properties, search and links.
+  health, tags, properties, search, links and the revision reads.
 
 Contributor rules are in [docs/api/README.md](../../api/README.md).
 

@@ -2,9 +2,10 @@
 
 [`swagger.json`](./swagger.json) and [`swagger.yaml`](./swagger.yaml) describe LeafWiki's HTTP
 API as **Swagger 2.0**, version `0.x`. They are **experimental and incomplete**: so far only
-`GET /api/health`, the tag and property reads (`/api/tags`, `/api/properties`) and the search
-and link reads (`/api/search`, `/api/pages/{id}/links`, `/api/links/broken`) are documented,
-and anything may change before v1. Discussion, inconsistencies
+`GET /api/health`, the tag and property reads (`/api/tags`, `/api/properties`), the search
+and link reads (`/api/search`, `/api/pages/{id}/links`, `/api/links/broken`) and the revision
+reads (`/api/pages/{id}/revisions/…`) are documented; restoring a revision follows with the page
+routes. Anything may change before v1. Discussion, inconsistencies
 and deferred decisions are tracked in [#1661](https://github.com/perber/leafwiki/issues/1661).
 
 The files are generated from Go comments and committed. Never edit them by hand. There is no

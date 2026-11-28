@@ -336,6 +336,129 @@ definitions:
     - checks
     - status
     type: object
+  revisions.RevisionAssetDeltaResponse:
+    properties:
+      name:
+        type: string
+      status:
+        type: string
+    required:
+    - name
+    - status
+    type: object
+  revisions.RevisionAssetResponse:
+    properties:
+      mimeType:
+        type: string
+      name:
+        type: string
+      sha256:
+        type: string
+      sizeBytes:
+        type: integer
+    required:
+    - name
+    - sha256
+    - sizeBytes
+    type: object
+  revisions.RevisionComparisonResponse:
+    properties:
+      assetChanges:
+        items:
+          $ref: '#/definitions/revisions.RevisionAssetDeltaResponse'
+        type: array
+      base:
+        $ref: '#/definitions/revisions.RevisionSnapshotResponse'
+      contentChanged:
+        type: boolean
+      target:
+        $ref: '#/definitions/revisions.RevisionSnapshotResponse'
+    required:
+    - assetChanges
+    - base
+    - contentChanged
+    - target
+    type: object
+  revisions.RevisionListResponse:
+    properties:
+      nextCursor:
+        description: NextCursor continues the list on the next request; empty on the
+          last page.
+        type: string
+      revisions:
+        items:
+          $ref: '#/definitions/revisions.RevisionResponse'
+        type: array
+    required:
+    - nextCursor
+    - revisions
+    type: object
+  revisions.RevisionResponse:
+    properties:
+      assetManifestHash:
+        type: string
+      author:
+        $ref: '#/definitions/dto.UserLabel'
+      authorId:
+        type: string
+      contentHash:
+        type: string
+      createdAt:
+        type: string
+      creatorId:
+        type: string
+      id:
+        type: string
+      kind:
+        type: string
+      lastAuthorId:
+        type: string
+      pageCreatedAt:
+        type: string
+      pageId:
+        type: string
+      pageUpdatedAt:
+        type: string
+      parentId:
+        type: string
+      path:
+        type: string
+      slug:
+        type: string
+      summary:
+        type: string
+      title:
+        type: string
+      type:
+        type: string
+    required:
+    - assetManifestHash
+    - authorId
+    - contentHash
+    - createdAt
+    - id
+    - kind
+    - pageId
+    - path
+    - slug
+    - title
+    - type
+    type: object
+  revisions.RevisionSnapshotResponse:
+    properties:
+      assets:
+        items:
+          $ref: '#/definitions/revisions.RevisionAssetResponse'
+        type: array
+      content:
+        type: string
+      revision:
+        $ref: '#/definitions/revisions.RevisionResponse'
+    required:
+    - assets
+    - content
+    - revision
+    type: object
   scopedread.LinkView:
     properties:
       kind:
@@ -544,6 +667,318 @@ paths:
       summary: Get link status of a page
       tags:
       - links
+  /pages/{id}/revisions:
+    get:
+      description: |-
+        Returns one page of the page's revisions. Pass nextCursor of a response as cursor to get the next page; it is empty on the last page. A page without revisions, an unknown page ID and an unknown cursor all answer 200 with an empty list.
+        Access: a signed-in user of any role (session cookie, API key or reverse-proxy identity). Public access does not open it: anonymous callers get 401 also when public access is on. With authentication disabled (--disable-auth) anyone can read it. Requires --enable-revision; without it the route does not exist (404).
+      parameters:
+      - description: Page ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - default: 50
+        description: Maximum number of revisions, 1 to 200; blank means 50, any other
+          value answers 400
+        in: query
+        maximum: 200
+        minimum: 1
+        name: limit
+        type: integer
+      - description: nextCursor of the previous response; omit for the first page
+        in: query
+        name: cursor
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: One page of revisions; an empty list when there are none
+          schema:
+            $ref: '#/definitions/revisions.RevisionListResponse'
+        "400":
+          description: Blank page ID (code revision_invalid_page_id), or limit not
+            an integer from 1 to 200 (code revision_invalid_limit)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: No valid session (also when public access is on), an invalid,
+            revoked or expired API key (when API-key management is enabled), or a
+            rejected trusted-proxy identity (when reverse-proxy authentication is
+            enabled)
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "429":
+          description: API-key attempts throttled
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "500":
+          description: 'Reading the revisions failed, also for a malformed page ID:
+            the body is an ErrorResponse (code revision_internal_error). Authentication
+            middleware failures return a LegacyError instead. Swagger 2.0 cannot express
+            this alternative, so the schema is a broad object.'
+          schema:
+            type: object
+        "503":
+          description: API-key store unavailable during a live restore (when API-key
+            management is enabled)
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+      security:
+      - BearerAuth: []
+      summary: List the revisions of a page
+      tags:
+      - revisions
+  /pages/{id}/revisions/{revisionId}:
+    get:
+      description: |-
+        Returns the revision as a snapshot: its metadata, the Markdown content of the page at that revision and the list of its assets. An empty revision ID (a path ending in /revisions//) never reaches this operation: the router answers 301 Moved Permanently to /revisions/, the list route. A blank one (only spaces) answers 400.
+        Access: a signed-in user of any role (session cookie, API key or reverse-proxy identity). Public access does not open it: anonymous callers get 401 also when public access is on. With authentication disabled (--disable-auth) anyone can read it. Requires --enable-revision; without it the route does not exist (404).
+      parameters:
+      - description: Page ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Revision ID
+        in: path
+        name: revisionId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: The revision snapshot
+          schema:
+            $ref: '#/definitions/revisions.RevisionSnapshotResponse'
+        "400":
+          description: Blank page ID (code revision_invalid_page_id) or blank revision
+            ID (code revision_invalid_revision_id)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: No valid session (also when public access is on), an invalid,
+            revoked or expired API key (when API-key management is enabled), or a
+            rejected trusted-proxy identity (when reverse-proxy authentication is
+            enabled)
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "404":
+          description: No such revision for this page (code revision_not_found)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "429":
+          description: API-key attempts throttled
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "500":
+          description: 'Reading the revision failed, also for a malformed page ID:
+            the body is an ErrorResponse (code revision_internal_error, revision_preview_content_unavailable
+            or revision_preview_assets_unavailable). Authentication middleware failures
+            return a LegacyError instead. Swagger 2.0 cannot express this alternative,
+            so the schema is a broad object.'
+          schema:
+            type: object
+        "503":
+          description: API-key store unavailable during a live restore (when API-key
+            management is enabled)
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+      security:
+      - BearerAuth: []
+      summary: Get a revision of a page
+      tags:
+      - revisions
+  /pages/{id}/revisions/{revisionId}/assets/{name}:
+    get:
+      description: |-
+        Returns an asset as it was stored with the revision. The name is the rest of the path and may contain "/", which Swagger 2.0 cannot express for a path parameter; revisions store only top-level files, so such a name answers 404. Responses carry X-Content-Type-Options: nosniff, Content-Security-Policy: sandbox except for PDFs, and Content-Disposition inline for raster images, audio, video and PDFs, attachment otherwise; script types are served as application/octet-stream. Range requests are supported.
+        Access: a signed-in user of any role (session cookie, API key or reverse-proxy identity). Public access does not open it: anonymous callers get 401 also when public access is on. With authentication disabled (--disable-auth) anyone can read it. Requires --enable-revision; without it the route does not exist (404).
+      parameters:
+      - description: Page ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Revision ID
+        in: path
+        name: revisionId
+        required: true
+        type: string
+      - description: Asset name; may contain /
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: The asset
+          schema:
+            type: file
+        "400":
+          description: Blank page ID (code revision_invalid_page_id), empty or blank
+            revision ID (code revision_invalid_revision_id), or empty asset name (code
+            revision_preview_asset_invalid_name)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: No valid session (also when public access is on), an invalid,
+            revoked or expired API key (when API-key management is enabled), or a
+            rejected trusted-proxy identity (when reverse-proxy authentication is
+            enabled)
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "404":
+          description: No such revision for this page (code revision_not_found), or
+            the revision has no asset with this name (code revision_preview_asset_not_found)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "429":
+          description: API-key attempts throttled
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "500":
+          description: 'Reading the asset failed, also for a malformed page ID: the
+            body is an ErrorResponse (code revision_internal_error, revision_preview_assets_unavailable
+            or revision_preview_asset_blob_unavailable). Authentication middleware
+            failures return a LegacyError instead. Swagger 2.0 cannot express this
+            alternative, so the schema is a broad object.'
+          schema:
+            type: object
+        "503":
+          description: API-key store unavailable during a live restore (when API-key
+            management is enabled)
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+      security:
+      - BearerAuth: []
+      summary: Read an asset of a revision
+      tags:
+      - revisions
+  /pages/{id}/revisions/compare:
+    get:
+      description: |-
+        Returns both revisions as snapshots (metadata, Markdown content and asset list), whether the content differs, and the asset changes from base to target, each with status added, removed or modified.
+        Access: a signed-in user of any role (session cookie, API key or reverse-proxy identity). Public access does not open it: anonymous callers get 401 also when public access is on. With authentication disabled (--disable-auth) anyone can read it. Requires --enable-revision; without it the route does not exist (404).
+      parameters:
+      - description: Page ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: ID of the base revision
+        in: query
+        name: base
+        required: true
+        type: string
+      - description: ID of the target revision
+        in: query
+        name: target
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: The comparison
+          schema:
+            $ref: '#/definitions/revisions.RevisionComparisonResponse'
+        "400":
+          description: Blank page ID (code revision_invalid_page_id), or base or target
+            missing (code revision_compare_invalid_request)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: No valid session (also when public access is on), an invalid,
+            revoked or expired API key (when API-key management is enabled), or a
+            rejected trusted-proxy identity (when reverse-proxy authentication is
+            enabled)
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "404":
+          description: base or target is not a revision of this page (code revision_not_found)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "429":
+          description: API-key attempts throttled
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "500":
+          description: 'Reading a revision failed, also for a malformed page ID: the
+            body is an ErrorResponse (code revision_internal_error, revision_preview_content_unavailable
+            or revision_preview_assets_unavailable). Authentication middleware failures
+            return a LegacyError instead. Swagger 2.0 cannot express this alternative,
+            so the schema is a broad object.'
+          schema:
+            type: object
+        "503":
+          description: API-key store unavailable during a live restore (when API-key
+            management is enabled)
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+      security:
+      - BearerAuth: []
+      summary: Compare two revisions of a page
+      tags:
+      - revisions
+  /pages/{id}/revisions/latest:
+    get:
+      description: |-
+        Returns the metadata of the page's newest revision, without its content or assets.
+        Access: a signed-in user of any role (session cookie, API key or reverse-proxy identity). Public access does not open it: anonymous callers get 401 also when public access is on. With authentication disabled (--disable-auth) anyone can read it. Requires --enable-revision; without it the route does not exist (404).
+      parameters:
+      - description: Page ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: The latest revision
+          schema:
+            $ref: '#/definitions/revisions.RevisionResponse'
+        "400":
+          description: Blank page ID (code revision_invalid_page_id)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: No valid session (also when public access is on), an invalid,
+            revoked or expired API key (when API-key management is enabled), or a
+            rejected trusted-proxy identity (when reverse-proxy authentication is
+            enabled)
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "404":
+          description: No revision for this page ID (code revision_not_found)
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "429":
+          description: API-key attempts throttled
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+        "500":
+          description: 'Reading the revision failed, also for a malformed page ID:
+            the body is an ErrorResponse (code revision_internal_error). Authentication
+            middleware failures return a LegacyError instead. Swagger 2.0 cannot express
+            this alternative, so the schema is a broad object.'
+          schema:
+            type: object
+        "503":
+          description: API-key store unavailable during a live restore (when API-key
+            management is enabled)
+          schema:
+            $ref: '#/definitions/dto.LegacyError'
+      security:
+      - BearerAuth: []
+      summary: Get the latest revision of a page
+      tags:
+      - revisions
   /properties:
     get:
       description: |-
